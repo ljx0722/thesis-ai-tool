@@ -64,6 +64,7 @@ function beforeRefList(el){var b=bodyBoundaryEl();if(!b)return true;return !(el.
 function firstBodyChEl(){return document.getElementById('ch-1')}
 
 function wrapExistingMarkers(refs){
+  try{
   var box=document.getElementById('thesisBox');if(!box||!refs.length)return;
   var refMap=new Map();refs.forEach(function(r){if(r.num)refMap.set(r.num,r)});
   var tw=document.createTreeWalker(box,NodeFilter.SHOW_TEXT,null,false),nodes=[];
@@ -119,6 +120,8 @@ function wrapExistingMarkers(refs){
       node.parentElement.replaceChild(frag,node)
     }
   }
+
+  }catch(e){}
 }
 function injectNewMarkers(refs){
   var box=document.getElementById('thesisBox');if(!box||!refs.length)return;
@@ -786,7 +789,7 @@ async function startSearch(){
     for(var ei2=0;ei2<enTake;ei2++)selected.push(enPool[ei2]);
     // 按年份重排最终结果
     selected.sort(function(a,b){return(parseInt(b.year)||0)-(parseInt(a.year)||0)});
-    console.log('[select] CN:',cnTake,'EN:',enTake,'total:',selected.length,'target:',total);
+    
   }catch(e3){console.warn('[step3] filter error:',e3.message);}
 
   try{updLoad('分配章节...',85);await sleep(0);var distMode=document.getElementById('fDist')&&document.getElementById('fDist').value||'auto';assignChapters(selected,distMode,total);}catch(e4){console.warn('[step4] assign error:',e4.message);}
@@ -818,7 +821,7 @@ async function startSearch(){
   updLoad('关联句子...',94);
   await sleep(0);
 
-  // 2b. 未匹配到的文献：追加标记到其章节最相关段落的末尾（不替换原文句子）
+  // 2b. 未匹配到的文献：在最佳段落的最相关句子末尾插入标记（不替换原文，末尾插入）
   try{mergedRefs.forEach(function(r){
     if(r.source==="existing"||r._domEl||!r.ch)return;
     var chEl=document.getElementById("ch-"+r.ch);if(!chEl||!chEl.parentElement)return;
@@ -831,40 +834,56 @@ async function startSearch(){
       }
       sib=sib.nextSibling;}
     var rtKws=extractTitleKws(r.title||"");
-    var bestPara=null,bestScore=0;
-    paras.forEach(function(pr){var sc=rtKws.reduce(function(s,w){return s+((pr.textContent||"").toLowerCase().indexOf(w)>=0?1:0)},0);if(sc>bestScore){bestScore=sc;bestPara=pr;}});
-    if(!bestPara)return;
-    // Append marker at end of paragraph (before the closing punctuation if any)
-    var mrkSpan3=document.createElement('span');
-    mrkSpan3.className='cite-marker generated';
+    // 在所有段落的所有句子中找最佳匹配句
+    var bestSentText=null,bestSentPara=null,bestSentScore=0,sentStartInPara=0,sentEndInPara=0;
+    paras.forEach(function(pr){
+      var pt=pr.textContent||"";
+      var re3=/[。；！？\.\?\!]/g,m3,last3=0;
+      while((m3=re3.exec(pt))!==null){
+        var st=pt.substring(last3,m3.index+1).trim();
+        if(st.length<10){last3=m3.index+1;continue;}
+        var sc=rtKws.reduce(function(s,w){return s+(st.toLowerCase().indexOf(w)>=0?1:0)},0);
+        if(sc>bestSentScore){bestSentScore=sc;bestSentText=st;bestSentPara=pr;sentStartInPara=last3;sentEndInPara=m3.index+1;}
+        last3=m3.index+1;
+      }
+      var tl2=pt.substring(last3).trim();
+      if(tl2.length>=10){var sc2=rtKws.reduce(function(s,w){return s+(tl2.toLowerCase().indexOf(w)>=0?1:0)},0);if(sc2>bestSentScore){bestSentScore=sc2;bestSentText=tl2;bestSentPara=pr;sentStartInPara=last3;sentEndInPara=pt.length;}}
+    });
+    if(!bestSentPara||bestSentScore<1)return;
+    // 在最佳匹配句末尾（标点符号之后）插入引用标记
+    var mrkSpan3=document.createElement('span');mrkSpan3.className='cite-marker generated';
     mrkSpan3.textContent='['+r.displayNum+']';
     mrkSpan3.onclick=function(nn){return function(e){e.stopPropagation();scrollToRef(nn);};}(r.displayNum);
-    var lastChild=bestPara.lastChild;
-    if(lastChild&&lastChild.nodeType===3&&/[。！？\.\?\!]$/.test((lastChild.textContent||'').trim())){
-      var txt2=lastChild.textContent||'',trimmed=txt2.trimEnd(),ws=txt2.substring(trimmed.length);
-      var m=trimmed.match(/[。！？\.\?\!]\s*$/);
-      if(m){
-        lastChild.textContent=trimmed.substring(0,m.index)+ws;
-        bestPara.appendChild(mrkSpan3);
-        bestPara.appendChild(document.createTextNode(trimmed.substring(m.index)));
-      }else{bestPara.appendChild(mrkSpan3);}
-    }else{bestPara.appendChild(mrkSpan3);}
+    // 用 TreeWalker 定位句末文本节点，在标点后插入
+    var tw4=document.createTreeWalker(bestSentPara,NodeFilter.SHOW_TEXT,null,false);
+    var pos4=0,tgNode=null,tgOff=0;
+    var tn4;
+    while((tn4=tw4.nextNode())!==null){var ln4=tn4.textContent.length;if(pos4+ln4>=sentEndInPara){tgNode=tn4;tgOff=sentEndInPara-pos4;break;}pos4+=ln4;}
+    if(tgNode){
+      tgNode.splitText(tgOff);
+      var afterNode=tgNode.nextSibling;
+      tgNode.parentElement.insertBefore(mrkSpan3,afterNode);
+    }else{bestSentPara.appendChild(mrkSpan3);}
     r._domEl=mrkSpan3;
-    r._ctx=(bestPara.textContent||'').substring(Math.max(0,(bestPara.textContent||'').length-80));
+    r._ctx=bestSentText||((bestSentPara.textContent||'').substring(0,80));
     r._hasSection=true;
   })}catch(es){console.warn("[auto] skip:",es.message);}
-
-  // 2c. 仍未匹配的（极少数）：追加到章节标题后的第一个段落末尾
+  // 2c. 极少数仍未匹配的：追加到章节下第一个段落的句末
   try{mergedRefs.forEach(function(r){
     if(r.source==="existing"||r._domEl||!r.ch)return;
     var chEl2=document.getElementById("ch-"+r.ch);if(!chEl2)return;
     var firstPara=chEl2.nextSibling;
     while(firstPara&&firstPara.nodeType!==1)firstPara=firstPara.nextSibling;
     if(!firstPara||!/^p$/i.test(firstPara.tagName||''))return;
+    // 找到段落第一句的末尾
+    var fpt=firstPara.textContent||"",mEnd=fpt.search(/[。！？\.\?\!]/),insertAt=mEnd>=0?mEnd+1:fpt.length;
+    var tw5=document.createTreeWalker(firstPara,NodeFilter.SHOW_TEXT,null,false);
+    var pos5=0,tgN2=null,tgO2=0,tn5;
+    while((tn5=tw5.nextNode())!==null){var ln5=tn5.textContent.length;if(pos5+ln5>=insertAt){tgN2=tn5;tgO2=insertAt-pos5;break;}pos5+=ln5;}
     var mrk2=document.createElement('span');mrk2.className='cite-marker generated';
     mrk2.textContent='['+r.displayNum+']';mrk2.onclick=function(nn){return function(e){e.stopPropagation();scrollToRef(nn);};}(r.displayNum);
-    firstPara.appendChild(mrk2);r._domEl=mrk2;
-    r._ctx=(firstPara.textContent||'').substring(0,60);r._hasSection=true;
+    if(tgN2){tgN2.splitText(tgO2);tgN2.parentElement.insertBefore(mrk2,tgN2.nextSibling);}else{firstPara.appendChild(mrk2);}
+    r._domEl=mrk2;r._ctx=(firstPara.textContent||'').substring(0,60);r._hasSection=true;
   })}catch(es2){}
 
   // 3.
@@ -1108,7 +1127,7 @@ function renderExistingOnly(){
   });
 
   c.innerHTML=h;
-  document.getElementById('refStatus').innerHTML='已有'+existingRefs.length+'条文献';
+  var rs=document.getElementById('refStatus');if(rs)rs.innerHTML='已有'+existingRefs.length+'条文献';
   updateDashboard(existingRefs);
 }
 
@@ -1516,7 +1535,7 @@ function clearRefSentenceHighlights(){
 // 知识图谱
 var kgApiUrl='http://localhost:5000/kg_api/generate',kgCurrentData=null,kgCurrentView='network';
 function showKnowledgeGraph(){if(!manuscriptText){alert('请先上传论文');return}kgCurrentData=null;document.getElementById('kgOverlay').style.display='flex';kgCurrentView='network';generateKnowledgeGraph();}
-function closeKnowledgeGraph(){document.getElementById('kgOverlay').style.display='none';}
+function closeKnowledgeGraph(){document.getElementById('kgOverlay').style.display='none';kgCurrentData=null;}
 function switchKGView(view){
   kgCurrentView=view;
   ['cloud','network','timeline'].forEach(function(v){var el=document.getElementById('kgTab'+v.charAt(0).toUpperCase()+v.slice(1));if(el)el.classList.toggle('active',v===view);});
@@ -2024,12 +2043,12 @@ function highlightKGNode(nodeId,on){
   gL.querySelectorAll('.kg-link').forEach(function(l){var lid=l.id.replace('link_',''),hit=links.some(function(ll){return ll.id===lid&&(ll.source===nodeId||ll.target===nodeId);});if(hit){l.setAttribute('stroke',on?'#fbbf24':'#cbd5e1');l.setAttribute('stroke-width',on?'3':'1.5');l.setAttribute('opacity',on?'1':'0.5');}else{l.setAttribute('opacity',on?'0.08':'0.5');}});
   // Also highlight word in cloud
   if(targetEnt&&targetEnt.type==='keyword'){
-    var canvas=document.getElementById('kgCloudCanvas'),words=canvas&&canvas._words;
+    var canvas=document.querySelector('#kgCloudPanel canvas'),words=canvas&&canvas._words;
     if(words){var ti=words.findIndex(function(w){return w.label===targetEnt.label;});if(ti>=0)highlightCloudWord(ti,on);}
   }
 }
 function highlightCloudWord(idx,on){
-  var canvas=document.getElementById('kgCloudCanvas');
+  var canvas=document.querySelector('#kgCloudPanel canvas');
   if(!canvas||!canvas._words)return;
   var ctx=canvas.getContext('2d'),w=canvas._words[idx];
   if(!w)return;
