@@ -383,6 +383,11 @@ def search_baidu_xueshu(query, max_rows=80):
 def ping():
     return jsonify({'ok': True, 'service': '论文文献AI利器', 'sources': ['OpenAlex','OpenAlex-CN','Crossref','Semantic Scholar','arXiv','CORE','PubMed','INSPIRE-HEP','DataCite','DOAJ','万方','百度学术']})
 
+def _run_source(fn, *args):
+    """Thread-safe wrapper: 在线程池中安全调用搜索函数"""
+    try: return fn(*args) or []
+    except: return []
+
 @app.route('/search_api', methods=['POST'])
 def search_api():
     try:
@@ -391,79 +396,45 @@ def search_api():
         max_per = data.get('max_per_query', 400)
         all_results = []
 
-        # 一级并发：所有 query 一起跑
-        def search_one_query(q):
-            q_results = []
+        for q in queries[:30]:
+            if not q.strip(): continue
             is_cn = bool(re.search(r'[一-鿿]', q))
 
-            # 定义源 + 超时策略：核心源先跑，边缘源后跑
-            # 优先级：OpenAlex(全学科) + S2(快) + Crossref(快) → 其他
-            fast_sources = [
-                (search_openalex, (q, max_per)),
-                (search_crossref, (q, 100)),
-                (search_semantic_scholar, (q, 100)),
-            ]
+            with ThreadPoolExecutor(max_workers=8) as ex:
+                futures = [
+                    ex.submit(_run_source, fetch_with_retry, search_openalex, q, max_per),
+                    ex.submit(_run_source, search_crossref, q, 100),
+                    ex.submit(_run_source, search_semantic_scholar, q, 100),
+                ]
+                if is_cn:
+                    futures.append(ex.submit(_run_source, fetch_with_retry, search_openalex_cn, q, 150))
+                    futures.append(ex.submit(_run_source, search_wanfang, q, 50))
+                futures.append(ex.submit(_run_source, search_arxiv, q, 100))
+                futures.append(ex.submit(_run_source, search_core, q, 80))
+                futures.append(ex.submit(_run_source, search_pubmed, q, 100))
+                futures.append(ex.submit(_run_source, search_inspirehep, q, 80))
+                futures.append(ex.submit(_run_source, search_datacite, q, 80))
+                futures.append(ex.submit(_run_source, search_doaj, q, 80))
 
-            slow_sources = [
-                (search_arxiv, (q, 100)),
-                (search_core, (q, 80)),
-                (search_pubmed, (q, 100)),
-                (search_inspirehep, (q, 80)),
-                (search_datacite, (q, 80)),
-                (search_doaj, (q, 80)),
-            ]
-
-            cn_sources = [
-                (search_openalex_cn, (q, 150)),
-                (search_wanfang, (q, 50)),
-            ]
-
-            # 并发跑 fast_sources（核心源必须全部跑）
-            with ThreadPoolExecutor(max_workers=6) as ex:
-                futures = {ex.submit(fetch_with_retry, fn, *args): fn.__name__ for fn, args in fast_sources}
-                for f in as_completed(futures, timeout=18):
-                    try: q_results.extend(f.result() or [])
+                for f in as_completed(futures, timeout=20):
+                    try: all_results.extend(f.result() or [])
                     except: pass
 
-            # 并发跑 slow_sources（边缘源，超时短）
-            if len(q_results) < max_per * 2:
-                with ThreadPoolExecutor(max_workers=6) as ex:
-                    futures2 = {ex.submit(fn, *args): fn.__name__ for fn, args in slow_sources}
-                    for f in as_completed(futures2, timeout=12):
-                        try: q_results.extend(f.result() or [])
-                        except: pass
-
-            # 中文专搜
+            # 百度学术并发翻页
             if is_cn:
-                with ThreadPoolExecutor(max_workers=4) as ex:
-                    futures3 = {ex.submit(fn, *args): fn.__name__ for fn, args in cn_sources}
-                    for f in as_completed(futures3, timeout=12):
-                        try: q_results.extend(f.result() or [])
-                        except: pass
-                # 百度学术（HTML抓取，保持并发）
                 try:
-                    with ThreadPoolExecutor(max_workers=3) as ex:
-                        bd_futures = [ex.submit(search_baidu_xueshu_page, q, pn) for pn in [0, 10, 20]]
+                    with ThreadPoolExecutor(max_workers=3) as ex2:
+                        bd_futures = [ex2.submit(_run_source, search_baidu_xueshu_page, q, pn) for pn in [0, 10, 20]]
                         for f in as_completed(bd_futures, timeout=12):
-                            try: q_results.extend(f.result() or [])
+                            try: all_results.extend(f.result() or [])
                             except: pass
                 except: pass
 
-            return q_results
-
-        # 并发搜索所有 query（限制并发数）
-        total_results = []
-        with ThreadPoolExecutor(max_workers=6) as ex:
-            futures = {ex.submit(search_one_query, q): q for q in queries[:30] if q.strip()}
-            for f in as_completed(futures, timeout=25):
-                try: total_results.extend(f.result() or [])
-                except: pass
-
-        total_results = dedup_results(total_results)
-        total_results.sort(key=lambda r: r.get('year') or 0, reverse=True)
-        cn = sum(1 for r in total_results if r.get('isCN'))
-        print(f'[search] {len(queries)} queries -> {len(total_results)} results (CN:{cn} EN:{len(total_results)-cn})')
-        return jsonify({'success': True, 'count': len(total_results), 'cn': cn, 'en': len(total_results) - cn, 'results': total_results})
+        all_results = dedup_results(all_results)
+        all_results.sort(key=lambda r: r.get('year') or 0, reverse=True)
+        cn = sum(1 for r in all_results if r.get('isCN'))
+        print(f'[search] {len(queries)} queries -> {len(all_results)} results (CN:{cn} EN:{len(all_results)-cn})')
+        return jsonify({'success': True, 'count': len(all_results), 'cn': cn, 'en': len(all_results) - cn, 'results': all_results})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
