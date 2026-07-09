@@ -84,7 +84,7 @@ test('kg_server.py compiles without errors', function() {
 test('HTML has all required ' + '<script>' + ' tags in correct order', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
   var scripts = html.match(/<script src="([^"]+)"><\/script>/g) || [];
-  var paths = scripts.map(function(s) { return s.match(/src="([^"]+)"/)[1]; });
+  var paths = scripts.map(function(s) { var m = s.match(/src="([^"]+)"/); return m ? m[1].split('?')[0] : ''; });
   var required = ['mammoth.browser.min.js', 'jszip.min.js', 'app.js',
     'js/modules/optimization.js', 'js/modules/format-check.js',
     'js/modules/terminology.js', 'js/modules/paragraph-analysis.js',

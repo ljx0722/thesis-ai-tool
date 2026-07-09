@@ -728,6 +728,7 @@ async function startSearch(){
   searchRounds=searchRounds.map(function(r){return Array.from(new Set(r)).filter(Boolean)});
   var allTerms3=[];searchRounds.forEach(function(r){allTerms3=allTerms3.concat(r);});
   allTerms3=Array.from(new Set(allTerms3));
+  if(!Array.isArray(allTerms3))allTerms3=[];
   var pool=[];var seen=new Set();
   var batchSize=40;
   updLoad('搜索('+allTerms3.length+'词,'+Math.ceil(allTerms3.length/batchSize)+'批)...',15);
