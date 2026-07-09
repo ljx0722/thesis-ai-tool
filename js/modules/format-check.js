@@ -53,6 +53,27 @@ function runFormatCheck(container) {
   if (h1Count > 1) issues.warnings.push({ msg: '检测到 ' + h1Count + ' 个 H1 标签，建议统一为章节标题格式（论文标题通常为1个H1属正常）' });
   else if (h1Count === 1) issues.ok.push({ msg: '检测到 1 个 H1 标签（通常为论文标题，正常）' });
 
+    // 摘要与关键词检查
+  if(typeof updLoad==='function')updLoad('检查摘要...',45);
+  h += '<h4>\ud83d\udcdd 摘要与关键词</h4>';
+  var absMatch=text.match(/(?:摘要|Abstract)[\s\S]{0,2000}?(?=\n(?:第[一二三四五六七八九十\d]+章|Abstract|关键词|关键字|Keyword|引言|绪论)|\nAbstract|$)/);
+  var absText=absMatch?absMatch[0]:text.substring(0,1500);
+  var absElements=[{label:'背景/问题',kw:['背景','问题','目前','现有','存在','面临','挑战']},{label:'方法/手段',kw:['方法','采用','基于','通过','模型','算法','实验','设计','利用']},{label:'结果/发现',kw:['结果','表明','发现','显示','证明','效果','性能','准确']},{label:'结论/意义',kw:['结论','意义','贡献','创新','价值','展望','启示']}];
+  var absLower=(absText||'').toLowerCase();
+  absElements.forEach(function(el){
+    var hits=el.kw.filter(function(k){return absLower.indexOf(k)>=0;}).length;
+    if(hits>=2)h+='<div class=\"finding ok\">\u2705 '+el.label+'要素已覆盖 ('+hits+'个关键词)</div>';
+    else if(hits>=1)h+='<div class=\"finding warn\">\u26a0 '+el.label+'要素不足，建议补充</div>';
+    else h+='<div class=\"finding err\">\u2757 '+el.label+'要素缺失</div>';
+  });
+  var kwMatch=text.match(/(?:关键词|关键字|Keywords)[\uff1a:]\s*(.+?)(?:\n|$)/i);
+  if(kwMatch){
+    var kws2=kwMatch[1].split(/[\uff1b;\uff0c,\s]+/).filter(function(w){return w.length>=2;});
+    if(kws2.length<3)h+='<div class=\"finding warn\">\u26a0 关键词仅'+kws2.length+'个，建议3-5个关键词</div>';
+    else if(kws2.length>8)h+='<div class=\"finding warn\">\u26a0 关键词'+kws2.length+'个（偏多），建议精简至3-5个</div>';
+    else h+='<div class=\"finding ok\">\u2705 关键词'+kws2.length+'个（合理范围）</div>';
+  }else{h+='<div class=\"finding warn\">\u26a0 未检测到中文关键词行</div>';}
+
   if(typeof updLoad==='function')updLoad('检查图表编号...',50);
 
   // 图/表编号检测：只在疑似标题行匹配（紧跟前缀+空格+编号），去重后检查连续性
@@ -99,6 +120,20 @@ function runFormatCheck(container) {
   } else if (tblNums.length === 1) {
     issues.ok.push({ msg: '检测到 1 个表编号（表' + tblNums[0] + '），无法判断连续性' });
   }
+
+    // 结论与展望检查
+  h += '<h4>\ud83c\udfc1 结论与展望</h4>';
+  var bodyChs2 = secs.filter(function(s) { return !/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name); });
+  var lastCh2=bodyChs2[bodyChs2.length-1];
+  if(lastCh2&&/结论|结语|总结|展望|对策|建议/.test(lastCh2.name)){
+    var lct=(lastCh2.text||'').length;
+    if(lct/totalChars<0.03)h+='<div class=\"finding warn\">\u26a0 结论章过短('+Math.round(lct/totalChars*100)+'%)，建议充实总结要点和展望</div>';
+    else h+='<div class=\"finding ok\">\u2705 结论章占比'+Math.round(lct/totalChars*100)+'%（合理）</div>';
+    if(/不足|局限|缺陷/.test(lastCh2.text||''))h+='<div class=\"finding ok\">\u2705 已说明研究局限性</div>';
+    else h+='<div class=\"finding warn\">\u26a0 未检测到研究局限性说明</div>';
+    if(/展望|后续|未来|进一步/.test(lastCh2.text||''))h+='<div class=\"finding ok\">\u2705 已包含研究展望</div>';
+    else h+='<div class=\"finding warn\">\u26a0 未检测到研究展望</div>';
+  }else{h+='<div class=\"finding warn\">\u26a0 未检测到结论/展望章</div>';}
 
   if(typeof updLoad==='function')updLoad('检查引用格式...',70);
 

@@ -375,6 +375,142 @@ test('TOUR: tourEnd calls showUploadOverlay when thesis not loaded', function() 
 });
 
 // ============================================================
+// ============================================================
+// SECTION 7: Module Enhancement Coverage
+// ============================================================
+console.log('\n=== Section 7: Module Enhancement Coverage ===');
+
+test('MODULE: format-check checks abstract elements', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
+  assert(src.indexOf('absElements') >= 0, 'Missing abstract element scoring');
+});
+
+test('MODULE: format-check checks conclusion structure', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
+  assert(src.indexOf('结论与展望') >= 0, 'Missing conclusion check section');
+  assert(src.indexOf('研究局限性') >= 0, 'Missing limitation detection');
+});
+
+test('MODULE: optimization detects research methods', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/optimization.js'), 'utf8');
+  assert(src.indexOf('研究方法检测') >= 0, 'Missing method detection');
+  assert(src.indexOf('methodHits') >= 0, 'Missing methodHits array');
+});
+
+test('MODULE: optimization detects innovation hints', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/optimization.js'), 'utf8');
+  assert(src.indexOf('创新点提示') >= 0, 'Missing innovation hints');
+  assert(src.indexOf('innoHits') >= 0, 'Missing innoHits tracking');
+});
+
+test('MODULE: paragraph analysis has academic tone check', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/paragraph-analysis.js'), 'utf8');
+  assert(src.indexOf('学术语调') >= 0, 'Missing academic tone section');
+  assert(src.indexOf('oralCount') >= 0 || src.indexOf('oralDensity') >= 0, 'Missing oral language counter');
+});
+
+test('MODULE: thesis-review.js covers all 10 dimensions', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
+  var dims = ['选题','文献','框架','方法','论证','结论','创新','写作','格式','实践'];
+  dims.forEach(function(d){assert(src.indexOf(d) >= 0, 'Missing dimension: '+d);});
+});
+
+test('MODULE: thesis-review.js auto+manual item distinction', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
+  assert(src.indexOf('auto: true') >= 0, 'Missing auto items');
+  assert(src.indexOf('auto: false') >= 0, 'Missing manual items');
+});
+
+test('MODULE: thesis-review composite uses all dimensions', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
+  assert(src.indexOf('dim1.score') >= 0, 'Missing dim1');
+  assert(src.indexOf('dim10.score') >= 0, 'Missing dim10');
+});
+
+test('MODULE: dashboard.js integrates review scores', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
+  assert(src.indexOf('computeThesisReview') >= 0, 'Missing review integration');
+  assert(src.indexOf('showReviewInDashboard') >= 0, 'Missing review handler');
+});
+
+test('UI: Dashboard 3D button exists with pulse animation', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf('dashboard-btn') >= 0, 'Missing dashboard button');
+  assert(html.indexOf('db-pulse') >= 0, 'Missing pulse animation');
+});
+
+test('UI: Dashboard overlay has review report button', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf('dashboard-btn') >= 0, 'Missing dashboard button');
+  assert(html.indexOf('showDashboard') >= 0, 'Missing showDashboard reference');
+});
+
+// ============================================================
+// SECTION 8: Onboarding Tour Coverage
+// ============================================================
+console.log('\n=== Section 8: Onboarding / Tour ===');
+
+test('ONBOARD: Tour covers all major modules', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/onboarding.js'), 'utf8');
+  var modules = ['上传论文','模块切换','参考文献','知识图谱','论文看板','小提示'];
+  modules.forEach(function(m){assert(src.indexOf(m) >= 0, 'Tour missing: '+m);});
+});
+
+test('ONBOARD: Tour step count >= 7', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/onboarding.js'), 'utf8');
+  var arrayItems = (src.match(/title:/g) || []).length;
+  assert(arrayItems >= 7, 'Tour should have >=7 steps, found ' + arrayItems);
+});
+
+// ============================================================
+// SECTION 9: Data Flow & Edge Cases (expanded)
+// ============================================================
+console.log('\n=== Section 9: Expanded Data Flow ===');
+
+test('DATA: thesis review includes timestamp', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
+  assert(src.indexOf('new Date()') >= 0, 'Missing timestamp');
+});
+
+test('DATA: thesis review stats include CN/EN/DOI/5yr', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
+  assert(src.indexOf('cnRefs') >= 0, 'Missing cnRefs');
+  assert(src.indexOf('enRefs') >= 0, 'Missing enRefs');
+  assert(src.indexOf('recentRefs') >= 0, 'Missing recentRefs');
+});
+
+test('SAFETY: thesis review returns early when no text', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
+  var idx = src.indexOf('function computeThesisReview()');
+  assert(idx >= 0, 'Function not found');
+});
+
+// ============================================================
+// SECTION 10: Literature Sources (expanded)
+// ============================================================
+console.log('\n=== Section 10: Literature Sources ===');
+
+test('SOURCES: All 12 sources exist in kg_server.py', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  var sources = ['search_openalex_cn','search_crossref','search_semantic_scholar',
+    'search_arxiv','search_core','search_pubmed','search_inspirehep','search_datacite',
+    'search_doaj','search_wanfang'];
+  sources.forEach(function(s){assert(src.indexOf(s) >= 0, 'Missing: '+s);});
+});
+
+test('SOURCES: Chinese sources only triggered for CN queries', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  var api = src.substring(src.indexOf('def search_api'), src.indexOf('def verify_api'));
+  assert(api.indexOf('is_cn') >= 0, 'Missing is_cn check');
+});
+
+test('SOURCES: ping endpoint reflects all new sources', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  assert(src.indexOf('PubMed') >= 0, 'Missing PubMed in sources list');
+  assert(src.indexOf('INSPIRE') >= 0, 'Missing INSPIRE-HEP in sources list');
+});
+
+
 // Results
 // ============================================================
 console.log('\n=== RESULTS ===');

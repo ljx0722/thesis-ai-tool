@@ -54,6 +54,29 @@ function runOptimization(container) {
   }
 
   // Lit density
+    // 研究方法检测
+  if(typeof updLoad==='function')updLoad('检测方法...',60);
+  h += '<h4>🔬 研究方法检测</h4>';
+  var methodHits=[];
+  if(/问卷|调查|Interview|访谈/.test(text))methodHits.push('调研类');
+  if(/回归|因子|熵值|SWOT|PEST|博弈|统计分析|SPSS|Stata|T.test|ANOVA/.test(text))methodHits.push('量化实证');
+  if(/案例|case study/.test(text.toLowerCase()))methodHits.push('案例法');
+  if(/实验|仿真|模拟|样机|测试/.test(text))methodHits.push('实验/仿真');
+  if(/文献研究|规范分析|比较研究|比较法/.test(text))methodHits.push('理论分析');
+  if(/文本分析|话语分析|历史分析/.test(text))methodHits.push('文本分析');
+  if(/技术路线|研究思路|研究路径/.test(text))methodHits.push('技术路线');
+  if(methodHits.length>=3)h+='<div class="finding ok">✅ 检测到'+methodHits.length+'种研究方法：'+methodHits.join('、')+'</div>';
+  else if(methodHits.length>=1)h+='<div class="finding warn">⚠ 仅检测到'+methodHits.length+'种方法：'+methodHits.join('、')+'，建议丰富研究手段</div>';
+  else h+='<div class="finding err">❗ 未检测到明确的研究方法，建议在绪论中说明研究方法</div>';
+
+  // 创新点提示
+  h += '<h4>✨ 创新点提示</h4>';
+  var innoHits=[];
+  if(/首次|创新|新颖|首创|改进|优化|新方法|新模型|新视角|新框架/.test(text))innoHits.push('检测到创新相关表述');
+  if(/不同于|区别于|弥补了|丰富了|拓展了/.test(text))innoHits.push('检测到差异化表述');
+  if(innoHits.length>0){innoHits.forEach(function(m){h+='<div class="finding info">📌 '+m+'</div>';});}
+  h+='<div class="finding info">📌 需人工判断：创新是否真实存在（理论/视角/方法/实践/对象）</div>';
+
   if(typeof updLoad==='function')updLoad('检查文献密度...',65);
   
   // === 摘要质量评估 ===

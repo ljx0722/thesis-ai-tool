@@ -72,6 +72,18 @@ function runParagraphAnalysis(container) {
   else if(readabilityScore>=50)h+='可读性中等，建议适当拆分长句，减少被动语态使用。';
   else h+='可读性偏低，建议大幅缩短句子，用主动语态替换被动表述。';
   h+='</div>';
+    // 学术语调分析
+  if(typeof updLoad==='function')updLoad('分析学术语调...',90);
+  h += '<h4>🎓 学术语调</h4>';
+  var oralCount=0;var oralWords=[/很\s/g,/挺\s/g,/\b太\b/g,/非常\s/g,/\b特别\b/g,/\b有点\b/g,/\b大概\b/g,/\b差不多\b/g,/\b可能吧\b/g,/\b我觉得\b/g,/\b感觉\b/g,/蛮/g];
+  oralWords.forEach(function(r){var mh=text.match(r);if(mh)oralCount+=mh.length;});
+  var oralDensity=Math.round(oralCount/Math.max(1,text.length/1000));
+  if(oralDensity<5)h+='<div class="finding ok">✅ 口语化程度低（'+oralDensity+'处/千字），学术语调良好</div>';
+  else if(oralDensity<15)h+='<div class="finding warn">⚠ 口语化密度'+oralDensity+'处/千字（中等），建议减少口语词</div>';
+  else h+='<div class="finding err">❗ 口语化密度'+oralDensity+'处/千字（偏高），需大幅提升书面化程度</div>';
+  var fpCount=(text.match(/我(们)?认为|我(们)?觉得|笔者|本文|本人/g)||[]).length;
+  if(fpCount>20)h+='<div class="finding warn">⚠ 第一人称/主体词出现'+fpCount+'次（偏多），建议适度减少</div>';
+
   h += '<h4>\ud83d\udd17 过渡词使用</h4>';
   var tw = ['因此','所以','然而','但是','此外','另外','首先','其次','最后','总之','综上所述','换言之','与此同时','另一方面','不仅如此','更重要的是','例如','比如','也就是说'];
   var tf = {};
