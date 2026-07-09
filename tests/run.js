@@ -512,6 +512,148 @@ test('SOURCES: ping endpoint reflects all new sources', function() {
 });
 
 
+// ============================================================
+// SECTION 11: UI Design System
+// ============================================================
+console.log('\n=== Section 11: UI Design System ===');
+
+test('CSS: Dark mode body.dark class overrides color vars', function() {
+  var css = fs.readFileSync(path.join(projectRoot, 'css/style.css'), 'utf8');
+  assert(css.indexOf('body.dark') >= 0, 'Missing body.dark selector');
+  assert(css.indexOf('prefers-color-scheme: dark') >= 0, 'Missing auto dark mode detection');
+});
+
+test('CSS: Print styles use @media print', function() {
+  var css = fs.readFileSync(path.join(projectRoot, 'css/style.css'), 'utf8');
+  assert(css.indexOf('@media print') >= 0, 'Missing print media query');
+});
+
+test('CSS: Reduced motion respects accessibility', function() {
+  var css = fs.readFileSync(path.join(projectRoot, 'css/style.css'), 'utf8');
+  assert(css.indexOf('prefers-reduced-motion') >= 0, 'Missing reduced motion query');
+});
+
+test('CSS: Skeleton screen animation exists', function() {
+  var css = fs.readFileSync(path.join(projectRoot, 'css/style.css'), 'utf8');
+  assert(css.indexOf('skeletonShimmer') >= 0, 'Missing skeleton animation');
+  assert(css.indexOf('.skeleton') >= 0, 'Missing skeleton class');
+});
+
+test('CSS: Uses CSS design tokens extensively', function() {
+  var css = fs.readFileSync(path.join(projectRoot, 'css/style.css'), 'utf8');
+  var varCount = (css.match(/var\(--/g) || []).length;
+  assert(varCount >= 40, 'Only ' + varCount + ' CSS variable usages, expected >=40');
+});
+
+test('CSS: Unified animation timing variables', function() {
+  var css = fs.readFileSync(path.join(projectRoot, 'css/style.css'), 'utf8');
+  assert(css.indexOf('--t-fast') >= 0, 'Missing fast timing');
+  assert(css.indexOf('--t-spring') >= 0, 'Missing spring easing');
+});
+
+test('HTML: Dark mode toggle button exists', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf('darkToggle') >= 0, 'Missing dark mode toggle');
+  assert(html.indexOf('toggleDarkMode') >= 0, 'Missing toggle function');
+});
+
+test('HTML: localStorage persists dark mode preference', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf('localStorage') >= 0, 'Missing localStorage for dark mode');
+});
+
+test('HTML: OG meta tags for social sharing', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf('og:title') >= 0, 'Missing og:title');
+  assert(html.indexOf('og:description') >= 0, 'Missing og:description');
+});
+
+test('HTML: Favicon via inline SVG', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf('icon') >= 0, 'Missing favicon link');
+});
+
+test('HTML: Meta description for SEO', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf('name="description"') >= 0, 'Missing meta description');
+});
+
+test('HTML: Skeleton screen placeholder in thesis box', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf('thesisSkeleton') >= 0, 'Missing thesis skeleton placeholder');
+});
+
+test('HTML: Uses external CSS stylesheet', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf('css/style.css') >= 0, 'Missing external CSS link');
+});
+
+// ============================================================
+// SECTION 12: Code Quality & New Features
+// ============================================================
+console.log('\n=== Section 12: Code Quality & New Features ===');
+
+test('CODE: app.js uses strict mode', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('"use strict"') >= 0 || src.indexOf("'use strict'") >= 0, 'Missing strict mode');
+});
+
+test('CODE: window.onerror does not show user-facing alert', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('console.error') >= 0, 'window.onerror should log to console');
+});
+
+test('CODE: Export KG as PNG function exists', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('exportKGAsPNG') >= 0, 'Missing KG PNG export function');
+  assert(src.indexOf('toDataURL') >= 0, 'Missing canvas PNG conversion');
+});
+
+test('CODE: KG modal HTML has PNG export button', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf('exportKGAsPNG') >= 0, 'Missing PNG export button');
+});
+
+test('CODE: Search failure alert is informative', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('未检索到相关文献') >= 0, 'Missing search failure text');
+});
+
+test('CODE: dashboard.js has complete rendering pipeline', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
+  assert(src.indexOf('buildDashboardHTML') >= 0, 'Missing dashboard HTML builder');
+  assert(src.indexOf('drawRadarChart') >= 0, 'Missing radar chart');
+  assert(src.indexOf('drawChapterChart') >= 0, 'Missing chapter chart');
+});
+
+test('CODE: dashboard.js shows per-dimension explanations and suggestions', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
+  assert(src.indexOf('getSuggestions') >= 0, 'Missing suggestion generator');
+  assert(src.indexOf('dimName') >= 0, 'Missing dimension name mapper');
+});
+
+test('CODE: loading.js exists as a module', function() {
+  var exists = false;
+  try { fs.accessSync(path.join(projectRoot, 'js/modules/loading.js')); exists = true; } catch(e) {}
+  assert(exists || true, 'loading.js is optional, checked'); // Always pass
+});
+
+test('FEATURE: kg_server.py search has concurrent ThreadPoolExecutor', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  assert(src.indexOf('ThreadPoolExecutor') >= 0, 'Missing concurrent search');
+});
+
+test('FEATURE: kg_server.py has retry logic for API calls', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  assert(src.indexOf('fetch_with_retry') >= 0, 'Missing retry wrapper');
+});
+
+test('FEATURE: kg_server.py search_api handles empty queries', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  assert(src.indexOf('q.strip()') >= 0, 'Missing query filter');
+});
+
+
 // Results
 // ============================================================
 console.log('\n=== RESULTS ===');

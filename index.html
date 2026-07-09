@@ -1,4 +1,13 @@
 <!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>论文AI利器</title>
+
+<meta property="og:title" content="论文AI利器 — 智能论文写作辅助平台">
+<meta property="og:description" content="一站式论文写作工具：DOCX解析、12源文献检索、十维评审、知识图谱、术语分析等">
+<meta property="og:type" content="website">
+<meta name="description" content="论文AI利器 — 智能论文写作辅助平台。支持DOCX论文解析、多源文献检索、GB/T 7714参考文献管理、论文评估报告、知识图谱可视化。">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>">
+
 <script src="mammoth.browser.min.js"></script>
 <script src="jszip.min.js"></script>
 <link rel="stylesheet" href="css/style.css"></head><body>
@@ -43,7 +52,7 @@
         <button onclick="zoomThesis(0,1)" style="font-size:.68rem;padding:3px 8px;border-radius:6px;border:1px solid var(--bd);cursor:pointer;background:var(--cardSolid);color:var(--t)">↺</button>
       </div>
     </div>
-    <div class="thesis-box" id="thesisBox"><i style="color:#9ca3af">论文原文将在此显示 — 请点击上方"📎 换论文"上传</i></div>
+    <div class="thesis-box" id="thesisBox"><i style="color:#9ca3af">论文原文将在此显示 — 请点击上方"📎 换论文"上传</i></div><div class="skeleton-full" id="thesisSkeleton" style="display:none"><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-block"></div><div class="skeleton skeleton-line"></div></div>
   </div>
   <div class="resizer" id="refResizer"></div>
   <div class="ref-panel" id="refPanel">
@@ -79,6 +88,7 @@
       </div>
       <div style="display:flex;gap:6px;align-items:center">
         <button onclick="exportReport()" style="background:var(--g);color:#fff;border:none;border-radius:18px;padding:8px 16px;cursor:pointer;font-weight:600;font-size:.72rem">📄 导出报告</button>
+        <button onclick="exportKGAsPNG()" style="background:rgba(0,0,0,0.06);color:var(--t);border:none;border-radius:18px;padding:8px 16px;cursor:pointer;font-weight:500;font-size:.72rem">🖼️ 导出PNG</button>
         <button onclick="closeKnowledgeGraph()" style="background:rgba(0,0,0,0.06);color:var(--t);border:none;border-radius:18px;padding:8px 16px;cursor:pointer;font-weight:600;font-size:.85rem">✕ 关闭</button>
       </div>
     </div>
@@ -118,6 +128,8 @@
 window.domReady=true;window.hasMammoth=typeof mammoth!=='undefined';window.hasJSZip=typeof JSZip!=='undefined';
 window._ambientTips=['参考文献最好近3年的占一半以上','英文文献不能太少，至少30%','摘要部分一般不需要引用','绪论里的文献综述要覆盖这个领域主要流派','每个章节至少引用1-2条文献支撑','数据和方法的描述通常需要引文献佐证','图表如果引用了别人的要标注来源','结语和展望里可以少放一些引用','期刊论文比学位论文更适合做参考文献','别在目录和附录附近插引用标记','GB/T 7714 不要漏了DOI','文献标题大小写要保持一致','引用年份越近说明研究越前沿','大数据加小样本，贝叶斯方法很有用'];
 </script>
+
+<button class="help-btn" id="darkToggle" onclick="toggleDarkMode()" title="切换暗色模式" style="bottom:72px">🌓</button>
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
 <script src="app.js"></script>
 <script src="js/modules/optimization.js"></script>
@@ -147,4 +159,27 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
   // 拖拽上传
   var drop=document.getElementById('uploadDrop');if(drop){['dragenter','dragover','dragleave','drop'].forEach(function(ev){document.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();},false);});['dragenter','dragover'].forEach(function(ev){document.addEventListener(ev,function(){drop.classList.add('dragover');},false);});['dragleave','drop'].forEach(function(ev){document.addEventListener(ev,function(){drop.classList.remove('dragover');},false);});document.addEventListener('drop',function(e){var files=e.dataTransfer.files;if(files.length){var fi=document.getElementById('fileInput');var dt=new DataTransfer();dt.items.add(files[0]);fi.files=dt.files;fi.dispatchEvent(new Event('change'));}});}
 })();
-</script></body></html>
+</script>
+<script>
+// Dark mode toggle
+(function(){
+  var mq=window.matchMedia('(prefers-color-scheme:dark)');
+  var saved=null;try{saved=localStorage.getItem('thesis-ai-dark')}catch(e){}
+  function setDark(on){
+    document.body.classList.toggle('dark',on);
+    document.body.classList.toggle('light',!on);
+    var btn=document.getElementById('darkToggle');
+    if(btn)btn.textContent=on?'☀️':'🌓';
+  }
+  if(saved!==null)setDark(saved==='1');
+  else if(mq.matches)setDark(true);
+  mq.addEventListener('change',function(e){setDark(e.matches)});
+  window.toggleDarkMode=function(){
+    var isDark=document.body.classList.contains('dark');
+    setDark(!isDark);
+    try{localStorage.setItem('thesis-ai-dark',isDark?'0':'1')}catch(e){}
+  };
+})();
+</script>
+
+</body></html>

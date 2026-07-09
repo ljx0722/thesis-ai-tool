@@ -268,3 +268,67 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 
 /* ====== Module area ====== */
 .module-area{flex:1;overflow-y:auto}
+
+/* ============================================================
+   DARK MODE — triggered by system preference or .dark class
+   ============================================================ */
+body.dark{--bg:#1c1c1e;--card:rgba(44,44,46,0.75);--cardHover:rgba(44,44,46,0.9);--solid:#2c2c2e;
+  --t:#f5f5f7;--t2:#e5e5ea;--t3:#d1d1d6;--m1:#8e8e93;--m2:#636366;--m3:#48484a;
+  --accent:#0a84ff;--success:#30d158;--danger:#ff453a;--warning:#ff9f0a;--purple:#bf5af2;
+  --border:rgba(255,255,255,0.08);--borderStrong:rgba(255,255,255,0.14);
+  --glass:rgba(44,44,46,0.7);--glassHover:rgba(44,44,46,0.85);
+  --s-xs:0 1px 3px rgba(0,0,0,0.3);--s-sm:0 2px 8px rgba(0,0,0,0.4);
+  --s-md:0 4px 16px rgba(0,0,0,0.5);--s-lg:0 8px 32px rgba(0,0,0,0.6);
+  --s-xl:0 16px 48px rgba(0,0,0,0.7);--s-ring:0 0 0 1px rgba(255,255,255,0.06);
+  --s-hover:0 6px 20px rgba(0,0,0,0.5);
+}
+@media (prefers-color-scheme: dark) {
+  body:not(.light) {
+    --bg:#1c1c1e;--card:rgba(44,44,46,0.75);--cardHover:rgba(44,44,46,0.9);--solid:#2c2c2e;
+    --t:#f5f5f7;--t2:#e5e5ea;--t3:#d1d1d6;--m1:#8e8e93;--m2:#636366;--m3:#48484a;
+    --accent:#0a84ff;--success:#30d158;--danger:#ff453a;--warning:#ff9f0a;--purple:#bf5af2;
+    --border:rgba(255,255,255,0.08);--borderStrong:rgba(255,255,255,0.14);
+    --glass:rgba(44,44,46,0.7);--glassHover:rgba(44,44,46,0.85);
+    --s-xs:0 1px 3px rgba(0,0,0,0.3);--s-sm:0 2px 8px rgba(0,0,0,0.4);
+    --s-md:0 4px 16px rgba(0,0,0,0.5);--s-lg:0 8px 32px rgba(0,0,0,0.6);
+    --s-xl:0 16px 48px rgba(0,0,0,0.7);--s-ring:0 0 0 1px rgba(255,255,255,0.06);
+    --s-hover:0 6px 20px rgba(0,0,0,0.5);
+  }
+}
+body.dark .dashboard-btn,body.dark .dash-card,body.dark .ref,body.dark .module-panel .finding,
+@media (prefers-color-scheme:dark){body:not(.light) .dashboard-btn,body:not(.light) .dash-card,body:not(.light) .ref,body:not(.light) .module-panel .finding
+{--solid:#2c2c2e;border-color:var(--border)}}
+
+/* ============================================================
+   PRINT STYLES — clean output for PDF/printing the report
+   ============================================================ */
+@media print {
+  .bar,.thesis-bar,.nav-sidebar,.ref-panel,.upload-overlay,.overlay,
+  .help-btn,.kb-hint,.resizer,.module-tabs,.bar-actions,#kgOverlay,#dbOverlay{display:none!important}
+  .thesis-panel{overflow:visible}
+  .thesis-box{margin:0;padding:0;box-shadow:none;border:none}
+  body{height:auto;overflow:visible}
+  .main{display:block;overflow:visible}
+  .ref-sentence{background:none!important;border-bottom:1px solid #007aff;padding:0}
+  .cite-marker{font-weight:bold;color:#000;background:none!important}
+  a{color:#000;text-decoration:underline}
+  @page{margin:2cm}
+}
+
+/* ============================================================
+   REDUCED MOTION — respect user accessibility preferences
+   ============================================================ */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important;scroll-behavior:auto!important}
+  .dashboard-btn{animation:none!important}
+}
+
+/* ============================================================
+   SKELETON SCREEN — placeholder shimmer during module switch
+   ============================================================ */
+@keyframes skeletonShimmer{0%{background-position:-200px 0}100%{background-position:calc(200px + 100%) 0}}
+.skeleton{background:linear-gradient(90deg,var(--border) 25%,rgba(128,128,128,0.1) 50%,var(--border) 75%);background-size:200px 100%;animation:skeletonShimmer 1.5s ease-in-out infinite;border-radius:var(--r-sm);height:14px;margin:8px 0}
+.skeleton-line{height:10px;width:80%;margin:6px 0}
+.skeleton-title{height:18px;width:50%;margin:12px 0 8px}
+.skeleton-block{height:60px;width:100%;margin:8px 0}
+.skeleton-full{height:100%;min-height:200px}

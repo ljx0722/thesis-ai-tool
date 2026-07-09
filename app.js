@@ -1,5 +1,5 @@
-var existingRefs=[],manuscriptText='',manuscriptHTML='',mergedRefs=[],paperTopics=[],zoomLevel=1,sections=[],selNavIdx=-1,searchRunning=false,appReady=false;
-window.onerror=function(m,s,l,c,e){alert('JS错误: '+m);return false};
+"use strict";var existingRefs=[],manuscriptText='',manuscriptHTML='',mergedRefs=[],paperTopics=[],zoomLevel=1,sections=[],selNavIdx=-1,searchRunning=false,appReady=false;
+window.onerror=function(m,s,l,c,e){console.error(m,'@',s,':',l);document.getElementById('statusBar')&&(document.getElementById('statusBar').textContent='⚠ 出现错误，请刷新页面');return true};
 // Init complete
 
 // UTILS
@@ -714,7 +714,7 @@ async function startSearch(){
 
   console.log('[search] Pool:',pool.length,'total rounds:',searchRounds.length);
 
-  if(!pool.length){hideLoad();searchRunning=false;alert('该论文在4个数据库中均未检索到相关文献。\n\n建议:\n1. 重新上传论文\n2. 检查Python服务窗口是否有网络错误\n3. 尝试减少检索数量');return}
+  if(!pool.length){hideLoad();searchRunning=false;alert('未检索到相关文献。\n\n可能原因：\n1. 论文主题词过于冷门\n2. 网络连接不稳定\n3. 搜索词数量不足\n\n建议：\n• 检查Python服务窗口日志\n• 访问 /ping 确认服务正常\n• 尝试减少检索文献总数');return}
 
   // STEP 3: 筛选排序 — 中英文分堆精选，确保比例精确（分片异步，避免卡死）
   var selected=[];
@@ -1499,6 +1499,31 @@ function clearRefSentenceHighlights(){
 // 知识图谱
 var kgApiUrl='http://localhost:5000/kg_api/generate',kgCurrentData=null,kgCurrentView='network';
 function showKnowledgeGraph(){if(!manuscriptText){alert('请先上传论文');return}kgCurrentData=null;document.getElementById('kgOverlay').style.display='flex';kgCurrentView='network';generateKnowledgeGraph();}
+
+function exportKGAsPNG(){
+  var svg=document.getElementById('kgSvg');
+  if(!svg){ttp('请先打开知识图谱');return;}
+  // Clone visible SVG content
+  var clone=svg.cloneNode(true);
+  clone.setAttribute('width',svg.clientWidth||1200);
+  clone.setAttribute('height',svg.clientHeight||700);
+  clone.style.cssText='background:#fafafa';
+  var data=new XMLSerializer().serializeToString(clone);
+  var svgBlob=new Blob([data],{type:'image/svg+xml;charset=utf-8'});
+  var url=URL.createObjectURL(svgBlob);
+  var img=new Image();img.onload=function(){
+    var canvas=document.createElement('canvas');
+    canvas.width=img.width;canvas.height=img.height;
+    var ctx=canvas.getContext('2d');ctx.fillStyle='#fafafa';ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img,0,0);
+    var a=document.createElement('a');a.href=canvas.toDataURL('image/png');
+    a.download='知识图谱.png';a.click();
+    URL.revokeObjectURL(url);
+  };
+  img.src=url;
+  ttp('知识图谱已导出为PNG');
+}
+
 function closeKnowledgeGraph(){document.getElementById('kgOverlay').style.display='none';kgCurrentData=null;}
 function switchKGView(view){
   kgCurrentView=view;
