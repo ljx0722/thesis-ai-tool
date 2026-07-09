@@ -701,20 +701,41 @@ async function startSearch(){
     });
   });
   searchRounds.push(Array.from(new Set(allHeadings)).slice(0,25));
-  // 合并去重为1轮，一次HTTP请求发送
-// (跳过泛词轮和主题搭配轮，减少检索时间)  // 去重各轮并合并为一批，一次HTTP请求发送（后端并发处理各源）
+  searchRounds.push(Array.from(new Set(allHeadings)).slice(0,25));
+  // 正文词轮次（恢复：保证检索覆盖全面）
+  var genEN=['construction','engineering','management','safety','monitoring','evaluation','prediction','analysis','design','optimization','machine learning','deep learning','neural network','artificial intelligence','big data','internet of things'];
+  var genCN=['工程','施工','管理','安全','监测','评价','预测','分析','设计','优化','系统','模型','方法','技术','智能','网络','算法','风险','评估','控制'];
+  var paraFreq2={},badRE2=/^(?:the|and|for|with|this|that|from|have|are|was|were|been|will|would|could|should|[一-鿿]?[的了是在和与等及或被把从对到向上向下只个性它他也都很这就那能会要可但而不因所以之为着中其已该并约]$)/;
+  var box3=document.getElementById('thesisBox');
+  if(box3){var paras3=box3.querySelectorAll('p');
+    for(var pi2=0;pi2<Math.min(paras3.length,150);pi2++){
+      var pt3=(paras3[pi2].textContent||'').replace(/[^一-鿿a-zA-Z]/g,' ');
+      var pw3=new Set();pt3.split(/\s+/).filter(function(w){return w.length>=2&&!badRE2.test(w)}).forEach(function(w){pw3.add(w)});
+      pw3.forEach(function(w){paraFreq2[w]=(paraFreq2[w]||0)+1});}}
+  var relevantSet2=new Set();
+  tpLabels.forEach(function(t){relevantSet2.add(t.toLowerCase())});
+  allSecWords.forEach(function(w){relevantSet2.add(w.toLowerCase())});
+  genCN.concat(genEN).forEach(function(w){relevantSet2.add(w.toLowerCase())});
+  var paraKws2=[];
+  Object.keys(paraFreq2).forEach(function(w){
+    if(paraFreq2[w]>=3||relevantSet2.has(w.toLowerCase())||Array.from(relevantSet2).some(function(rw){return rw.indexOf(w)>=0||w.indexOf(rw)>=0}))paraKws2.push(w);});
+  paraKws2.sort(function(a,b){return(paraFreq2[b]||0)-(paraFreq2[a]||0)});
+  searchRounds.push(paraKws2.slice(0,60));
+  // 主题词搭配领域通用词
+  var extra3=[];
+  tpLabels.slice(0,6).forEach(function(t){var gs=/[一-鿿]/.test(t)?genCN:genEN;gs.slice(0,5).forEach(function(g){extra3.push(t+' '+g)})});
+  searchRounds.push(extra3.slice(0,40));
+  // 合并去重各轮 → 1次HTTP请求
   searchRounds=searchRounds.map(function(r){return Array.from(new Set(r)).filter(Boolean)});
-  var allTerms2=[];searchRounds.forEach(function(r){allTerms2=allTerms2.concat(r);});
-  allTerms2=Array.from(new Set(allTerms2)); // 全局去重
-  pool=[];seen=new Set();
-  updLoad('搜索('+allTerms2.length+'词)...',15);
-  var resp=await fetch('/search_api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:allTerms2,max_per_query:300})});
+  var allTerms3=[];searchRounds.forEach(function(r){allTerms3=allTerms3.concat(r);});
+  allTerms3=Array.from(new Set(allTerms3));
+  var pool=[];var seen=new Set();
+  updLoad('搜索('+allTerms3.length+'词)...',15);
+  var resp=await fetch('/search_api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:allTerms3,max_per_query:500})});
   if(resp.ok){var rj=await resp.json();if(rj.success&&rj.results){rj.results.forEach(function(rr){var nk=norm(rr.title).substring(0,60);if(!seen.has(nk)){seen.add(nk);pool.push(rr);}})}}
   updLoad('累计'+pool.length+'条',30);
 
-  console.log('[search] Pool:',pool.length,'total rounds:',searchRounds.length);
-
-  if(!pool.length){hideLoad();searchRunning=false;alert('未检索到相关文献。\n\n可能原因：\n1. 论文主题词过于冷门\n2. 网络连接不稳定\n3. 搜索词数量不足\n\n建议：\n• 检查Python服务窗口日志\n• 访问 /ping 确认服务正常\n• 尝试减少检索文献总数');return}
+if(!pool.length){hideLoad();searchRunning=false;alert('未检索到相关文献。\n\n可能原因：\n1. 论文主题词过于冷门\n2. 网络连接不稳定\n3. 搜索词数量不足\n\n建议：\n• 检查Python服务窗口日志\n• 访问 /ping 确认服务正常\n• 尝试减少检索文献总数');return}
 
   // STEP 3: 筛选排序 — 中英文分堆精选，确保比例精确（分片异步，避免卡死）
   var selected=[];
