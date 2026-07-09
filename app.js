@@ -701,52 +701,16 @@ async function startSearch(){
     });
   });
   searchRounds.push(Array.from(new Set(allHeadings)).slice(0,25));
-  // 第5轮前：定义领域泛词供后续过滤用
-  var genEN=['construction','engineering','management','safety','monitoring','evaluation','prediction','analysis','design','optimization','machine learning','deep learning','neural network','artificial intelligence','big data','internet of things'];
-  var genCN=['工程','施工','管理','安全','监测','评价','预测','分析','设计','优化','系统','模型','方法','技术','智能','网络','算法','风险','评估','控制'];
-  // 第5轮：正文词——只取高频且与主题相关的词（≥3段，或与章标题/主题词/泛词有交集）
-  var paraFreq={},badRE=/^(?:the|and|for|with|this|that|from|have|are|was|were|been|will|would|could|should|[一-鿿]?[的了是在和与等及或被把从对到向上向下只个性它他也都很这就那能会要可但而不因所以之为着中其已该并约]$)/;
-  var box2=document.getElementById('thesisBox');
-  if(box2){var paras=box2.querySelectorAll('p');
-    for(var pi=0;pi<Math.min(paras.length,150);pi++){
-      var pt=(paras[pi].textContent||'').replace(/[^一-鿿a-zA-Z]/g,' ');
-      var pw=new Set();pt.split(/\s+/).filter(function(w){return w.length>=2&&!badRE.test(w)}).forEach(function(w){pw.add(w)});
-      pw.forEach(function(w){paraFreq[w]=(paraFreq[w]||0)+1});
-    }
-  }
-  var relevantSet=new Set();
-  tpLabels.forEach(function(t){relevantSet.add(t.toLowerCase())});
-  allSecWords.forEach(function(w){relevantSet.add(w.toLowerCase())});
-  genCN.concat(genEN).forEach(function(w){relevantSet.add(w.toLowerCase())});
-  var paraKws=[];
-  Object.keys(paraFreq).forEach(function(w){
-    if(paraFreq[w]>=3||relevantSet.has(w.toLowerCase())||Array.from(relevantSet).some(function(rw){return rw.indexOf(w)>=0||w.indexOf(rw)>=0}))paraKws.push(w);
-  });
-  paraKws.sort(function(a,b){return(paraFreq[b]||0)-(paraFreq[a]||0)});
-  searchRounds.push(paraKws.slice(0,60));
-  // 第6轮：主题词搭配领域通用词
-  var extra=[];
-  tpLabels.slice(0,6).forEach(function(t){var gs=/[一-鿿]/.test(t)?genCN:genEN;gs.slice(0,5).forEach(function(g){extra.push(t+' '+g)})});
-  searchRounds.push(extra.slice(0,40));
-  // 去重各轮
+  // 合并去重为1轮，一次HTTP请求发送
+// (跳过泛词轮和主题搭配轮，减少检索时间)  // 去重各轮并合并为一批，一次HTTP请求发送（后端并发处理各源）
   searchRounds=searchRounds.map(function(r){return Array.from(new Set(r)).filter(Boolean)});
-
-  // 跑全部轮次
-  var pool=[],seen=new Set(),chunkSize=2;
-  for(var round=0;round<searchRounds.length;round++){
-    var terms=searchRounds[round];
-    if(!terms.length)continue;
-    updLoad('第'+(round+1)+'/'+searchRounds.length+'轮('+terms.length+'词)...',10+round*12);
-    var fetches=[];
-    for(var bi=0;bi<terms.length;bi+=chunkSize){
-      (function(batch){
-        var ck=batch.join(',');if(searchCache[ck]){searchCache[ck].forEach(function(rr){var nk=norm(rr.title).substring(0,60);if(!seen.has(nk)){seen.add(nk);pool.push(rr)}});return;}
-        var p=fetch('/search_api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:batch,max_per_query:500})}).then(function(r){return r.json()}).then(function(rj){if(rj.success&&rj.results){searchCache[ck]=rj.results;rj.results.forEach(function(rr){var nk=norm(rr.title).substring(0,60);if(!seen.has(nk)){seen.add(nk);pool.push(rr)}})}}).catch(function(e){console.warn('Batch err:',e)});
-        fetches.push(p);
-      })(terms.slice(bi,bi+chunkSize));
-    }
-    await Promise.all(fetches);updLoad('累计'+pool.length+'条',20+round*12);
-  }
+  var allTerms2=[];searchRounds.forEach(function(r){allTerms2=allTerms2.concat(r);});
+  allTerms2=Array.from(new Set(allTerms2)); // 全局去重
+  pool=[];seen=new Set();
+  updLoad('搜索('+allTerms2.length+'词)...',15);
+  var resp=await fetch('/search_api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:allTerms2,max_per_query:300})});
+  if(resp.ok){var rj=await resp.json();if(rj.success&&rj.results){rj.results.forEach(function(rr){var nk=norm(rr.title).substring(0,60);if(!seen.has(nk)){seen.add(nk);pool.push(rr);}})}}
+  updLoad('累计'+pool.length+'条',30);
 
   console.log('[search] Pool:',pool.length,'total rounds:',searchRounds.length);
 
