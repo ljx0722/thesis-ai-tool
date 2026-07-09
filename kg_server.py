@@ -121,7 +121,7 @@ def dedup_results(results):
 def search_openalex(query, max_rows=300):
     results = []
     from urllib.request import quote
-    for page in range(1, 2):
+    for page in range(1, 3):
         url = f'https://api.openalex.org/works?search={quote(query)}&per_page=200&page={page}&mailto=thesis@wb.com'
         data = fetch_json(url)
         if not data or 'results' not in data or not data['results']: break
@@ -141,7 +141,7 @@ def search_openalex(query, max_rows=300):
 def search_crossref(query, max_rows=100):
     results = []
     from urllib.request import quote
-    for offset in range(0, 200, 200):
+    for offset in range(0, 300, 150):
         if len(results) >= max_rows: break
         data = fetch_json(f'https://api.crossref.org/works?query={quote(query)}&rows=100&offset={offset}&mailto=thesis@wb.com')
         if not data or 'message' not in data: break
@@ -164,7 +164,7 @@ def search_openalex_cn(query, max_rows=200):
     '''OpenAlex with Chinese language filter: 大幅提高中文文献召回率'''
     results = []
     from urllib.request import quote
-    for page in range(1, 2):
+    for page in range(1, 3):
         if len(results) >= max_rows: break
         url = f'https://api.openalex.org/works?search={quote(query)}&filter=language:zh&per_page=200&page={page}&mailto=thesis@wb.com'
         data = fetch_json(url)
@@ -184,7 +184,7 @@ def search_openalex_cn(query, max_rows=200):
 def search_semantic_scholar(query, max_rows=100):
     results = []
     from urllib.request import quote
-    for offset in range(0, 200, 200):
+    for offset in range(0, 300, 150):
         if len(results) >= max_rows: break
         url = f'https://api.semanticscholar.org/graph/v1/paper/search?query={quote(query)}&limit=100&offset={offset}&fields=title,year,journal,authors,externalIds'
         data = fetch_json(url)
@@ -249,7 +249,7 @@ def search_core(query, max_rows=100):
     from urllib.request import quote
     try:
         # CORE v3 API - 不需要 API key 也能做基础搜索
-        for page in range(1, 2):
+        for page in range(1, 3):
             if len(results) >= max_rows: break
             url = f'https://api.core.ac.uk/v3/search/works?q={quote(query)}&limit=100&offset={(page-1)*100}'
             data = fetch_json(url, timeout=20)
@@ -678,7 +678,7 @@ def search_inspirehep(query, max_rows=100):
     results = []
     from urllib.request import quote
     try:
-        for page in range(1, 2):
+        for page in range(1, 3):
             if len(results) >= max_rows: break
             url = f'https://inspirehep.net/api/literature?q={quote(query)}&size=100&page={page}&sort=mostrecent'
             data = fetch_json(url, timeout=15)
@@ -708,7 +708,7 @@ def search_datacite(query, max_rows=100):
     results = []
     from urllib.request import quote
     try:
-        for offset in range(0, 200, 200):
+        for offset in range(0, 300, 150):
             if len(results) >= max_rows: break
             url = f'https://api.datacite.org/dois?query={quote(query)}&page[size]=100&page[number]={offset//100+1}&sort=relevance'
             data = fetch_json(url, timeout=15)
@@ -738,7 +738,7 @@ def search_doaj(query, max_rows=100):
     results = []
     from urllib.request import quote
     try:
-        for page in range(1, 2):
+        for page in range(1, 3):
             if len(results) >= max_rows: break
             url = f'https://doaj.org/api/search/articles/{quote(query)}?page={page}&pageSize=50'
             data = fetch_json(url, timeout=15)

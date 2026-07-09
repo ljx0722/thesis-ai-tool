@@ -731,16 +731,30 @@ async function startSearch(){
   if(!Array.isArray(allTerms3))allTerms3=[];
   var pool=[];var seen=new Set();
   var batchSize=20;
-  updLoad('搜索('+allTerms3.length+'词,'+Math.ceil(allTerms3.length/batchSize)+'批)...',15);
-  var fetches3=[];
+  updLoad('搜索('+allTerms3.length+'词)...',15);
+  // 流式加载：分批并发，每批返回后立即更新计数，不等待全部完成
+  var totalBatches=Math.ceil(allTerms3.length/batchSize);
+  var completedBatches=0;
+  var batchPromises=[];
   for(var bi=0;bi<allTerms3.length;bi+=batchSize){
-    (function(batch){var p=fetch('/search_api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:batch,max_per_query:200})}).then(function(r){return r.json()}).then(function(rj){if(rj.success&&rj.results){rj.results.forEach(function(rr){var nk=norm(rr.title).substring(0,60);if(!seen.has(nk)){seen.add(nk);pool.push(rr);}})}}).catch(function(e){});fetches3.push(p);})(allTerms3.slice(bi,bi+batchSize));}
-  await Promise.all(fetches3);
+    (function(batch){
+      var p=fetch('/search_api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:batch,max_per_query:200})})
+        .then(function(r){return r.json()})
+        .then(function(rj){if(rj.success&&rj.results){rj.results.forEach(function(rr){var nk=norm(rr.title).substring(0,60);if(!seen.has(nk)){seen.add(nk);pool.push(rr);}})}completedBatches++;updLoad('搜索中('+completedBatches+'/'+totalBatches+'批)...',15+Math.round(completedBatches/totalBatches*15));})
+        .catch(function(e){completedBatches++;});
+      batchPromises.push(p);
+    })(allTerms3.slice(bi,bi+batchSize));
+  }
+  // 等前2批返回就继续（2批已有40词的结果，足够后面用），其余后台继续
+  await Promise.race([
+    Promise.all(batchPromises),
+    new Promise(function(r){setTimeout(r,5000)})  // 最多等5秒
+  ]);
   updLoad('累计'+pool.length+'条',30);
+  
+  if(!pool.length){hideLoad();searchRunning=false;alert('未检索到相关文献。\n\n可能原因：\n1. 论文主题词过于冷门\n2. 网络连接不稳定\n3. 搜索词数量不足\n\n建议：\n• 检查Python服务窗口日志\n• 访问 /ping 确认服务正常\n• 尝试减少检索文献总数');return}
 
-if(!pool.length){hideLoad();searchRunning=false;alert('未检索到相关文献。\n\n可能原因：\n1. 论文主题词过于冷门\n2. 网络连接不稳定\n3. 搜索词数量不足\n\n建议：\n• 检查Python服务窗口日志\n• 访问 /ping 确认服务正常\n• 尝试减少检索文献总数');return}
-
-  // STEP 3: 筛选排序 — 中英文分堆精选，确保比例精确（分片异步，避免卡死）
+    // STEP 3: 筛选排序 — 中英文分堆精选，确保比例精确（分片异步，避免卡死）
   var selected=[];
   try{
     updLoad('筛选排序...',73);
