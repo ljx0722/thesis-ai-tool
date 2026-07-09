@@ -4,7 +4,7 @@ Flask后端: HTTP文件服务 + 知识图谱API + 多源文献检索API
 数据源: OpenAlex / Crossref / Semantic Scholar / arXiv / CORE / 百度学术
 """
 from flask import Flask, request, jsonify, send_file
-import math, random, json, re, os, html, time, xml.etree.ElementTree as ET
+import math, random, json, re, os, html, time, threading, xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 try:
@@ -31,12 +31,10 @@ def serve_static(filename):
 
 
 # ========== 辅助函数 ==========
-import threading
-SESSION = None
 _local = threading.local()
 
 def get_session():
-    """线程安全的 Session：每个线程独立实例，避免并发损坏"""
+    """Thread-safe: 每线程独立 Session，避免并发损坏连接池"""
     if not HAS_REQUESTS: return None
     if not hasattr(_local, 'session'):
         _local.session = requests.Session()
@@ -52,15 +50,14 @@ def fetch_with_retry(fn, *args, max_retries=2, **kwargs):
             if attempt < max_retries: time.sleep(0.5 * (attempt + 1))
     return None
 
-def fetch_json(url, headers=None, timeout=8):
-    """用 requests 获取 JSON，失败时 fallback 到 urllib（超时短，快速失败）"""
+def fetch_json(url, headers=None, timeout=15):
+    """用 requests 获取 JSON，失败时 fallback 到 urllib"""
     if HAS_REQUESTS:
         try:
             s = get_session()
-            if s:
-                r = s.get(url, headers=headers, timeout=timeout)
-                if r.status_code == 200:
-                    return r.json()
+            r = s.get(url, headers=headers, timeout=timeout)
+            if r.status_code == 200:
+                return r.json()
         except Exception:
             pass
     # fallback: urllib
@@ -73,14 +70,13 @@ def fetch_json(url, headers=None, timeout=8):
     except Exception:
         return None
 
-def fetch_text(url, headers=None, timeout=8):
+def fetch_text(url, headers=None, timeout=15):
     if HAS_REQUESTS:
         try:
             s = get_session()
-            if s:
-                r = s.get(url, headers=headers, timeout=timeout)
-                if r.status_code == 200:
-                    return r.text
+            r = s.get(url, headers=headers, timeout=timeout)
+            if r.status_code == 200:
+                return r.text
         except Exception:
             pass
     try:
@@ -121,7 +117,7 @@ def dedup_results(results):
 def search_openalex(query, max_rows=300):
     results = []
     from urllib.request import quote
-    for page in range(1, 3):
+    for page in range(1, 5):
         url = f'https://api.openalex.org/works?search={quote(query)}&per_page=200&page={page}&mailto=thesis@wb.com'
         data = fetch_json(url)
         if not data or 'results' not in data or not data['results']: break
@@ -141,7 +137,7 @@ def search_openalex(query, max_rows=300):
 def search_crossref(query, max_rows=100):
     results = []
     from urllib.request import quote
-    for offset in range(0, 300, 150):
+    for offset in range(0, 400, 100):
         if len(results) >= max_rows: break
         data = fetch_json(f'https://api.crossref.org/works?query={quote(query)}&rows=100&offset={offset}&mailto=thesis@wb.com')
         if not data or 'message' not in data: break
@@ -164,7 +160,7 @@ def search_openalex_cn(query, max_rows=200):
     '''OpenAlex with Chinese language filter: 大幅提高中文文献召回率'''
     results = []
     from urllib.request import quote
-    for page in range(1, 3):
+    for page in range(1, 4):
         if len(results) >= max_rows: break
         url = f'https://api.openalex.org/works?search={quote(query)}&filter=language:zh&per_page=200&page={page}&mailto=thesis@wb.com'
         data = fetch_json(url)
@@ -184,7 +180,7 @@ def search_openalex_cn(query, max_rows=200):
 def search_semantic_scholar(query, max_rows=100):
     results = []
     from urllib.request import quote
-    for offset in range(0, 300, 150):
+    for offset in range(0, 200, 100):
         if len(results) >= max_rows: break
         url = f'https://api.semanticscholar.org/graph/v1/paper/search?query={quote(query)}&limit=100&offset={offset}&fields=title,year,journal,authors,externalIds'
         data = fetch_json(url)
@@ -249,7 +245,7 @@ def search_core(query, max_rows=100):
     from urllib.request import quote
     try:
         # CORE v3 API - 不需要 API key 也能做基础搜索
-        for page in range(1, 3):
+        for page in range(1, 4):
             if len(results) >= max_rows: break
             url = f'https://api.core.ac.uk/v3/search/works?q={quote(query)}&limit=100&offset={(page-1)*100}'
             data = fetch_json(url, timeout=20)
@@ -403,25 +399,24 @@ def search_api():
         for q in queries[:30]:
             if not q.strip(): continue
             is_cn = bool(re.search(r'[一-鿿]', q))
-            q_max = min(max_per, 200)  # 每个源最多200条，避免超时
 
-            with ThreadPoolExecutor(max_workers=5) as ex:
+            with ThreadPoolExecutor(max_workers=8) as ex:
                 futures = [
-                    ex.submit(_run_source, fetch_with_retry, search_openalex, q, 80),
-                    ex.submit(_run_source, search_crossref, q, 50),
-                    ex.submit(_run_source, search_semantic_scholar, q, 50),
+                    ex.submit(_run_source, fetch_with_retry, search_openalex, q, max_per),
+                    ex.submit(_run_source, search_crossref, q, 100),
+                    ex.submit(_run_source, search_semantic_scholar, q, 100),
                 ]
                 if is_cn:
-                    futures.append(ex.submit(_run_source, fetch_with_retry, search_openalex_cn, q, 100))
-                    futures.append(ex.submit(_run_source, search_wanfang, q, 30))
-                futures.append(ex.submit(_run_source, search_arxiv, q, 50))
-                futures.append(ex.submit(_run_source, search_core, q, 40))
-                futures.append(ex.submit(_run_source, search_pubmed, q, 50))
-                futures.append(ex.submit(_run_source, search_inspirehep, q, 40))
-                futures.append(ex.submit(_run_source, search_datacite, q, 40))
-                futures.append(ex.submit(_run_source, search_doaj, q, 40))
+                    futures.append(ex.submit(_run_source, fetch_with_retry, search_openalex_cn, q, 150))
+                    futures.append(ex.submit(_run_source, search_wanfang, q, 50))
+                futures.append(ex.submit(_run_source, search_arxiv, q, 100))
+                futures.append(ex.submit(_run_source, search_core, q, 80))
+                futures.append(ex.submit(_run_source, search_pubmed, q, 100))
+                futures.append(ex.submit(_run_source, search_inspirehep, q, 80))
+                futures.append(ex.submit(_run_source, search_datacite, q, 80))
+                futures.append(ex.submit(_run_source, search_doaj, q, 80))
 
-                for f in as_completed(futures, timeout=30):
+                for f in as_completed(futures, timeout=20):
                     try: all_results.extend(f.result() or [])
                     except: pass
 
@@ -678,7 +673,7 @@ def search_inspirehep(query, max_rows=100):
     results = []
     from urllib.request import quote
     try:
-        for page in range(1, 3):
+        for page in range(1, 4):
             if len(results) >= max_rows: break
             url = f'https://inspirehep.net/api/literature?q={quote(query)}&size=100&page={page}&sort=mostrecent'
             data = fetch_json(url, timeout=15)
@@ -708,7 +703,7 @@ def search_datacite(query, max_rows=100):
     results = []
     from urllib.request import quote
     try:
-        for offset in range(0, 300, 150):
+        for offset in range(0, 200, 100):
             if len(results) >= max_rows: break
             url = f'https://api.datacite.org/dois?query={quote(query)}&page[size]=100&page[number]={offset//100+1}&sort=relevance'
             data = fetch_json(url, timeout=15)
@@ -738,7 +733,7 @@ def search_doaj(query, max_rows=100):
     results = []
     from urllib.request import quote
     try:
-        for page in range(1, 3):
+        for page in range(1, 4):
             if len(results) >= max_rows: break
             url = f'https://doaj.org/api/search/articles/{quote(query)}?page={page}&pageSize=50'
             data = fetch_json(url, timeout=15)

@@ -38,30 +38,7 @@ function extractCtxBeforeMarker(txt,refN){
   return ctx;
 }
 function showLoad(m,p,d){var o=document.getElementById('loadOv');o.classList.add('show');document.getElementById('loadMsg').textContent=m;if(p!==undefined){document.getElementById('loadPct').style.display='block';document.getElementById('loadPct').textContent=p+'%';document.getElementById('loadBar').style.width=p+'%'}document.getElementById('loadDetail').textContent=d||''}
-function updLoad(m,p,d){document.getElementById('loadMsg').textContent=m;
-  if(p!==undefined){document.getElementById('loadPct').style.display='block';document.getElementById('loadPct').textContent=p+'%';document.getElementById('loadBar').style.width=p+'%'}
-  if(d)document.getElementById('loadDetail').textContent=d
-}
-// 增强版进度：显示搜索数据源级详情
-var _srStatus={batches:[],totalBatches:0,completedBatches:0,poolCount:0};
-function initSrStatus(totalB){_srStatus={batches:[],totalBatches:totalB,completedBatches:0,poolCount:0};}
-function updateSrPanel(){var el=document.getElementById('srProgress');if(!el)return;
-  el.style.display='block';
-  var s=_srStatus,h='';
-  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-weight:600;color:var(--t)">⚡ 检索进度</span><span style="color:var(--m1);font-size:.6rem">'+s.completedBatches+'/'+s.totalBatches+' 批</span></div>';
-  s.batches.forEach(function(b){
-    var icon=b.done?'✅':(b.fetching?'⏳':'○');
-    var icls=b.done?'done':(b.fetching?'running':'wait');
-    h+='<div class="sr-row"><span class="sr-icon '+icls+'">'+icon+'</span><span class="sr-label">'+(b.label||(b.id+1))+'</span>';
-    if(b.count!==undefined){h+='<span class="sr-count">'+b.count+'条</span>';
-      var pct=s.totalBatches>0?Math.round((b.count||0)/Math.max(1,s.poolCount||1)*100):0;
-      h+='<div class="sr-bar-wrap"><div class="sr-bar-fill" style="width:'+Math.min(100,pct*3)+'%"></div></div>';
-    }else{h+='<span class="sr-count"></span><div class="sr-bar-wrap"></div>';}
-    h+='</div>';
-  });
-  h+='<div class="sr-total">📦 累计 '+s.poolCount+' 条文献</div>';
-  el.innerHTML=h;
-}
+function updLoad(m,p,d){document.getElementById('loadMsg').textContent=m;if(p!==undefined){document.getElementById('loadPct').style.display='block';document.getElementById('loadPct').textContent=p+'%';document.getElementById('loadBar').style.width=p+'%'}if(d)document.getElementById('loadDetail').textContent=d}
 function hideLoad(){document.getElementById('loadOv').classList.remove('show')}
 function zoomThesis(d,r){if(r)zoomLevel=1;else zoomLevel=Math.max(0.5,Math.min(2,zoomLevel+d));document.getElementById('thesisBox').style.zoom=zoomLevel;document.getElementById('zoomLabel').textContent=Math.round(zoomLevel*100)+'%'}
 
@@ -724,63 +701,52 @@ async function startSearch(){
     });
   });
   searchRounds.push(Array.from(new Set(allHeadings)).slice(0,25));
-  // 正文词轮次（恢复：保证检索覆盖全面）
-  var genEN=['construction','engineering','management','safety','monitoring','evaluation','prediction','analysis','design','optimization','machine learning','deep learning','neural network','artificial intelligence','big data','internet of things'];
-  var genCN=['工程','施工','管理','安全','监测','评价','预测','分析','设计','优化','系统','模型','方法','技术','智能','网络','算法','风险','评估','控制'];
-  var paraFreq2={},badRE2=/^(?:the|and|for|with|this|that|from|have|are|was|were|been|will|would|could|should|[一-鿿]?[的了是在和与等及或被把从对到向上向下只个性它他也都很这就那能会要可但而不因所以之为着中其已该并约]$)/;
-  var box3=document.getElementById('thesisBox');
-  if(box3){var paras3=box3.querySelectorAll('p');
-    for(var pi2=0;pi2<Math.min(paras3.length,150);pi2++){
-      var pt3=(paras3[pi2].textContent||'').replace(/[^一-鿿a-zA-Z]/g,' ');
-      var pw3=new Set();pt3.split(/\s+/).filter(function(w){return w.length>=2&&!badRE2.test(w)}).forEach(function(w){pw3.add(w)});
-      pw3.forEach(function(w){paraFreq2[w]=(paraFreq2[w]||0)+1});}}
-  var relevantSet2=new Set();
-  tpLabels.forEach(function(t){relevantSet2.add(t.toLowerCase())});
-  allSecWords.forEach(function(w){relevantSet2.add(w.toLowerCase())});
-  genCN.concat(genEN).forEach(function(w){relevantSet2.add(w.toLowerCase())});
-  var paraKws2=[];
-  Object.keys(paraFreq2).forEach(function(w){
-    if(paraFreq2[w]>=3||relevantSet2.has(w.toLowerCase())||Array.from(relevantSet2).some(function(rw){return rw.indexOf(w)>=0||w.indexOf(rw)>=0}))paraKws2.push(w);});
-  paraKws2.sort(function(a,b){return(paraFreq2[b]||0)-(paraFreq2[a]||0)});
-  searchRounds.push(paraKws2.slice(0,60));
-  // 主题词搭配领域通用词
-  var extra3=[];
-  tpLabels.slice(0,6).forEach(function(t){var gs=/[一-鿿]/.test(t)?genCN:genEN;gs.slice(0,5).forEach(function(g){extra3.push(t+' '+g)})});
-  searchRounds.push(extra3.slice(0,40));
-  // 合并去重各轮 → 1次HTTP请求
+
+  // 第5轮：全文逐句摘要关键词（每句提取3-5个关键词批量检索）
+  updLoad('提取句子摘要...',5);
+  var sentenceKws = {};
+  var box3 = document.getElementById('thesisBox');
+  if (box3) {
+    var rfBd2 = bodyBoundaryEl();
+    var allPs = box3.querySelectorAll('p');
+    for (var si2 = 0; si2 < Math.min(allPs.length, 200); si2++) {
+      if (rfBd2 && (allPs[si2].compareDocumentPosition(rfBd2) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
+      var stxt = (allPs[si2].textContent || '').trim();
+      if (stxt.length < 20) continue;
+      var sents = stxt.split(/[。！？\.\?\!]/).filter(function(s){return s.trim().length >= 8;});
+      for (var si3 = 0; si3 < sents.length; si3++) {
+        var senText = sents[si3].trim();
+        var senKws = extractTitleKws(senText);
+        for (var ki2 = 0; ki2 < senKws.length; ki2++) {
+          var kw = senKws[ki2];
+          if (kw.length >= 2) sentenceKws[kw] = (sentenceKws[kw] || 0) + 1;
+        }
+      }
+    }
+  }
+  var sentenceKwList = Object.entries(sentenceKws).sort(function(a,b){return b[1]-a[1];}).slice(0,80).map(function(e){return e[0];});
+  searchRounds.push(sentenceKwList);
+
+  // 第6轮：句子关键词两两组合
+  var sentCombos=[];
+  for(var sk=0;sk<Math.min(sentenceKwList.length-1,15);sk++){sentCombos.push(sentenceKwList[sk]+' '+sentenceKwList[sk+1]);}
+  searchRounds.push(sentCombos.slice(0,30));
+
+  // 合并去重 → 分批发送（每批40词）
   searchRounds=searchRounds.map(function(r){return Array.from(new Set(r)).filter(Boolean)});
   var allTerms3=[];searchRounds.forEach(function(r){allTerms3=allTerms3.concat(r);});
-  allTerms3=Array.from(new Set(allTerms3)).slice(0,60);
-  if(!Array.isArray(allTerms3))allTerms3=[];
+  allTerms3=Array.from(new Set(allTerms3));
   var pool=[];var seen=new Set();
-  var batchSize=20;
-  updLoad('搜索('+allTerms3.length+'词)...',15);
-  // 流式加载：分批并发，每批返回后立即更新计数，不等待全部完成
-  var totalBatches=Math.ceil(allTerms3.length/batchSize);
-  var completedBatches=0;
-  var batchPromises=[];
+  var batchSize=40;
+  updLoad('搜索('+allTerms3.length+'词,'+Math.ceil(allTerms3.length/batchSize)+'批)...',15);
+  var fetches3=[];
   for(var bi=0;bi<allTerms3.length;bi+=batchSize){
-    (function(batch,bi2){
-      var batchNum=Math.floor(bi2/batchSize)+1;
-      _srStatus.batches.push({id:batchNum,label:'第'+batchNum+'批('+batch.length+'词)',fetching:true,done:false});
-      updateSrPanel();
-      var p=fetch('/search_api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:batch,max_per_query:200})})
-        .then(function(r){return r.json()})
-        .then(function(rj){var count=0;if(rj.success&&rj.results){rj.results.forEach(function(rr){var nk=norm(rr.title).substring(0,60);if(!seen.has(nk)){seen.add(nk);pool.push(rr);}})}count=pool.length-(_srStatus.poolCount||0);_srStatus.poolCount=pool.length;completedBatches++;_srStatus.completedBatches=completedBatches;var bi2_=bi2,batchNum_=batchNum;var batchEntry=_srStatus.batches.find(function(b){return b.id===batchNum_});if(batchEntry){batchEntry.done=true;batchEntry.fetching=false;batchEntry.count=count;}updLoad('搜索中('+completedBatches+'/'+totalBatches+'批)...',15+Math.round(completedBatches/totalBatches*15));updateSrPanel();})
-        .catch(function(e){completedBatches++;});
-      batchPromises.push(p);
-    })(allTerms3.slice(bi,bi+batchSize),bi);
-  }
-  // 等前2批返回就继续（2批已有40词的结果，足够后面用），其余后台继续
-  await Promise.race([
-    Promise.all(batchPromises),
-    new Promise(function(r){setTimeout(r,5000)})  // 最多等5秒
-  ]);
+    (function(batch){var p=fetch('/search_api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:batch,max_per_query:500})}).then(function(r){return r.json()}).then(function(rj){if(rj.success&&rj.results){rj.results.forEach(function(rr){var nk=norm(rr.title).substring(0,60);if(!seen.has(nk)){seen.add(nk);pool.push(rr);}})}_srStatus.poolCount=pool.length;updateSrPanel();}).catch(function(e){});fetches3.push(p);})(allTerms3.slice(bi,bi+batchSize));}
+  await Promise.all(fetches3);
   updLoad('累计'+pool.length+'条',30);
-  
+  va
   if(!pool.length){hideLoad();searchRunning=false;alert('未检索到相关文献。\n\n可能原因：\n1. 论文主题词过于冷门\n2. 网络连接不稳定\n3. 搜索词数量不足\n\n建议：\n• 检查Python服务窗口日志\n• 访问 /ping 确认服务正常\n• 尝试减少检索文献总数');return}
-
-    // STEP 3: 筛选排序 — 中英文分堆精选，确保比例精确（分片异步，避免卡死）
+  // STEP 3: 筛选排序 — 中英文分堆精选，确保比例精确（分片异步，避免卡死）
   var selected=[];
   try{
     updLoad('筛选排序...',73);
