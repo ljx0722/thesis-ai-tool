@@ -655,7 +655,7 @@ function extractAllKeywords(topics,secs){
 async function startSearch(){
   if(!manuscriptText){alert('请先上传论文文件');return}
   if(searchRunning)return;searchRunning=true;
-  showLoad('诊断API连接...',0);
+  showLoad('诊断API连接...',0);if(typeof startCatGame==='function')setTimeout(function(){startCatGame();},500);
   try{
   // STEP 0: 检测Flask服务连通性（用轻量ping接口）
   var connected=false;
