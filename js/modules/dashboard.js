@@ -38,6 +38,29 @@ function buildDashboard() {
 
 // ========== 计算综合评分 ==========
 function computeAllScores() {
+  var rev = typeof computeThesisReview === 'function' ? computeThesisReview() : null;
+  if (rev && rev.dimensions) {
+    return {
+      composite: rev.composite,
+      grade: rev.composite >= 80 ? 'A' : (rev.composite >= 65 ? 'B' : (rev.composite >= 50 ? 'C' : 'D')),
+      struct: rev.dimensions[2] ? rev.dimensions[2].score : 60,
+      literature: rev.dimensions[1] ? rev.dimensions[1].score : 45,
+      format: rev.dimensions[8] ? rev.dimensions[8].score : 70,
+      readability: rev.dimensions[7] ? rev.dimensions[7].score : 60,
+      terminology: 65,
+      avgSentLen: rev.stats.avgSentLen,
+      totalChars: rev.stats.totalChars,
+      totalChapters: rev.stats.chapters,
+      totalRefs: rev.stats.refs,
+      cnRefs: rev.stats.cnRefs,
+      enRefs: rev.stats.enRefs,
+      figCount: (manuscriptText.match(/图\s*\d+/g) || []).length,
+      sectionCount: (function(){var c2=0;(sections||[]).forEach(function(s){(s.sections||[]).forEach(function(sc){c2++;if(sc.subs)c2+=sc.subs.length;});});return c2;})(),
+      doiRate: rev.stats.refs > 0 ? Math.round(rev.stats.doiRefs/Math.max(1,rev.stats.refs)*100) : 0,
+      fullReview: rev
+    };
+  }
+  // Fallback — simple scoring
   var text = manuscriptText || '';
   var secs = sections || [];
   var bodyChs = secs.filter(function(s) { return !/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name); });
@@ -402,4 +425,24 @@ function drawChapterChart() {
     ctx.fillText(Math.round(pct) + '%', x + barW / 2, y - 4);
     ctx.fillText(cs.name.substring(2, 6) || cs.name, x + barW / 2, h - 2);
   });
+}
+
+function showReviewInDashboard() {
+  var overlay = document.getElementById('dbOverlay');
+  if (!overlay) return;
+  overlay.style.display = 'flex';
+  var content = document.getElementById('dbContent');
+  if (!content) return;
+  content.innerHTML = '<div style="text-align:center;padding:60px;color:#86868b"><div style="font-size:2rem;margin-bottom:12px">⏳</div>正在生成评审报告...</div>';
+  setTimeout(function() {
+    var h = '<div style="display:flex;height:100%;gap:16px">';
+    h += '<div style="flex:1;overflow-y:auto;background:#fff;border-radius:18px;box-shadow:0 2px 16px rgba(0,0,0,0.06);padding:20px">';
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">';
+    h += '<h2 style="font-size:1.1rem;font-weight:700;color:#1d1d1f;margin:0">📋 十维评审报告</h2>';
+    h += '<button onclick="copyReviewText()" style="background:#0071e3;color:#fff;border:none;border-radius:18px;padding:8px 18px;cursor:pointer;font-weight:600;font-size:.72rem">📄 复制评语</button>';
+    h += '</div>';
+    h += renderReviewReport();
+    h += '</div></div>';
+    content.innerHTML = h;
+  }, 100);
 }
