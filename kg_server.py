@@ -240,6 +240,41 @@ def search_core(query, max_rows=100):
     return results
 
 
+
+# ========== PubMed (生命科学/医学免费API) ==========
+def search_pubmed(query, max_rows=100):
+    """PubMed E-utilities: 免费官方 API，覆盖生物医学/生命科学文献"""
+    results = []
+    from urllib.request import quote
+    try:
+        # Step 1: esearch 获取 PMID 列表
+        search_url = f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={quote(query)}&retmax={min(max_rows,100)}&retmode=json&sort=relevance'
+        search_data = fetch_json(search_url, timeout=15)
+        if not search_data or 'esearchresult' not in search_data: return results
+        id_list = search_data['esearchresult'].get('idlist', [])
+        if not id_list: return results
+        # Step 2: esummary 批量获取详情（每次最多 20 篇）
+        for i in range(0, min(len(id_list), max_rows), 20):
+            batch = ','.join(id_list[i:i+20])
+            summary_url = f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id={batch}&retmode=json'
+            summary_data = fetch_json(summary_url, timeout=15)
+            if not summary_data or 'result' not in summary_data: continue
+            for pmid in id_list[i:i+20]:
+                item = summary_data['result'].get(pmid)
+                if not item or isinstance(item, str): continue
+                title = item.get('title', '') or ''
+                journal = item.get('source', '') or item.get('fulljournalname', '') or ''
+                year = str(item.get('pubdate', '') or '')[:4]
+                authors_list = [a.get('name', '') for a in (item.get('authors', []) or [])]
+                authors = ', '.join(authors_list[:5])
+                doi = ''
+                if item.get('elocationid', '').startswith('doi:'):
+                    doi = item['elocationid'].replace('doi:', '').strip()
+                if title and len(title) >= 3:
+                    results.append(make_result(title, journal, year, authors, doi, 'PM'))
+    except Exception: pass
+    return results
+
 # ========== ⑥ 百度学术 (HTML抓取, 多页) ==========
 def search_baidu_xueshu_page(query, pn):
     results = []
@@ -324,7 +359,7 @@ def search_baidu_xueshu(query, max_rows=80):
 # ========== 统一检索 API ==========
 @app.route('/ping', methods=['GET'])
 def ping():
-    return jsonify({'ok': True, 'service': '论文文献AI利器', 'sources': ['OpenAlex','Crossref','Semantic Scholar','arXiv','CORE','百度学术']})
+    return jsonify({'ok': True, 'service': '论文文献AI利器', 'sources': ['OpenAlex','Crossref','Semantic Scholar','arXiv','CORE','PubMed','百度学术']})
 
 @app.route('/search_api', methods=['POST'])
 def search_api():
@@ -350,6 +385,11 @@ def search_api():
             try: all_results.extend(search_arxiv(q, 100) or [])
             except: pass
             # CORE (开放获取聚合)
+            try: all_results.extend(search_core(q, 100) or [])
+            except: pass
+            # PubMed (生命科学/医学)
+            try: all_results.extend(search_pubmed(q, 100) or [])
+            except: pass
             try: all_results.extend(search_core(q, 100) or [])
             except: pass
             # 百度学术 (中文主力，并发翻页)
@@ -596,7 +636,7 @@ if __name__ == '__main__':
     print("论文文献AI利器 - Python知识图谱服务")
     print("=" * 50)
     print(f"HTTP库: {'requests (推荐)' if HAS_REQUESTS else 'urllib (建议 pip install requests)'}")
-    print("数据源: OpenAlex | Crossref | Semantic Scholar | arXiv | CORE | 百度学术")
+    print("数据源: OpenAlex | Crossref | Semantic Scholar | arXiv | CORE | PubMed | 百度学术")
     print("访问: http://localhost:5000")
     print("=" * 50)
     app.run(host='0.0.0.0', port=5000, debug=False)

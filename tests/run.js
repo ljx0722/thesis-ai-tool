@@ -191,6 +191,16 @@ test('BUG-FIX: closeKnowledgeGraph clears kgCurrentData', function() {
   assert(closeBody.indexOf('kgCurrentData=null') >= 0, 'closeKnowledgeGraph does not clear kgCurrentData');
 });
 
+test('FEATURE: PubMed search integrated in kg_server.py', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  assert(src.indexOf('search_pubmed') >= 0, 'PubMed search function not found');
+  assert(src.indexOf('eutils.ncbi.nlm.nih.gov') >= 0, 'PubMed E-utilities API endpoint not found');
+  assert(src.indexOf('esearch') >= 0, 'PubMed esearch step missing');
+  assert(src.indexOf('esummary') >= 0, 'PubMed esummary step missing');
+  assert(src.indexOf('PMID') >= 0 || src.indexOf('pubmed') >= 0, 'PubMed ID extraction missing');
+  assert(src.indexOf('source: PM') >= 0 || src.indexOf("'PM'") >= 0, 'PubMed source tag "PM" missing');
+});
+
 // ============================================================
 // SECTION 3: Data Flow & Edge Cases
 // ============================================================
