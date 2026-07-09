@@ -139,6 +139,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <script src="js/modules/dashboard.js"></script>
 <script src="js/modules/thesis-review.js"></script>
 <script src="js/modules/onboarding.js"></script>
+<script src="js/modules/cat-game.js"></script>
 <script src="js/app-modules.js"></script>
 <script>
 (function(){
@@ -154,8 +155,13 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
     el.addEventListener('mouseenter',function(){clearTimeout(ft)});
     el.addEventListener('mouseleave',function(){ft=setTimeout(function(){el.classList.remove('show');setTimeout(function(){el.remove();var i=spawned.indexOf(el);if(i>=0)spawned.splice(i,1)},600)},1000)});
   }
-  var _origShow=showLoad;showLoad=function(m,p,d){_origShow(m,p,d);clearAll();timer=setInterval(spawnOne,1800);spawnOne()};
-  var _origHide=hideLoad;hideLoad=function(){clearAll();_origHide()};
+  var _origShow=showLoad;showLoad=function(m,p,d){_origShow(m,p,d);
+    clearAll();
+    if(typeof startCatGame==='function'&&m&&(m.indexOf('检索')>=0||m.indexOf('搜索')>=0)){
+      setTimeout(function(){startCatGame();},600);
+    }else{timer=setInterval(spawnOne,1800);spawnOne();}
+  };
+  var _origHide=hideLoad;hideLoad=function(){clearAll();if(typeof stopCatGame==='function')stopCatGame();_origHide();};
   // 拖拽上传
   var drop=document.getElementById('uploadDrop');if(drop){['dragenter','dragover','dragleave','drop'].forEach(function(ev){document.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();},false);});['dragenter','dragover'].forEach(function(ev){document.addEventListener(ev,function(){drop.classList.add('dragover');},false);});['dragleave','drop'].forEach(function(ev){document.addEventListener(ev,function(){drop.classList.remove('dragover');},false);});document.addEventListener('drop',function(e){var files=e.dataTransfer.files;if(files.length){var fi=document.getElementById('fileInput');var dt=new DataTransfer();dt.items.add(files[0]);fi.files=dt.files;fi.dispatchEvent(new Event('change'));}});}
 })();
