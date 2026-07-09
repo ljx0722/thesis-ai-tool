@@ -1187,19 +1187,20 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
     var ext=(f.name||'').toLowerCase().split('.').pop();
     if(ext!=='docx'){alert('不支持 .'+ext+', 请上传 .docx 文件');return}
 
-    if(typeof mammoth==='undefined'){
-      // Wait for mammoth to load (big file, may still be downloading)
-      showLoad('等待Word解析库加载...',0);
-      for(var retry=0;retry<30&&typeof mammoth==='undefined';retry++){
-        await new Promise(function(rr){setTimeout(rr,500)});
-        updLoad('等待库加载...',Math.min(100,retry*5));
-      }
-      hideLoad();
-      if(typeof mammoth==='undefined'){alert('mammoth.browser.min.js 加载超时。请刷新页面后重试，或检查该文件是否在相同目录。');return}
-    }
-    if(typeof JSZip==='undefined'){alert('jszip.min.js 未加载。请检查文件是否在相同目录。');return}
+    // 立即显示加载遮罩，不等库加载
+    showLoad('准备解析...', 2, f.name);
 
-    showLoad('解析中...',0);var buf;
+    if(typeof mammoth==='undefined'){
+      updLoad('等待Word解析库加载...',3);
+      for(var retry=0;retry<15&&typeof mammoth==='undefined';retry++){
+        await new Promise(function(rr){setTimeout(rr,200)});
+        updLoad('等待库加载...',Math.min(8,retry*0.5+3));
+      }
+      if(typeof mammoth==='undefined'){hideLoad();alert('mammoth.browser.min.js 加载超时。请刷新页面后重试，或检查该文件是否在相同目录。');return}
+    }
+    if(typeof JSZip==='undefined'){hideLoad();alert('jszip.min.js 未加载。请检查文件是否在相同目录。');return}
+
+    updLoad('读取文件...',10);var buf;
     try{buf=await f.arrayBuffer()}catch(er2){hideLoad();alert('文件读取失败: '+er2.message);return}
     try{
     // 清空跨文件缓存
