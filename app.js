@@ -38,7 +38,30 @@ function extractCtxBeforeMarker(txt,refN){
   return ctx;
 }
 function showLoad(m,p,d){var o=document.getElementById('loadOv');o.classList.add('show');document.getElementById('loadMsg').textContent=m;if(p!==undefined){document.getElementById('loadPct').style.display='block';document.getElementById('loadPct').textContent=p+'%';document.getElementById('loadBar').style.width=p+'%'}document.getElementById('loadDetail').textContent=d||''}
-function updLoad(m,p,d){document.getElementById('loadMsg').textContent=m;if(p!==undefined){document.getElementById('loadPct').style.display='block';document.getElementById('loadPct').textContent=p+'%';document.getElementById('loadBar').style.width=p+'%'}if(d)document.getElementById('loadDetail').textContent=d}
+function updLoad(m,p,d){document.getElementById('loadMsg').textContent=m;
+  if(p!==undefined){document.getElementById('loadPct').style.display='block';document.getElementById('loadPct').textContent=p+'%';document.getElementById('loadBar').style.width=p+'%'}
+  if(d)document.getElementById('loadDetail').textContent=d
+}
+// 增强版进度：显示搜索数据源级详情
+var _srStatus={batches:[],totalBatches:0,completedBatches:0,poolCount:0};
+function initSrStatus(totalB){_srStatus={batches:[],totalBatches:totalB,completedBatches:0,poolCount:0};}
+function updateSrPanel(){var el=document.getElementById('srProgress');if(!el)return;
+  el.style.display='block';
+  var s=_srStatus,h='';
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-weight:600;color:var(--t)">⚡ 检索进度</span><span style="color:var(--m1);font-size:.6rem">'+s.completedBatches+'/'+s.totalBatches+' 批</span></div>';
+  s.batches.forEach(function(b){
+    var icon=b.done?'✅':(b.fetching?'⏳':'○');
+    var icls=b.done?'done':(b.fetching?'running':'wait');
+    h+='<div class="sr-row"><span class="sr-icon '+icls+'">'+icon+'</span><span class="sr-label">'+(b.label||(b.id+1))+'</span>';
+    if(b.count!==undefined){h+='<span class="sr-count">'+b.count+'条</span>';
+      var pct=s.totalBatches>0?Math.round((b.count||0)/Math.max(1,s.poolCount||1)*100):0;
+      h+='<div class="sr-bar-wrap"><div class="sr-bar-fill" style="width:'+Math.min(100,pct*3)+'%"></div></div>';
+    }else{h+='<span class="sr-count"></span><div class="sr-bar-wrap"></div>';}
+    h+='</div>';
+  });
+  h+='<div class="sr-total">📦 累计 '+s.poolCount+' 条文献</div>';
+  el.innerHTML=h;
+}
 function hideLoad(){document.getElementById('loadOv').classList.remove('show')}
 function zoomThesis(d,r){if(r)zoomLevel=1;else zoomLevel=Math.max(0.5,Math.min(2,zoomLevel+d));document.getElementById('thesisBox').style.zoom=zoomLevel;document.getElementById('zoomLabel').textContent=Math.round(zoomLevel*100)+'%'}
 
@@ -737,13 +760,16 @@ async function startSearch(){
   var completedBatches=0;
   var batchPromises=[];
   for(var bi=0;bi<allTerms3.length;bi+=batchSize){
-    (function(batch){
+    (function(batch,bi2){
+      var batchNum=Math.floor(bi2/batchSize)+1;
+      _srStatus.batches.push({id:batchNum,label:'第'+batchNum+'批('+batch.length+'词)',fetching:true,done:false});
+      updateSrPanel();
       var p=fetch('/search_api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:batch,max_per_query:200})})
         .then(function(r){return r.json()})
-        .then(function(rj){if(rj.success&&rj.results){rj.results.forEach(function(rr){var nk=norm(rr.title).substring(0,60);if(!seen.has(nk)){seen.add(nk);pool.push(rr);}})}completedBatches++;updLoad('搜索中('+completedBatches+'/'+totalBatches+'批)...',15+Math.round(completedBatches/totalBatches*15));})
+        .then(function(rj){var count=0;if(rj.success&&rj.results){rj.results.forEach(function(rr){var nk=norm(rr.title).substring(0,60);if(!seen.has(nk)){seen.add(nk);pool.push(rr);}})}count=pool.length-(_srStatus.poolCount||0);_srStatus.poolCount=pool.length;completedBatches++;_srStatus.completedBatches=completedBatches;var bi2_=bi2,batchNum_=batchNum;var batchEntry=_srStatus.batches.find(function(b){return b.id===batchNum_});if(batchEntry){batchEntry.done=true;batchEntry.fetching=false;batchEntry.count=count;}updLoad('搜索中('+completedBatches+'/'+totalBatches+'批)...',15+Math.round(completedBatches/totalBatches*15));updateSrPanel();})
         .catch(function(e){completedBatches++;});
       batchPromises.push(p);
-    })(allTerms3.slice(bi,bi+batchSize));
+    })(allTerms3.slice(bi,bi+batchSize),bi);
   }
   // 等前2批返回就继续（2批已有40词的结果，足够后面用），其余后台继续
   await Promise.race([

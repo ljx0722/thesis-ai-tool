@@ -121,7 +121,17 @@
   </div>
 </div>
 
-<div class="overlay" id="loadOv"><div class="obox"><div class="spinner"></div><div class="msg" id="loadMsg"></div><div class="pct" id="loadPct" style="display:none">0%</div><div class="pbar"><div class="pfill" id="loadBar"></div></div><div class="detail" id="loadDetail"></div></div><div class="ambient-tips" id="ambientTips"></div></div>
+<div class="overlay" id="loadOv">
+  <div class="obox" style="max-width:600px">
+    <div class="spinner"></div>
+    <div class="msg" id="loadMsg"></div>
+    <div class="pct" id="loadPct" style="display:none">0%</div>
+    <div class="pbar"><div class="pfill" id="loadBar"></div></div>
+    <div class="detail" id="loadDetail"></div>
+    <div class="sr-progress" id="srProgress" style="display:none"></div>
+  </div>
+  <div class="ambient-tips" id="ambientTips"></div>
+</div>
 <div class="ttp" id="ttp"></div>
 
 <script>
@@ -131,16 +141,16 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 
 <button class="help-btn" id="darkToggle" onclick="toggleDarkMode()" title="切换暗色模式" style="bottom:72px">🌓</button>
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
-<script src="app.js?v=7"></script>
-<script src="js/modules/optimization.js?v=7"></script>
-<script src="js/modules/format-check.js?v=7"></script>
-<script src="js/modules/terminology.js?v=7"></script>
-<script src="js/modules/paragraph-analysis.js?v=7"></script>
-<script src="js/modules/dashboard.js?v=7"></script>
-<script src="js/modules/thesis-review.js?v=7"></script>
-<script src="js/modules/onboarding.js?v=7"></script>
-<script src="js/modules/cat-game.js?v=7"></script>
-<script src="js/app-modules.js?v=7"></script>
+<script src="app.js?v=8"></script>
+<script src="js/modules/optimization.js?v=8"></script>
+<script src="js/modules/format-check.js?v=8"></script>
+<script src="js/modules/terminology.js?v=8"></script>
+<script src="js/modules/paragraph-analysis.js?v=8"></script>
+<script src="js/modules/dashboard.js?v=8"></script>
+<script src="js/modules/thesis-review.js?v=8"></script>
+<script src="js/modules/onboarding.js?v=8"></script>
+<script src="js/modules/cat-game.js?v=8"></script>
+<script src="js/app-modules.js?v=8"></script>
 <script>
 (function(){
   var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');
