@@ -54,6 +54,11 @@ function buildTourSteps() {
       icon: '🔍'
     },
     {
+      title: '📊 论文看板',
+      body: '点击顶栏中央的圆形按钮打开 <b>论文看板</b>。<br>综合评估报告：五维雷达图、综合评分、<br>章节分布、优先建议，一页纵览论文全局。',
+      el: null, pos: 'center', icon: '📊'
+    },
+    {
       title: '💡 小提示',
       body: '⌨ <b>快捷键</b>：Ctrl+1~6 切换模块 | Ctrl+Enter 检索 | Ctrl+B 导出 | Ctrl+O 换论文<br>📄 <b>知识图谱中可导出分析报告</b><br>🔗 <b>顶栏补全DOI按钮可自动补全缺失信息</b><br><br>点击右上角 <b>?</b> 按钮可随时重新查看本指南。',
       el: null, pos: 'center',

@@ -125,6 +125,8 @@ function updateBarActions() {
     var el = document.getElementById(id);
     if (el) { if (_thesisLoaded) el.removeAttribute('disabled'); else el.setAttribute('disabled', ''); }
   });
+  var dbBtn = document.getElementById('dashboardBtn');
+  if (dbBtn) { if (_thesisLoaded) dbBtn.removeAttribute('disabled'); else dbBtn.setAttribute('disabled', ''); }
 }
 
 function resetSearch() {
