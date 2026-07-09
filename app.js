@@ -1252,14 +1252,34 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
     }
 
     if(box&&rawRefs.length){
+      // 找到参考文献边界
       var refBoundary=null,tw=document.createTreeWalker(box,NodeFilter.SHOW_ELEMENT,null,false),el2=tw.firstChild();
-      while(el2){var t2=(el2.textContent||'').replace(/\s+/g,'');if(t2.indexOf('参考文献')===0&&/^(p|h[1-6]|div)$/i.test(el2.tagName||'')){refBoundary=el2;break}el2=tw.nextNode()}
-      rawRefs.forEach(function(r){var n2=r.num,nf='['+n2+']',tw2=document.createTreeWalker(box,NodeFilter.SHOW_ELEMENT,null,false),el3=tw2.firstChild(),best=null;while(el3){var tag=(el3.tagName||'').toLowerCase();if(/^(p|li|h[1-6]|div|td)$/.test(tag)){var txt3=el3.textContent||'',mi=txt3.indexOf(nf);while(mi>=0){var ac=txt3[mi+nf.length]||'';if(!/\d/.test(ac))break;mi=txt3.indexOf(nf,mi+1)}if(mi>=0){if(refBoundary&&(el3.compareDocumentPosition(refBoundary)&Node.DOCUMENT_POSITION_FOLLOWING)){}else best=el3}}el3=tw2.nextNode()}if(best){r._domEl=best;r.ch=chapterForElement(best);
-      // 保存原始段落文本，之后用此文本提取句子
-      r._ctx=extractCtxBeforeMarker(best.textContent||'',r.num);
-      var sp0=locateRefInRawDOM(best,r.num);
-      r._chName=sp0.ch;r._secName=sp0.sec;r._subName=sp0.sub;
-    }})
+      while(el2){var t2=(el2.textContent||'').replace(/\s+/g,'');if(t2.indexOf('参考文献')===0&&/^(p|li|h[1-6]|div)$/i.test(el2.tagName||'')){refBoundary=el2;break}el2=tw.nextNode()}
+      // 一次DOM遍历定位所有引用（N个引用→1次遍历，不再N次）
+      var refMap={};rawRefs.forEach(function(r){refMap[r.num]=r;});
+      var twAll=document.createTreeWalker(box,NodeFilter.SHOW_ELEMENT,null,false),elAll=twAll.firstChild();
+      while(elAll){
+        var tagE=(elAll.tagName||'').toLowerCase();
+        if(/^(p|li|h[1-6]|div|td)$/.test(tagE)){
+          if(!refBoundary||!(elAll.compareDocumentPosition(refBoundary)&Node.DOCUMENT_POSITION_FOLLOWING)){
+            var elTxt=elAll.textContent||'';
+            // 找这个元素中所有的 [N] 标记
+            var rm=/\[(\d+)\]/g,rmM;
+            while((rmM=rm.exec(elTxt))!==null){
+              var rn=parseInt(rmM[1]);
+              if(skip&&rmM[1].length>1){var nextCh=elTxt[rmM.index+rmM[0].length]||'';if(/\d/.test(nextCh))continue;}
+              var mr=refMap[rn];
+              if(mr&&!mr._domEl){
+                mr._domEl=elAll;mr.ch=chapterForElement(elAll);
+                mr._ctx=extractCtxBeforeMarker(elTxt,rn);
+                var sp0=locateRefInRawDOM(elAll,rn);
+                mr._chName=sp0.ch;mr._secName=sp0.sec;mr._subName=sp0.sub;
+              }
+            }
+          }
+        }
+        elAll=twAll.nextNode();
+      }
     }
     existingRefs=rawRefs;
     existingRefs.forEach(function(r){
@@ -1273,6 +1293,7 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
     });
     updateDashboard(existingRefs);
 
+    await sleep(0);
     wrapExistingMarkers(rawRefs.filter(function(r){return r.num}));
     setTimeout(function(){highlightRefSentences();},100);
     // (已移除死代码：_isOriginal对所有已有文献为true，此循环永不会执行)
