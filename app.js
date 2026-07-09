@@ -701,7 +701,6 @@ async function startSearch(){
     });
   });
   searchRounds.push(Array.from(new Set(allHeadings)).slice(0,25));
-  searchRounds.push(Array.from(new Set(allHeadings)).slice(0,25));
   // 正文词轮次（恢复：保证检索覆盖全面）
   var genEN=['construction','engineering','management','safety','monitoring','evaluation','prediction','analysis','design','optimization','machine learning','deep learning','neural network','artificial intelligence','big data','internet of things'];
   var genCN=['工程','施工','管理','安全','监测','评价','预测','分析','设计','优化','系统','模型','方法','技术','智能','网络','算法','风险','评估','控制'];
@@ -730,9 +729,12 @@ async function startSearch(){
   var allTerms3=[];searchRounds.forEach(function(r){allTerms3=allTerms3.concat(r);});
   allTerms3=Array.from(new Set(allTerms3));
   var pool=[];var seen=new Set();
-  updLoad('搜索('+allTerms3.length+'词)...',15);
-  var resp=await fetch('/search_api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:allTerms3,max_per_query:500})});
-  if(resp.ok){var rj=await resp.json();if(rj.success&&rj.results){rj.results.forEach(function(rr){var nk=norm(rr.title).substring(0,60);if(!seen.has(nk)){seen.add(nk);pool.push(rr);}})}}
+  var batchSize=40;
+  updLoad('搜索('+allTerms3.length+'词,'+Math.ceil(allTerms3.length/batchSize)+'批)...',15);
+  var fetches3=[];
+  for(var bi=0;bi<allTerms3.length;bi+=batchSize){
+    (function(batch){var p=fetch('/search_api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:batch,max_per_query:400})}).then(function(r){return r.json()}).then(function(rj){if(rj.success&&rj.results){rj.results.forEach(function(rr){var nk=norm(rr.title).substring(0,60);if(!seen.has(nk)){seen.add(nk);pool.push(rr);}})}}).catch(function(e){});fetches3.push(p);})(allTerms3.slice(bi,bi+batchSize));}
+  await Promise.all(fetches3);
   updLoad('累计'+pool.length+'条',30);
 
 if(!pool.length){hideLoad();searchRunning=false;alert('未检索到相关文献。\n\n可能原因：\n1. 论文主题词过于冷门\n2. 网络连接不稳定\n3. 搜索词数量不足\n\n建议：\n• 检查Python服务窗口日志\n• 访问 /ping 确认服务正常\n• 尝试减少检索文献总数');return}
