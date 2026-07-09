@@ -435,8 +435,9 @@ test('MODULE: dashboard.js integrates review scores', function() {
 
 test('UI: Dashboard 3D button exists with pulse animation', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  var css = fs.readFileSync(path.join(projectRoot, 'css/style.css'), 'utf8');
   assert(html.indexOf('dashboard-btn') >= 0, 'Missing dashboard button');
-  assert(html.indexOf('db-pulse') >= 0, 'Missing pulse animation');
+  assert(css.indexOf('db-breathe') >= 0, 'Missing pulse animation in CSS');
 });
 
 test('UI: Dashboard overlay has review report button', function() {
