@@ -2,14 +2,7 @@ __pycache__/
 *.pyc
 *.bak
 *.phase0.bak
-app.js.phase0.bak
-index.html.phase0.bak
-kg_server.py.phase0.bak
-# 大型第三方库（大于1MB，用pip安装或CDN加载即可）
-pdf.min.js
-pdf.worker.min.js
-mammoth.browser.min.js
-jszip.min.js
+*.pre-ui.bak
 # IDE
 .vscode/
 .idea/
