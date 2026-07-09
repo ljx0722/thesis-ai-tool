@@ -180,6 +180,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 .kb-hint{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(30,30,32,0.85);backdrop-filter:blur(10px);color:rgba(255,255,255,0.6);font-size:.62rem;padding:4px 14px;border-radius:20px;z-index:9998;pointer-events:none;opacity:0;transition:opacity .3s}
 .kb-hint.show{opacity:1}.ref-sentence{background:rgba(0,113,227,0.08);border-radius:3px;padding:0 2px;transition:background .2s}
 .ref-sentence:hover{background:rgba(0,113,227,0.18)}
+.help-btn{position:fixed;bottom:20px;right:20px;width:42px;height:42px;border-radius:50%;background:rgba(30,30,32,0.85);backdrop-filter:blur(10px);color:#fff;font-size:1.1rem;font-weight:600;border:none;cursor:pointer;z-index:9997;box-shadow:0 4px 16px rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;transition:transform .15s,box-shadow .15s}
+.help-btn:hover{transform:scale(1.08);box-shadow:0 6px 20px rgba(0,0,0,0.3)}
 </style></head><body>
 <div id="fileBlock"><b>⚠️ 请通过 HTTP 访问</b><br><br>本页面需要调用外部API检索文献，无法从 file:// 协议使用。<br><br><button onclick="window.open('http://localhost:5000/','_self')" style="font-size:1rem;padding:10px 30px;background:var(--b);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700">🔗 一键跳转 HTTP</button><br><br><small style="color:var(--m)">或双击运行 <b>启动.bat</b> 后点击上方按钮</small></div>
 <script>if(window.location.protocol==='file:'){document.getElementById('fileBlock').style.display='block';document.querySelector('.main')&&(document.querySelector('.main').style.display='none');document.querySelector('.bar')&&(document.querySelector('.bar').style.display='none');fetch('http://localhost:5000/',{mode:'no-cors'}).then(function(r){window.location.href='http://localhost:5000/'}).catch(function(){});}</script>
@@ -277,11 +279,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 window.domReady=true;window.hasMammoth=typeof mammoth!=='undefined';window.hasJSZip=typeof JSZip!=='undefined';
 window._ambientTips=['参考文献最好近3年的占一半以上','英文文献不能太少，至少30%','摘要部分一般不需要引用','绪论里的文献综述要覆盖这个领域主要流派','每个章节至少引用1-2条文献支撑','数据和方法的描述通常需要引文献佐证','图表如果引用了别人的要标注来源','结语和展望里可以少放一些引用','期刊论文比学位论文更适合做参考文献','别在目录和附录附近插引用标记','GB/T 7714 不要漏了DOI','文献标题大小写要保持一致','引用年份越近说明研究越前沿','大数据加小样本，贝叶斯方法很有用'];
 </script>
+<button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
 <script src="app.js"></script>
 <script src="js/modules/optimization.js"></script>
 <script src="js/modules/format-check.js"></script>
 <script src="js/modules/terminology.js"></script>
 <script src="js/modules/paragraph-analysis.js"></script>
+<script src="js/modules/onboarding.js"></script>
 <script src="js/app-modules.js"></script>
 <script>
 (function(){
