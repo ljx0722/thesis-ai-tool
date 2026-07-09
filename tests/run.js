@@ -654,6 +654,53 @@ test('FEATURE: kg_server.py search_api handles empty queries', function() {
 });
 
 
+// ============================================================
+// SECTION 14: Regression Tests (Bugs found in production)
+// ============================================================
+console.log('\n=== Section 14: Regression Tests ===');
+
+test('REGRESSION: format-check.js declares totalChars before use', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
+  assert(src.indexOf('var totalChars = text.length') >= 0, 'totalChars must be declared before conclusion check');
+});
+
+test('REGRESSION: dashboard.js buildDashboardHTML uses s.bodyChs not bare bodyChs', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
+  assert(src.indexOf('_dbBodyChs = s.bodyChs') >= 0, 'Must reference s.bodyChs, not bare bodyChs variable');
+});
+
+test('REGRESSION: dashboard.js drawChapterChart uses window._dbBodyChs', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
+  assert(src.indexOf('window._dbBodyChs') >= 0, 'drawChapterChart must read from window._dbBodyChs');
+});
+
+test('REGRESSION: optimization.js declares totalChars before use', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/optimization.js'), 'utf8');
+  assert(src.indexOf('var totalChars = text.length') >= 0, 'totalChars must be declared');
+});
+
+test('REGRESSION: paragraph-analysis.js declares bodyBoundaryEl or uses it from global', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/paragraph-analysis.js'), 'utf8');
+  assert(src.indexOf('typeof bodyBoundaryEl') >= 0, 'bodyBoundaryEl must have typeof guard');
+});
+
+test('REGRESSION: All run* functions accept container parameter', function() {
+  var files = ['js/modules/format-check.js','js/modules/optimization.js',
+    'js/modules/terminology.js','js/modules/paragraph-analysis.js'];
+  files.forEach(function(f) {
+    var src = fs.readFileSync(path.join(projectRoot, f), 'utf8');
+    assert(src.indexOf('function run') >= 0 && src.indexOf('container)') >= 0,
+      f + ': run* function must accept container parameter');
+  });
+});
+
+test('REGRESSION: dashboard.js functions all use proper variable scoping', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
+  assert(src.indexOf('var s = computeAllScores()') >= 0, 'buildDashboardHTML must declare var s');
+  assert(src.indexOf('var h = ') >= 0, 'buildDashboardHTML must declare var h');
+});
+
+
 // Results
 // ============================================================
 console.log('\n=== RESULTS ===');

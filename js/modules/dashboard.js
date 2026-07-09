@@ -222,7 +222,7 @@ function buildDashboardHTML() {
 
   // Store for chart rendering
   window._dbScores = s;
-  window._dbBodyChs = bodyChs;
+  window._dbBodyChs = s.bodyChs;
 
   return h;
 }
