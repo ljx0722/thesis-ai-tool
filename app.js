@@ -154,6 +154,9 @@ function injectNewMarkers(refs){
       if(cur.nodeType===1){
         var tag=(cur.tagName||'').toLowerCase();
         if(/^p$/.test(tag)){
+          // 跳过正文尾部（参考文献之后的段落）
+          var bb=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
+          if(bb&&(cur.compareDocumentPosition(bb)&Node.DOCUMENT_POSITION_FOLLOWING)){cur=cur.nextSibling;continue;}
           if(cur.querySelector&&cur.querySelector('.cite-marker')){cur=cur.nextSibling;continue}
           paras.push(cur)
         }
@@ -190,7 +193,7 @@ function injectNewMarkers(refs){
         var sk=extractTitleKws(sen.text);
         var o2=sk.filter(function(w){return kw.indexOf(w)>=0}).length;
         var dupRate=kw.length>0?Math.round(o2/Math.max(1,(sk.length+kw.length)/2)*100):0;
-        if(score>=1&&score>bestScore){bestScore=score;bestRef=r;bestDupRate=dupRate}
+        if(score>=2&&score>bestScore){bestScore=score;bestRef=r;bestDupRate=dupRate}
       });
       if(bestRef){
         usedRefs.add(bestRef);
@@ -815,61 +818,56 @@ async function startSearch(){
   updLoad('关联句子...',94);
   await sleep(0);
 
-  // 2b. 没匹配到的：找与文献标题语义最相近的句子，替换该句
+  // 2b. 未匹配到的文献：追加标记到其章节最相关段落的末尾（不替换原文句子）
   try{mergedRefs.forEach(function(r){
     if(r.source==="existing"||r._domEl||!r.ch)return;
     var chEl=document.getElementById("ch-"+r.ch);if(!chEl||!chEl.parentElement)return;
+    var bodyBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
     var paras=[],sib=chEl.nextSibling;
     while(sib){if(sib.nodeType===1&&sib._slevel==="ch")break;
-      if(sib.querySelectorAll)sib.querySelectorAll("p").forEach(function(pp){if(pp.textContent&&pp.textContent.length>10)paras.push(pp)});
-      if(sib.tagName&&/^p$/i.test(sib.tagName)&&sib.textContent&&sib.textContent.length>10)paras.push(sib);
+      if(sib.nodeType===1&&/^p$/i.test(sib.tagName)&&sib.textContent&&sib.textContent.length>20){
+        if(bodyBound&&(sib.compareDocumentPosition(bodyBound)&Node.DOCUMENT_POSITION_FOLLOWING)){sib=sib.nextSibling;continue;}
+        paras.push(sib);
+      }
       sib=sib.nextSibling;}
     var rtKws=extractTitleKws(r.title||"");
-    var bestSentence=null,bestSentencePara=null,bestScore=0;
-    paras.forEach(function(pr){
-      var txt=pr.textContent||"";
-      var sents=txt.split(/[。；！？\.\?\!]/g);
-      sents.forEach(function(st){var sc=rtKws.reduce(function(s,w){return s+(st.toLowerCase().indexOf(w)>=0?1:0)},0);
-        if(sc>bestScore){bestScore=sc;bestSentence=st;bestSentencePara=pr;}});
-    });
-    var kws=(paperTopics||[]).map(function(t){return t.label}).filter(function(t){return(r.title||"").toLowerCase().indexOf(t.toLowerCase())>=0}).slice(0,4);
-    if(kws.length===0)kws=[(r.title||"").substring(0,6)];
-    var genSen="相关研究表明，"+kws.join("、")+"等方向对该领域具有重要参考价值。";
-    var marker='<span class="cite-marker generated" onclick="scrollToRef('+r.displayNum+')">['+r.displayNum+']</span>';
-    if(bestSentencePara&&bestSentence&&bestScore>=1){
-      var orig2=bestSentencePara.textContent||"",sidx=orig2.indexOf(bestSentence);
-      if(sidx>=0&&sidx+bestSentence.length<=orig2.length){
-        var tw2=document.createTreeWalker(bestSentencePara,NodeFilter.SHOW_TEXT,null,false);
-        var pos2=0,tgtStart=null,offStart=0,tgtEnd=null,offEnd=0,tn3;
-        while((tn3=tw2.nextNode())!==null){var ln=tn3.textContent.length;
-          if(!tgtStart&&pos2+ln>sidx){tgtStart=tn3;offStart=sidx-pos2;}
-          if(!tgtEnd&&pos2+ln>=sidx+bestSentence.length){tgtEnd=tn3;offEnd=sidx+bestSentence.length-pos2;break;}
-          pos2+=ln;}
-        if(tgtStart&&tgtEnd&&tgtStart===tgtEnd){
-          var rightPart2=tgtEnd.splitText(offEnd);
-          var midPart2=tgtStart.splitText(offStart);
-          midPart2.parentElement.removeChild(midPart2);
-          var repSpan2=document.createElement('span');
-          repSpan2.style.cssText='background:#ecfdf5;padding:1px 4px;border-radius:2px;font-size:.6rem;color:#059669;margin-right:4px';
-          repSpan2.textContent='AI替换';
-          var mrkSpan2=document.createElement('span');
-          mrkSpan2.className='cite-marker generated';
-          mrkSpan2.textContent='['+r.displayNum+']';
-          mrkSpan2.onclick=function(nn){return function(e){e.stopPropagation();scrollToRef(nn);};}(r.displayNum);
-          var sepText2=/[。；：！？\.\?\!]$/.test(tgtStart.textContent||'')?'':'，';
-          tgtStart.parentElement.insertBefore(document.createTextNode(sepText2),rightPart2);
-          tgtStart.parentElement.insertBefore(repSpan2,rightPart2);
-          tgtStart.parentElement.insertBefore(document.createTextNode(genSen),rightPart2);
-          tgtStart.parentElement.insertBefore(mrkSpan2,rightPart2);
-          r._domEl=mrkSpan2;
-        }
-      }
-    }
-    if(!r._domEl)r._domEl=bestSentencePara?bestSentencePara.querySelector(".cite-marker"):null;
-    r._ctx=genSen;r._hasSection=true;
-  })}catch(es){console.warn("[auto] skip:",es.message)}
+    var bestPara=null,bestScore=0;
+    paras.forEach(function(pr){var sc=rtKws.reduce(function(s,w){return s+((pr.textContent||"").toLowerCase().indexOf(w)>=0?1:0)},0);if(sc>bestScore){bestScore=sc;bestPara=pr;}});
+    if(!bestPara)return;
+    // Append marker at end of paragraph (before the closing punctuation if any)
+    var mrkSpan3=document.createElement('span');
+    mrkSpan3.className='cite-marker generated';
+    mrkSpan3.textContent='['+r.displayNum+']';
+    mrkSpan3.onclick=function(nn){return function(e){e.stopPropagation();scrollToRef(nn);};}(r.displayNum);
+    var lastChild=bestPara.lastChild;
+    if(lastChild&&lastChild.nodeType===3&&/[。！？\.\?\!]$/.test((lastChild.textContent||'').trim())){
+      var txt2=lastChild.textContent||'',trimmed=txt2.trimEnd(),ws=txt2.substring(trimmed.length);
+      var m=trimmed.match(/[。！？\.\?\!]\s*$/);
+      if(m){
+        lastChild.textContent=trimmed.substring(0,m.index)+ws;
+        bestPara.appendChild(mrkSpan3);
+        bestPara.appendChild(document.createTextNode(trimmed.substring(m.index)));
+      }else{bestPara.appendChild(mrkSpan3);}
+    }else{bestPara.appendChild(mrkSpan3);}
+    r._domEl=mrkSpan3;
+    r._ctx=(bestPara.textContent||'').substring(Math.max(0,(bestPara.textContent||'').length-80));
+    r._hasSection=true;
+  })}catch(es){console.warn("[auto] skip:",es.message);}
 
-  // 3. 收集正文中所有.cite-marker的DOM顺序
+  // 2c. 仍未匹配的（极少数）：追加到章节标题后的第一个段落末尾
+  try{mergedRefs.forEach(function(r){
+    if(r.source==="existing"||r._domEl||!r.ch)return;
+    var chEl2=document.getElementById("ch-"+r.ch);if(!chEl2)return;
+    var firstPara=chEl2.nextSibling;
+    while(firstPara&&firstPara.nodeType!==1)firstPara=firstPara.nextSibling;
+    if(!firstPara||!/^p$/i.test(firstPara.tagName||''))return;
+    var mrk2=document.createElement('span');mrk2.className='cite-marker generated';
+    mrk2.textContent='['+r.displayNum+']';mrk2.onclick=function(nn){return function(e){e.stopPropagation();scrollToRef(nn);};}(r.displayNum);
+    firstPara.appendChild(mrk2);r._domEl=mrk2;
+    r._ctx=(firstPara.textContent||'').substring(0,60);r._hasSection=true;
+  })}catch(es2){}
+
+  // 3.
   var refBoundary2=bodyBoundaryEl();
   var oldRefs=mergedRefs.slice();var markersInOrder=[];
   var spanList=document.querySelectorAll('.cite-marker');
@@ -880,14 +878,17 @@ async function startSearch(){
     if(ref2)markersInOrder.push(ref2);
   }
 
-  // 4. 按DOM顺序重建mergedRefs，分配新的displayNum（原文ref的句子绑定保留，序号重新排）
+  // 4. 按DOM顺序重建mergedRefs，分配新的displayNum
+  // 先收集有DOM的，再追加无DOM的，全部按临时序号排序保持稳定
   mergedRefs=[];
   var seen2=new Set();
   markersInOrder.forEach(function(ref3){
     if(!seen2.has(ref3)){seen2.add(ref3);ref3.displayNum=mergedRefs.length+1;mergedRefs.push(ref3);}
   });
-  // 追加没有DOM标记的文献（如未匹配到句子的新文献）
-  oldRefs.forEach(function(r){if(!seen2.has(r)){r.displayNum=mergedRefs.length+1;mergedRefs.push(r);seen2.add(r);}});
+  // 没有DOM标记的文献按 tempNum 排序后追加（保持编号连续性）
+  var noDom=oldRefs.filter(function(r){return !seen2.has(r);});
+  noDom.sort(function(a,b){return(a.tempNum||0)-(b.tempNum||0);});
+  noDom.forEach(function(r){r.displayNum=mergedRefs.length+1;mergedRefs.push(r);seen2.add(r);});
 
   // 5. 更新所有span的数字和click为新的displayNum
   spanList=document.querySelectorAll('.cite-marker');
@@ -1121,7 +1122,7 @@ function deleteRef(idx){
   if(r._domEl&&r._domEl.parentElement)r._domEl.parentElement.removeChild(r._domEl);
   // Remove from list
   mergedRefs.splice(idx,1);
-  // Renumber all remaining refs in DOM order
+  // Renumber all remaining refs in DOM order (stable: no-DOM refs sorted by tempNum)
   var spanList3=document.querySelectorAll('.cite-marker');
   var oldRefs3=mergedRefs.slice();mergedRefs=[];
   var seen3=new Set();
@@ -1132,7 +1133,9 @@ function deleteRef(idx){
     var ref3=oldRefs3.find(function(rf){return rf._domEl===sp3;});
     if(ref3&&!seen3.has(ref3)){seen3.add(ref3);ref3.displayNum=mergedRefs.length+1;mergedRefs.push(ref3);}
   }
-  oldRefs3.forEach(function(rf){if(!seen3.has(rf)){rf.displayNum=mergedRefs.length+1;mergedRefs.push(rf);seen3.add(rf);}});
+  var noDom2=oldRefs3.filter(function(rf){return !seen3.has(rf);});
+  noDom2.sort(function(a,b){return(a.tempNum||0)-(b.tempNum||0);});
+  noDom2.forEach(function(rf){rf.displayNum=mergedRefs.length+1;mergedRefs.push(rf);seen3.add(rf);});
   // Update span texts
   spanList3=document.querySelectorAll('.cite-marker');
   for(var ui3=0;ui3<spanList3.length;ui3++){
