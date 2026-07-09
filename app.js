@@ -522,7 +522,7 @@ function extractTitleKws(title){
   return Array.from(new Set(kws)).slice(0,12);
 }
 
-function assignChapters(refs,mode,total){
+async function assignChapters(refs,mode,total){
   if(!refs.length||!sections.length)return;
   if(!sections[0].text||sections[0].text===manuscriptText)populateChapterText();
   // Only use body chapters (excluding 参考文献/附录/致谢/获奖等)
@@ -530,7 +530,14 @@ function assignChapters(refs,mode,total){
   var n2=bodyChs.length,lastCh=bodyChs[n2-1].ch;
   if(!n2){console.warn('[assign] No body chapters found!');return}
   // Score against body chapters only
-  var scores=refs.map(function(r){var kws=extractTitleKws(r.title||'');return bodyChs.map(function(cs){var ct=(cs.text||'').toLowerCase();var h=kws.reduce(function(s,w){return s+(ct.indexOf(w)>=0?1:0)},0);return kws.length>0?h/kws.length:0});});
+  await sleep(0);
+  var scores=[];
+  for(var sci=0;sci<refs.length;sci+=30){
+    var sce=Math.min(sci+30,refs.length);
+    for(var scj=sci;scj<sce;scj++){var r2=refs[scj];var kws=extractTitleKws(r2.title||"");scores[scj]=bodyChs.map(function(cs){var ct=(cs.text||"").toLowerCase();var h=kws.reduce(function(s,w){return s+(ct.indexOf(w)>=0?1:0)},0);return kws.length>0?h/kws.length:0;});}
+    await sleep(0);
+  }
+  await sleep(0);
   var lCap=Math.max(1,Math.floor(refs.length*0.05));
   var targets=[];
 
@@ -801,7 +808,7 @@ async function startSearch(){
     
   }catch(e3){console.warn('[step3] filter error:',e3.message);}
 
-  try{updLoad('分配章节...',85);await sleep(0);var distMode=document.getElementById('fDist')&&document.getElementById('fDist').value||'auto';assignChapters(selected,distMode,total);}catch(e4){console.warn('[step4] assign error:',e4.message);}
+  try{updLoad('分配章节...',85);await sleep(0);var distMode=document.getElementById('fDist')&&document.getElementById('fDist').value||'auto';await assignChapters(selected,distMode,total);}catch(e4){console.warn('[step4] assign error:',e4.message);}
   try{updLoad('四维度评估...',90);await sleep(0);await forEachChunked(selected,function(r){scoreReference(r,{source:'new',hasSentence:false});},50);}catch(e5){console.warn('[step5] score error:',e5.message);}
 
   // === STEP 6: MERGE, RENUMBER & RE-ANCHOR ===
