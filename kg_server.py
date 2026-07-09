@@ -390,6 +390,7 @@ def _run_source(fn, *args):
 
 @app.route('/search_api', methods=['POST'])
 def search_api():
+    """文献检索：每个 query 的多个数据源串行调用"""
     try:
         data = request.get_json() or {}
         queries = data.get('queries', [])
@@ -400,34 +401,27 @@ def search_api():
             if not q.strip(): continue
             is_cn = bool(re.search(r'[一-鿿]', q))
 
-            with ThreadPoolExecutor(max_workers=8) as ex:
-                futures = [
-                    ex.submit(_run_source, fetch_with_retry, search_openalex, q, max_per),
-                    ex.submit(_run_source, search_crossref, q, 100),
-                    ex.submit(_run_source, search_semantic_scholar, q, 100),
-                ]
-                if is_cn:
-                    futures.append(ex.submit(_run_source, fetch_with_retry, search_openalex_cn, q, 150))
-                    futures.append(ex.submit(_run_source, search_wanfang, q, 50))
-                futures.append(ex.submit(_run_source, search_arxiv, q, 100))
-                futures.append(ex.submit(_run_source, search_core, q, 80))
-                futures.append(ex.submit(_run_source, search_pubmed, q, 100))
-                futures.append(ex.submit(_run_source, search_inspirehep, q, 80))
-                futures.append(ex.submit(_run_source, search_datacite, q, 80))
-                futures.append(ex.submit(_run_source, search_doaj, q, 80))
-
-                for f in as_completed(futures, timeout=20):
-                    try: all_results.extend(f.result() or [])
-                    except: pass
-
-            # 百度学术并发翻页
+            # 所有数据源串行调用（稳定优先）
+            sources = [
+                lambda: fetch_with_retry(search_openalex, q, min(max_per, 80)),
+                lambda: search_crossref(q, 50),
+                lambda: search_semantic_scholar(q, 50),
+                lambda: search_arxiv(q, 50),
+                lambda: search_core(q, 40),
+                lambda: search_pubmed(q, 50),
+                lambda: search_inspirehep(q, 40),
+                lambda: search_datacite(q, 40),
+                lambda: search_doaj(q, 40),
+            ]
             if is_cn:
-                try:
-                    with ThreadPoolExecutor(max_workers=3) as ex2:
-                        bd_futures = [ex2.submit(_run_source, search_baidu_xueshu_page, q, pn) for pn in [0, 10, 20]]
-                        for f in as_completed(bd_futures, timeout=12):
-                            try: all_results.extend(f.result() or [])
-                            except: pass
+                sources.append(lambda: fetch_with_retry(search_openalex_cn, q, 100))
+                sources.append(lambda: search_wanfang(q, 30))
+                sources.append(lambda: search_baidu_xueshu_page(q, 0))
+                sources.append(lambda: search_baidu_xueshu_page(q, 10))
+                sources.append(lambda: search_baidu_xueshu_page(q, 20))
+
+            for source_fn in sources:
+                try: all_results.extend(source_fn() or [])
                 except: pass
 
         all_results = dedup_results(all_results)
