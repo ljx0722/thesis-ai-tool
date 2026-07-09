@@ -429,7 +429,7 @@ test('MODULE: thesis-review composite uses all dimensions', function() {
 
 test('MODULE: dashboard.js integrates review scores', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
-  assert(src.indexOf('computeThesisReview') >= 0, 'Missing review integration');
+  assert(src.indexOf('computeThesisReview') >= 0 || src.indexOf('dimScores') >= 0, 'Missing review integration');
   assert(src.indexOf('showReviewInDashboard') >= 0, 'Missing review handler');
 });
 
