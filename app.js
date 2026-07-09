@@ -734,7 +734,7 @@ async function startSearch(){
   updLoad('搜索('+allTerms3.length+'词,'+Math.ceil(allTerms3.length/batchSize)+'批)...',15);
   var fetches3=[];
   for(var bi=0;bi<allTerms3.length;bi+=batchSize){
-    (function(batch){var p=fetch('/search_api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:batch,max_per_query:400})}).then(function(r){return r.json()}).then(function(rj){if(rj.success&&rj.results){rj.results.forEach(function(rr){var nk=norm(rr.title).substring(0,60);if(!seen.has(nk)){seen.add(nk);pool.push(rr);}})}}).catch(function(e){});fetches3.push(p);})(allTerms3.slice(bi,bi+batchSize));}
+    (function(batch){var p=fetch('/search_api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:batch,max_per_query:200})}).then(function(r){return r.json()}).then(function(rj){if(rj.success&&rj.results){rj.results.forEach(function(rr){var nk=norm(rr.title).substring(0,60);if(!seen.has(nk)){seen.add(nk);pool.push(rr);}})}}).catch(function(e){});fetches3.push(p);})(allTerms3.slice(bi,bi+batchSize));}
   await Promise.all(fetches3);
   updLoad('累计'+pool.length+'条',30);
 

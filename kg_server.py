@@ -31,17 +31,19 @@ def serve_static(filename):
 
 
 # ========== 辅助函数 ==========
+import threading
 SESSION = None
+_local = threading.local()
 
 def get_session():
-    """延迟创建 requests Session，复用连接池"""
-    global SESSION
-    if SESSION is None and HAS_REQUESTS:
-        SESSION = requests.Session()
-        SESSION.headers.update({
+    """线程安全的 Session：每个线程独立实例，避免并发损坏"""
+    if not HAS_REQUESTS: return None
+    if not hasattr(_local, 'session'):
+        _local.session = requests.Session()
+        _local.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         })
-    return SESSION
+    return _local.session
 
 def fetch_with_retry(fn, *args, max_retries=2, **kwargs):
     for attempt in range(max_retries + 1):
@@ -50,14 +52,15 @@ def fetch_with_retry(fn, *args, max_retries=2, **kwargs):
             if attempt < max_retries: time.sleep(0.5 * (attempt + 1))
     return None
 
-def fetch_json(url, headers=None, timeout=15):
-    """用 requests 获取 JSON，失败时 fallback 到 urllib"""
+def fetch_json(url, headers=None, timeout=8):
+    """用 requests 获取 JSON，失败时 fallback 到 urllib（超时短，快速失败）"""
     if HAS_REQUESTS:
         try:
             s = get_session()
-            r = s.get(url, headers=headers, timeout=timeout)
-            if r.status_code == 200:
-                return r.json()
+            if s:
+                r = s.get(url, headers=headers, timeout=timeout)
+                if r.status_code == 200:
+                    return r.json()
         except Exception:
             pass
     # fallback: urllib
@@ -70,13 +73,14 @@ def fetch_json(url, headers=None, timeout=15):
     except Exception:
         return None
 
-def fetch_text(url, headers=None, timeout=15):
+def fetch_text(url, headers=None, timeout=8):
     if HAS_REQUESTS:
         try:
             s = get_session()
-            r = s.get(url, headers=headers, timeout=timeout)
-            if r.status_code == 200:
-                return r.text
+            if s:
+                r = s.get(url, headers=headers, timeout=timeout)
+                if r.status_code == 200:
+                    return r.text
         except Exception:
             pass
     try:
@@ -399,24 +403,25 @@ def search_api():
         for q in queries[:30]:
             if not q.strip(): continue
             is_cn = bool(re.search(r'[一-鿿]', q))
+            q_max = min(max_per, 200)  # 每个源最多200条，避免超时
 
-            with ThreadPoolExecutor(max_workers=8) as ex:
+            with ThreadPoolExecutor(max_workers=5) as ex:
                 futures = [
-                    ex.submit(_run_source, fetch_with_retry, search_openalex, q, max_per),
-                    ex.submit(_run_source, search_crossref, q, 100),
-                    ex.submit(_run_source, search_semantic_scholar, q, 100),
+                    ex.submit(_run_source, fetch_with_retry, search_openalex, q, 80),
+                    ex.submit(_run_source, search_crossref, q, 50),
+                    ex.submit(_run_source, search_semantic_scholar, q, 50),
                 ]
                 if is_cn:
-                    futures.append(ex.submit(_run_source, fetch_with_retry, search_openalex_cn, q, 150))
-                    futures.append(ex.submit(_run_source, search_wanfang, q, 50))
-                futures.append(ex.submit(_run_source, search_arxiv, q, 100))
-                futures.append(ex.submit(_run_source, search_core, q, 80))
-                futures.append(ex.submit(_run_source, search_pubmed, q, 100))
-                futures.append(ex.submit(_run_source, search_inspirehep, q, 80))
-                futures.append(ex.submit(_run_source, search_datacite, q, 80))
-                futures.append(ex.submit(_run_source, search_doaj, q, 80))
+                    futures.append(ex.submit(_run_source, fetch_with_retry, search_openalex_cn, q, 100))
+                    futures.append(ex.submit(_run_source, search_wanfang, q, 30))
+                futures.append(ex.submit(_run_source, search_arxiv, q, 50))
+                futures.append(ex.submit(_run_source, search_core, q, 40))
+                futures.append(ex.submit(_run_source, search_pubmed, q, 50))
+                futures.append(ex.submit(_run_source, search_inspirehep, q, 40))
+                futures.append(ex.submit(_run_source, search_datacite, q, 40))
+                futures.append(ex.submit(_run_source, search_doaj, q, 40))
 
-                for f in as_completed(futures, timeout=20):
+                for f in as_completed(futures, timeout=30):
                     try: all_results.extend(f.result() or [])
                     except: pass
 
