@@ -1267,7 +1267,8 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
             var rm=/\[(\d+)\]/g,rmM;
             while((rmM=rm.exec(elTxt))!==null){
               var rn=parseInt(rmM[1]);
-              if(skip&&rmM[1].length>1){var nextCh=elTxt[rmM.index+rmM[0].length]||'';if(/\d/.test(nextCh))continue;}
+              // 跳过被误匹配的更大数字（如[2]匹配到[20]里的2）
+              if(rmM[0].length>2){var after=elTxt[rmM.index+rmM[0].length]||'';if(/\d/.test(after))continue;}
               var mr=refMap[rn];
               if(mr&&!mr._domEl){
                 mr._domEl=elAll;mr.ch=chapterForElement(elAll);
