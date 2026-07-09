@@ -732,18 +732,33 @@ async function startSearch(){
   for(var sk=0;sk<Math.min(sentenceKwList.length-1,15);sk++){sentCombos.push(sentenceKwList[sk]+' '+sentenceKwList[sk+1]);}
   searchRounds.push(sentCombos.slice(0,30));
 
-  // 合并去重 → 分批发送（每批40词）
+  // 合并去重 → 逐词并发搜索（1词/请求，并发6个，后端只查3源每词约2-4s）
   searchRounds=searchRounds.map(function(r){return Array.from(new Set(r)).filter(Boolean)});
   var allTerms3=[];searchRounds.forEach(function(r){allTerms3=allTerms3.concat(r);});
   allTerms3=Array.from(new Set(allTerms3));
   var pool=[];var seen=new Set();
-  var batchSize=15;
-  initSrStatus(Math.ceil(allTerms3.length/batchSize));
-  updLoad('搜索('+allTerms3.length+'词,'+Math.ceil(allTerms3.length/batchSize)+'批)...',15);
-  var fetches3=[];
-  for(var bi=0;bi<allTerms3.length;bi+=batchSize){
-    (function(batch){var p=fetch('/search_api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:batch,max_per_query:100})}).then(function(r){return r.json()}).then(function(rj){if(rj.success&&rj.results){rj.results.forEach(function(rr){var nk=norm(rr.title).substring(0,60);if(!seen.has(nk)){seen.add(nk);pool.push(rr);}})}_srStatus.poolCount=pool.length;updateSrPanel();}).catch(function(e){});fetches3.push(p);})(allTerms3.slice(bi,bi+batchSize));}
-  await Promise.all(fetches3);
+  var concurrency=6; // 同时最多6个请求
+  updLoad('搜索('+allTerms3.length+'词)...',15);
+  var completed=0,total=allTerms3.length;
+  function searchOneWord(word){
+    return fetch('/search_api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:[word],max_per_query:100})})
+      .then(function(r){return r.json()}).then(function(rj){if(rj.success&&rj.results){rj.results.forEach(function(rr){var nk=norm(rr.title).substring(0,60);if(!seen.has(nk)){seen.add(nk);pool.push(rr);}})}completed++;updLoad('搜索中('+completed+'/'+total+')...',15+Math.round(completed/total*15));updateSrPanel();})
+      .catch(function(){completed++;});
+  }
+  // 并发池：同时跑 concurrency 个请求
+  var idx=0,promises=[];
+  function startNext(){
+    while(promises.length<concurrency&&idx<allTerms3.length){
+      var p=searchOneWord(allTerms3[idx++]).then(function(){promises=promises.filter(function(x){return x!==p;});startNext();});
+      promises.push(p);
+    }
+  }
+  startNext();
+  // 等全部完成（最多90秒）
+  if(promises.length>0){await Promise.race([Promise.all(promises),new Promise(function(r){setTimeout(r,90000)})]);}
+  // 收尾：确保所有请求都完成
+  var startWait=Date.now();
+  while(promises.length>0&&Date.now()-startWait<10000){await sleep(200);}
   updLoad('累计'+pool.length+'条',30);
   if(!pool.length){hideLoad();searchRunning=false;alert('未检索到相关文献。\n\n可能原因：\n1. 论文主题词过于冷门\n2. 网络连接不稳定\n3. 搜索词数量不足\n\n建议：\n• 检查Python服务窗口日志\n• 访问 /ping 确认服务正常\n• 尝试减少检索文献总数');return}
   // STEP 3: 筛选排序 — 中英文分堆精选，确保比例精确（分片异步，避免卡死）

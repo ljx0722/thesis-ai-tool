@@ -390,7 +390,7 @@ def _run_source(fn, *args):
 
 @app.route('/search_api', methods=['POST'])
 def search_api():
-    """文献检索：每个 query 的多个数据源串行调用"""
+    """单词搜索：每次只查1个词、3个核心源，返回前100条"""
     try:
         data = request.get_json() or {}
         queries = data.get('queries', [])
@@ -401,33 +401,22 @@ def search_api():
             if not q.strip(): continue
             is_cn = bool(re.search(r'[一-鿿]', q))
 
-            # 所有数据源串行调用（稳定优先）
-            sources = [
-                lambda: fetch_with_retry(search_openalex, q, min(max_per, 80)),
+            # 每个词只查3个最快源
+            for source_fn in [
+                lambda: fetch_with_retry(search_openalex, q, min(max_per, 100)),
                 lambda: search_crossref(q, 50),
                 lambda: search_semantic_scholar(q, 50),
-                lambda: search_arxiv(q, 50),
-                lambda: search_core(q, 40),
-                lambda: search_pubmed(q, 50),
-                lambda: search_inspirehep(q, 40),
-                lambda: search_datacite(q, 40),
-                lambda: search_doaj(q, 40),
-            ]
-            if is_cn:
-                sources.append(lambda: fetch_with_retry(search_openalex_cn, q, 100))
-                sources.append(lambda: search_wanfang(q, 30))
-                sources.append(lambda: search_baidu_xueshu_page(q, 0))
-                sources.append(lambda: search_baidu_xueshu_page(q, 10))
-                sources.append(lambda: search_baidu_xueshu_page(q, 20))
-
-            for source_fn in sources:
+            ]:
                 try: all_results.extend(source_fn() or [])
+                except: pass
+
+            if is_cn:
+                try: all_results.extend(search_baidu_xueshu_page(q, 0) or [])
                 except: pass
 
         all_results = dedup_results(all_results)
         all_results.sort(key=lambda r: r.get('year') or 0, reverse=True)
         cn = sum(1 for r in all_results if r.get('isCN'))
-        print(f'[search] {len(queries)} queries -> {len(all_results)} results (CN:{cn} EN:{len(all_results)-cn})')
         return jsonify({'success': True, 'count': len(all_results), 'cn': cn, 'en': len(all_results) - cn, 'results': all_results})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
