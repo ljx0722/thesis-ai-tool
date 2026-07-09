@@ -359,7 +359,7 @@ def search_baidu_xueshu(query, max_rows=80):
 # ========== 统一检索 API ==========
 @app.route('/ping', methods=['GET'])
 def ping():
-    return jsonify({'ok': True, 'service': '论文文献AI利器', 'sources': ['OpenAlex','Crossref','Semantic Scholar','arXiv','CORE','PubMed','百度学术']})
+    return jsonify({'ok': True, 'service': '论文文献AI利器', 'sources': ['OpenAlex','Crossref','Semantic Scholar','arXiv','CORE','PubMed','INSPIRE-HEP','DataCite','DOAJ','百度学术']})
 
 @app.route('/search_api', methods=['POST'])
 def search_api():
@@ -390,7 +390,14 @@ def search_api():
             # PubMed (生命科学/医学)
             try: all_results.extend(search_pubmed(q, 100) or [])
             except: pass
-            try: all_results.extend(search_core(q, 100) or [])
+            # INSPIRE-HEP (高能物理)
+            try: all_results.extend(search_inspirehep(q, 100) or [])
+            except: pass
+            # DataCite (数据集/灰色文献)
+            try: all_results.extend(search_datacite(q, 100) or [])
+            except: pass
+            # DOAJ (开放获取期刊)
+            try: all_results.extend(search_doaj(q, 100) or [])
             except: pass
             # 百度学术 (中文主力，并发翻页)
             if is_cn:
@@ -636,7 +643,98 @@ if __name__ == '__main__':
     print("论文文献AI利器 - Python知识图谱服务")
     print("=" * 50)
     print(f"HTTP库: {'requests (推荐)' if HAS_REQUESTS else 'urllib (建议 pip install requests)'}")
-    print("数据源: OpenAlex | Crossref | Semantic Scholar | arXiv | CORE | PubMed | 百度学术")
+    print("数据源: OpenAlex | Crossref | Semantic Scholar | arXiv | CORE | PubMed | INSPIRE-HEP | DataCite | DOAJ | 百度学术")
     print("访问: http://localhost:5000")
     print("=" * 50)
     app.run(host='0.0.0.0', port=5000, debug=False)
+# ========== INSPIRE-HEP (高能物理/核物理/天体物理) ==========
+def search_inspirehep(query, max_rows=100):
+    '''INSPIRE-HEP: CERN 维护，覆盖高能物理、核物理、天体物理、加速器物理'''
+    results = []
+    from urllib.request import quote
+    try:
+        for page in range(1, 4):
+            if len(results) >= max_rows: break
+            url = f'https://inspirehep.net/api/literature?q={quote(query)}&size=100&page={page}&sort=mostrecent'
+            data = fetch_json(url, timeout=15)
+            if not data or 'hits' not in data: break
+            hits = data['hits'].get('hits', [])
+            if not hits: break
+            for item in hits:
+                metadata = item.get('metadata', {})
+                title = metadata.get('titles', [{}])[0].get('title', '') or ''
+                journal = ''
+                pub_info = metadata.get('publication_info', [])
+                if pub_info:
+                    jn = pub_info[0].get('journal_title', '') or ''
+                    if jn: journal = jn
+                year = str(metadata.get('publication_info', [{}])[0].get('year', '') or '')
+                authors = ', '.join([a.get('full_name', '') for a in (metadata.get('authors', []) or [])[:6]])
+                doi = metadata.get('dois', [{}])[0].get('value', '') or ''
+                if title and len(title) >= 3:
+                    results.append(make_result(title, journal, year, authors, doi, 'IN'))
+    except Exception: pass
+    return results
+
+
+# ========== DataCite (数据集/灰色文献/预印本) ==========
+def search_datacite(query, max_rows=100):
+    '''DataCite: DOI 注册中心，覆盖数据集、软件、预印本、灰色文献'''
+    results = []
+    from urllib.request import quote
+    try:
+        for offset in range(0, 200, 100):
+            if len(results) >= max_rows: break
+            url = f'https://api.datacite.org/dois?query={quote(query)}&page[size]=100&page[number]={offset//100+1}&sort=relevance'
+            data = fetch_json(url, timeout=15)
+            if not data or 'data' not in data: break
+            items = data.get('data', [])
+            if not items: break
+            for item in items:
+                attrs = item.get('attributes', {})
+                titles = attrs.get('titles', [])
+                title = titles[0].get('title', '') if titles else ''
+                if not title: continue
+                journal = attrs.get('publisher', '') or attrs.get('container', {}).get('title', '') or ''
+                year = str(attrs.get('publicationYear', '') or '')
+                authors = ', '.join([a.get('name', '') for a in (attrs.get('creators', []) or [])[:5]])
+                doi = attrs.get('doi', '') or item.get('id', '').replace('https://doi.org/', '')
+                rtype = attrs.get('types', {}).get('resourceTypeGeneral', '')
+                if rtype and rtype not in ('Text', 'JournalArticle'):
+                    journal = rtype + ' · ' + (journal or 'DataCite')
+                results.append(make_result(title, journal, year, authors, doi, 'DC'))
+    except Exception: pass
+    return results
+
+
+# ========== DOAJ (开放获取期刊文章) ==========
+def search_doaj(query, max_rows=100):
+    '''DOAJ: Directory of Open Access Journals，覆盖全球开放获取期刊'''
+    results = []
+    from urllib.request import quote
+    try:
+        for page in range(1, 4):
+            if len(results) >= max_rows: break
+            url = f'https://doaj.org/api/search/articles/{quote(query)}?page={page}&pageSize=50'
+            data = fetch_json(url, timeout=15)
+            if not data or 'results' not in data: break
+            items = data.get('results', [])
+            if not items: break
+            for item in items:
+                bib = item.get('bibjson', {})
+                title = bib.get('title', '') or ''
+                journal = ''
+                jn = bib.get('journal', {})
+                if jn: journal = jn.get('title', '') or ''
+                year = str(bib.get('year', '') or '')
+                authors = ', '.join([a.get('name', '') for a in (bib.get('author', []) or [])[:5]])
+                doi = ''
+                ids = bib.get('identifier', [])
+                for ido in ids:
+                    if ido.get('type') == 'doi': doi = ido.get('id', ''); break
+                if title and len(title) >= 3:
+                    results.append(make_result(title, journal, year, authors, doi, 'DJ'))
+    except Exception: pass
+    return results
+
+
