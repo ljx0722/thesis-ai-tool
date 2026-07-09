@@ -20,6 +20,7 @@ function runFormatCheck(container) {
   stats.sections = 0; bodyChs.forEach(function(c) { stats.sections += (c.sections||[]).length; });
   stats.subs = 0; bodyChs.forEach(function(c) { (c.sections||[]).forEach(function(s) { stats.subs += (s.subs||[]).length; }); });
   stats.words = Math.round(text.length / 1000);
+  var totalChars = text.length;
   stats.paras = (html.match(/<p[ >]/g) || []).length;
 
   if(typeof updLoad==='function')updLoad('检查标题层级...',30);
