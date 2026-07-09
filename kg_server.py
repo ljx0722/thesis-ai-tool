@@ -154,6 +154,28 @@ def search_crossref(query, max_rows=100):
     return results
 
 
+
+# ========== OpenAlex 中文专搜（提高中文文献命中率） ==========
+def search_openalex_cn(query, max_rows=200):
+    '''OpenAlex with Chinese language filter: 大幅提高中文文献召回率'''
+    results = []
+    from urllib.request import quote
+    for page in range(1, 4):
+        if len(results) >= max_rows: break
+        url = f'https://api.openalex.org/works?search={quote(query)}&filter=language:zh&per_page=200&page={page}&mailto=thesis@wb.com'
+        data = fetch_json(url)
+        if not data or 'results' not in data or not data['results']: break
+        for item in data['results']:
+            title = item.get('title', '') or ''
+            journal = ''
+            if item.get('primary_location') and item['primary_location'].get('source'):
+                journal = item['primary_location']['source'].get('display_name', '') or ''
+            year = item.get('publication_year', '') or ''
+            authors = ', '.join([a.get('author', {}).get('display_name', '') for a in (item.get('authorships') or [])])
+            doi = item.get('doi', '') or ''
+            if title: results.append(make_result(title, journal, year, authors, doi, 'OA-CN'))
+    return results
+
 # ========== ③ Semantic Scholar (AI/NLP领域强) ==========
 def search_semantic_scholar(query, max_rows=100):
     results = []
@@ -359,7 +381,7 @@ def search_baidu_xueshu(query, max_rows=80):
 # ========== 统一检索 API ==========
 @app.route('/ping', methods=['GET'])
 def ping():
-    return jsonify({'ok': True, 'service': '论文文献AI利器', 'sources': ['OpenAlex','Crossref','Semantic Scholar','arXiv','CORE','PubMed','INSPIRE-HEP','DataCite','DOAJ','百度学术']})
+    return jsonify({'ok': True, 'service': '论文文献AI利器', 'sources': ['OpenAlex','OpenAlex-CN','Crossref','Semantic Scholar','arXiv','CORE','PubMed','INSPIRE-HEP','DataCite','DOAJ','万方','百度学术']})
 
 @app.route('/search_api', methods=['POST'])
 def search_api():
@@ -381,6 +403,10 @@ def search_api():
             # Semantic Scholar
             try: all_results.extend(search_semantic_scholar(q, 100) or [])
             except: pass
+            # OpenAlex 中文专搜
+            if is_cn:
+                try: all_results.extend(fetch_with_retry(search_openalex_cn, q, 200) or [])
+                except: pass
             # arXiv (物理/CS/数学方向)
             try: all_results.extend(search_arxiv(q, 100) or [])
             except: pass
@@ -399,7 +425,9 @@ def search_api():
             # DOAJ (开放获取期刊)
             try: all_results.extend(search_doaj(q, 100) or [])
             except: pass
-            # 百度学术 (中文主力，并发翻页)
+            # 百度学术 + 万方 (中文强化)
+            try: all_results.extend(search_wanfang(q, 60) or [])
+            except: pass
             if is_cn:
                 try:
                     with ThreadPoolExecutor(max_workers=3) as ex:
@@ -643,7 +671,7 @@ if __name__ == '__main__':
     print("论文文献AI利器 - Python知识图谱服务")
     print("=" * 50)
     print(f"HTTP库: {'requests (推荐)' if HAS_REQUESTS else 'urllib (建议 pip install requests)'}")
-    print("数据源: OpenAlex | Crossref | Semantic Scholar | arXiv | CORE | PubMed | INSPIRE-HEP | DataCite | DOAJ | 百度学术")
+    print("数据源: OpenAlex | OpenAlex-CN | Crossref | Semantic Scholar | arXiv | CORE | PubMed | INSPIRE-HEP | DataCite | DOAJ | 万方 | 百度学术")
     print("访问: http://localhost:5000")
     print("=" * 50)
     app.run(host='0.0.0.0', port=5000, debug=False)
@@ -734,6 +762,46 @@ def search_doaj(query, max_rows=100):
                     if ido.get('type') == 'doi': doi = ido.get('id', ''); break
                 if title and len(title) >= 3:
                     results.append(make_result(title, journal, year, authors, doi, 'DJ'))
+    except Exception: pass
+    return results
+
+
+# ========== 万方数据 (公开搜索页抓取) ==========
+def search_wanfang(query, max_rows=60):
+    '''万方数据公开搜索页: 中文期刊/学位论文'''
+    results = []
+    from urllib.request import quote
+    try:
+        for pn in range(0, min(30, max_rows), 10):
+            if len(results) >= max_rows: break
+            url = f'https://s.wanfangdata.com.cn/paper?q={quote(query)}&p={pn}'
+            html_text = fetch_text(url, headers={'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36','Accept':'text/html','Accept-Language':'zh-CN,zh;q=0.9'}, timeout=15)
+            if not html_text: break
+            # 万方搜索结果格式: <div class="record-item"> ... <a class="title">标题</a> ... <span class="source">期刊 年份</span>
+            items = re.findall(r'<div[^>]*class="[^"]*record-item[^"]*"[^>]*>(.*?)</div>\s*</div>\s*</div>', html_text, re.DOTALL)
+            if not items:
+                # Fallback pattern
+                items = re.findall(r'<a[^>]*class="[^"]*title[^"]*"[^>]*>(.*?)</a>', html_text)
+                for title_text in items[:10]:
+                    title = html.unescape(re.sub(r'<[^>]+>', '', title_text)).strip()
+                    if title and len(title) >= 3:
+                        results.append(make_result(title, '', '', '', '', 'WF'))
+                break
+            for item_block in items[:30]:
+                title_m = re.search(r'<a[^>]*class="[^"]*title[^"]*"[^>]*>(.*?)</a>', item_block)
+                if not title_m: continue
+                title = html.unescape(re.sub(r'<[^>]+>', '', title_m.group(1))).strip()
+                journal, year = '', ''
+                src_m = re.search(r'class="[^"]*source[^"]*"[^>]*>(.*?)</', item_block)
+                if src_m:
+                    src_text = html.unescape(re.sub(r'<[^>]+>', '', src_m.group(1))).strip()
+                    ym = re.search(r'((?:19|20)\d{2})', src_text)
+                    if ym: year = ym.group(1)
+                    journal = re.sub(r'\s*[-—]\s*\d{4}.*', '', src_text).strip()
+                if title and len(title) >= 3:
+                    results.append(make_result(title, journal, year, '', '', 'WF'))
+            if not items: break
+            time.sleep(0.3)
     except Exception: pass
     return results
 
