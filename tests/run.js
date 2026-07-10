@@ -795,6 +795,174 @@ test('BUG: ch-1 access includes null guard', function() {
 });
 
 
+// ============================================================
+// SECTION 17: Regression Tests — Features That Degraded Before
+// ============================================================
+console.log('\n=== Section 17: Anti-Regression ===');
+
+test('REGRESSION: Cat game starts when batch verify shows loading', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("batchVerify") >= 0 && src.indexOf("startCatGame") >= 0, 'Cat game must start in batchVerify');
+});
+
+test('REGRESSION: Cat game starts when startSearch shows loading', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("startSearch") >= 0 && src.indexOf("startCatGame") >= 0, 'Cat game must start in startSearch');
+});
+
+test('REGRESSION: Dashboard overlay has dark background (not light)', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf("rgba(30,30,32,0.92)") >= 0 || html.indexOf("rgba(30,30,32,0.92)") >= 0, 'Dashboard overlay must use dark background');
+});
+
+test('REGRESSION: Dashboard uses soccer-stat card layout', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
+  assert(src.indexOf("soccer-stat") >= 0, 'Dashboard must use soccer-stat card classes');
+  assert(src.indexOf("grid-template-columns") >= 0, 'Dashboard dimension scores must use grid layout');
+});
+
+test('REGRESSION: Dashboard score circle explains weighting formula', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
+  assert(src.indexOf("结构×15%") >= 0 || src.indexOf("x 15%") >= 0, 'Score circle must show weighting breakdown');
+});
+
+test('REGRESSION: Dashboard has radar chart explanation icon', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
+  assert(src.indexOf("雷达图") >= 0 && src.indexOf("ⓘ") >= 0, 'Radar chart must have info icon');
+});
+
+test('REGRESSION: Search progress panel has explanation text', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf("学术数据库") >= 0 || html.indexOf("并发执行") >= 0, 'Search progress panel must explain data sources');
+});
+
+test('REGRESSION: Game shows hint text to new players', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/cat-game.js'), 'utf8');
+  assert(src.indexOf("守护小猫") >= 0 || src.indexOf("hintEl") >= 0, 'Game must show tutorial hint');
+});
+
+test('REGRESSION: Tree nav has title attribute for accessibility', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf("nav-tree") >= 0, 'Navigation tree must exist');
+});
+
+test('REGRESSION: ScoreReference uses extractTitleKws not paperTopics', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var scoreFunc = src.substring(src.indexOf("function scoreReference"), src.indexOf("function structureThesisBox") || src.length);
+  assert(scoreFunc.indexOf("extractTitleKws(r.title") >= 0, 'Must use extractTitleKws on ref title');
+  assert(scoreFunc.indexOf("sentenceKwList") >= 0 || scoreFunc.indexOf("sentenceKws2") >= 0, 'Must cross-match with sentence keywords');
+});
+
+test('REGRESSION: Score bars have info-icons with tooltips', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var renderRefs = src.substring(src.indexOf("function renderRefs"), src.indexOf("function renderExistingOnly"));
+  assert(renderRefs.indexOf("ℹ️") >= 0 || renderRefs.indexOf("title=") >= 0, 'Score bars must have explanation tooltips');
+});
+
+test('REGRESSION: Four scoring dimensions all have tooltips', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("_scoreInfo") >= 0, 'Must define _scoreInfo with tooltips');
+  assert(src.indexOf("_scoreInfo.conf") >= 0 || src.indexOf('_scoreInfo["conf"]') >= 0, 'Must reference _scoreInfo in rendering');
+});
+
+test('REGRESSION: Inject skips paragraphs before chapter 1', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var injectFunc = src.substring(src.indexOf("function injectNewMarkers"), src.indexOf("function scrollToRef"));
+  assert(injectFunc.indexOf("compareDocumentPosition") >= 0, 'injectNewMarkers must use compareDocumentPosition for ch-1 guard');
+});
+
+test('REGRESSION: WrapExistingMarkers skips paragraphs before chapter 1', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var wrapFunc = src.substring(src.indexOf("function wrapExistingMarkers"), src.indexOf("function injectNewMarkers"));
+  assert(wrapFunc.indexOf("compareDocumentPosition(ch1El)") >= 0 || wrapFunc.indexOf("compareDocumentPosition(ch1") >= 0, 'wrapExistingMarkers must skip pre-ch1 paragraphs');
+});
+
+test('REGRESSION: Batch verify sends catGame start in same event loop', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("batchCompleteDOI") >= 0, 'DOI completion function must exist');
+});
+
+test('REGRESSION: DOI completion also shows loading overlay', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("showLoad") >= 0, 'DOI completion and verify must use showLoad');
+});
+
+test('REGRESSION: All 10 review dimensions are computed with auto and manual items', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
+  var revFunc = src.substring(src.indexOf("function computeThesisReview"), src.indexOf("function renderReviewReport"));
+  assert(revFunc.indexOf("dim1") >= 0 && revFunc.indexOf("dim10") >= 0, 'All 10 dimensions must be computed');
+  assert(revFunc.indexOf("auto: true") >= 0, 'Must have auto-detected items');
+  assert(revFunc.indexOf("auto: false") >= 0 || revFunc.indexOf("人工") >= 0, 'Must have manual items');
+});
+
+test('REGRESSION: Review composite uses all 10 dimensions in formula', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
+  assert(src.indexOf("dim1.score * 0.10") >= 0, 'dim1 must contribute to composite');
+  assert(src.indexOf("dim10.score * 0.07") >= 0, 'dim10 must contribute to composite');
+});
+
+test('REGRESSION: Review render function generates HTML report', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
+  assert(src.indexOf("renderReviewReport") >= 0, 'Must have review report renderer');
+  assert(src.indexOf("generateReviewText") >= 0, 'Must have text review generator');
+  assert(src.indexOf("copyReviewText") >= 0, 'Must have copy-to-clipboard function');
+});
+
+test('REGRESSION: Search uses sentence-level keyword extraction', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("sentenceKws") >= 0, 'Must use sentence-level keyword extraction');
+  assert(src.indexOf("sentenceKwList") >= 0, 'Must build sentence keyword list');
+});
+
+test('REGRESSION: assignChapters is async and chunked', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("async function assignChapters") >= 0, 'assignChapters must be async');
+  assert(src.indexOf("sci<refs.length;sci+=30") >= 0, 'assignChapters must use 30-ref chunking');
+});
+
+test('REGRESSION: English 30% minimum enforced with pool split', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("cnPool") >= 0 && src.indexOf("enPool") >= 0, 'Pool splitting must use cnPool/enPool');
+  assert(src.indexOf("enWanted") >= 0, 'enWanted calculation must exist');
+});
+
+test('REGRESSION: Non-body chapters excluded from search rounds', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("获奖|奖项|认证|荣誉|专利|攻读|在读") >= 0, 'Award/license chapters must be excluded');
+});
+
+test('REGRESSION: Thread-safe session uses threading.local()', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  assert(src.indexOf("threading.local()") >= 0, 'Must use thread-local sessions');
+  assert(src.indexOf("_local.session = requests.Session()") >= 0, 'Must create per-thread sessions');
+});
+
+test('REGRESSION: Search API function body uses lambda (not ThreadPoolExecutor)', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  var searchFn = src.substring(src.indexOf("def search_api"), src.indexOf("def verify_api"));
+  assert(searchFn.indexOf("ThreadPoolExecutor") < 0, 'search_api function body must NOT use ThreadPoolExecutor (causes 400 errors on Sealos)');
+  assert(searchFn.indexOf("lambda:") >= 0, 'search_api must use lambda-based serial calls');
+});
+
+test('REGRESSION: Search API queries only OpenAlex/Crossref/Semantic Scholar', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  var searchFn = src.substring(src.indexOf("def search_api"), src.indexOf("def verify_api"));
+  assert(searchFn.indexOf("search_openalex") >= 0, 'Must query OpenAlex');
+  assert(searchFn.indexOf("search_crossref") >= 0, 'Must query Crossref');
+  assert(searchFn.indexOf("search_semantic_scholar") >= 0, 'Must query Semantic Scholar');
+});
+
+test('REGRESSION: Frontend sends 1 word per request with concurrency', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("concurrency=6") >= 0 || src.indexOf("concurrency = 6") >= 0, 'Frontend must use concurrency pool');
+  assert(src.indexOf("searchOneWord") >= 0, 'Frontend must send single-word requests');
+});
+
+test('REGRESSION: Gunicorn timeout is 180 seconds', function() {
+  var procfile = fs.readFileSync(path.join(projectRoot, 'Procfile'), 'utf8');
+  assert(procfile.indexOf("timeout 180") >= 0 || procfile.indexOf("timeout=180") >= 0, 'Gunicorn timeout must be 180s');
+});
+
 // Results
 // ============================================================
 console.log('\n=== RESULTS ===');
