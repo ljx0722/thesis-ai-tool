@@ -713,10 +713,12 @@ test('PAPER: Chapter extraction scans p+h1+h2+h3 for chapter/section text patter
   assert(src.indexOf("isChapter") >= 0, 'Must flag chapter candidates');
 });
 
-test('PAPER: Chapter extraction has text-pattern fallback with expanded p scan', function() {
+test('PAPER: Chapter extraction has boundary guards (pastCh1, refBound)', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf("headingCandidates.length < 3") >= 0, 'Must have fallback when few headings found');
-  assert(src.indexOf("sections.push(curCh3)") >= 0, 'Must push chapters into sections array');
+  assert(src.indexOf("pastCh1") >= 0, 'Must skip content before chapter 1');
+  assert(src.indexOf("refBound") >= 0, 'Must detect reference list boundary');
+  assert(src.indexOf("sections.push(curCh4)") >= 0 || src.indexOf("sections.push") >= 0, 'Must push chapters into sections array');
+  assert(src.indexOf("level===0") >= 0, 'Must detect chapter level (level 0)');
 });
 
 test('PAPER: Text-based fallback exists when H1/H2/H3 parsing fails', function() {

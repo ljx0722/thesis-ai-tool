@@ -1254,60 +1254,58 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
 
     updLoad('构建章节树...','35');
 
-    // === 章节解析：扫描所有段落文本匹配"第X章"（不依赖 HTML 标签类型） ===
-    // mammoth 把 Word 标题转成 p 或 h1/h2/h3，取决于样式映射。直接扫描 p+h1+h2+h3 全覆盖。
+    // === 章节解析：扫描 p+h1~h6，仅取第一章到参考文献之间的内容 ===
     var box = document.getElementById('thesisBox');
     sections = [];
     if (box) {
-      // 收集所有可用的标题候选元素（h1/h2/h3 + 样式中含有"第X章"的 p）
-      var allHeadingEls = box.querySelectorAll('h1,h2,h3,p');
-      var headingCandidates = [];
-      for (var ai = 0; ai < allHeadingEls.length; ai++) {
-        var el2 = allHeadingEls[ai];
-        var txt2 = (el2.textContent || '').trim();
-        if (!txt2) continue;
-        // 只保留以"第X章"或"X.X"或"X.X.X"开头的元素，或已经是 h1/h2/h3 的元素
-        var tag2 = (el2.tagName || '').toLowerCase();
-        var isHeading = /^(h[1-6])$/.test(tag2);
-        var isChapter = /^第([一-鿿\d]+)章/.test(txt2);
-        var isSection = /^\d+\.\d+(\s|$)/.test(txt2);
-        var isSubSection = /^\d+\.\d+\.\d+(\s|$)/.test(txt2);
-        if (isHeading || isChapter || isSection || isSubSection) {
-          headingCandidates.push({ el: el2, tag: tag2, txt: txt2, isCh: isChapter, isSec: isSection, isSub: isSubSection, isH: isHeading });
+      // 第一步：找"参考文献"边界元素
+      var refBound=null;
+      var allEls3=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+      for(var ri=0;ri<allEls3.length;ri++){
+        var rt=(allEls3[ri].textContent||'').replace(/\\s+/g,'');
+        if(rt.indexOf('参考文献')===0&&rt.length<20){refBound=allEls3[ri];break;}
+      }
+      // 第二步：收集在"第1章"→"参考文献"之间的标题候选
+      var headingCandidates=[];
+      var pastCh1=false;
+      for(var ai=0;ai<allEls3.length;ai++){
+        var el2=allEls3[ai],txt2=(el2.textContent||'').trim();
+        if(!txt2)continue;
+        // 到达参考文献就停止
+        if(refBound&&el2===refBound)break;
+        if(refBound&&(el2.compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))break;
+        // 标记/目录/摘要等第一章之前的内容全部跳过
+        var isCh1=/^第[一1]章/.test(txt2);
+        if(isCh1)pastCh1=true;
+        if(!pastCh1)continue;
+        // 判断标题级别：数字编号层级（1. / 1.1 / 1.1.1 / 1.1.1.1 / ...）
+        var numMatch=txt2.match(/^((?:\d+\.)*\d+)\s+(.*)/);
+        var isChapterText=/^第([一-鿿\d]+)章/.test(txt2);
+        var isNumberedHeading=numMatch!==null;
+        if(isChapterText||isNumberedHeading){
+          var level=0;
+          if(isChapterText){level=0;} // 章
+          else{level=numMatch[1].split('.').length-1;} // 1.1→1级, 1.1.1→2级, ...
+          var num=isChapterText?txt2:numMatch[1];
+          var title=isChapterText?txt2:(numMatch[2]||txt2);
+          headingCandidates.push({el:el2,txt:txt2,num:num,title:title,level:level});
         }
       }
-      // 第二遍：如果候选太少，扩大范围 — 扫描所有 p 找"第X章"
-      if (headingCandidates.length < 3) {
-        var allPs = box.querySelectorAll('p');
-        for (var pi = 0; pi < allPs.length; pi++) {
-          var pt = (allPs[pi].textContent || '').trim();
-          if (/^第([一-鿿\d]+)章/.test(pt) || /^\d+\.\d+(\s|$)/.test(pt)) {
-            // 检查是否已存在
-            var exists = false;
-            for (var ci2 = 0; ci2 < headingCandidates.length; ci2++) {
-              if (headingCandidates[ci2].el === allPs[pi]) { exists = true; break; }
-            }
-            if (!exists) headingCandidates.push({ el: allPs[pi], tag: 'p', txt: pt, isCh: /^第/.test(pt), isSec: /^\d+\.\d+(\s|$)/.test(pt), isSub: /^\d+\.\d+\.\d+(\s|$)/.test(pt), isH: false });
-          }
-        }
-      }
-
-      // 构建章节树
-      var curCh3 = null, curSec3 = null;
-      for (var hi = 0; hi < headingCandidates.length; hi++) {
-        var hc = headingCandidates[hi];
-        if (hc.isCh) {
-          var chM3 = hc.txt.match(/^第([一-鿿\d]+)章\s*(.*)/);
-          var cName = chM3 ? hc.txt : hc.txt;
-          curCh3 = { ch: chM3 ? cnDigit(chM3[1]) : (sections.length + 1), name: cName, sections: [], el: hc.el };
-          sections.push(curCh3); curSec3 = null;
-        } else if (hc.isSec && curCh3) {
-          var secM = hc.txt.match(/^(\d+\.\d+)\s*(.*)/);
-          curSec3 = { num: secM ? secM[1] : hc.txt.substring(0, 3), title: secM ? (secM[2] || hc.txt) : hc.txt, subs: [], el: hc.el };
-          curCh3.sections.push(curSec3);
-        } else if (hc.isSub && curSec3) {
-          var subM = hc.txt.match(/^(\d+\.\d+\.\d+)\s*(.*)/);
-          curSec3.subs.push({ num: subM ? subM[1] : hc.txt.substring(0, 5), title: subM ? (subM[2] || hc.txt) : hc.txt, el: hc.el });
+      // 第三步：构建多级树
+      var curCh4=null,curLvl={}; // level->parent
+      for(var hi=0;hi<headingCandidates.length;hi++){
+        var hc=headingCandidates[hi];
+        if(hc.level===0){
+          var chM4=hc.txt.match(/^第([一-鿿\d]+)章/);var chNum2=chM4?cnDigit(chM4[1]):(sections.length+1);
+          curCh4={ch:chNum||(sections.length+1),name:hc.txt,sections:[],el:hc.el};
+          sections.push(curCh4);curLvl={0:curCh4};
+        }else if(curCh4){
+          var parent=curLvl[hc.level-1];
+          if(!parent){parent=curCh4;sections=sections;}
+          var node={num:hc.num,title:hc.title,el:hc.el};
+          if(hc.level===1){node.subs=[];parent.sections?parent.sections.push(node):(parent.subs=parent.subs||[],parent.subs.push(node));}
+          else{node.subs=[];parent.subs?parent.subs.push(node):(parent.subs=parent.subs||[],parent.subs.push(node));}
+          curLvl[hc.level]=node;
         }
       }
     }
