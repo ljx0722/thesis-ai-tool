@@ -756,6 +756,45 @@ test('PAPER: _thesisLoaded is properly set via onThesisLoaded callback', functio
 });
 
 
+
+// ============================================================
+// SECTION 16: UI & Citation Scope Fixes
+// ============================================================
+console.log('\n=== Section 16: UI & Citation Scope ===');
+
+test('UI: Section anchors have IDs set on DOM elements', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("allEls2[ei2].id = 'sec-") >= 0, 'Section DOM IDs must be set');
+});
+
+test('UI: Subsection anchors have DOM IDs', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("sub-' + sub.num.replace") >= 0 || src.indexOf("allEls2[ei3].id") >= 0, 'Subsection DOM IDs must be set');
+});
+
+test('UI: navClickToSec function exists', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('function navClickToSec') >= 0, 'Missing navClickToSec function');
+});
+
+test('BUG: wrapExistingMarkers skips paragraphs before chapter 1', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("getElementById('ch-1')") >= 0, 'Missing ch-1 reference in wrapExistingMarkers guard');
+});
+
+test('BUG: injectNewMarkers skips paragraphs before chapter 1', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var ch1Count = (src.match(/getElementById\('ch-1'\)/g) || []).length;
+  assert(ch1Count >= 2, 'ch-1 guard needed in both wrap AND inject, found: ' + ch1Count);
+});
+
+test('BUG: ch-1 access includes null guard', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var hasNullGuard = src.indexOf('if(ch1El&&') >= 0 || src.indexOf('if(ch1&&') >= 0 || src.indexOf('if(fc4&&') >= 0;
+  assert(hasNullGuard, 'ch-1 access must include null check');
+});
+
+
 // Results
 // ============================================================
 console.log('\n=== RESULTS ===');
