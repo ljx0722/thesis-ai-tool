@@ -1297,7 +1297,7 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
         var hc=headingCandidates[hi];
         if(hc.level===0){
           var chM4=hc.txt.match(/^第([一-鿿\d]+)章/);var chNum2=chM4?cnDigit(chM4[1]):(sections.length+1);
-          curCh4={ch:chNum||(sections.length+1),name:hc.txt,sections:[],el:hc.el};
+          curCh4={ch:chNum2||(sections.length+1),name:hc.txt,sections:[],el:hc.el};
           sections.push(curCh4);curLvl={0:curCh4};
         }else if(curCh4){
           var parent=curLvl[hc.level-1];
@@ -1350,28 +1350,40 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
         ar.innerHTML = '&#9654;';
         el3.insertBefore(ar, el3.firstChild);
       }
-      // 标定节/小节 DOM 锚点
+      // 标定节/小节 DOM 锚点（优先用解析阶段已绑定的 el，避免 mammoth 转 p 标签后找不到）
       if (cs.sections) {
         for (var si2 = 0; si2 < cs.sections.length; si2++) {
           var sec = cs.sections[si2];
-          var allEls2 = box.querySelectorAll('h1,h2,h3');
-          for (var ei2 = 0; ei2 < allEls2.length; ei2++) {
-            if ((allEls2[ei2].textContent||'').replace(/\s+/g,'') === (sec.num+' '+sec.title).replace(/\s+/g,'')) {
-              sec.el = allEls2[ei2];
-              allEls2[ei2].id = 'sec-' + sec.num.replace(/\./g,'-');
-              allEls2[ei2].style.cssText = 'cursor:pointer';
-              break;
+          if (sec.el) {
+            sec.el.id = 'sec-' + sec.num.replace(/\./g,'-');
+            sec.el.style.cssText = 'cursor:pointer';
+          } else {
+            // fallback: 宽搜索（p + h1~h6）
+            var allEls2 = box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+            for (var ei2 = 0; ei2 < allEls2.length; ei2++) {
+              if ((allEls2[ei2].textContent||'').replace(/\s+/g,'') === (sec.num+' '+sec.title).replace(/\s+/g,'')) {
+                sec.el = allEls2[ei2];
+                allEls2[ei2].id = 'sec-' + sec.num.replace(/\./g,'-');
+                allEls2[ei2].style.cssText = 'cursor:pointer';
+                break;
+              }
             }
           }
           if (sec.subs) {
             for (var ui2 = 0; ui2 < sec.subs.length; ui2++) {
               var sub = sec.subs[ui2];
-              for (var ei3 = 0; ei3 < allEls2.length; ei3++) {
-                if ((allEls2[ei3].textContent||'').replace(/\s+/g,'') === (sub.num+' '+sub.title).replace(/\s+/g,'')) {
-                  sub.el = allEls2[ei3];
-                  allEls2[ei3].id = 'sub-' + sub.num.replace(/\./g,'-');
-                  allEls2[ei3].style.cssText = 'cursor:pointer';
-                  break;
+              if (sub.el) {
+                sub.el.id = 'sub-' + sub.num.replace(/\./g,'-');
+                sub.el.style.cssText = 'cursor:pointer';
+              } else {
+                var allEls3 = box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+                for (var ei3 = 0; ei3 < allEls3.length; ei3++) {
+                  if ((allEls3[ei3].textContent||'').replace(/\s+/g,'') === (sub.num+' '+sub.title).replace(/\s+/g,'')) {
+                    sub.el = allEls3[ei3];
+                    allEls3[ei3].id = 'sub-' + sub.num.replace(/\./g,'-');
+                    allEls3[ei3].style.cssText = 'cursor:pointer';
+                    break;
+                  }
                 }
               }
             }

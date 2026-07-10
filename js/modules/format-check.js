@@ -6,6 +6,7 @@ function runFormatCheck(container) {
   var text = manuscriptText || '';
   var html = manuscriptHTML || '';
   var secs = sections || [];
+  var h = '';
   if (!text || !secs.length) {
     container.innerHTML = '<div style="text-align:center;padding:40px;color:#9ca3af">请先上传论文</div>';
     return;
@@ -54,7 +55,21 @@ function runFormatCheck(container) {
   if (h1Count > 1) issues.warnings.push({ msg: '检测到 ' + h1Count + ' 个 H1 标签，建议统一为章节标题格式（论文标题通常为1个H1属正常）' });
   else if (h1Count === 1) issues.ok.push({ msg: '检测到 1 个 H1 标签（通常为论文标题，正常）' });
 
-    // 摘要与关键词检查
+    // 引用位置检测
+  h += '<h4>📍 引用位置检测</h4>';
+  var badRefs=0;
+  var allRefMs=text.match(/\[\d+\]/g)||[];
+  if(allRefMs.length>0){
+    for(var ri=0;ri<allRefMs.length;ri++){
+      var rp=text.indexOf(allRefMs[ri]);
+      if(rp>0&&!/[。！？\.\?\!]\s*$/.test(text.substring(rp-12,rp)))badRefs++;
+    }
+    if(badRefs>5)h+='<div class="finding warn">⚠ ' + badRefs + ' 处引用标记出现在句子中间，建议移至标点之后</div>';
+    else if(badRefs>0)h+='<div class="finding ok">✅ 仅 '+badRefs+' 处引用位置可改进</div>';
+    else h+='<div class="finding ok">✅ 引用标记位置规范</div>';
+  }
+
+  // 摘要与关键词检查
   if(typeof updLoad==='function')updLoad('检查摘要...',45);
   h += '<h4>\ud83d\udcdd 摘要与关键词</h4>';
   var absMatch=text.match(/(?:摘要|Abstract)[\s\S]{0,2000}?(?=\n(?:第[一二三四五六七八九十\d]+章|Abstract|关键词|关键字|Keyword|引言|绪论)|\nAbstract|$)/);
@@ -122,7 +137,16 @@ function runFormatCheck(container) {
     issues.ok.push({ msg: '检测到 1 个表编号（表' + tblNums[0] + '），无法判断连续性' });
   }
 
-    // 结论与展望检查
+    // 中英文摘要完整性
+  h += '<h4>🌐 中英文摘要完整性</h4>';
+  var cnAbs=text.indexOf('摘要')>=0;
+  var enAbs=/Abstract\b/i.test(text);
+  if(cnAbs&&enAbs)h+='<div class="finding ok">✅ 同时包含中文摘要和英文Abstract</div>';
+  else if(cnAbs)h+='<div class="finding warn">⚠ 仅有中文摘要，建议补充英文Abstract</div>';
+  else if(enAbs)h+='<div class="finding warn">⚠ 仅有英文Abstract，建议补充中文摘要</div>';
+  else h+='<div class="finding err">❗ 未检测到摘要，请检查格式</div>';
+
+  // 结论与展望检查
   h += '<h4>\ud83c\udfc1 结论与展望</h4>';
   var bodyChs2 = secs.filter(function(s) { return !/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name); });
   var lastCh2=bodyChs2[bodyChs2.length-1];
@@ -184,7 +208,14 @@ function runFormatCheck(container) {
   function sevIcon(t) { return t === 'errors' ? '\u2757' : (t === 'warnings' ? '\u26a0' : '\u2705'); }
   function sevCls(t) { return t === 'errors' ? 'err' : (t === 'warnings' ? 'warn' : 'ok'); }
 
-  var h = '<div class="module-panel">';
+  // 页眉页脚检测
+  h += '<h4>📄 页眉页脚</h4>';
+  var hasHeader=html.indexOf('Running Head')>=0||/第[一二三\d]+章/.test(html.substring(0,500));
+  var hasPageNum=/\d+<\/p>/.test(html.substring(Math.max(0,html.length-2000)));
+  if(hasHeader||hasPageNum)h+='<div class="finding ok">✅ 检测到可能的页眉/页脚内容</div>';
+  else h+='<div class="finding info">📌 未检测到页眉/页脚，建议添加学校名称和页码</div>';
+
+  h = '<div class="module-panel">';
   h += '<h4>\ud83d\udcca 格式统计</h4>';
   h += '<div class="dash-row">';
   h += '<div class="dash-item"><div class="dv">' + stats.chapters + '</div><div class="dl">章节</div></div>';

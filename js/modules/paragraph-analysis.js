@@ -55,15 +55,16 @@ function runParagraphAnalysis(container) {
   if(typeof updLoad==='function')updLoad('检测过渡词...',65);
 
   // === 可读性评分 ===
+  var bc4=(sections||[]).filter(function(s){return!/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name)});
+
   if(typeof updLoad==='function')updLoad('计算可读性...',75);
-      h += '<h4>📊 引用密度分布</h4>';
+  h += '<h4>📊 引用密度分布</h4>';
   var crc={};bc4.forEach(function(cs){crc[cs.ch]=0;});
   var ar2=(typeof mergedRefs!=='undefined'&&mergedRefs.length)?mergedRefs:(typeof existingRefs!=='undefined'?existingRefs:[]);
   ar2.forEach(function(r){var ck=r.ch||1;crc[ck]=(crc[ck]||0)+1;});
   bc4.forEach(function(cs){var cnt=crc[cs.ch]||0,clen=Math.max(1,(cs.text||'').length);var dn=Math.round(cnt/clen*1000*100)/100;h+='<div class="stat-row"><span class="slabel">'+cs.name+'</span><span class="svalue">'+dn+'条/千字</span></div>';});
   if(Object.values(crc).reduce(function(a,b){return a+b;},0)===0)h+='<div class="finding info">📌 尚未检索文献，切换到参考文献模块检索后查看</div>';
   h += '<h4>🔄 首尾呼应度</h4>';
-  var bc4=(sections||[]).filter(function(s){return!/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name)});
   if(bc4.length>=2){var fc3=bc4[0],lc=bc4[bc4.length-1];var fk=extractTitleKws(fc3.text||''),lk=extractTitleKws(lc.text||'');var sh=fk.filter(function(w){return lk.indexOf(w)>=0;}).length;var er=Math.min(fk.length,lk.length)>0?Math.round(sh/Math.min(fk.length,lk.length)*100):0;
     if(er>=40)h+='<div class="finding ok">✅ 首尾呼应度 '+er+'%（绪论与结论共享关键词）</div>';else h+='<div class="finding warn">⚠ 首尾呼应度 '+er+'%（偏低），建议结论回应绪论提出的问题</div>';}
   h += '<h4>📖 可读性评分</h4>';
@@ -156,7 +157,7 @@ function jumpToParagraph(idx) {
     if ((filtered[i].textContent||'').trim().length >= 10) {
       if (count === idx) {
         filtered[i].scrollIntoView({behavior:'smooth',block:'center'});
-        filtered[i].style.transition='background .3s';paras[i].style.background='#fef3c7';
+        filtered[i].style.transition='background .3s';filtered[i].style.background='#fef3c7';
         setTimeout(function(){filtered[i].style.background='';},2000);
         return;
       }

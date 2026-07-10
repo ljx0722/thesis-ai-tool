@@ -43,6 +43,17 @@ function runTerminology(container) {
 
   if(typeof updLoad==='function')updLoad('检测中英混用...',65);
   h+='<h4>\ud83c\udf10 中英术语混用</h4>';
+  if(typeof updLoad==='function')updLoad('检测中英混用...',65);
+  h+='<h4>🔄 术语演变检测</h4>';
+  var bodyChs3=(sections||[]).filter(function(s){return!/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name)});
+  var evolveIssues=0;
+  var trackPairs=[{a:'机器学习',b:'机械学习'},{a:'深度学习',b:'深层学习'},{a:'特征提取',b:'特征抽取'},{a:'数据预处理',b:'数据预处理'}];
+  trackPairs.forEach(function(p){
+    var chsA=[],chsB=[];
+    bodyChs3.forEach(function(cs,i){if((cs.text||'').indexOf(p.a)>=0)chsA.push(i+1);if((cs.text||'').indexOf(p.b)>=0)chsB.push(i+1);});
+    if(chsA.length&&chsB.length){evolveIssues++;h+='<div class="finding warn">⚠ '+p.a+'（第'+chsA.join(',')+'章） vs '+p.b+'（第'+chsB.join(',')+'章），表述不一致</div>';}
+  });
+  if(!evolveIssues)h+='<div class="finding ok">✅ 术语在各章中表述一致</div>';
   var mx=[{c:'机器学习',e:'machine learning'},{c:'深度学习',e:'deep learning'},{c:'神经网络',e:'neural network'},{c:'人工智能',e:'artificial intelligence'},{c:'数据集',e:'dataset'},{c:'准确率',e:'accuracy'},{c:'特征',e:'feature'},{c:'算法',e:'algorithm'},{c:'模型',e:'model'},{c:'参数',e:'parameter'}];
   var mf=false;
   mx.forEach(function(mt){var hc=text.indexOf(mt.c)>=0,he=new RegExp('\\b'+mt.e.replace(/ /g,'\\s+')+'\\b','i').test(text);if(hc&&he){mf=true;h+='<div class="finding info">\ud83d\udccc \u201c'+mt.c+'\u201d 和 \u201c'+mt.e+'\u201d 同时出现，建议统一</div>';}});
@@ -59,6 +70,15 @@ function runTerminology(container) {
   var abf=false;
   ab.forEach(function(ap){var ms=text.match(ap.r);if(ms&&ms.length>0){var fi=text.indexOf(ms[0]),bf2=text.substring(Math.max(0,fi-120),fi);if(bf2.indexOf(ap.f.substring(0,Math.min(8,ap.f.length)))<0){abf=true;h+='<div class="finding warn">\u26a0 \u201c'+ms[0]+'\u201d 首次未给出全称（'+ap.f+'），共 '+ms.length+' 次</div>';}}});
   if(!abf)h+='<div class="finding ok">\u2705 检测到的缩写均已正确给出全称</div>';
+
+  h += '<h4>📝 外文术语翻译一致性</h4>';
+  var transPairs=[{en:'CNN',cn:'卷积神经网络'},{en:'RNN',cn:'循环神经网络'},{en:'SVM',cn:'支持向量机'},{en:'NLP',cn:'自然语言处理'},{en:'PCA',cn:'主成分分析'}];
+  var transIssues=0;
+  transPairs.forEach(function(p){
+    var enRx=new RegExp('\\\\b'+p.en+'\\\\b','gi');var enCount=(text.match(enRx)||[]).length;
+    if(enCount>0&&text.indexOf(p.cn)<0){transIssues++;h+='<div class="finding warn">⚠ '+p.en+' 出现 '+enCount+' 次，但未找到其中文翻译 '+p.cn+'</div>';}
+  });
+  if(!transIssues)h+='<div class="finding ok">✅ 外文术语均有对应中文翻译</div>';
 
     h += '<h4>🏷️ 专有名词库</h4>';
   var pn={};var pnM, pnR=/\b[A-Z][A-Za-z]{2,}(?:\s+[A-Z][A-Za-z]{2,})?\b/g;
