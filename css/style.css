@@ -103,7 +103,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 .thesis-box{flex:1;overflow-y:auto;padding:var(--sp-5) var(--sp-6);background:var(--solid);margin:var(--sp-2);border-radius:var(--r-md);box-shadow:var(--s-sm);border:1px solid var(--border)}
 .thesis-box h1{font-size:var(--fs-3xl);margin:8px 0 4px;color:var(--t);letter-spacing:-.01em}
 .thesis-box p{margin:6px 0;text-indent:2em;line-height:1.9;font-size:14px;color:var(--t2)}
-.thesis-box table{display:none}
 
 /* Section fold */
 .ch-head,.sec-head,.sub-head{display:flex;align-items:center;gap:6px;padding:5px 12px;cursor:pointer;user-select:none;border-radius:var(--r-xs);width:100%;line-height:1;transition:all var(--t-fast)}
@@ -343,3 +342,12 @@ body.dark .dashboard-btn,body.dark .dash-card,body.dark .ref,body.dark .module-p
 .sr-bar-wrap{flex:1;height:3px;background:rgba(0,0,0,0.05);border-radius:var(--r-full);overflow:hidden}
 .sr-bar-fill{height:100%;border-radius:var(--r-full);transition:width .3s ease;background:var(--accent)}
 .sr-total{text-align:center;font-size:var(--fs-xs);color:var(--m1);margin-top:8px;font-family:'SF Mono',ui-monospace,monospace;font-weight:var(--fw-semibold)}
+
+/* ==== 论文内容样式（图片/表格/公式） ==== */
+.thesis-box img{max-width:100%;height:auto;display:block;margin:10px auto;border-radius:4px}
+.thesis-box table{border-collapse:collapse;width:100%;margin:12px 0;font-size:.75rem}
+.thesis-box td{border:1px solid var(--borderStrong);padding:6px 10px;vertical-align:top;line-height:1.6}
+.thesis-box th{border:1px solid var(--borderStrong);padding:6px 10px;background:rgba(0,0,0,0.03);font-weight:var(--fw-semibold);text-align:center;font-size:.72rem}
+.thesis-box table caption{font-size:.7rem;font-weight:var(--fw-semibold);margin-bottom:4px;color:var(--t2)}
+.thesis-box .math,.thesis-box mjx-container,.thesis-box .MathJax{max-width:100%;overflow-x:auto;display:inline-block;vertical-align:middle}
+.thesis-box p img:only-child{margin:12px auto;border:1px solid var(--border);box-shadow:var(--s-xs)}

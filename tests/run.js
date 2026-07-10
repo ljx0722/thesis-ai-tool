@@ -963,6 +963,33 @@ test('REGRESSION: Gunicorn timeout is 180 seconds', function() {
   assert(procfile.indexOf("timeout 180") >= 0 || procfile.indexOf("timeout=180") >= 0, 'Gunicorn timeout must be 180s');
 });
 
+// ============================================================
+// SECTION 18: Content Rendering (Images, Tables, Formulas)
+// ============================================================
+console.log('\n=== Section 18: Content Rendering ===');
+
+test('RENDER: Images have responsive max-width styling', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("max-width:100%;height:auto") >= 0, 'Images must have responsive styling');
+  assert(src.indexOf('loading="lazy"') >= 0 || src.indexOf("loading='lazy'") >= 0, 'Images should use lazy loading');
+});
+
+test('RENDER: Tables are NOT hidden by CSS display:none', function() {
+  var css = fs.readFileSync(path.join(projectRoot, 'css/style.css'), 'utf8');
+  assert(css.indexOf(".thesis-box table{display:none}") < 0, 'Table display:none must be removed from CSS');
+  assert(css.indexOf("border-collapse:collapse") >= 0, 'Tables must have proper styling');
+});
+
+test('RENDER: Upload immediately shows loading overlay', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var handler = src.substring(src.indexOf("fileInput"), src.indexOf("convertToHtml"));
+  // showLoad should appear early in the handler, before the mammoth library check
+  var slIdx = handler.indexOf('showLoad(');
+  assert(slIdx > 0, 'showLoad must be called in the upload handler');
+  assert(slIdx < 400, 'showLoad must appear early in the handler (within first 400 chars)');
+});
+
+
 // Results
 // ============================================================
 console.log('\n=== RESULTS ===');

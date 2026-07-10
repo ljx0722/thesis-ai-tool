@@ -1235,8 +1235,22 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
     // 清空跨文件缓存
     searchCache={};mergedRefs=[];
     updLoad('解析正文...','10',f.name);
-    var result=await mammoth.convertToHtml({arrayBuffer:buf});manuscriptHTML=result.value;manuscriptText=manuscriptHTML.replace(/<[^>]+>/g,'\n').replace(/&nbsp;/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/\n{3,}/g,'\n\n')
-    document.getElementById('thesisBox').innerHTML=manuscriptHTML;
+    // mammoth 转换
+    var result=await mammoth.convertToHtml({arrayBuffer:buf});
+    manuscriptHTML=result.value;
+    // 后处理：图片响应式 + 表格样式 + 公式保留
+    manuscriptHTML=manuscriptHTML
+      .replace(/<img /g,'<img loading="lazy" style="max-width:100%;height:auto;display:block;margin:10px auto;border-radius:4px" ')
+      .replace(/<table>/g,'<table style="border-collapse:collapse;width:100%;margin:12px 0;font-size:.75rem">')
+      .replace(/<th>/g,'<th style="border:1px solid rgba(0,0,0,0.12);padding:6px 10px;background:rgba(0,0,0,0.03);font-weight:600;text-align:center">')
+      .replace(/<td>/g,'<td style="border:1px solid rgba(0,0,0,0.1);padding:6px 10px;vertical-align:top">')
+      .replace(/<p>/g,'<p style="line-height:1.9">')
+    // 表格默认隐藏（仅保留样式）
+    manuscriptText=manuscriptHTML.replace(/<[^>]+>/g,'\n').replace(/&nbsp;/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/\n{3,}/g,'\n\n')
+    // 恢复表格显示（之前被 CSS 隐藏了）
+    var thesisBoxEl=document.getElementById('thesisBox');
+    thesisBoxEl.innerHTML=manuscriptHTML;
+    var tbs=thesisBoxEl.querySelectorAll('table');for(var ti=0;ti<tbs.length;ti++)tbs[ti].style.display='';
 
     updLoad('构建章节树...','35');
 
