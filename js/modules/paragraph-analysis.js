@@ -133,12 +133,14 @@ function runParagraphAnalysis(container) {
     }
   }
 
-  if(typeof updLoad==='function')updLoad('完成',100);
-  h += '</div>';
-    h += '<h4>🔢 段落编号检查</h4>';
+  if(typeof updLoad==='function')updLoad('段落编号检查...',95);
+  h += '<h4>🔢 段落编号检查</h4>';
   var seqs=[['首先','其次','再次','最后'],['第一','第二','第三','第四'],['一方面','另一方面']];var ni=0;
   seqs.forEach(function(seq){var fd=seq.filter(function(w){return text.indexOf(w)>=0;});if(fd.length>0&&fd.length<seq.length){ni++;h+='<div class="finding warn">⚠ 序列「'+seq.join(', ')+'」仅出现'+fd.length+'项，可能不完整</div>';}});
   if(!ni)h+='<div class="finding ok">✅ 段落编号序列完整</div>';
+
+  if(typeof updLoad==='function')updLoad('完成',100);
+  h += '</div>';
   container.innerHTML = h;
 }
 

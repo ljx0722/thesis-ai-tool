@@ -992,21 +992,6 @@ test('RENDER: Upload immediately shows loading overlay', function() {
 });
 
 
-// Results
-// ============================================================
-console.log('\n=== RESULTS ===');
-console.log('  Passed:  ' + passed);
-console.log('  Failed:  ' + failed);
-console.log('  Warnings:' + warnings);
-console.log('  Total:   ' + (passed + failed + warnings));
-
-if (failed > 0) {
-  console.log('\n❌ TESTS FAILED — fix before deploying!');
-  process.exit(1);
-} else {
-  console.log('\n✅ All tests passed — ready to deploy.');
-  process.exit(0);
-}
 // ============================================================
 // SECTION 19: Module Enhancement Coverage
 // ============================================================
@@ -1043,3 +1028,91 @@ test('OPT: Chapter structure comparison exists', function() { var src = fs.readF
 test('KG: Chapter correlation matrix exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8'); assert(src.indexOf('computeChapterCorrelation') >= 0, 'Missing chapter correlation matrix'); });
 
 
+// ============================================================
+// SECTION 20: Audit Regression
+// ============================================================
+console.log('\n=== Section 20: Audit Regression ===');
+
+test('AUDIT: renderRefNetwork function exists', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('function renderRefNetwork') >= 0, 'Missing renderRefNetwork');
+});
+
+test('AUDIT: section anchoring searches p+h1-h6', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var hasBroad = src.indexOf("querySelectorAll('p,h1,h2,h3,h4,h5,h6')") >= 0 || src.indexOf('querySelectorAll("p,h1,h2,h3,h4,h5,h6")') >= 0;
+  assert(hasBroad, 'Section anchoring missing broad element search');
+});
+
+test('AUDIT: format-check var h declared before first h+= use', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
+  var varHIdx = src.indexOf('var h = ');
+  var firstHUse = src.indexOf('h += ');
+  assert(varHIdx >= 0 && firstHUse >= 0 && varHIdx < firstHUse, 'var h must be declared before first h+=');
+});
+
+test('AUDIT: terminology.js has no duplicate updLoad calls', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/terminology.js'), 'utf8');
+  var matches = src.match(/检测中英混用/g);
+  assert((matches || []).length === 1, 'Duplicate updLoad in terminology.js');
+});
+
+test('AUDIT: terminology.js section ordering correct', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/terminology.js'), 'utf8');
+  var evoIdx = src.indexOf('术语演变检测');
+  var mxIdx = src.indexOf('中英术语混用');
+  assert(evoIdx >= 0 && mxIdx >= 0 && evoIdx < mxIdx, '术语演变 must be before 中英混用');
+});
+
+test('AUDIT: paragraph-analysis numbering before closing div', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/paragraph-analysis.js'), 'utf8');
+  var numIdx = src.indexOf('段落编号检查');
+  var closeDiv = src.lastIndexOf("h += '</div>'");
+  assert(numIdx >= 0 && closeDiv >= 0 && numIdx < closeDiv, '段落编号检查 before closing div');
+});
+
+test('AUDIT: paragraph-analysis bc4 before ref density', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/paragraph-analysis.js'), 'utf8');
+  var bc4Idx = src.indexOf('var bc4=');
+  var rdIdx = src.indexOf('引用密度分布');
+  assert(bc4Idx >= 0 && rdIdx >= 0 && bc4Idx < rdIdx, 'bc4 before ref density');
+});
+
+test('AUDIT: optimization updLoad percentages monotonic', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/optimization.js'), 'utf8');
+  var re = /updLoad\('[^']*',(\d+)\)/g, m;
+  var last = 0, ok = true;
+  while ((m = re.exec(src)) !== null) {
+    var pct = parseInt(m[1]);
+    if (pct < last) ok = false;
+    last = pct;
+  }
+  assert(ok, 'updLoad percentages must be monotonic');
+});
+
+test('AUDIT: chapter parsing uses cnDigit not bare parseInt', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('cnDigit(chM4[1])') >= 0, 'Must use cnDigit for Chinese chapter nums');
+});
+
+test('AUDIT: structureThesisBox uses compareDocumentPosition', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('compareDocumentPosition') >= 0, 'structureThesisBox uses DOM-order sort');
+});
+
+
+// Results
+// ============================================================
+console.log('\n=== RESULTS ===');
+console.log('  Passed:  ' + passed);
+console.log('  Failed:  ' + failed);
+console.log('  Warnings:' + warnings);
+console.log('  Total:   ' + (passed + failed + warnings));
+
+if (failed > 0) {
+  console.log('\n❌ TESTS FAILED — fix before deploying!');
+  process.exit(1);
+} else {
+  console.log('\n✅ All tests passed — ready to deploy.');
+  process.exit(0);
+}

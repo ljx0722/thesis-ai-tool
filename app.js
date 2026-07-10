@@ -2060,6 +2060,13 @@ function renderNetworkGraph(data){
   sv.addEventListener('mouseup',function(){pan=false;ndid=null;});sv.addEventListener('mouseleave',function(){pan=false;ndid=null;});
   gN.querySelectorAll('.kg-node').forEach(function(nG){nG.addEventListener('mousedown',function(ev){if(ev.button===0){ndid=this.id.replace('node_','');ev.stopPropagation();}});});
 }
+// ====== 文献引用网络（引用关系可视化） ======
+function renderRefNetwork(){
+  var tc=document.getElementById('kgTimelineCanvas');
+  if(!tc||kgCurrentView!=='timeline')return;
+  // Placeholder for future citation network graph
+  // Current implementation uses the timeline view canvas
+}
 // ====== 交互式时间线（SVG，论文散点+标题悬停） ======
 function renderTimeline(){
   var tc = document.getElementById('kgTimelineCanvas');

@@ -41,6 +41,18 @@ function runOptimization(container) {
 
   // Structure
   if(typeof updLoad==='function')updLoad('结构诊断...',50);
+  h += "<h4>📋 目录结构对比</h4>";
+  var bodyChs5=(sections||[]).filter(function(s){return!/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name)});
+  var standardStruct=["绪论/引言","文献综述/理论","研究方法/设计","实证/调研/分析","结论/对策/建议"];
+  var matched=0;
+  standardStruct.forEach(function(p){
+    var keywords=p.split("/");
+    var found=bodyChs5.some(function(cs){return keywords.some(function(k){return cs.name.indexOf(k)>=0;});});
+    if(found)matched++;
+  });
+  if(matched>=4)h+="<div class=\"finding ok\">✅ 目录结构覆盖 "+matched+"/5 标准要素（"+standardStruct.join(", ")+"）</div>";
+  else if(matched>=3)h+="<div class=\"finding warn\">⚠ 目录结构覆盖 "+matched+"/5，建议补充缺失要素</div>";
+  else h+="<div class=\"finding err\">❗ 目录结构仅覆盖 "+matched+"/5，论文结构需大幅调整</div>";
   h += '<h4>\ud83c\udfd7 结构诊断</h4>';
   if (bodyChs.length >= 2) {
     var fl = (bodyChs[0].text||'').length, ll = (bodyChs[bodyChs.length-1].text||'').length;
@@ -81,10 +93,10 @@ function runOptimization(container) {
   if(innoHits.length>0){innoHits.forEach(function(m){h+='<div class="finding info">📌 '+m+'</div>';});}
   h+='<div class="finding info">📌 需人工判断：创新是否真实存在（理论/视角/方法/实践/对象）</div>';
 
-  if(typeof updLoad==='function')updLoad('检查文献密度...',65);
+  if(typeof updLoad==='function')updLoad('检查文献密度...',60);
   
   // === 摘要质量评估 ===
-  if(typeof updLoad==='function')updLoad('评估摘要...',55);
+  if(typeof updLoad==='function')updLoad('评估摘要...',70);
   h += '<h4>\ud83d\udcdd 摘要质量评估</h4>';
   var absMatch=text.match(/(?:摘要|Abstract)[\s\S]{0,2000}?(?=\n(?:第[一二三四五六七八九十\d]+章|Abstract|关键词|关键字|Keyword|引言|绪论|第1章|\n\n\n)|\nAbstract|$)/);
   var absText=absMatch?absMatch[0]:text.substring(0,1500);
