@@ -1275,7 +1275,7 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
         if(refBound&&el2===refBound)break;
         if(refBound&&(el2.compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))break;
         // 标记/目录/摘要等第一章之前的内容全部跳过（兼容中文"第X章"和英文"Chapter"模式）
-        var isStart= /^第[一1一二三四五六七八九十]章/.test(txt2) || /^Chapter\s+\d/.test(txt2) || /^(1\.|1\s+)Introduction/.test(txt2);
+        var isStart= /^第[一1一二三四五六七八九十\d]+章/.test(txt2) || /^Chapter\s+\d/.test(txt2) || /^(1\.|1\s+)Introduction/.test(txt2);
         if(isStart)pastCh1=true;
         if(!pastCh1)continue;
         // 判断标题级别：数字编号层级（1. / 1.1 / 1.1.1 / 1.1.1.1 / ...）
@@ -1291,7 +1291,25 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
           headingCandidates.push({el:el2,txt:txt2,num:num,title:title,level:level});
         }
       }
-      // 第三步：构建多级树（去重：mammoth 可能把章节标题拆成多个元素）
+      // 第三步：合并 mammoth 拆分的标题（如 <p>第2章</p><p>文献综述</p> → "第2章 文献综述"）
+      for(var hi=0;hi<headingCandidates.length;hi++){
+        var hc=headingCandidates[hi];
+        var nextEl=hc.el?hc.el.nextElementSibling:null;
+        // 如果当前标题文本以编号结束（如 "第2章" 或 "2.1"），且下一个兄弟元素的文本不是标题模式，合并
+        if(nextEl&&/^(第[一二三四五六七八九十\d]+章|\d+(?:\.\d+)*)\s*$/.test(hc.txt)){
+          var nextTxt=(nextEl.textContent||'').trim();
+          if(nextTxt&&nextTxt.length>1&&nextTxt.length<60&&
+             !/^第[一二三四五六七八九十\d]+章/.test(nextTxt)&&
+             !/^(?:\d+\.)*\d+\s/.test(nextTxt)&&
+             !/^(?:摘要|Abstract|关键词|目录|参考文献|致谢|附录)/.test(nextTxt)){
+            // 合并：更新当前 heading 的文本和元素引用
+            hc.txt=hc.txt+' '+nextTxt;
+            hc.title=hc.title+' '+nextTxt;
+            hc.el=nextEl; // 指向合并后的元素，便于后续设置 ID
+          }
+        }
+      }
+      // 第四步：构建多级树（去重：mammoth 可能把章节标题拆成多个元素）
       var curCh4=null,curLvl={}; // level->parent
       for(var hi=0;hi<headingCandidates.length;hi++){
         var hc=headingCandidates[hi];
