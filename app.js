@@ -1254,50 +1254,64 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
 
     updLoad('构建章节树...','35');
 
-    // === 全新章节解析：基于 mammoth HTML 的 H1/H2/H3 标签（不依赖 Word 样式编号） ===
-    // mammoth 无论原始样式是什么，都会把 Word 标题转成 h1/h2/h3
+    // === 章节解析：扫描所有段落文本匹配"第X章"（不依赖 HTML 标签类型） ===
+    // mammoth 把 Word 标题转成 p 或 h1/h2/h3，取决于样式映射。直接扫描 p+h1+h2+h3 全覆盖。
     var box = document.getElementById('thesisBox');
     sections = [];
     if (box) {
-      var hTags = box.querySelectorAll('h1,h2,h3');
-      var curCh2 = null, curSec2 = null;
-      for (var hi = 0; hi < hTags.length; hi++) {
-        var el = hTags[hi], tag = (el.tagName || '').toLowerCase();
-        var txt = (el.textContent || '').trim();
-        if (!txt) continue;
-
-        if (tag === 'h1') {
-          // 章节标题：优先匹配 "第X章 xxx"
-          var chM3 = txt.match(/^第([一-鿿\d]+)章\s*(.*)/);
-          if (chM3) {
-            curCh2 = { ch: cnDigit(chM3[1]), name: txt, sections: [], el: el };
-            sections.push(curCh2); curSec2 = null;
-          } else {
-            // H1 但无"第X章"格式 — 可能是论文标题或英文 chapter
-            curCh2 = { ch: sections.length + 1, name: txt, sections: [], el: el };
-            sections.push(curCh2); curSec2 = null;
-          }
-        } else if (tag === 'h2' && curCh2) {
-          var secM = txt.match(/^(\d+\.\d+)\s*(.*)/);
-          if (secM) {
-            curSec2 = { num: secM[1], title: secM[2] || txt, subs: [] };
-            curCh2.sections.push(curSec2);
-          } else {
-            // H2 但无编号格式 — 当作无编号小节
-            curSec2 = { num: (curCh2.sections.length + 1).toString(), title: txt, subs: [] };
-            curCh2.sections.push(curSec2);
-          }
-        } else if (tag === 'h3' && curSec2) {
-          var subM = txt.match(/^(\d+\.\d+\.\d+)\s*(.*)/);
-          if (subM) {
-            curSec2.subs.push({ num: subM[1], title: subM[2] || txt });
-          } else {
-            curSec2.subs.push({ num: curSec2.num + '.' + (curSec2.subs.length + 1), title: txt });
+      // 收集所有可用的标题候选元素（h1/h2/h3 + 样式中含有"第X章"的 p）
+      var allHeadingEls = box.querySelectorAll('h1,h2,h3,p');
+      var headingCandidates = [];
+      for (var ai = 0; ai < allHeadingEls.length; ai++) {
+        var el2 = allHeadingEls[ai];
+        var txt2 = (el2.textContent || '').trim();
+        if (!txt2) continue;
+        // 只保留以"第X章"或"X.X"或"X.X.X"开头的元素，或已经是 h1/h2/h3 的元素
+        var tag2 = (el2.tagName || '').toLowerCase();
+        var isHeading = /^(h[1-6])$/.test(tag2);
+        var isChapter = /^第([一-鿿\d]+)章/.test(txt2);
+        var isSection = /^\d+\.\d+(\s|$)/.test(txt2);
+        var isSubSection = /^\d+\.\d+\.\d+(\s|$)/.test(txt2);
+        if (isHeading || isChapter || isSection || isSubSection) {
+          headingCandidates.push({ el: el2, tag: tag2, txt: txt2, isCh: isChapter, isSec: isSection, isSub: isSubSection, isH: isHeading });
+        }
+      }
+      // 第二遍：如果候选太少，扩大范围 — 扫描所有 p 找"第X章"
+      if (headingCandidates.length < 3) {
+        var allPs = box.querySelectorAll('p');
+        for (var pi = 0; pi < allPs.length; pi++) {
+          var pt = (allPs[pi].textContent || '').trim();
+          if (/^第([一-鿿\d]+)章/.test(pt) || /^\d+\.\d+(\s|$)/.test(pt)) {
+            // 检查是否已存在
+            var exists = false;
+            for (var ci2 = 0; ci2 < headingCandidates.length; ci2++) {
+              if (headingCandidates[ci2].el === allPs[pi]) { exists = true; break; }
+            }
+            if (!exists) headingCandidates.push({ el: allPs[pi], tag: 'p', txt: pt, isCh: /^第/.test(pt), isSec: /^\d+\.\d+(\s|$)/.test(pt), isSub: /^\d+\.\d+\.\d+(\s|$)/.test(pt), isH: false });
           }
         }
       }
+
+      // 构建章节树
+      var curCh3 = null, curSec3 = null;
+      for (var hi = 0; hi < headingCandidates.length; hi++) {
+        var hc = headingCandidates[hi];
+        if (hc.isCh) {
+          var chM3 = hc.txt.match(/^第([一-鿿\d]+)章\s*(.*)/);
+          var cName = chM3 ? hc.txt : hc.txt;
+          curCh3 = { ch: chM3 ? cnDigit(chM3[1]) : (sections.length + 1), name: cName, sections: [], el: hc.el };
+          sections.push(curCh3); curSec3 = null;
+        } else if (hc.isSec && curCh3) {
+          var secM = hc.txt.match(/^(\d+\.\d+)\s*(.*)/);
+          curSec3 = { num: secM ? secM[1] : hc.txt.substring(0, 3), title: secM ? (secM[2] || hc.txt) : hc.txt, subs: [], el: hc.el };
+          curCh3.sections.push(curSec3);
+        } else if (hc.isSub && curSec3) {
+          var subM = hc.txt.match(/^(\d+\.\d+\.\d+)\s*(.*)/);
+          curSec3.subs.push({ num: subM ? subM[1] : hc.txt.substring(0, 5), title: subM ? (subM[2] || hc.txt) : hc.txt, el: hc.el });
+        }
+      }
     }
-    // 如果 H1/H2/H3 没找到，回退到正则扫描 textContent
+    // 正则回退
     if (!sections.length) {
       var chMap2 = {}, re2 = /第([一-鿿\d]+)章/g, m2;
       while ((m2 = re2.exec(manuscriptText)) !== null) {

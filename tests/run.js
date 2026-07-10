@@ -706,17 +706,17 @@ test('REGRESSION: dashboard.js functions all use proper variable scoping', funct
 // ============================================================
 console.log('\n=== Section 15: Paper Structure & Robustness ===');
 
-test('PAPER: Chapter extraction uses mammoth HTML H1 tags (not style IDs)', function() {
+test('PAPER: Chapter extraction scans p+h1+h2+h3 for chapter/section text patterns', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf("querySelectorAll('h1,h2,h3')") >= 0, 'Must use mammoth HTML heading tags instead of style IDs');
-  assert(src.indexOf("tag === 'h1'") >= 0, 'Must detect H1 as chapter');
+  assert(src.indexOf("querySelectorAll('h1,h2,h3,p')") >= 0, 'Must scan p+h1+h2+h3 for chapters');
+  assert(src.indexOf("headingCandidates") >= 0, 'Must collect heading candidates from text content');
+  assert(src.indexOf("isChapter") >= 0, 'Must flag chapter candidates');
 });
 
-test('PAPER: Upload flow uses mammoth HTML H1/H2/H3, not raw XML style IDs', function() {
+test('PAPER: Chapter extraction has text-pattern fallback with expanded p scan', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  // The upload flow (around line 1234) should use querySelectorAll on mammoth HTML
-  var uploadSection = src.substring(src.indexOf("updLoad('构建章节树"), src.indexOf("updLoad('提取参考文献"));
-  assert(uploadSection.indexOf("querySelectorAll('h1,h2,h3')") >= 0, 'Upload flow must use mammoth HTML headings, not XML style IDs');
+  assert(src.indexOf("headingCandidates.length < 3") >= 0, 'Must have fallback when few headings found');
+  assert(src.indexOf("sections.push(curCh3)") >= 0, 'Must push chapters into sections array');
 });
 
 test('PAPER: Text-based fallback exists when H1/H2/H3 parsing fails', function() {
@@ -731,9 +731,9 @@ test('PAPER: onThesisLoaded called even on parse error (catch block)', function(
   assert(catchBlock.indexOf("onThesisLoaded") >= 0, 'onThesisLoaded must be called in catch block too');
 });
 
-test('PAPER: Mammoth HTML chapter extraction is primary (regex is fallback)', function() {
+test('PAPER: Text-pattern chapter scanning (p+h1+h2+h3) is primary (regex is fallback)', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf("querySelectorAll('h1,h2,h3')") >= 0 && src.indexOf("!sections.length") >= 0, 'Mammoth HTML primary + regex fallback for chapters');
+  assert(src.indexOf("querySelectorAll('h1,h2,h3,p')") >= 0 && src.indexOf("!sections.length") >= 0, 'Text-pattern scanning primary + regex fallback for chapters');
 });
 
 test('PAPER: Non-docx files (.doc) show appropriate error', function() {
@@ -741,11 +741,11 @@ test('PAPER: Non-docx files (.doc) show appropriate error', function() {
   assert(src.indexOf("ext!=='docx'") >= 0, 'Missing docx-only file extension check');
 });
 
-test('PAPER: sections array built from mammoth HTML H1/H2/H3 tags', function() {
+test('PAPER: sections array built from text-pattern scanning of all paragraph elements', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf("querySelectorAll('h1,h2,h3')") >= 0, 'sections must be built from mammoth HTML heading tags');
-  assert(src.indexOf("tag === 'h1'") >= 0, 'H1 detection missing');
-  assert(src.indexOf("tag === 'h2'") >= 0, 'H2 detection missing');
+  assert(src.indexOf("querySelectorAll('h1,h2,h3,p')") >= 0, 'Must scan paragraphs for heading patterns');
+  assert(src.indexOf("isChapter") >= 0, 'Must use isChapter flag');
+  assert(src.indexOf("headingCandidates") >= 0, 'Must use headingCandidates array');
   assert(src.indexOf("!sections.length") >= 0, 'text fallback for empty sections missing');
 });
 
