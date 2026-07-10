@@ -952,6 +952,8 @@ async function startSearch(){
   searchRunning=false;
   updLoad('渲染结果...',98);
   await sleep(0);
+  // 注入完成后，给有句子位置的文献补算句子重合度
+  try{mergedRefs.filter(function(r){return r.subType==='appended'&&r._domEl;}).forEach(function(r){scoreReference(r,{source:'new',hasSentence:true});});}catch(e){}
   // 通知刷新所有动态视图
   if(typeof onRefsChanged==='function')onRefsChanged();
   hideLoad();
@@ -1465,25 +1467,26 @@ function scoreReference(r, opts){
     r.conf=r.conf||Math.min(70,base);
   }
 
-  // 主题词标签列表（完整字符串，非bigram）
-  var tpLabels=(paperTopics||[]).map(function(t){return t.label.toLowerCase()});
-  var titleLower=(r.title||r.ci||'').toLowerCase();
-
-  // ② 主题相关度: 论文主题标签在文献标题中的命中比例
-  if(tpLabels.length>0){
-    var h1=0;tpLabels.forEach(function(t){if(titleLower.indexOf(t)>=0)h1++;});
-    r._topicRel=Math.min(100,Math.round(h1/Math.max(1,Math.min(tpLabels.length,10))*100));
+  // ② 主题相关度：文献标题关键词 ∩ 论文全文高频词 / 文献标题关键词数
+  // 重新提取文献标题关键词（不是paperTopics的bigram，是字的实际词语）
+  var refTitleKws=extractTitleKws(r.title||r.ci||'');
+  // 跟论文全文的句子摘要词做交叉匹配（更精准）
+  var sentenceKws2=(typeof sentenceKwList!=='undefined'&&sentenceKwList.length)?sentenceKwList:(paperTopics||[]).map(function(t){return t.label||''}).filter(function(w){return w.length>=2;});
+  if(refTitleKws.length>0&&sentenceKws2.length>0){
+    var h1=0;for(var ti=0;ti<refTitleKws.length;ti++){if(sentenceKws2.indexOf(refTitleKws[ti])>=0)h1++;}
+    r._topicRel=Math.min(100,Math.round(h1/Math.max(1,Math.min(refTitleKws.length,10))*100));
   }else{r._topicRel=0;}
 
-  // ③ 章节适配度: 论文主题标签在章内容中的命中比例
-  if(r.ch&&tpLabels.length>0){
+  // ③ 章节适配度：文献标题关键词 ∩ 该章节的句子摘要词 / 文献标题关键词数
+  if(r.ch&&refTitleKws.length>0){
     var chObj=sections.find(function(s){return s.ch===r.ch});
-    var chText=((chObj&&chObj.text)||manuscriptText||'').toLowerCase();
-    var h2=0;tpLabels.forEach(function(t){if(chText.indexOf(t)>=0)h2++;});
-    r._secFit=Math.min(100,Math.round(h2/Math.max(1,Math.min(tpLabels.length,10))*100));
+    var chText2=((chObj&&chObj.text)||manuscriptText||'').toLowerCase();
+    var chKws=extractTitleKws(chText2); // 从章文本中提取关键词
+    var h2=0;for(var ci=0;ci<refTitleKws.length;ci++){if(chKws.indexOf(refTitleKws[ci])>=0)h2++;}
+    r._secFit=Math.min(100,Math.round(h2/Math.max(1,Math.min(refTitleKws.length,10))*100));
   }else{r._secFit=0;}
 
-  // ④ 句子重合度: 句子文本中命中的主题词 / 总主题词数
+  // ④ 句子重合度：文献标题关键词 ∩ 句子的关键词 / 文献标题关键词数
   if(opts&&opts.hasSentence){
     var ctxText=(r._ctx||'').toLowerCase();
     if(!ctxText&&r._domEl){
@@ -1493,9 +1496,10 @@ function scoreReference(r, opts){
       }catch(e){ctxText=(r._ctx||'').toLowerCase();}
       r._ctx=ctxText;
     }
-    if(ctxText&&tpLabels.length>0){
-      var h3=0;tpLabels.forEach(function(t){if(ctxText.indexOf(t)>=0)h3++;});
-      r._dupRate=Math.min(100,Math.round(h3/Math.max(1,Math.min(tpLabels.length,10))*100));
+    if(ctxText&&refTitleKws.length>0){
+      var ctxKws=extractTitleKws(ctxText);
+      var h3=0;for(var ctxI=0;ctxI<refTitleKws.length;ctxI++){if(ctxKws.indexOf(refTitleKws[ctxI])>=0)h3++;}
+      r._dupRate=Math.min(100,Math.round(h3/Math.max(1,Math.min(refTitleKws.length,10))*100));
     }else{r._dupRate=0;}
   }else if(isNew){r._dupRate=0;}
 }
