@@ -1190,7 +1190,7 @@ function copyOne(idx){var r=mergedRefs[idx];if(!r)return;var gb=formatGB7714(r);
 function copyBib(){navigator.clipboard.writeText(mergedRefs.map(function(r,i){return'['+(r.displayNum||(i+1))+'] '+formatGB7714(r).replace(/<[^>]+>/g,'')}).join('\n\n'));ttp('已复制')}
 async function reverify(idx){var r=mergedRefs[idx];if(!r)return;showLoad('校验中...',0);var title=r.title||'',jr=r.journal||'',yr=r.year||'';if(!title&&r.ci){var m=parseRefMeta(r.ci);title=m.title;jr=m.journal;yr=m.yr}if(!title&&r.ci){title=r.ci.replace(/\s+/g,' ').substring(0,100).replace(/^\[\d+\]\s*/,'').trim()}var v=await verifyRef(title,jr,yr,r.doi||'');r.conf=v.score||Math.min(35,r.conf||0);if(v.doi&&!r.doi)r.doi=v.doi;r._citations=v.citations||0;r._retracted=v.retracted;r._verified=v.verified;r._pubType=v.pub_type;r._verifySource=v.source;hideLoad();renderRefs();ttp(v.verified?'✅ DOI验证通过 ('+v.score+'%)':(v.score>=50?'⚠ 部分匹配 ('+v.score+'%)':'❓ 未验证'))}
 async function reverifyExisting(idx){var r=existingRefs[idx];if(!r)return;showLoad('校验中...',0);var title=r.title||'',jr=r.journal||'',yr=r.year||'';if(!title&&r.ci){var m=parseRefMeta(r.ci);title=m.title;jr=m.journal;yr=m.yr}if(!title&&r.ci){title=r.ci.replace(/\s+/g,' ').substring(0,100).replace(/^\[\d+\]\s*/,'').trim()}var v=await verifyRef(title,jr,yr,r.doi||'');r.conf=v.score||Math.min(35,r.conf||0);if(v.doi&&!r.doi)r.doi=v.doi;r._citations=v.citations||0;r._retracted=v.retracted;r._verified=v.verified;r._pubType=v.pub_type;r._verifySource=v.source;hideLoad();renderExistingOnly();ttp(v.verified?'✅ DOI验证通过 ('+v.score+'%)':(v.score>=50?'⚠ 部分匹配 ('+v.score+'%)':'❓ 未验证'))}
-async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;if(!list.length)return ttp('请先检索');showLoad('批量校验中...',0);var done=0,total=list.length;
+async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;if(!list.length)return ttp('请先检索');showLoad('批量校验中...',0);if(typeof startCatGame==='function')setTimeout(function(){startCatGame();},500);var done=0,total=list.length;
   // 并发校验（每批4个）
   for(var bi=0;bi<total;bi+=4){
     var batch=list.slice(bi,Math.min(bi+4,total));
@@ -1232,11 +1232,94 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
     document.getElementById('thesisBox').innerHTML=manuscriptHTML;
 
     updLoad('构建章节树...','35');
-    var tree=null;try{tree=await parseDocxStructure(buf)}catch(er2){console.warn(er2)}
-    if(tree)markAnchors(tree);
-    sections=tree?tree.map(function(tc){return{ch:tc.ch,name:tc.name,text:manuscriptText,sections:tc.sections}}):[];
-    if(sections.length&&tree)populateChapterText();
-    if(!sections.length){var chMap={},re=/第([一-鿿\d]+)章/g,m;while((m=re.exec(manuscriptText))!==null){var d=cnDigit(m[1]);if(chMap[d])continue;var af=manuscriptText.substring(m.index+m[0].length);if(!af.startsWith('\n'))continue;if(/PAGEREF|HYPERLINK|_Toc/.test(af.substring(0,250)))continue;chMap[d]={dig:d,pos:m.index}};var chs=Object.values(chMap).sort(function(a,b){return a.pos-b.pos});sections=chs.map(function(hi,ii){var af2=manuscriptText.substring(hi.pos+2),nl=af2.indexOf('\n'),t=(nl>0?af2.substring(0,nl):af2.substring(0,50)).trim().replace(/\s*\d+\.\d+.*$/,'').trim();return{ch:hi.dig,name:'第'+hi.dig+'章 '+t,text:manuscriptText,sections:[]}})}
+
+    // === 全新章节解析：基于 mammoth HTML 的 H1/H2/H3 标签（不依赖 Word 样式编号） ===
+    // mammoth 无论原始样式是什么，都会把 Word 标题转成 h1/h2/h3
+    var box = document.getElementById('thesisBox');
+    sections = [];
+    if (box) {
+      var hTags = box.querySelectorAll('h1,h2,h3');
+      var curCh2 = null, curSec2 = null;
+      for (var hi = 0; hi < hTags.length; hi++) {
+        var el = hTags[hi], tag = (el.tagName || '').toLowerCase();
+        var txt = (el.textContent || '').trim();
+        if (!txt) continue;
+
+        if (tag === 'h1') {
+          // 章节标题：优先匹配 "第X章 xxx"
+          var chM3 = txt.match(/^第([一-鿿\d]+)章\s*(.*)/);
+          if (chM3) {
+            curCh2 = { ch: cnDigit(chM3[1]), name: txt, sections: [], el: el };
+            sections.push(curCh2); curSec2 = null;
+          } else {
+            // H1 但无"第X章"格式 — 可能是论文标题或英文 chapter
+            curCh2 = { ch: sections.length + 1, name: txt, sections: [], el: el };
+            sections.push(curCh2); curSec2 = null;
+          }
+        } else if (tag === 'h2' && curCh2) {
+          var secM = txt.match(/^(\d+\.\d+)\s*(.*)/);
+          if (secM) {
+            curSec2 = { num: secM[1], title: secM[2] || txt, subs: [] };
+            curCh2.sections.push(curSec2);
+          } else {
+            // H2 但无编号格式 — 当作无编号小节
+            curSec2 = { num: (curCh2.sections.length + 1).toString(), title: txt, subs: [] };
+            curCh2.sections.push(curSec2);
+          }
+        } else if (tag === 'h3' && curSec2) {
+          var subM = txt.match(/^(\d+\.\d+\.\d+)\s*(.*)/);
+          if (subM) {
+            curSec2.subs.push({ num: subM[1], title: subM[2] || txt });
+          } else {
+            curSec2.subs.push({ num: curSec2.num + '.' + (curSec2.subs.length + 1), title: txt });
+          }
+        }
+      }
+    }
+    // 如果 H1/H2/H3 没找到，回退到正则扫描 textContent
+    if (!sections.length) {
+      var chMap2 = {}, re2 = /第([一-鿿\d]+)章/g, m2;
+      while ((m2 = re2.exec(manuscriptText)) !== null) {
+        var d2 = cnDigit(m2[1]);
+        if (chMap2[d2]) continue;
+        var af2 = manuscriptText.substring(m2.index + m2[0].length);
+        if (!af2.startsWith('\n') && !af2.match(/^\s*[^\n]/)) continue;
+        if (/PAGEREF|HYPERLINK|_Toc/.test(af2.substring(0, 250))) continue;
+        chMap2[d2] = { dig: d2, pos: m2.index };
+      }
+      var chs2 = Object.values(chMap2).sort(function(a, b) { return a.pos - b.pos; });
+      sections = chs2.map(function(hi, ii) {
+        var af3 = manuscriptText.substring(hi.pos + 2), nl2 = af3.indexOf('\n');
+        var t = (nl2 > 0 ? af3.substring(0, nl2) : af3.substring(0, 50)).trim().replace(/\s*\d+\.\d+.*$/, '').trim();
+        return { ch: hi.dig, name: '第' + hi.dig + '章 ' + t, text: manuscriptText, sections: [] };
+      });
+      console.log('[chapters] using text fallback, found', sections.length);
+    }
+    // 给每个 chapter 用 markAnchors 打 DOM 锚点
+    sections.forEach(function(cs) {
+      var el3 = cs.el;
+      if (!el3) {
+        // 从 DOM 中按章节名查找对应元素
+        var allEls = box.querySelectorAll('h1,h2,h3,p');
+        for (var ei = 0; ei < allEls.length; ei++) {
+          if ((allEls[ei].textContent || '').replace(/\s+/g, '') === cs.name.replace(/\s+/g, '')) {
+            el3 = allEls[ei]; break;
+          }
+        }
+      }
+      if (el3) {
+        el3.id = 'ch-' + cs.ch;
+        // 标记为可折叠
+        el3._slevel = 'ch';
+        el3.classList.add('ch-head');
+        var ar = document.createElement('span');
+        ar.className = 'toggle-arrow open';
+        ar.innerHTML = '&#9654;';
+        el3.insertBefore(ar, el3.firstChild);
+      }
+    });
+    // 分章填充文本
+    if (sections.length) populateChapterText();
 
     updLoad('提取参考文献...','60');
     var rawRefs=[];try{rawRefs=await extractRefsFromRawDocx(buf)}catch(er3){console.warn(er3)}

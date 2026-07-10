@@ -706,20 +706,23 @@ test('REGRESSION: dashboard.js functions all use proper variable scoping', funct
 // ============================================================
 console.log('\n=== Section 15: Paper Structure & Robustness ===');
 
-test('PAPER: parseDocxStructure accepts WPS/Kingsoft style IDs 1-9 for chapters', function() {
+test('PAPER: Chapter extraction uses mammoth HTML H1 tags (not style IDs)', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf("parseInt(a.style)>=1&&parseInt(a.style)<=9") >= 0, 'Missing WPS style 1-9 chapter detection');
+  assert(src.indexOf("querySelectorAll('h1,h2,h3')") >= 0, 'Must use mammoth HTML heading tags instead of style IDs');
+  assert(src.indexOf("tag === 'h1'") >= 0, 'Must detect H1 as chapter');
 });
 
-test('PAPER: parseDocxStructure accepts style IDs 10-20 for sections', function() {
+test('PAPER: Upload flow uses mammoth HTML H1/H2/H3, not raw XML style IDs', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf("parseInt(a.style)>=10&&parseInt(a.style)<=20") >= 0, 'Missing WPS style section detection');
+  // The upload flow (around line 1234) should use querySelectorAll on mammoth HTML
+  var uploadSection = src.substring(src.indexOf("updLoad('构建章节树"), src.indexOf("updLoad('提取参考文献"));
+  assert(uploadSection.indexOf("querySelectorAll('h1,h2,h3')") >= 0, 'Upload flow must use mammoth HTML headings, not XML style IDs');
 });
 
-test('PAPER: parseDocxStructure has text-based fallback when styles fail', function() {
+test('PAPER: Text-based fallback exists when H1/H2/H3 parsing fails', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf("chSet") >= 0, 'Missing text-based chapter extraction fallback');
-  assert(src.indexOf("tree.length") >= 0, 'Missing tree length check before fallback');
+  assert(src.indexOf("!sections.length") >= 0, 'Must have empty sections check');
+  assert(src.indexOf("chMap") >= 0, 'Must have text-based chapter extraction fallback');
 });
 
 test('PAPER: onThesisLoaded called even on parse error (catch block)', function() {
@@ -728,9 +731,9 @@ test('PAPER: onThesisLoaded called even on parse error (catch block)', function(
   assert(catchBlock.indexOf("onThesisLoaded") >= 0, 'onThesisLoaded must be called in catch block too');
 });
 
-test('PAPER: Mammoth HTML fallback regex exists for chapter extraction', function() {
+test('PAPER: Mammoth HTML chapter extraction is primary (regex is fallback)', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf("!sections.length") >= 0 && src.indexOf("chMap") >= 0, 'Missing mammoth HTML fallback for chapters');
+  assert(src.indexOf("querySelectorAll('h1,h2,h3')") >= 0 && src.indexOf("!sections.length") >= 0, 'Mammoth HTML primary + regex fallback for chapters');
 });
 
 test('PAPER: Non-docx files (.doc) show appropriate error', function() {
@@ -738,9 +741,12 @@ test('PAPER: Non-docx files (.doc) show appropriate error', function() {
   assert(src.indexOf("ext!=='docx'") >= 0, 'Missing docx-only file extension check');
 });
 
-test('PAPER: sections array defaults to empty when tree is null', function() {
+test('PAPER: sections array built from mammoth HTML H1/H2/H3 tags', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf("sections=tree?tree.map") >= 0 || src.indexOf("sections = tree ? tree.map") >= 0, 'sections must handle null tree gracefully');
+  assert(src.indexOf("querySelectorAll('h1,h2,h3')") >= 0, 'sections must be built from mammoth HTML heading tags');
+  assert(src.indexOf("tag === 'h1'") >= 0, 'H1 detection missing');
+  assert(src.indexOf("tag === 'h2'") >= 0, 'H2 detection missing');
+  assert(src.indexOf("!sections.length") >= 0, 'text fallback for empty sections missing');
 });
 
 test('PAPER: _thesisLoaded is properly set via onThesisLoaded callback', function() {
