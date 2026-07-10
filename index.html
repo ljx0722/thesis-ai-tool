@@ -39,7 +39,7 @@
 <div class="main">
   <div class="nav-sidebar" id="navSidebar">
     <h3>📑 目录</h3>
-    <div class="nav-tree" id="navTree"><i style="color:var(--m);font-size:.7rem;padding:8px;display:block">请先上传论文</i></div>
+    <div class="nav-tree" id="navTree" title="点击章/节/小节跳转到对应位置"><i style="color:var(--m);font-size:.7rem;padding:8px;display:block">请先上传论文</i></div>
   </div>
   <div class="resizer" id="navResizer"></div>
   <div class="thesis-panel">
@@ -105,7 +105,7 @@
 
 
 <!-- ====== 论文看板弹窗 ====== -->
-<div id="dbOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:99998;align-items:center;justify-content:center">
+<div id="dbOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(30,30,32,0.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:99998;align-items:center;justify-content:center">
   <div style="background:var(--cardSolid);border-radius:var(--radiusLg);padding:20px;width:95%;height:92%;max-width:1500px;display:flex;flex-direction:column;box-shadow:0 25px 80px rgba(0,0,0,0.2);position:relative">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0">
       <div>
@@ -128,7 +128,7 @@
     <div class="pct" id="loadPct" style="display:none">0%</div>
     <div class="pbar"><div class="pfill" id="loadBar"></div></div>
     <div class="detail" id="loadDetail"></div>
-    <div class="sr-progress" id="srProgress" style="display:none"></div>
+    <div class="sr-progress" id="srProgress" style="display:none"><div style="font-size:.55rem;color:var(--m1);margin-bottom:6px;text-align:center">📡 每词查询 3 个学术数据库（OpenAlex + Crossref + Semantic Scholar），并发执行</div></div>
   </div>
   <div class="ambient-tips" id="ambientTips"></div>
 </div>
@@ -141,16 +141,16 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 
 <button class="help-btn" id="darkToggle" onclick="toggleDarkMode()" title="切换暗色模式" style="bottom:72px">🌓</button>
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
-<script src="app.js?v=21"></script>
-<script src="js/modules/optimization.js?v=21"></script>
-<script src="js/modules/format-check.js?v=21"></script>
-<script src="js/modules/terminology.js?v=21"></script>
-<script src="js/modules/paragraph-analysis.js?v=21"></script>
-<script src="js/modules/dashboard.js?v=21"></script>
-<script src="js/modules/thesis-review.js?v=21"></script>
-<script src="js/modules/onboarding.js?v=21"></script>
-<script src="js/modules/cat-game.js?v=21"></script>
-<script src="js/app-modules.js?v=21"></script>
+<script src="app.js?v=22"></script>
+<script src="js/modules/optimization.js?v=22"></script>
+<script src="js/modules/format-check.js?v=22"></script>
+<script src="js/modules/terminology.js?v=22"></script>
+<script src="js/modules/paragraph-analysis.js?v=22"></script>
+<script src="js/modules/dashboard.js?v=22"></script>
+<script src="js/modules/thesis-review.js?v=22"></script>
+<script src="js/modules/onboarding.js?v=22"></script>
+<script src="js/modules/cat-game.js?v=22"></script>
+<script src="js/app-modules.js?v=22"></script>
 <script>
 (function(){
   var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');

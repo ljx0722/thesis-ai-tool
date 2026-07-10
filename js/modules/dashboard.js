@@ -175,17 +175,21 @@ function buildDashboardHTML() {
     {name:'格式规范',score:s.dimScores.format, info:'DOI覆盖率('+s.doiRate+'%)、图表编号、GB/T 7714规范'},
     {name:'实践价值',score:s.dimScores.practical||55, info:'行业/政策/企业应用场景，落地可行性'},
   ];
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">';
   dims.forEach(function(d) {
     var cl = d.score>=80?'#30d158':(d.score>=60?'#0071e3':(d.score>=40?'#ff9f0a':'#ff3b30'));
-    h += '<div style="margin-bottom:8px">';
-    h += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">';
-    h += '<span style="font-size:.68rem;font-weight:600;color:#1d1d1f">'+d.name+'</span>';
-    h += '<span style="font-size:.68rem;font-weight:700;color:'+cl+';font-family:SF Mono,monospace">'+d.score+'</span>';
-    h += '</div>';
-    h += '<div style="height:7px;background:#e5e7eb;border-radius:6px;overflow:hidden"><div style="height:100%;width:'+d.score+'%;background:'+cl+';border-radius:6px;transition:width .6s ease"></div></div>';
-    h += '<div style="font-size:.58rem;color:#86868b;margin-top:1px">'+d.info+'</div>';
-    h += '</div>';
+    var lvl = d.score>=80?'优秀':(d.score>=60?'良好':(d.score>=40?'一般':'需改进'));
+    var fill = d.score/100;
+    h += '<div class="soccer-stat" title="'+d.info+' | 评分: '+d.score+'/100 — '+lvl+'\n\n计算公式：基于论文数据的多维度自动评估。" style="cursor:help;position:relative;overflow:hidden;background:#fff;border-radius:12px;padding:12px 10px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.06);transition:all .2s">';
+    h += '<div style="position:absolute;bottom:0;left:0;width:100%;height:'+(fill*100)+'%;background:'+cl+';opacity:'+(0.06+fill*0.06).toFixed(2)+';transition:height .6s ease;border-radius:0 0 12px 12px"></div>';
+    h += '<div style="position:relative;z-index:1">';
+    h += '<div style="font-size:1.5rem;font-weight:700;color:'+cl+';font-family:SF Mono,monospace;line-height:1">'+d.score+'</div>';
+    h += '<div style="font-size:.55rem;font-weight:600;color:#86868b;margin:2px 0">/100</div>';
+    h += '<div style="font-size:.7rem;font-weight:600;color:#1d1d1f;margin:4px 0">'+d.name+'</div>';
+    h += '<div style="font-size:.52rem;color:'+cl+';font-weight:600;background:rgba(0,0,0,0.03);padding:2px 8px;border-radius:8px;display:inline-block">'+lvl+'</div>';
+    h += '</div></div>';
   });
+  h += '</div>';
   h += '</div>';
 
   // Suggestions card

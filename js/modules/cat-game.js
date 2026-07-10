@@ -16,6 +16,13 @@ function startCatGame() {
   if (_gameActive) return;
   _gameActive = true;
 
+  // 新手提示
+  var hintEl=document.createElement('div');
+  hintEl.style.cssText='position:fixed;top:20%;left:50%;transform:translate(-50%,0);color:rgba(255,255,255,0.9);font-size:1.1rem;z-index:10002;font-family:-apple-system,"PingFang SC",sans-serif;pointer-events:none;transition:opacity .6s;text-shadow:0 2px 8px rgba(0,0,0,0.5);text-align:center';
+  hintEl.innerHTML='🐱 守护小猫<br><span style="font-size:.75rem;opacity:.7">用鼠标挡住边缘 · 坚持越久越好</span>';
+  document.body.appendChild(hintEl);
+  setTimeout(function(){hintEl.style.opacity='0';setTimeout(function(){if(hintEl.parentElement)hintEl.parentElement.removeChild(hintEl);},600);},3000);
+
   // 创建全屏 Canvas
   var canvas = document.createElement('canvas');
   canvas.id = 'catGameCanvas';
