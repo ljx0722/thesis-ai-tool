@@ -106,10 +106,10 @@
 
 <!-- ====== 论文看板弹窗 ====== -->
 <div id="dbOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(30,30,32,0.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:99998;align-items:center;justify-content:center">
-  <div style="background:var(--cardSolid);border-radius:var(--radiusLg);padding:20px;width:95%;height:92%;max-width:1500px;display:flex;flex-direction:column;box-shadow:0 25px 80px rgba(0,0,0,0.2);position:relative">
+  <div style="background:var(--solid);border-radius:var(--r-xl);padding:24px;width:95%;height:92%;max-width:1500px;display:flex;flex-direction:column;box-shadow:0 25px 80px rgba(0,0,0,0.3),0 0 0 1px rgba(255,255,255,0.1);position:relative;border:1px solid rgba(255,255,255,0.08)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0">
       <div>
-        <h2 style="font-size:1.15rem;font-weight:700;color:var(--t);margin:0">📊 论文看板</h2>
+        <h2 style="font-size:1.2rem;font-weight:700;color:#1d1d1f;margin:0;letter-spacing:-.02em">📊 论文看板</h2>
         <div style="font-size:.68rem;color:var(--m);margin-top:2px">综合评估报告 · 数据来源于各分析模块</div>
       </div>
       <div style="display:flex;gap:6px;align-items:center">
@@ -141,16 +141,16 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 
 <button class="help-btn" id="darkToggle" onclick="toggleDarkMode()" title="切换暗色模式" style="bottom:72px">🌓</button>
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
-<script src="app.js?v=23"></script>
-<script src="js/modules/optimization.js?v=23"></script>
-<script src="js/modules/format-check.js?v=23"></script>
-<script src="js/modules/terminology.js?v=23"></script>
-<script src="js/modules/paragraph-analysis.js?v=23"></script>
-<script src="js/modules/dashboard.js?v=23"></script>
-<script src="js/modules/thesis-review.js?v=23"></script>
-<script src="js/modules/onboarding.js?v=23"></script>
-<script src="js/modules/cat-game.js?v=23"></script>
-<script src="js/app-modules.js?v=23"></script>
+<script src="app.js?v=24"></script>
+<script src="js/modules/optimization.js?v=24"></script>
+<script src="js/modules/format-check.js?v=24"></script>
+<script src="js/modules/terminology.js?v=24"></script>
+<script src="js/modules/paragraph-analysis.js?v=24"></script>
+<script src="js/modules/dashboard.js?v=24"></script>
+<script src="js/modules/thesis-review.js?v=24"></script>
+<script src="js/modules/onboarding.js?v=24"></script>
+<script src="js/modules/cat-game.js?v=24"></script>
+<script src="js/app-modules.js?v=24"></script>
 <script>
 (function(){
   var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');

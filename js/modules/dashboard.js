@@ -175,7 +175,7 @@ function buildDashboardHTML() {
     {name:'格式规范',score:s.dimScores.format, info:'DOI覆盖率('+s.doiRate+'%)、图表编号、GB/T 7714规范'},
     {name:'实践价值',score:s.dimScores.practical||55, info:'行业/政策/企业应用场景，落地可行性'},
   ];
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">';
+  h += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">';
   dims.forEach(function(d) {
     var cl = d.score>=80?'#30d158':(d.score>=60?'#0071e3':(d.score>=40?'#ff9f0a':'#ff3b30'));
     var lvl = d.score>=80?'优秀':(d.score>=60?'良好':(d.score>=40?'一般':'需改进'));
