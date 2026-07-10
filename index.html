@@ -58,7 +58,7 @@
   <div class="ref-panel" id="refPanel">
     <div class="kw-bar ref-only" id="kwBar" style="display:none"><h4>🔑 论文主题词</h4><div class="kw-tags" id="kwTags"></div></div>
     <div class="dashboard ref-only" id="dashboard"><div class="dash-card"><div class="dv" id="dashTotal">0</div><div class="dl">总文献</div></div><div class="dash-card"><div class="dv" id="dashCN">0</div><div class="dl">中文</div></div><div class="dash-card"><div class="dv" id="dashEN">0</div><div class="dl">英文</div></div><div class="dash-card"><div class="dv" id="dash3Y">0</div><div class="dl">3年内</div></div><div class="dash-card"><div class="dv" id="dash5Y">0</div><div class="dl">5年内</div></div></div>
-    <div class="filters ref-only"><label>共</label><input id="fTotal" value="0" min="5" max="200" placeholder="自动"><label>中≥</label><input id="fCN" value="45">%<label>英≥</label><input id="fEN" value="30">%<label>3年≥</label><input id="fY3" value="50">%<label>5年≥</label><input id="fY5" value="75">%<label>分布</label><select id="fDist"><option value="auto">模型自动</option><option value="uniform">按章节平均</option><option value="weighted">按内容多少</option></select></div>
+    <div class="filters ref-only"><label title="检索文献总数（自动推荐=每千字1条）">共</label><input id="fTotal" value="0" min="5" max="200" placeholder="自动"><label title="中文文献最高占比。实际会根据英文最低占比自动调整">中≤</label><input id="fCN" value="45">%<label title="英文文献最低占比。如果中文上限太低，英文会自动补齐">英≥</label><input id="fEN" value="30">%<label title="近3年文献目标占比">3年≥</label><input id="fY3" value="50">%<label title="近5年文献目标占比">5年≥</label><input id="fY5" value="75">%<label>分布</label><select id="fDist"><option value="auto">模型自动</option><option value="uniform">按章节平均</option><option value="weighted">按内容多少</option></select></div>
     <div class="ref-list ref-only" id="refs"><div style="text-align:center;padding:60px;color:#9ca3af;font-size:.82rem">← 请先上传论文</div></div>
   </div>
 </div>
@@ -81,9 +81,9 @@
       <div style="display:flex;align-items:center;gap:12px">
         <h2 style="font-size:1.1rem;font-weight:700;color:var(--t);margin:0">🕸️ 知识图谱</h2>
         <div id="kgTabs" style="display:flex;gap:2px;background:rgba(0,0,0,0.04);border-radius:18px;padding:2px">
-          <button onclick="switchKGView('cloud')" id="kgTabCloud" class="kg-tab active">☁️ 词云</button>
-          <button onclick="switchKGView('network')" id="kgTabNetwork" class="kg-tab">🔗 网络</button>
-          <button onclick="switchKGView('timeline')" id="kgTabTimeline" class="kg-tab">📅 时间线</button>
+          <button onclick="switchKGView('cloud')" id="kgTabCloud" class="kg-tab active" title="词云视图：交互式关键词可视化。词的大小代表出现频率，连线代表同章共现关系。鼠标悬停高亮关联词，滚轮缩放。">☁️ 词云</button>
+          <button onclick="switchKGView('network')" id="kgTabNetwork" class="kg-tab" title="网络图视图：力导向节点关系图。蓝色=关键词，绿色=章节，紫色=小节，橙色=文献。滚轮缩放，左键拖拽。">🔗 网络</button>
+          <button onclick="switchKGView('timeline')" id="kgTabTimeline" class="kg-tab" title="时间线视图：文献按发表年份排布。圆点颜色：蓝=原文文献，紫=顺延文献，绿=新增文献。悬停查看标题、期刊、年份。">📅 时间线</button>
         </div>
       </div>
       <div style="display:flex;gap:6px;align-items:center">
@@ -141,16 +141,16 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 
 <button class="help-btn" id="darkToggle" onclick="toggleDarkMode()" title="切换暗色模式" style="bottom:72px">🌓</button>
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
-<script src="app.js?v=19"></script>
-<script src="js/modules/optimization.js?v=19"></script>
-<script src="js/modules/format-check.js?v=19"></script>
-<script src="js/modules/terminology.js?v=19"></script>
-<script src="js/modules/paragraph-analysis.js?v=19"></script>
-<script src="js/modules/dashboard.js?v=19"></script>
-<script src="js/modules/thesis-review.js?v=19"></script>
-<script src="js/modules/onboarding.js?v=19"></script>
-<script src="js/modules/cat-game.js?v=19"></script>
-<script src="js/app-modules.js?v=19"></script>
+<script src="app.js?v=20"></script>
+<script src="js/modules/optimization.js?v=20"></script>
+<script src="js/modules/format-check.js?v=20"></script>
+<script src="js/modules/terminology.js?v=20"></script>
+<script src="js/modules/paragraph-analysis.js?v=20"></script>
+<script src="js/modules/dashboard.js?v=20"></script>
+<script src="js/modules/thesis-review.js?v=20"></script>
+<script src="js/modules/onboarding.js?v=20"></script>
+<script src="js/modules/cat-game.js?v=20"></script>
+<script src="js/app-modules.js?v=20"></script>
 <script>
 (function(){
   var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');

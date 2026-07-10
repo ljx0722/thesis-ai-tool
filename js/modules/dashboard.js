@@ -124,12 +124,12 @@ function buildDashboardHTML() {
   h += '<span style="font-size:.58rem;color:#86868b;font-weight:600">总分/100</span>';
   h += '</div></div>';
   h += '<div style="font-size:1.2rem;font-weight:800;color:'+gc+';font-family:SF Mono,monospace">'+s.grade+' 级 — '+gradeLabel+'</div>';
-  h += '<div style="font-size:.62rem;color:#86868b;margin-top:4px;line-height:1.5">综合评分基于十维评审体系<br>涵盖选题/文献/框架/方法/论证/<br>结论/创新/写作/格式/实践价值</div>';
+  h += '<div style="font-size:.58rem;color:#86868b;margin-top:4px;line-height:1.5">加权公式：结构×15% + 文献×35% + 格式×20%<br>+ 可读性×15% + 术语×15%<br>十维雷达图源：选题/框架/方法/论证/结论/创新/写作/实践</div>';
   h += '</div>';
 
   // Radar
   h += '<div style="background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.04);padding:14px;position:relative">';
-  h += '<div style="font-size:.7rem;font-weight:600;color:#1d1d1f;margin-bottom:6px">📊 十维雷达图</div>';
+  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:.7rem;font-weight:600;color:#1d1d1f">📊 十维雷达图</span><span title="雷达图展示10个评审维度的得分分布。数据多边形面积越大代表论文越均衡。低分维度对应的三角形顶点会内缩。" style="font-size:.55rem;color:#86868b;cursor:help">ⓘ</span></div>';
   h += '<canvas id="dbRadar" style="width:100%;height:230px"></canvas>';
   h += '</div>';
 
@@ -141,7 +141,7 @@ function buildDashboardHTML() {
 
   // Quick stats
   h += '<div style="background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.04);padding:14px">';
-  h += '<div style="font-size:.7rem;font-weight:600;color:#1d1d1f;margin-bottom:8px">📈 快速统计</div>';
+  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:.7rem;font-weight:600;color:#1d1d1f">📈 快速统计</span><span title="下方指标基于论文文本和文献数据的自动检测结果" style="font-size:.55rem;color:#86868b;cursor:help">ⓘ</span></div>';
   h += statRow('总字数',Math.round(s.totalChars/1000)+'k 字',s.totalChars>30000?'#30d158':(s.totalChars>15000?'#0071e3':'#ff9f0a'));
   h += statRow('正文章节',s.chapters+' 章',s.chapters>=5?'#30d158':(s.chapters>=3?'#0071e3':'#ff3b30'));
   h += statRow('小节数',s.sections+' 个',s.sections>=8?'#30d158':(s.sections>=4?'#0071e3':'#ff9f0a'));
@@ -162,7 +162,7 @@ function buildDashboardHTML() {
 
   // Dimension score bars
   h += '<div style="background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.04);padding:16px">';
-  h += '<div style="font-size:.72rem;font-weight:600;color:#1d1d1f;margin-bottom:10px">📈 十维得分详解</div>';
+  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:.72rem;font-weight:600;color:#1d1d1f">📈 十维得分详解</span><span title="十维评审体系各维度自动评分。绿色≥80分良好，蓝色≥60分正常，橙色≥40分需关注，红色<40分需重点改进。" style="font-size:.55rem;color:#86868b;cursor:help">ⓘ</span></div>';
   var dims = [
     {name:'选题价值',score:s.dimScores.innovation+5||45, info:'题目表述、研究范围、理论与实践价值'},
     {name:'文献综述',score:s.dimScores.literature, info:'文献总量('+s.totalRefs+'条)、外文占比('+s.enRate+'%)、近五年率('+s.recentRate+'%)'},
@@ -190,7 +190,7 @@ function buildDashboardHTML() {
 
   // Suggestions card
   h += '<div style="background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.04);padding:16px">';
-  h += '<div style="font-size:.72rem;font-weight:600;color:#1d1d1f;margin-bottom:10px">💡 优先改进建议</div>';
+  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:.72rem;font-weight:600;color:#1d1d1f">💡 优先改进建议</span><span title="基于论文弱项维度自动生成的改进建议。先修高分影响项（如文献综述 ×35%），再修低影响项。" style="font-size:.55rem;color:#86868b;cursor:help">ⓘ</span></div>';
   var suggestions = [];
   ['struct','literature','format','method','content','conclusion','innovation','readable','practical'].forEach(function(key) {
     var sc = s.dimScores[key]||50;

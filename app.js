@@ -1,5 +1,7 @@
 "use strict";var existingRefs=[],manuscriptText='',manuscriptHTML='',mergedRefs=[],paperTopics=[],zoomLevel=1,sections=[],selNavIdx=-1,searchRunning=false,appReady=false;
 window.onerror=function(m,s,l,c,e){console.error(m,'@',s,':',l);document.getElementById('statusBar')&&(document.getElementById('statusBar').textContent='⚠ 出现错误，请刷新页面');return true};
+// 评分维度的解释提示
+var _scoreInfo={conf:'🔍 真实度：文献在数据库中是否真实存在。DOI精确匹配=高可信；多源标题匹配=可信；无法匹配=低。',topicRel:'🎯 主题相关度：文献标题关键词与论文全文关键词的交集比例。分数越高，文献越贴合论文主题。',secFit:'📂 章节适配度：文献标题关键词与所在章节内容的交叉匹配比例。反映该文献是否适合放在此章。',dupRate:'📝 句子重合度：文献关键词与插入位置上下文关键词的交集。数值高=插入的句子和文献主题高度吻合。'};
 // Init complete
 
 // UTILS
@@ -1071,10 +1073,10 @@ function renderRefs(){
         h+='<div class="ref-row" style="background:#fef2f2;border-radius:4px;padding:4px 8px;margin:4px 0"><span class="label" style="color:#dc2626">⚠</span><span class="value" style="color:#dc2626;font-weight:600">未匹配到具体小节 — 建议点击下方"✏️ 优化句子"</span></div>';
       }
       if(sp.ctx)h+='<div class="ref-row"><span class="label">句子</span><span class="value text">「'+sp.ctx+'」</span></div>';
-      h+='<div class="ref-bar"><span class="label">真实度</span><div class="bar-wrap"><div class="bar-fill '+cl+'" style="width:'+conf+'%"></div></div><span class="num">'+conf+'%</span></div>';
-      h+='<div class="ref-bar"><span class="label">主题相关</span><div class="bar-wrap"><div class="bar-fill '+(r._topicRel>=70?'high':r._topicRel>=40?'medium':'low')+'" style="width:'+(r._topicRel||0)+'%"></div></div><span class="num">'+(r._topicRel||0)+'%</span></div>';
-      h+='<div class="ref-bar"><span class="label">章节适配</span><div class="bar-wrap"><div class="bar-fill '+(r._secFit>=70?'high':r._secFit>=40?'medium':'low')+'" style="width:'+(r._secFit||0)+'%"></div></div><span class="num">'+(r._secFit||0)+'%</span></div>';
-      h+='<div class="ref-bar"><span class="label">句子重合</span><div class="bar-wrap"><div class="bar-fill '+drCl+'" style="width:'+dupRate+'%"></div></div><span class="num">'+dupRate+'%</span></div>';
+      h+='<div class="ref-bar"><span class="label" title="'+_scoreInfo.conf+'">真实度 ℹ️</span><div class="bar-wrap"><div class="bar-fill '+cl+'" style="width:'+conf+'%"></div></div><span class="num">'+conf+'%</span></div>';
+      h+='<div class="ref-bar"><span class="label" title="'+_scoreInfo.topicRel+'">主题相关 ℹ️</span><div class="bar-wrap"><div class="bar-fill '+(r._topicRel>=70?'high':r._topicRel>=40?'medium':'low')+'" style="width:'+(r._topicRel||0)+'%"></div></div><span class="num">'+(r._topicRel||0)+'%</span></div>';
+      h+='<div class="ref-bar"><span class="label" title="'+_scoreInfo.secFit+'">章节适配 ℹ️</span><div class="bar-wrap"><div class="bar-fill '+(r._secFit>=70?'high':r._secFit>=40?'medium':'low')+'" style="width:'+(r._secFit||0)+'%"></div></div><span class="num">'+(r._secFit||0)+'%</span></div>';
+      h+='<div class="ref-bar"><span class="label" title="'+_scoreInfo.dupRate+'">句子重合 ℹ️</span><div class="bar-wrap"><div class="bar-fill '+drCl+'" style="width:'+dupRate+'%"></div></div><span class="num">'+dupRate+'%</span></div>';
       h+='</div>';
       h+='<div class="ref-actions" onclick="event.stopPropagation()">'+act+'<span style="margin-left:auto;font-size:.6rem;color:#94a3b8">'+labelText+'</span></div>';
       h+='</div>';
@@ -1132,10 +1134,10 @@ function renderExistingOnly(){
       if(sp.sub)h+='<span class="value sub"> → '+sp.sub+'</span>';
       h+='</div>';
       if(sp.ctx)h+='<div class="ref-row"><span class="label">句子</span><span class="value text">「'+sp.ctx+'」</span></div>';
-      h+='<div class="ref-bar"><span class="label">真实度</span><div class="bar-wrap"><div class="bar-fill '+cl+'" style="width:'+conf+'%"></div></div><span class="num">'+conf+'%</span></div>';
-      h+='<div class="ref-bar"><span class="label">主题相关</span><div class="bar-wrap"><div class="bar-fill '+(r._topicRel>=70?'high':r._topicRel>=40?'medium':'low')+'" style="width:'+(r._topicRel||0)+'%"></div></div><span class="num">'+(r._topicRel||0)+'%</span></div>';
-      h+='<div class="ref-bar"><span class="label">章节适配</span><div class="bar-wrap"><div class="bar-fill '+(r._secFit>=70?'high':r._secFit>=40?'medium':'low')+'" style="width:'+(r._secFit||0)+'%"></div></div><span class="num">'+(r._secFit||0)+'%</span></div>';
-      h+='<div class="ref-bar"><span class="label">句子重合</span><div class="bar-wrap"><div class="bar-fill '+drCl+'" style="width:'+dupRate+'%"></div></div><span class="num">'+dupRate+'%</span></div>';
+      h+='<div class="ref-bar"><span class="label" title="'+_scoreInfo.conf+'">真实度 ℹ️</span><div class="bar-wrap"><div class="bar-fill '+cl+'" style="width:'+conf+'%"></div></div><span class="num">'+conf+'%</span></div>';
+      h+='<div class="ref-bar"><span class="label" title="'+_scoreInfo.topicRel+'">主题相关 ℹ️</span><div class="bar-wrap"><div class="bar-fill '+(r._topicRel>=70?'high':r._topicRel>=40?'medium':'low')+'" style="width:'+(r._topicRel||0)+'%"></div></div><span class="num">'+(r._topicRel||0)+'%</span></div>';
+      h+='<div class="ref-bar"><span class="label" title="'+_scoreInfo.secFit+'">章节适配 ℹ️</span><div class="bar-wrap"><div class="bar-fill '+(r._secFit>=70?'high':r._secFit>=40?'medium':'low')+'" style="width:'+(r._secFit||0)+'%"></div></div><span class="num">'+(r._secFit||0)+'%</span></div>';
+      h+='<div class="ref-bar"><span class="label" title="'+_scoreInfo.dupRate+'">句子重合 ℹ️</span><div class="bar-wrap"><div class="bar-fill '+drCl+'" style="width:'+dupRate+'%"></div></div><span class="num">'+dupRate+'%</span></div>';
       h+='</div>';
       h+='<div class="ref-actions" onclick="event.stopPropagation()">';
       h+='<button class="verify" onclick="reverifyExisting('+i+')">校验</button>';
