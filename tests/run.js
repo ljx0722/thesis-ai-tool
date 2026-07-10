@@ -701,6 +701,55 @@ test('REGRESSION: dashboard.js functions all use proper variable scoping', funct
 });
 
 
+// ============================================================
+// SECTION 15: Paper Structure & Robustness Tests
+// ============================================================
+console.log('\n=== Section 15: Paper Structure & Robustness ===');
+
+test('PAPER: parseDocxStructure accepts WPS/Kingsoft style IDs 1-9 for chapters', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("parseInt(a.style)>=1&&parseInt(a.style)<=9") >= 0, 'Missing WPS style 1-9 chapter detection');
+});
+
+test('PAPER: parseDocxStructure accepts style IDs 10-20 for sections', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("parseInt(a.style)>=10&&parseInt(a.style)<=20") >= 0, 'Missing WPS style section detection');
+});
+
+test('PAPER: parseDocxStructure has text-based fallback when styles fail', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("chSet") >= 0, 'Missing text-based chapter extraction fallback');
+  assert(src.indexOf("tree.length") >= 0, 'Missing tree length check before fallback');
+});
+
+test('PAPER: onThesisLoaded called even on parse error (catch block)', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var catchBlock = src.substring(src.lastIndexOf("catch(err)"), src.lastIndexOf("catch(err)") + 300);
+  assert(catchBlock.indexOf("onThesisLoaded") >= 0, 'onThesisLoaded must be called in catch block too');
+});
+
+test('PAPER: Mammoth HTML fallback regex exists for chapter extraction', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("!sections.length") >= 0 && src.indexOf("chMap") >= 0, 'Missing mammoth HTML fallback for chapters');
+});
+
+test('PAPER: Non-docx files (.doc) show appropriate error', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("ext!=='docx'") >= 0, 'Missing docx-only file extension check');
+});
+
+test('PAPER: sections array defaults to empty when tree is null', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("sections=tree?tree.map") >= 0 || src.indexOf("sections = tree ? tree.map") >= 0, 'sections must handle null tree gracefully');
+});
+
+test('PAPER: _thesisLoaded is properly set via onThesisLoaded callback', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/app-modules.js'), 'utf8');
+  assert(src.indexOf("onThesisLoaded") >= 0, 'onThesisLoaded function must exist in app-modules');
+  assert(src.indexOf("_thesisLoaded = true") >= 0, '_thesisLoaded must be set to true');
+});
+
+
 // Results
 // ============================================================
 console.log('\n=== RESULTS ===');
