@@ -73,6 +73,7 @@
     <div class="upload-footer">💡 文件仅在本机解析，不会上传到任何服务器</div>
   </div>
 </div>
+<script>document.getElementById("uploadOverlay").classList.add("show");window._pendingFile=null;document.getElementById("fileInput").addEventListener("change",function(e){if(e.target.files.length){window._pendingFile=e.target.files[0];var s=document.getElementById("upStatus");if(s)s.textContent="已选择: "+e.target.files[0].name;}});</script>
 
 <!-- ====== 知识图谱弹窗 ====== -->
 <div id="kgOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:99999;align-items:center;justify-content:center">
@@ -141,6 +142,8 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 
 <button class="help-btn" id="darkToggle" onclick="toggleDarkMode()" title="切换暗色模式" style="bottom:72px">🌓</button>
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
+<script defer src="mammoth.browser.min.js"></script>
+<script defer src="jszip.min.js"></script>
 <script src="app.js?v=27"></script>
 <script src="js/modules/optimization.js?v=27"></script>
 <script src="js/modules/format-check.js?v=27"></script>

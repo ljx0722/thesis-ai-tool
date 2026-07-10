@@ -706,11 +706,11 @@ test('REGRESSION: dashboard.js functions all use proper variable scoping', funct
 // ============================================================
 console.log('\n=== Section 15: Paper Structure & Robustness ===');
 
-test('PAPER: Chapter extraction scans p+h1+h2+h3 for chapter/section text patterns', function() {
+test('PAPER: Chapter extraction scans p+h1~h6 for chapter/section text patterns', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf("querySelectorAll('h1,h2,h3,p')") >= 0, 'Must scan p+h1+h2+h3 for chapters');
+  assert(src.indexOf("querySelectorAll('p,h1,h2,h3,h4,h5,h6')") >= 0 || src.indexOf('querySelectorAll("p,h1,h2,h3,h4,h5,h6")') >= 0, 'Must scan p+h1~h6 for chapters');
   assert(src.indexOf("headingCandidates") >= 0, 'Must collect heading candidates from text content');
-  assert(src.indexOf("isChapter") >= 0, 'Must flag chapter candidates');
+  assert(src.indexOf("isChapterText") >= 0, 'Must flag chapter candidates');
 });
 
 test('PAPER: Chapter extraction has boundary guards (pastCh1, refBound)', function() {
@@ -733,9 +733,9 @@ test('PAPER: onThesisLoaded called even on parse error (catch block)', function(
   assert(catchBlock.indexOf("onThesisLoaded") >= 0, 'onThesisLoaded must be called in catch block too');
 });
 
-test('PAPER: Text-pattern chapter scanning (p+h1+h2+h3) is primary (regex is fallback)', function() {
+test('PAPER: Text-pattern chapter scanning is primary (regex is fallback)', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf("querySelectorAll('h1,h2,h3,p')") >= 0 && src.indexOf("!sections.length") >= 0, 'Text-pattern scanning primary + regex fallback for chapters');
+  assert((src.indexOf("querySelectorAll('p,h1") >= 0 || src.indexOf('querySelectorAll("p,h1') >= 0) && src.indexOf("!sections.length") >= 0, 'Text-pattern scanning primary + regex fallback for chapters');
 });
 
 test('PAPER: Non-docx files (.doc) show appropriate error', function() {
@@ -745,8 +745,8 @@ test('PAPER: Non-docx files (.doc) show appropriate error', function() {
 
 test('PAPER: sections array built from text-pattern scanning of all paragraph elements', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf("querySelectorAll('h1,h2,h3,p')") >= 0, 'Must scan paragraphs for heading patterns');
-  assert(src.indexOf("isChapter") >= 0, 'Must use isChapter flag');
+  assert(src.indexOf("querySelectorAll('p,h1") >= 0 || src.indexOf('querySelectorAll("p,h1') >= 0, 'Must scan paragraphs for heading patterns');
+  assert(src.indexOf("isChapterText") >= 0, 'Must use isChapterText flag');
   assert(src.indexOf("headingCandidates") >= 0, 'Must use headingCandidates array');
   assert(src.indexOf("!sections.length") >= 0, 'text fallback for empty sections missing');
 });

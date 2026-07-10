@@ -1262,7 +1262,7 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
       var refBound=null;
       var allEls3=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
       for(var ri=0;ri<allEls3.length;ri++){
-        var rt=(allEls3[ri].textContent||'').replace(/\\s+/g,'');
+        var rt=(allEls3[ri].textContent||'').replace(/\s+/g,'');
         if(rt.indexOf('参考文献')===0&&rt.length<20){refBound=allEls3[ri];break;}
       }
       // 第二步：收集在"第1章"→"参考文献"之间的标题候选
@@ -1291,14 +1291,23 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
           headingCandidates.push({el:el2,txt:txt2,num:num,title:title,level:level});
         }
       }
-      // 第三步：构建多级树
+      // 第三步：构建多级树（去重：mammoth 可能把章节标题拆成多个元素）
       var curCh4=null,curLvl={}; // level->parent
       for(var hi=0;hi<headingCandidates.length;hi++){
         var hc=headingCandidates[hi];
         if(hc.level===0){
           var chM4=hc.txt.match(/^第([一-鿿\d]+)章/);var chNum2=chM4?cnDigit(chM4[1]):(sections.length+1);
-          curCh4={ch:chNum2||(sections.length+1),name:hc.txt,sections:[],el:hc.el};
-          sections.push(curCh4);curLvl={0:curCh4};
+          // 去重：同一章号只保留标题最长、有 DOM 锚点的条目
+          var dupCh=null;
+          for(var ci=0;ci<sections.length;ci++){if(sections[ci].ch===chNum2){dupCh=sections[ci];break;}}
+          if(dupCh){
+            if(hc.txt.length>dupCh.name.length){dupCh.name=hc.txt;}
+            if(hc.el&&!dupCh.el){dupCh.el=hc.el;}
+            curCh4=dupCh;curLvl={0:curCh4};
+          }else{
+            curCh4={ch:chNum2||(sections.length+1),name:hc.txt,sections:[],el:hc.el};
+            sections.push(curCh4);curLvl={0:curCh4};
+          }
         }else if(curCh4){
           var parent=curLvl[hc.level-1];
           if(!parent){parent=curCh4;sections=sections;}
@@ -1333,7 +1342,7 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
       var el3 = cs.el;
       if (!el3) {
         // 从 DOM 中按章节名查找对应元素
-        var allEls = box.querySelectorAll('h1,h2,h3,p');
+        var allEls = box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
         for (var ei = 0; ei < allEls.length; ei++) {
           if ((allEls[ei].textContent || '').replace(/\s+/g, '') === cs.name.replace(/\s+/g, '')) {
             el3 = allEls[ei]; break;
@@ -1491,6 +1500,12 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
     // 结构化面板放在try外面，出错不影响正文展示
     try{structureThesisBox();}catch(e){console.warn('[struct] 跳过结构化:',e.message);}
   });
+
+  // 如果用户在上传遮罩打开后、库加载完成前选择了文件，自动触发解析
+  if(window._pendingFile){
+    var dt=new DataTransfer();dt.items.add(window._pendingFile);
+    fi.files=dt.files;fi.dispatchEvent(new Event('change'));window._pendingFile=null;
+  }
 
 })();
 
