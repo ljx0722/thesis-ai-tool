@@ -70,6 +70,10 @@ function runOptimization(container) {
   else h+='<div class="finding err">❗ 未检测到明确的研究方法，建议在绪论中说明研究方法</div>';
 
   // 创新点提示
+    h += '<h4>📊 数据可视化建议</h4>';
+  var dp=0,aps2=document.getElementById('thesisBox')?document.getElementById('thesisBox').querySelectorAll('p'):[];
+  for(var dpi=0;dpi<Math.min(aps2.length,100);dpi++){var dpt=(aps2[dpi].textContent||'').trim();if(/\d+(\.\d+)?%/.test(dpt)&&dpt.length>60&&!/图|表|Table|Figure/.test(dpt))dp++;}
+  if(dp>5)h+='<div class="finding info">📌 检测到 '+dp+' 个纯文字段落包含百分比数据，建议用图表呈现</div>';else h+='<div class="finding ok">✅ 数据呈现方式合理</div>';
   h += '<h4>✨ 创新点提示</h4>';
   var innoHits=[];
   if(/首次|创新|新颖|首创|改进|优化|新方法|新模型|新视角|新框架/.test(text))innoHits.push('检测到创新相关表述');

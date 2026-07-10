@@ -1007,3 +1007,39 @@ if (failed > 0) {
   console.log('\n✅ All tests passed — ready to deploy.');
   process.exit(0);
 }
+// ============================================================
+// SECTION 19: Module Enhancement Coverage
+// ============================================================
+console.log('\n=== Section 19: Module Enhancement Coverage ===');
+
+test('FORMAT: Abstract bilingual check exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8'); assert(src.indexOf('中英文摘要完整性') >= 0, 'Missing abstract bilingual check'); });
+
+test('FORMAT: Citation position detection exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8'); assert(src.indexOf('引用位置检测') >= 0, 'Missing citation position detection'); });
+
+test('FORMAT: Chart citation check exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8'); assert(src.indexOf('图表引用检测') >= 0, 'Missing chart citation check'); });
+
+test('FORMAT: Header/footer detection exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8'); assert(src.indexOf('页眉页脚') >= 0, 'Missing header/footer detection'); });
+
+test('TERM: Spell check dictionary exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/terminology.js'), 'utf8'); assert(src.indexOf('术语拼写检查') >= 0, 'Missing spell check'); });
+
+test('TERM: Term evolution detection exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/terminology.js'), 'utf8'); assert(src.indexOf('术语演变检测') >= 0, 'Missing term evolution detection'); });
+
+test('TERM: Translation consistency check exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/terminology.js'), 'utf8'); assert(src.indexOf('外文术语翻译一致性') >= 0, 'Missing translation consistency'); });
+
+test('TERM: Proper noun extraction exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/terminology.js'), 'utf8'); assert(src.indexOf('专有名词库') >= 0, 'Missing proper noun extraction'); });
+
+test('PARA: Paragraph logic coherence exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/paragraph-analysis.js'), 'utf8'); assert(src.indexOf('段落逻辑连贯性') >= 0, 'Missing paragraph logic coherence'); });
+
+test('PARA: Head-tail echo check exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/paragraph-analysis.js'), 'utf8'); assert(src.indexOf('首尾呼应度') >= 0, 'Missing head-tail echo check'); });
+
+test('PARA: Reference density distribution exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/paragraph-analysis.js'), 'utf8'); assert(src.indexOf('引用密度分布') >= 0, 'Missing reference density distribution'); });
+
+test('PARA: Paragraph numbering check exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/paragraph-analysis.js'), 'utf8'); assert(src.indexOf('段落编号检查') >= 0, 'Missing paragraph numbering check'); });
+
+test('OPT: Data viz suggestion exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/optimization.js'), 'utf8'); assert(src.indexOf('数据可视化建议') >= 0, 'Missing data visualization suggestion'); });
+
+test('OPT: Chapter structure comparison exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/optimization.js'), 'utf8'); assert(src.indexOf('目录结构对比') >= 0, 'Missing chapter structure comparison'); });
+
+test('KG: Chapter correlation matrix exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8'); assert(src.indexOf('computeChapterCorrelation') >= 0, 'Missing chapter correlation matrix'); });
+
+

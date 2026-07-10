@@ -1834,6 +1834,18 @@ function renderKnowledgeGraph(data){
 }
 // ====== 交互式词云（全屏，带频次+关联线） ======
 var _wcScale2 = 1, _wcTx2 = 0, _wcTy2 = 0, _wcPan2 = false, _wcPx2 = 0, _wcPy2 = 0;
+// 关键词演变渲染
+function renderKeywordEvolution(){
+  var cp2=document.getElementById('kgCloudPanel');if(!cp2||kgCurrentView!=='cloud')return;
+  var tps5=paperTopics.slice(0,12);if(!tps5.length)return;
+  var bcs8=(sections||[]).filter(function(s){return!/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name)});
+  var h5='<div style="font-size:.68rem;font-weight:600;color:#1d1d1f;margin:10px 0">📈 关键词演变（各章出现强度）</div>';
+  h5+='<div style="display:flex;flex-direction:column;gap:3px">';
+  tps5.forEach(function(t){h5+='<div style="display:flex;align-items:center;gap:4px;font-size:.6rem"><span style="min-width:50px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+t.label+'</span>';
+    bcs8.forEach(function(cs){var ct5=((cs.text||'').match(new RegExp(t.label,'g'))||[]).length;var bh=Math.min(14,Math.max(2,ct5));h5+='<div style="flex:1;height:12px;background:rgba(0,0,0,0.03);border-radius:2px;position:relative"><div style="position:absolute;bottom:0;left:0;width:100%;height:'+bh+'px;background:#0071e3;opacity:'+(0.2+Math.min(1,ct5/20)).toFixed(2)+';border-radius:2px;transition:height .3s" title="'+cs.name+': '+ct5+'次"></div></div>';});h5+='</div>';});
+  h5+='</div>';cp2.innerHTML=h5;
+}
+
 function renderWordCloud(){
   var cp = document.getElementById('kgCloudPanel');
   if (!cp || kgCurrentView !== 'cloud') return;
@@ -2284,6 +2296,17 @@ function showNodeTooltip(e,ev){
 function hideNodeTooltip(){if(kgTooltip)kgTooltip.style.display='none';}
 
 // ====== 一键导出报告 ======
+// 章节关联度矩阵计算
+function computeChapterCorrelation(){
+  var bc7=(sections||[]).filter(function(s){return!/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name)});
+  var n2=bc7.length;if(n2<2)return null;
+  var m=[];
+  for(var ci=0;ci<n2;ci++){m[ci]=[];var ki=extractTitleKws(bc7[ci].text||'');for(var cj=0;cj<n2;cj++){if(ci===cj){m[ci][cj]=1;continue;}
+    var kj=extractTitleKws(bc7[cj].text||'');var ic=ki.filter(function(w){return kj.indexOf(w)>=0;}).length;
+    m[ci][cj]=Math.round(ic/Math.max(1,new Set(ki.concat(kj)).size)*100);}}
+  return{chapters:bc7.map(function(c){return c.name;}),matrix:m};
+}
+
 function exportReport(){
   if(!manuscriptText){alert('请先上传论文');return;}
   showLoad('生成报告...',20,'整合所有分析数据');

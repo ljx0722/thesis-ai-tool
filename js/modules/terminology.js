@@ -48,6 +48,11 @@ function runTerminology(container) {
   mx.forEach(function(mt){var hc=text.indexOf(mt.c)>=0,he=new RegExp('\\b'+mt.e.replace(/ /g,'\\s+')+'\\b','i').test(text);if(hc&&he){mf=true;h+='<div class="finding info">\ud83d\udccc \u201c'+mt.c+'\u201d 和 \u201c'+mt.e+'\u201d 同时出现，建议统一</div>';}});
   if(!mf)h+='<div class="finding ok">\u2705 中英文术语使用一致</div>';
 
+    if(typeof updLoad==='function')updLoad('拼写检查...',85);
+  h += '<h4>📖 术语拼写检查</h4>';
+  var sd={'神经网络':'神经网路','机器学习':'机器学习','深度学习':'深度学习'};var si=0;
+  Object.keys(sd).forEach(function(cr){var rx=new RegExp(sd[cr],'g');var ct=(text.match(rx)||[]).length;if(ct>0){si++;h+='<div class="finding warn">⚠ 可能拼错: '+sd[cr]+' ('+ct+'次)，应为 '+cr+'</div>';}});
+  if(!si)h+='<div class="finding ok">✅ 未检测到常见术语拼写错误</div>';
   if(typeof updLoad==='function')updLoad('检查缩写...',80);
   h+='<h4>\ud83d\udcdd 缩写首次使用检查</h4>';
   var ab=[{r:/\bCNN\b/g,f:'卷积神经网络(Convolutional Neural Network)'},{r:/\bRNN\b/g,f:'循环神经网络(Recurrent Neural Network)'},{r:/\bLSTM\b/g,f:'长短期记忆网络(Long Short-Term Memory)'},{r:/\bSVM\b/g,f:'支持向量机(Support Vector Machine)'},{r:/\bNLP\b/g,f:'自然语言处理(Natural Language Processing)'},{r:/\bPCA\b/g,f:'主成分分析(Principal Component Analysis)'},{r:/\bGAN\b/g,f:'生成对抗网络(Generative Adversarial Network)'},{r:/\bIoT\b/g,f:'物联网(Internet of Things)'},{r:/\bAPI\b/g,f:'应用程序接口(Application Programming Interface)'},{r:/\bGPU\b/g,f:'图形处理器(Graphics Processing Unit)'},{r:/\bROC\b/g,f:'受试者工作特征(Receiver Operating Characteristic)'},{r:/\bAUC\b/g,f:'曲线下面积(Area Under Curve)'},{r:/\bMSE\b/g,f:'均方误差(Mean Squared Error)'},{r:/\bMAE\b/g,f:'平均绝对误差(Mean Absolute Error)'}];
@@ -55,6 +60,11 @@ function runTerminology(container) {
   ab.forEach(function(ap){var ms=text.match(ap.r);if(ms&&ms.length>0){var fi=text.indexOf(ms[0]),bf2=text.substring(Math.max(0,fi-120),fi);if(bf2.indexOf(ap.f.substring(0,Math.min(8,ap.f.length)))<0){abf=true;h+='<div class="finding warn">\u26a0 \u201c'+ms[0]+'\u201d 首次未给出全称（'+ap.f+'），共 '+ms.length+' 次</div>';}}});
   if(!abf)h+='<div class="finding ok">\u2705 检测到的缩写均已正确给出全称</div>';
 
+    h += '<h4>🏷️ 专有名词库</h4>';
+  var pn={};var pnM, pnR=/\b[A-Z][A-Za-z]{2,}(?:\s+[A-Z][A-Za-z]{2,})?\b/g;
+  while((pnM=pnR.exec(text))!==null){var pw=pnM[0];pn[pw]=(pn[pw]||0)+1;}
+  var pl=Object.entries(pn).filter(function(e){return e[1]>=3;}).sort(function(a,b){return b[1]-a[1];}).slice(0,15);
+  if(pl.length){pl.forEach(function(e){h+='<span class="term-tag">'+e[0]+' ('+e[1]+')</span>';});}else{h+='<div class="finding info">📌 未检测到足够的专有名词</div>';}
   if(typeof updLoad==='function')updLoad('完成',100);
   h+='</div>';
   container.innerHTML = h;

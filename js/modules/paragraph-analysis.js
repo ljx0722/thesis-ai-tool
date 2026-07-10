@@ -56,6 +56,16 @@ function runParagraphAnalysis(container) {
 
   // === 可读性评分 ===
   if(typeof updLoad==='function')updLoad('计算可读性...',75);
+      h += '<h4>📊 引用密度分布</h4>';
+  var crc={};bc4.forEach(function(cs){crc[cs.ch]=0;});
+  var ar2=(typeof mergedRefs!=='undefined'&&mergedRefs.length)?mergedRefs:(typeof existingRefs!=='undefined'?existingRefs:[]);
+  ar2.forEach(function(r){var ck=r.ch||1;crc[ck]=(crc[ck]||0)+1;});
+  bc4.forEach(function(cs){var cnt=crc[cs.ch]||0,clen=Math.max(1,(cs.text||'').length);var dn=Math.round(cnt/clen*1000*100)/100;h+='<div class="stat-row"><span class="slabel">'+cs.name+'</span><span class="svalue">'+dn+'条/千字</span></div>';});
+  if(Object.values(crc).reduce(function(a,b){return a+b;},0)===0)h+='<div class="finding info">📌 尚未检索文献，切换到参考文献模块检索后查看</div>';
+  h += '<h4>🔄 首尾呼应度</h4>';
+  var bc4=(sections||[]).filter(function(s){return!/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name)});
+  if(bc4.length>=2){var fc3=bc4[0],lc=bc4[bc4.length-1];var fk=extractTitleKws(fc3.text||''),lk=extractTitleKws(lc.text||'');var sh=fk.filter(function(w){return lk.indexOf(w)>=0;}).length;var er=Math.min(fk.length,lk.length)>0?Math.round(sh/Math.min(fk.length,lk.length)*100):0;
+    if(er>=40)h+='<div class="finding ok">✅ 首尾呼应度 '+er+'%（绪论与结论共享关键词）</div>';else h+='<div class="finding warn">⚠ 首尾呼应度 '+er+'%（偏低），建议结论回应绪论提出的问题</div>';}
   h += '<h4>📖 可读性评分</h4>';
   var avgSentLen=stats.avgSentLen||0;
   var passiveCount=(text.match(/被(?!称为|视为|认为|广泛|动|迫|告|捕|害|杀|偷|抢|骗|称作|誉为|评为|列为|授予|命名为|应用于|用于)/g)||[]).length+(text.match(/由(?!于|此|来|衷)/g)||[]).length+(text.match(/受(?!到|理|访|伤|贿|益|众|灾|限|托|邀|聘|训|教|精)/g)||[]).length;
@@ -74,6 +84,12 @@ function runParagraphAnalysis(container) {
   h+='</div>';
     // 学术语调分析
   if(typeof updLoad==='function')updLoad('分析学术语调...',90);
+    h += '<h4>🔗 段落逻辑连贯性</h4>';
+  var lb=0,ps4=box?box.querySelectorAll('p'):[];
+  for(var li=1;li<Math.min(ps4.length,80);li++){var ptA=(ps4[li-1].textContent||'').toLowerCase(),ptB=(ps4[li].textContent||'').toLowerCase();var ka=extractTitleKws(ptA),kb=extractTitleKws(ptB);if(ka.length&&kb.length){var ov2=ka.filter(function(w){return kb.indexOf(w)>=0;}).length;if(ov2===0&&ptA.length>30&&ptB.length>30)lb++;}}
+  if(lb>10)h+='<div class="finding warn">⚠ 检测到 '+lb+' 处可能的逻辑断点（相邻段落无共享关键词）</div>';
+  else if(lb>0)h+='<div class="finding ok">✅ '+lb+' 处逻辑跳跃，整体连贯性良好</div>';
+  else h+='<div class="finding ok">✅ 段落间逻辑连贯</div>';
   h += '<h4>🎓 学术语调</h4>';
   var oralCount=0;var oralWords=[/很\s/g,/挺\s/g,/\b太\b/g,/非常\s/g,/\b特别\b/g,/\b有点\b/g,/\b大概\b/g,/\b差不多\b/g,/\b可能吧\b/g,/\b我觉得\b/g,/\b感觉\b/g,/蛮/g];
   oralWords.forEach(function(r){var mh=text.match(r);if(mh)oralCount+=mh.length;});
@@ -118,6 +134,10 @@ function runParagraphAnalysis(container) {
 
   if(typeof updLoad==='function')updLoad('完成',100);
   h += '</div>';
+    h += '<h4>🔢 段落编号检查</h4>';
+  var seqs=[['首先','其次','再次','最后'],['第一','第二','第三','第四'],['一方面','另一方面']];var ni=0;
+  seqs.forEach(function(seq){var fd=seq.filter(function(w){return text.indexOf(w)>=0;});if(fd.length>0&&fd.length<seq.length){ni++;h+='<div class="finding warn">⚠ 序列「'+seq.join(', ')+'」仅出现'+fd.length+'项，可能不完整</div>';}});
+  if(!ni)h+='<div class="finding ok">✅ 段落编号序列完整</div>';
   container.innerHTML = h;
 }
 

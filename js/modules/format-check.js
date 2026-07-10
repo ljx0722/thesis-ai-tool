@@ -136,6 +136,14 @@ function runFormatCheck(container) {
     else h+='<div class=\"finding warn\">\u26a0 未检测到研究展望</div>';
   }else{h+='<div class=\"finding warn\">\u26a0 未检测到结论/展望章</div>';}
 
+    h += '<h4>🔗 图表引用检测</h4>';
+  var fN3=[],fR3=/图\s*(\d+)/g,fm3;while((fm3=fR3.exec(text))!==null)fN3.push(fm3[1]);
+  var tN3=[],tR3=/表\s*(\d+)/g,tm3;while((tm3=tR3.exec(text))!==null)tN3.push(tm3[1]);
+  var uf=0,ut=0;fN3.forEach(function(n){if(text.indexOf('图'+n)===text.lastIndexOf('图'+n))uf++;});
+  tN3.forEach(function(n){if(text.indexOf('表'+n)===text.lastIndexOf('表'+n))ut++;});
+  if(uf>0||ut>0)h+='<div class="finding warn">⚠ '+uf+'个图、'+ut+'个表可能未被正文引用</div>';
+  else if(fN3.length||tN3.length)h+='<div class="finding ok">✅ 图表均被正文引用</div>';
+  else h+='<div class="finding info">📌 未检测到图表编号</div>';
   if(typeof updLoad==='function')updLoad('检查引用格式...',70);
 
   var refList = (typeof mergedRefs !== 'undefined' && mergedRefs.length) ? mergedRefs : (typeof existingRefs !== 'undefined' ? existingRefs : []);
