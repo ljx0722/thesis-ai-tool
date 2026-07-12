@@ -1999,6 +1999,14 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
 
     showLoad('准备解析...', 2, f.name);
 
+    // === .doc 提示：推荐转为 .docx 以获得完整标题样式信息 ===
+    if(ext==='doc'){
+      hideLoad();
+      var docChoice=confirm('⚠ 此文件为旧版 .doc 格式。\n\n建议用 Word 打开后另存为 .docx 再上传，可以保留标题样式信息，校准更准确。\n\n直接上传 .doc 将丢失字体样式数据，只能解析纯文本。\n\n点击"确定"继续上传 .doc，点击"取消"返回。');
+      if(!docChoice){document.getElementById('fileInput').value='';return}
+      showLoad('准备解析...', 2, f.name);
+    }
+
     if(ext==='docx'){
     if(typeof mammoth==='undefined'){
       updLoad('等待Word解析库加载...',3);
