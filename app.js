@@ -1112,11 +1112,13 @@ function cwShowConfirmPopup(sname){
   var items=[],cached=window._docxStyleGroups&&window._docxStyleGroups.length?window._docxStyleGroups:cwGetStyleGroups();
   for(var ci=0;ci<cached.length;ci++){
     if(cached[ci].name===sname&&cached[ci]._texts&&cached[ci]._texts.length){
-      var txts=cached[ci]._texts,seen2={};
+      var txts=cached[ci]._texts,seen2={},eix=0;
       for(var ti=0;ti<txts.length;ti++){
-        var tx=txts[ti];if(!tx||tx.length<2||seen2[tx])continue;
+        var tx=txts[ti];if(!tx||tx.length<2){eix++;continue;}
+        if(seen2[tx]){eix++;continue;}
         seen2[tx]=true;
-        items.push({txt:tx,el:cached[ci]._els?cached[ci]._els[ti]:null,checked:true,idx:items.length});
+        items.push({txt:tx,el:cached[ci]._els?cached[ci]._els[eix]:null,checked:true,idx:items.length});
+        eix++;
       }
       break;
     }
@@ -2135,6 +2137,31 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     var thesisBoxEl=document.getElementById('thesisBox');
     thesisBoxEl.innerHTML=manuscriptHTML;
     var tbs=thesisBoxEl.querySelectorAll('table');for(var ti=0;ti<tbs.length;ti++)tbs[ti].style.display='';
+    // 为 _docxStyleGroups 补充 _els（DOM 元素引用），确保校准向导能直接获取元素而非文本匹配
+    if(window._docxStyleGroups&&window._docxStyleGroups.length){
+      var textToGidx={};
+      for(var gi=0;gi<window._docxStyleGroups.length;gi++){
+        window._docxStyleGroups[gi]._els=[];
+        var txts2=window._docxStyleGroups[gi]._texts||[];
+        for(var ti2=0;ti2<txts2.length;ti2++){
+          if(txts2[ti2]&&txts2[ti2].length>=2)textToGidx[txts2[ti2]]=gi;
+        }
+      }
+      var allDomEls=thesisBoxEl.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li');
+      for(var dei=0;dei<allDomEls.length;dei++){
+        var dt=(allDomEls[dei].textContent||'').trim();if(!dt||dt.length<2)continue;
+        var gix=textToGidx[dt];
+        if(gix!==undefined){window._docxStyleGroups[gix]._els.push(allDomEls[dei]);continue;}
+        if(dt.length>=10){
+          for(var key in textToGidx){
+            if(key.length>=10&&dt.substring(0,20)===key.substring(0,20)){
+              window._docxStyleGroups[textToGidx[key]]._els.push(allDomEls[dei]);break;
+            }
+          }
+        }
+      }
+      console.log('[docx] Populated _els for',window._docxStyleGroups.length,'style groups');
+    }
 
     updLoad('构建章节树...','35');
 
