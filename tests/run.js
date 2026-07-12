@@ -1211,75 +1211,44 @@ test('FLOW: assign modal has mode selector (auto/uniform/weighted)', function() 
 // ============================================================
 console.log('\n=== Section 22: Inline Heading Calibration ===');
 
-test('HC: startInlineCalibration function exists', function() {
+test('HC: startInlineCalibration wrapper exists', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('function startInlineCalibration') >= 0, 'Missing startInlineCalibration');
+  assert(src.indexOf('function startInlineCalibration') >= 0, 'Missing startInlineCalibration wrapper');
 });
 
-test('HC: iclSetMode function for level selection exists', function() {
+test('HC: showCalibrationModal function exists', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('function iclSetMode') >= 0, 'Missing iclSetMode');
+  assert(src.indexOf('function showCalibrationModal') >= 0, 'Missing showCalibrationModal');
 });
 
-test('HC: iclClick function for paragraph click handler exists', function() {
+test('HC: renderMcList renders candidate rows with context', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('function iclClick') >= 0, 'Missing iclClick');
+  assert(src.indexOf('function renderMcList') >= 0, 'Missing renderMcList');
+  var fnBody = src.substring(src.indexOf('function renderMcList'), src.indexOf('function mcToggle'));
+  assert(fnBody.indexOf('nextElementSibling') >= 0, 'Modal must show next-paragraph context');
 });
 
-test('HC: iclStyleFingerprint extracts font-size + weight + family', function() {
+test('HC: mcToggle cycles level on click', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('function iclStyleFingerprint') >= 0, 'Missing iclStyleFingerprint');
-  var fnStart = src.indexOf('function iclStyleFingerprint');
-  var fnBody = src.substring(fnStart, fnStart + 200);
-  assert(fnBody.indexOf('fontSize') >= 0, 'Must use fontSize in style fingerprint');
-  assert(fnBody.indexOf('fontWeight') >= 0, 'Must use fontWeight in style fingerprint');
-  assert(fnBody.indexOf('fontFamily') >= 0, 'Must use fontFamily in style fingerprint');
+  assert(src.indexOf('function mcToggle') >= 0, 'Missing mcToggle');
 });
 
-test('HC: iclClick auto-batches same-style elements', function() {
+test('HC: mcAcceptAll / mcClose / mcCleanup exist', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  var fnStart = src.indexOf('function iclClick');
-  var fnBody = src.substring(fnStart, src.indexOf('\nfunction icl', fnStart + 20));
-  assert(fnBody.indexOf('iclStyleFingerprint') >= 0, 'iclClick must use style fingerprinting');
-  assert(fnBody.indexOf('batchCount') >= 0, 'iclClick must batch auto-select same-style elements');
-  assert(fnBody.indexOf('bodyBoundaryEl') >= 0 || fnBody.indexOf('refBound') >= 0, 'iclClick must respect reference boundary');
-});
-
-test('HC: iclUpdatePreview generates live tree preview', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('function iclUpdatePreview') >= 0, 'Missing iclUpdatePreview');
-});
-
-test('HC: iclRefreshMarkers adds colored left borders', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('function iclRefreshMarkers') >= 0, 'Missing iclRefreshMarkers');
-});
-
-test('HC: iclClearAll resets selections', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('function iclClearAll') >= 0, 'Missing iclClearAll');
+  assert(src.indexOf('function mcAcceptAll') >= 0, 'Missing mcAcceptAll');
+  assert(src.indexOf('function mcClose') >= 0, 'Missing mcClose');
+  assert(src.indexOf('function mcCleanup') >= 0, 'Missing mcCleanup');
 });
 
 test('HC: upload flow calls startInlineCalibration', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('startInlineCalibration(box,') >= 0 || src.indexOf('startInlineCalibration(box, allHeadings') >= 0, 'Upload handler must call inline calibration');
+  assert(src.indexOf('startInlineCalibration(box,') >= 0, 'Upload handler must call calibration');
 });
 
-test('HC: old hcOverlay removed from index.html', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(src.indexOf('id="hcOverlay"') < 0, 'Old hcOverlay must be removed');
-});
-
-test('HC: cleanupInlineCalibration removes event listeners', function() {
+test('HC: heading detection no longer guesses body text as headings', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('function cleanupInlineCalibration') >= 0, 'Missing cleanupInlineCalibration');
+  assert(src.indexOf('乐观猜测为节标题') < 0, 'Must not guess body text as headings');
 });
-
-test('HC: iclFinish converts selections to heading candidates', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('function iclFinish') >= 0, 'Missing iclFinish');
-});
-
 
 // ============================================================
 // SECTION 23: System Integrity Guards (anti-decay from all 15 historical bug categories)
