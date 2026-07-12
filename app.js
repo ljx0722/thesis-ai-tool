@@ -1995,15 +1995,11 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
   fi.addEventListener('change',async function(e){
     var f=e.target.files[0];if(!f)return;
     var ext=(f.name||'').toLowerCase().split('.').pop();
-    if(ext!=='docx'){
-      if(ext==='doc'){alert('旧版 .doc 格式不支持。\n\n请用 Word 打开后另存为 .docx 格式再上传。');}
-      else{alert('不支持 .'+ext+', 请上传 .docx 文件');}
-      return
-    }
+    if(ext!=='docx'&&ext!=='doc'){alert('不支持 .'+ext+', 请上传 .docx 或 .doc 文件');return}
 
-    // 立即显示加载遮罩，不等库加载
     showLoad('准备解析...', 2, f.name);
 
+    if(ext==='docx'){
     if(typeof mammoth==='undefined'){
       updLoad('等待Word解析库加载...',3);
       for(var retry=0;retry<15&&typeof mammoth==='undefined';retry++){
@@ -2016,11 +2012,26 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
 
     updLoad('读取文件...',10);var buf;
     try{buf=await f.arrayBuffer()}catch(er2){hideLoad();alert('文件读取失败: '+er2.message);return}
+    } // end if docx
+
     try{
-    // 清空跨文件缓存
     searchCache={};mergedRefs=[];
     updLoad('解析正文...','10',f.name);
 
+    // === .doc 格式：后端转换 ===
+    if(ext==='doc'){
+      updLoad('转换 .doc...',8);
+      var formData=new FormData();formData.append('file',f);
+      var resp2=await fetch('/convert_doc',{method:'POST',body:formData});
+      var jj2=await resp2.json();
+      if(!jj2.success){hideLoad();alert('.doc 转换失败: '+jj2.error);return}
+      manuscriptHTML=jj2.html;manuscriptText=jj2.text;
+      window._docxStyleGroups=[];
+      updLoad('加载正文...',15);
+    }
+
+    // === .docx 格式：本地解析 ===
+    if(ext==='docx'){
     // === 预处理：从 docx ZIP 直接解析 Word 样式名+数量+示例 ===
     window._docxStyleGroups=[];
     try{
@@ -2058,6 +2069,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     // mammoth 转换
     var result=await mammoth.convertToHtml({arrayBuffer:buf},{includeDefaultStyleMap:true,transformDocument:function(doc){return doc;}});
     manuscriptHTML=result.value;
+    } // end if docx
     // 后处理：图片响应式 + 表格样式 + 公式保留
     manuscriptHTML=manuscriptHTML
       .replace(/<img /g,'<img loading="lazy" style="max-width:100%;height:auto;display:block;margin:10px auto;border-radius:4px" ')

@@ -641,6 +641,125 @@ def kg_api():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+# ========== .doc 文件转换 API（旧版 Word 格式支持） ==========
+@app.route('/convert_doc', methods=['POST'])
+def convert_doc():
+    """接收 .doc 文件，提取纯文本并包装为 HTML 返回"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No file uploaded'}), 400
+        f = request.files['file']
+        buf = f.read()
+        if not buf or len(buf) < 1024:
+            return jsonify({'success': False, 'error': 'File too small or empty'}), 400
+
+        import olefile
+        from html import escape
+        ole = olefile.OleFileIO(buf)
+        # 尝试读取 WordDocument 流中的文本
+        # .doc 文件的文本存储在 WordDocument 流中，但格式复杂
+        # 简化方案：读取 1Table/0Table 中的 Unicode 文本
+        text_parts = []
+
+        # 方法1：尝试读取主文本流
+        if ole.exists('WordDocument'):
+            word_stream = ole.openstream('WordDocument').read()
+            # 从 WordDocument 流中提取 Unicode 文本片段
+            # Word 97-2003 二进制格式：FIB 在偏移 0，文本起始位置在 FIB 中
+            # 简化：提取所有可打印的 Unicode 字符序列
+            import struct
+            # 尝试解析 FIB 获取文本范围
+            try:
+                # FIB 的 ccpText 在偏移 0x4C 处（4字节 LE）
+                ccpText = struct.unpack_from('<I', word_stream, 0x4C)[0]
+                # 文本起始在 FIB 偏移后
+                # 简化：从整个流中提取 UTF-16LE 文本段
+                text_start = 0
+                for i in range(0, len(word_stream) - 1, 2):
+                    ch = struct.unpack_from('<H', word_stream, i)[0]
+                    if 0x20 <= ch <= 0xFFFF and ch != 0xFFFE:
+                        text_start = i
+                        break
+                # 提取 text_start 之后的文本
+                chars = []
+                for i in range(text_start, min(text_start + ccpText * 2 + 200, len(word_stream) - 1), 2):
+                    ch = struct.unpack_from('<H', word_stream, i)[0]
+                    if ch == 0x000D or ch == 0x0007:  # CR or Bell = paragraph marker
+                        chars.append('\n')
+                    elif 0x20 <= ch <= 0xFFFD:
+                        chars.append(chr(ch))
+                    elif ch == 0:  # null terminator
+                        if chars and chars[-1] != '\n':
+                            chars.append('\n')
+                extracted = ''.join(chars).strip()
+                if extracted and len(extracted) > 100:
+                    text_parts.append(extracted)
+            except:
+                pass
+
+        # 方法2：如果主文本流解析失败，尝试从 1Table 流中提取
+        if not text_parts and ole.exists('1Table'):
+            try:
+                table = ole.openstream('1Table').read()
+                # 提取可打印文本
+                chars = []
+                for ch in table.decode('utf-16-le', errors='ignore'):
+                    if ch.isprintable() or ch in '\n\r\t':
+                        chars.append(ch)
+                extracted = ''.join(chars).strip()
+                if extracted and len(extracted) > 100:
+                    text_parts.append(extracted)
+            except:
+                pass
+
+        # 方法3：最后的兜底 - 从整个 OLE 文件中提取所有可读文本
+        if not text_parts:
+            all_text = []
+            for stream_name in ole.listdir():
+                try:
+                    flat_name = '/'.join(stream_name)
+                    data = ole.openstream(flat_name).read()
+                    # 尝试 UTF-16LE 解码
+                    try:
+                        decoded = data.decode('utf-16-le', errors='ignore')
+                        # 只保留包含中文字符的连续文本段
+                        for segment in decoded.split('\x00\x00\x00'):
+                            clean = ''.join(c for c in segment if c.isprintable() or c in '\n\r\t ')
+                            if len(clean) > 40 and any('一' <= c <= '鿿' for c in clean):
+                                all_text.append(clean)
+                    except:
+                        pass
+                except:
+                    pass
+            if all_text:
+                text_parts = all_text
+
+        ole.close()
+
+        if not text_parts:
+            return jsonify({
+                'success': False,
+                'error': '无法从该 .doc 文件中提取文本。建议用 Word 打开后另存为 .docx 格式再上传。'
+            }), 400
+
+        # 合并所有文本片段
+        full_text = '\n\n'.join(text_parts)
+        # 包装为基本 HTML（每行一个 <p>）
+        lines = full_text.split('\n')
+        html_parts = ['<p>' + escape(line.strip()) + '</p>' for line in lines if line.strip()]
+        html = '\n'.join(html_parts)
+
+        return jsonify({
+            'success': True,
+            'text': full_text[:500000],
+            'html': html[:800000],
+            'charCount': len(full_text)
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     print("=" * 50)
     print("论文文献AI利器 - Python知识图谱服务")
