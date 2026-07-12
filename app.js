@@ -1097,7 +1097,17 @@ var _cwCandidates=[],_cwCallback=null,_cwPhase=0;
 
 function _cwStyleFingerprint(el){
   if(!el)return'';
-  try{var cs=getComputedStyle(el);return[cs.fontFamily,cs.fontSize,cs.fontWeight,cs.color||'',cs.textAlign||'',(el.tagName||'').toUpperCase()].join('|')}catch(e){return''}
+  // 优先用 mammoth 保留的结构信息，而非浏览器 computed style
+  var tag=(el.tagName||'').toUpperCase(); // H1/H2/H3... 或 P
+  var cls=el.className||''; // mammoth 可能注入的 CSS class
+  var inline=el.getAttribute('style')||'';
+  // 提取 Word 样式 ID（如 mammoth 的 styleMap 输出）
+  var dataId=el.getAttribute('data-style-id')||'';
+  // 标签 + class + 是否为 heading 标签 已足够区分层级
+  // 用 computed font-weight 做辅助（heading 标签天然 bold）
+  var fw='';
+  try{fw=getComputedStyle(el).fontWeight||'400'}catch(e){}
+  return [tag,cls.substring(0,30),dataId,fw,inline.indexOf('font-size')>=0?inline:''].join('|');
 }
 
 function startInlineCalibration(box, autoDetected){
@@ -1254,7 +1264,18 @@ function renderCalibrationModal(){
         var c2=items[i],txt=(c2.txt||'').substring(0,100);
         var fp=_cwStyleFingerprint(c2.el);
         var sameCount=cwCountSame(fp);
-        var fmtPreview=fp.split('|').slice(0,3).join(' / ');
+function _cwFpLabel(fp){
+  var parts=fp.split('|');
+  var tag=parts[0]||'';
+  var cls=parts[1]||'';
+  var fw=parts[3]||'';
+  var label=tag+' '+(tag==='P'?'段落':(tag==='H1'?'一级标题':(tag==='H2'?'二级标题':(tag==='H3'?'三级标题':''))));
+  if(cls)label+=' class='+cls;
+  if(fw&&fw!='400')label+=' 加粗';
+  return label;
+}
+
+        var fmtPreview=_cwFpLabel(fp);
 
         var row=document.createElement('div');
         row.style.cssText='cursor:pointer;display:flex;align-items:center;gap:10px;padding:6px 10px;margin:1px 0;border-radius:8px;border-left:3px solid '+colors[ph]+';transition:background .1s';
