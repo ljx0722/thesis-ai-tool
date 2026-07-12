@@ -1142,6 +1142,70 @@ test('AUDIT: terminology spell dictionary expanded beyond 3 pairs', function() {
 });
 
 
+// ============================================================
+// SECTION 21: Interactive Search Flow (ref confirmation + assign modals)
+// ============================================================
+console.log('\n=== Section 21: Interactive Search Flow ===');
+
+test('FLOW: calcRefConfidence function exists', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('function calcRefConfidence') >= 0, 'Missing calcRefConfidence');
+});
+
+test('FLOW: showRefConfirmModal function exists', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('function showRefConfirmModal') >= 0, 'Missing showRefConfirmModal');
+});
+
+test('FLOW: showAssignModal function exists', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('function showAssignModal') >= 0, 'Missing showAssignModal');
+});
+
+test('FLOW: rcOverlay modal HTML exists', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(src.indexOf('id="rcOverlay"') >= 0, 'Missing rcOverlay modal in index.html');
+});
+
+test('FLOW: asOverlay modal HTML exists', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(src.indexOf('id="asOverlay"') >= 0, 'Missing asOverlay modal in index.html');
+});
+
+test('FLOW: startSearch uses showRefConfirmModal', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('showRefConfirmModal(pool') >= 0, 'startSearch must call showRefConfirmModal');
+});
+
+test('FLOW: startSearch uses showAssignModal', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('showAssignModal(selected') >= 0, 'startSearch must call showAssignModal');
+});
+
+test('FLOW: confidence score considers year + source + DOI + journal', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var fnStart = src.indexOf('function calcRefConfidence');
+  var fnBody = src.substring(fnStart, fnStart + 800);
+  assert(fnBody.indexOf('year') >= 0, 'calcRefConfidence must consider year');
+  assert(fnBody.indexOf('source') >= 0, 'calcRefConfidence must consider source authority');
+  assert(fnBody.indexOf('doi') >= 0, 'calcRefConfidence must consider DOI');
+  assert(fnBody.indexOf('journal') >= 0, 'calcRefConfidence must consider journal');
+});
+
+test('FLOW: ref confirmation modal has select-all and filter buttons', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(src.indexOf('rcSelectAll') >= 0, 'Missing select-all button');
+  assert(src.indexOf('rcSelectNone') >= 0, 'Missing invert button');
+  assert(src.indexOf('rcFilter') >= 0, 'Missing filter buttons');
+});
+
+test('FLOW: assign modal has mode selector (auto/uniform/weighted)', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(src.indexOf('id="asMode"') >= 0, 'Missing assignment mode selector');
+  assert(src.indexOf('asSkip') >= 0, 'Missing skip button for auto-assign');
+});
+
+
 // Results
 // ============================================================
 console.log('\n=== RESULTS ===');
