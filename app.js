@@ -1103,6 +1103,10 @@ function showCalibrationWizard(){_cwPhase=0;renderCalibrationModal();hideLoad();
 
 // 从 mammoth 输出的 HTML 中提取所有 Word 样式名及其出现次数
 function cwGetStyleGroups(){
+  // 直接用预解析的 docx 样式数据，不走 DOM 猜测
+  var cached=window._docxStyleGroups||[];
+  if(cached.length)return cached;
+  // 兜底：从 HTML class 提取（仅当预解析失败时）
   var box=document.getElementById('thesisBox');if(!box)return[];
   var refBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
   var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6'),groups={};
@@ -1110,19 +1114,14 @@ function cwGetStyleGroups(){
     if(refBound&&(els[i].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
     var t=(els[i].textContent||'').trim();if(!t||t.length<2)continue;
     if(/^\d{1,3}$/.test(t)||/^[ivxlcdm]+$/i.test(t))continue;
-    // 提取 mammoth 保存的 Word 样式名
     var cls=els[i].className||'';
     var snm=cls.match(/style-name\s*:\s*['\x22]?([^'\x22;\]]+)/i);
     var sname=snm?snm[1].replace(/['\s\x22]+$/,'').trim():'Normal';
-    // 简化样式名
-    if(!groups[sname])groups[sname]={name:sname,els:[],count:0,samples:[]};
+    if(!groups[sname])groups[sname]={name:sname,count:0,samples:[]};
     groups[sname].count++;
-    groups[sname].els.push(els[i]);
     if(groups[sname].samples.length<2)groups[sname].samples.push(t.substring(0,80));
   }
-  // 按数量降序排列
-  var result=Object.values(groups).sort(function(a,b){return b.count-a.count;});
-  return result;
+  return Object.values(groups).sort(function(a,b){return b.count-a.count;});
 }
 
 function startInlineCalibration(box,autoDetected){
@@ -1157,34 +1156,45 @@ function cwPrevPhase(){if(_cwPhase>0){_cwPhase--;renderCalibrationModal();}}
 
 function cwFinish(){
   var ov=document.getElementById('cwOverlay');if(ov)ov.parentElement.removeChild(ov);
-  // 将用户选择的样式名映射应用到 DOM：给匹配的元素加 data-heading-level
+
+  // 用预解析 docx 数据：重建 allHeadings
+  _cwCandidates=[];
   var box=document.getElementById('thesisBox');
-  if(box){
-    var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
-    for(var i=0;i<els.length;i++){
-      var cls2=els[i].className||'';
-      var snm2=cls2.match(/style-name\s*:\s*['\x22]?([^'\x22;\]]+)/i);
-      var sn=snm2?snm2[1].replace(/['\s\x22]+$/,'').trim():'';
-      for(var lv=0;lv<3;lv++){
-        if(_cwSelections[lv]&&_cwSelections[lv].has(sn)){
-          els[i].setAttribute('data-heading-level',lv.toString());
-          break;
-        }
-      }
-    }
-  }
-  // 根据 data-heading-level 重建 candidates
-  if(box){
-    _cwCandidates=[];
+  if(box&&window._docxStyleGroups&&window._docxStyleGroups.length){
     var refBound2=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
-    var els2=box.querySelectorAll('[data-heading-level]');
+    var els2=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+    // 为每个样式名建立文本示例集合（用于快速匹配）
+    var styleSamples={},styleLv={};
+    window._docxStyleGroups.forEach(function(g){
+      styleSamples[g.name]=g.samples||[];
+      for(var lv=0;lv<3;lv++){if(_cwSelections[lv]&&_cwSelections[lv].has(g.name))styleLv[g.name]=lv;}
+    });
+
     for(var j=0;j<els2.length;j++){
       if(refBound2&&(els2[j].compareDocumentPosition(refBound2)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
-      var lv=parseInt(els2[j].getAttribute('data-heading-level')||'-1');
-      var txt=(els2[j].textContent||'').trim();
-      if(txt&&lv>=0)_cwCandidates.push({el:els2[j],txt:txt,level:lv,tagLevel:-1,bare:false});
+      var et=(els2[j].textContent||'').trim();
+      if(!et||et.length<2)continue;
+      // 尝试匹配：遍历所有样式，检查当前元素的文本是否在样式示例里
+      var matchedStyle=null;
+      for(var sn2 in styleSamples){
+        if(styleLv[sn2]===undefined)continue;
+        var samples=styleSamples[sn2];
+        var found=false;
+        for(var si=0;si<samples.length;si++){
+          if(et===samples[si]||(et.length>=10&&samples[si].length>=10&&et.substring(0,20)===samples[si].substring(0,20))){
+            found=true;break;
+          }
+        }
+        if(found){matchedStyle=sn2;break;}
+      }
+      if(matchedStyle!==null){
+        var lv=styleLv[matchedStyle];
+        _cwCandidates.push({el:els2[j],txt:et,level:lv,tagLevel:-1,bare:false});
+      }
     }
+    console.log('[cal] Matched',_cwCandidates.length,'headings from pre-parsed styles');
   }
+
   _cwSelections={'0':new Set(),'1':new Set(),'2':new Set()};
   if(_cwCallback)_cwCallback(_cwCandidates);
 }
@@ -1275,7 +1285,7 @@ function renderCalibrationModal(){
   document.body.appendChild(ov);
 }
 
-// Cleanup old _cwCandidates usage in tree builder: now checks data-heading-level
+// Old compat stubs — calibration uses cwGetStyleGroups directly
 function cwGetItemsForPhase(){return[];}
 function cwGetUnassigned(){return[];}
 
@@ -1875,7 +1885,38 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
     searchCache={};mergedRefs=[];
     updLoad('解析正文...','10',f.name);
 
-    // === 先做一次轻量转换（不强行猜样式映射）===
+    // === 预处理：从 docx ZIP 直接解析 Word 样式名+数量+示例 ===
+    window._docxStyleGroups=[];
+    try{
+      var docxZip=await JSZip.loadAsync(buf);
+      var stylesXml=await docxZip.file('word/styles.xml').async('string');
+      var docXml=await docxZip.file('word/document.xml').async('string');
+      if(stylesXml&&docXml){
+        var styleNameMap={};
+        var reS=/<w:style[^>]*w:styleId="([^"]*)"[^>]*>[\s\S]*?<w:name[^>]*w:val="([^"]*)"[\s\S]*?<\/w:style>/g,mS;
+        while((mS=reS.exec(stylesXml))!==null)styleNameMap[mS[1]]=mS[2];
+        var sg={};
+        var reP=/<w:p[ >][\s\S]*?<\/w:p>/g,mP;
+        while((mP=reP.exec(docXml))!==null){
+          var p=mP[0];
+          var sm=p.match(/<w:pStyle[^>]*w:val="([^"]*)"/);
+          var sid=sm?sm[1]:'Normal';
+          var sname=styleNameMap[sid]||sid;
+          var tx=[],tr=/<w:t[^>]*>([^<]*)<\/w:t>/g,tm;
+          while((tm=tr.exec(p))!==null)tx.push(tm[1]);
+          var txt=tx.join('').trim();
+          if(!txt||txt.length<2)continue;
+          if(/^\d{1,3}$/.test(txt)||/^[ivxlcdm]+$/i.test(txt))continue;
+          if(!sg[sname])sg[sname]={name:sname,count:0,samples:[]};
+          sg[sname].count++;
+          if(sg[sname].samples.length<2)sg[sname].samples.push(txt.substring(0,80));
+        }
+        window._docxStyleGroups=Object.values(sg).sort(function(a,b){return b.count-a.count;});
+        console.log('[docx] Pre-parsed',window._docxStyleGroups.length,'style groups');
+      }
+    }catch(e){console.warn('[docx] Pre-parse failed:',e.message);}
+
+    // mammoth 转换
     var result=await mammoth.convertToHtml({arrayBuffer:buf},{includeDefaultStyleMap:true,transformDocument:function(doc){return doc;}});
     manuscriptHTML=result.value;
     // 后处理：图片响应式 + 表格样式 + 公式保留
@@ -1987,7 +2028,7 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
       // 统计标签分布
       var tagStats={};for(var ti=tocIdx;ti<Math.min(tocIdx+30,allEls.length);ti++){var tn=(allEls[ti].tagName||'').toUpperCase();tagStats[tn]=(tagStats[tn]||0)+1;}
       console.log('[detect] first 30 tags after tocIdx:',JSON.stringify(tagStats));
-      // ===== 第3步：收集标题候选（HTML 标签 + 用户校准后的 data-heading-level）=====
+      // ===== 第3步：收集标题候选（HTML 标签 + 文本模式）=====
       var allHeadings = [];
       for (var ei = bodyStartIdx; ei < allEls.length; ei++) {
         var el2 = allEls[ei], txt2 = (el2.textContent || '').trim();
@@ -1996,10 +2037,7 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
         if (/^\d{1,3}$/.test(txt2) || /^[ivxlcdmIVXLCDM]+$/.test(txt2)) continue;
         if (/\t\d{1,3}$/.test(txt2) || /[\s\.]{2,}\d{1,3}$/.test(txt2)) continue;
         var tagName = (el2.tagName || '').toUpperCase();
-        var dl=el2.getAttribute('data-heading-level');
-        if (dl!==null&&dl!==''){
-          allHeadings.push({ el: el2, txt: txt2, level: parseInt(dl), tagLevel: -1, bare: false });
-        } else if (/^H[1-6]$/.test(tagName)) {
+        if (/^H[1-6]$/.test(tagName)) {
           allHeadings.push({ el: el2, txt: txt2, level: -1, tagLevel: parseInt(tagName.charAt(1)), bare: false });
         }
       }
@@ -2066,26 +2104,10 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
           if (hc.txt === hdTxt) hc.bare = true;
         }
       }
-      // ===== 第4.5步: 进入标题校准模式（点击原文选取）=====
-      _totalHeadingCount = allHeadings.length;
-      _bareHeadingCount = 0;
-      for (var bi2 = 0; bi2 < allHeadings.length; bi2++) { if (allHeadings[bi2].bare) _bareHeadingCount++; }
-
+      // ===== 第4.5步: 标题校准 =====
       updLoad('标题校准...', '37');
-      // 让用户选择 Word 样式→层级映射
       var calibrated = await startInlineCalibration(box, allHeadings);
       if (calibrated !== null) allHeadings = calibrated;
-      // 如果校准后无结果，从 DOM 的 data-heading-level 重新收集
-      if (!allHeadings.length){
-        allHeadings=[];
-        var postEls=box.querySelectorAll('[data-heading-level]');
-        for(var ps=0;ps<postEls.length;ps++){
-          var pel=postEls[ps],pdl=pel.getAttribute('data-heading-level');
-          var ptr=(pel.textContent||'').trim();
-          if(ptr&&pdl!==null)allHeadings.push({el:pel,txt:ptr,level:parseInt(pdl),tagLevel:-1,bare:false});
-        }
-        console.log('[cal] Post-calibration scan found',allHeadings.length,'headings via data-heading-level');
-      }
       // ===== 第5步：从校准后的标题列表构建章节树（支持任意深度） =====
       sections = [];
       var stack = []; // [{node, level}]
