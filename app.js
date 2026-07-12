@@ -1,4 +1,6 @@
 "use strict";var existingRefs=[],manuscriptText='',manuscriptHTML='',mergedRefs=[],paperTopics=[],zoomLevel=1,sections=[],selNavIdx=-1,searchRunning=false,appReady=false,_bareHeadingCount=0,_totalHeadingCount=0;
+// 全文树索引：chapters/sections/subs/paragraphs/sentences 全局扁平数组，O(1) 查找
+var _treeIndex={chapters:[],sections:[],subs:[],paragraphs:[],sentences:[]};
 window.onerror=function(m,s,l,c,e){console.error(m,'@',s,':',l);document.getElementById('statusBar')&&(document.getElementById('statusBar').textContent='⚠ 出现错误，请刷新页面');return true};
 // 评分维度的解释提示
 var _scoreInfo={conf:'🔍 真实度：文献在数据库中是否真实存在。DOI精确匹配=高可信；多源标题匹配=可信；无法匹配=低。',topicRel:'🎯 主题相关度：文献标题关键词与论文全文关键词的交集比例。分数越高，文献越贴合论文主题。',secFit:'📂 章节适配度：文献标题关键词与所在章节内容的交叉匹配比例。反映该文献是否适合放在此章。',dupRate:'📝 句子重合度：文献关键词与插入位置上下文关键词的交集。数值高=插入的句子和文献主题高度吻合。'};
@@ -1990,6 +1992,112 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
   }
   hideLoad();if(mergedRefs.length)renderRefs();else renderExistingOnly();ttp('校验完成: '+total+'条');}
 
+// ========== 全文树构建器：章→节→小节→段落→句子（5层） ==========
+function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
+  // ① 构建标题树（章/节/小节）
+  var tree=[],hdMap=new Map();
+  allHeadings.forEach(function(h){if(h.level>=0)hdMap.set(h.el,{el:h.el,txt:h.txt,level:h.level});});
+  var chCounter=0,stack=[];
+  for(var hi=0;hi<allHeadings.length;hi++){
+    var hd=allHeadings[hi];if(hd.level<0)continue;
+    while(stack.length>0&&stack[stack.length-1].level>=hd.level)stack.pop();
+    var nStr=detectHeadingNum(hd.txt);
+    if(hd.level===0){
+      chCounter++;var cn=detectChapterNum(hd.txt)||chCounter;
+      var dup=null;for(var ci=0;ci<tree.length;ci++){if(tree[ci].ch===cn){dup=tree[ci];break;}}
+      var ch={ch:cn,name:hd.txt,el:hd.el,sections:[]};
+      if(dup){ch=dup;if(hd.txt.length>ch.name.length)ch.name=hd.txt;}
+      else tree.push(ch);
+      stack=[{node:ch,level:0}];
+    }else{
+      if(!stack.length)continue;
+      var parent=stack[stack.length-1].node;
+      var nc={num:nStr,title:hd.txt.replace(/^[\d\.\s、,，]+/,''),el:hd.el,subs:[]};
+      if(hd.level===1){if(!parent.sections)parent.sections=[];parent.sections.push(nc);stack.push({node:nc,level:1});}
+      else if(hd.level===2&&parent.sections&&parent.sections.length){var sec=parent.sections[parent.sections.length-1];if(!sec.subs)sec.subs=[];sec.subs.push(nc);stack.push({node:nc,level:2});}
+    }
+  }
+
+  // ② 遍历 DOM，为每个标题节点收集其下的段落和句子
+  var allBodyEls=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li');
+  // 将标题元素映射到树节点
+  var elToNode=new Map(),hdEls=[];
+  function mapNode(node,lv){
+    if(node.el)hdEls.push({el:node.el,node:node,level:lv});
+    var kids=node.sections||node.subs||[];
+    for(var i=0;i<kids.length;i++)mapNode(kids[i],lv+1);
+  }
+  for(var i=0;i<tree.length;i++)mapNode(tree[i],0);
+  hdEls.sort(function(a,b){return(a.el.compareDocumentPosition(b.el)&Node.DOCUMENT_POSITION_FOLLOWING)?-1:1;});
+
+  // ③ 收集每个标题节点下方的段落，拆分成句子
+  for(var hi2=0;hi2<hdEls.length;hi2++){
+    var he=hdEls[hi2],node=he.node;
+    // 找到该标题在 allBodyEls 中的位置
+    var startPos=-1;
+    for(var si=0;si<allBodyEls.length;si++){if(allBodyEls[si]===he.el){startPos=si;break;}}
+    if(startPos<0)continue;
+    // 找下一个标题的位置作为边界
+    var endPos=allBodyEls.length;
+    for(var ei=startPos+1;ei<allBodyEls.length;ei++){
+      if(refBound&&(allBodyEls[ei].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING)){endPos=ei;break;}
+      if(hdMap.has(allBodyEls[ei])){endPos=ei;break;}
+    }
+    // 收集该区间内的非标题段落
+    node.paragraphs=[];var fullText='';
+    for(var pi=startPos+1;pi<endPos;pi++){
+      var pEl=allBodyEls[pi];
+      if(hdMap.has(pEl))continue; // 跳过子标题
+      var pt=(pEl.textContent||'').trim();
+      if(!pt||pt.length<2)continue;
+      if(/^\d{1,3}$/.test(pt)||/^[ivxlcdm]+$/i.test(pt)||/^[-—–]/.test(pt))continue;
+      // 拆句子
+      var sents=[],last=0,t=pt;
+      for(var c=0;c<t.length;c++){
+        var ch=t.charAt(c);
+        if('。！？.!?'.indexOf(ch)>=0){
+          var s=t.substring(last,c+1).trim();
+          if(s.length>=2)sents.push({text:s,el:pEl,refs:[]});
+          last=c+1;
+        }
+      }
+      var tail=t.substring(last).trim();
+      if(tail.length>=2)sents.push({text:tail,el:pEl,refs:[]});
+      if(sents.length>0){
+        var para={el:pEl,text:pt,sentences:sents};
+        node.paragraphs.push(para);
+        for(var sk=0;sk<sents.length;sk++)sents[sk]._paragraph=para;
+        fullText+=pt+'\n';
+      }
+    }
+    node.text=fullText.trim();
+  }
+
+  // ④ 构建全局索引
+  _treeIndex={chapters:[],sections:[],subs:[],paragraphs:[],sentences:[]};
+  function indexNode(node,lv,parent){
+    if(lv===0){var ci={idx:_treeIndex.chapters.length,ch:node.ch,name:node.name,el:node.el,node:node};_treeIndex.chapters.push(ci);}
+    else if(lv===1){var si={idx:_treeIndex.sections.length,num:node.num,title:node.title,el:node.el,node:node,_chapter:parent};_treeIndex.sections.push(si);}
+    else if(lv===2){var ui={idx:_treeIndex.subs.length,num:node.num,title:node.title,el:node.el,node:node,_section:parent};_treeIndex.subs.push(ui);}
+    if(node.paragraphs){
+      for(var pi=0;pi<node.paragraphs.length;pi++){
+        var p=node.paragraphs[pi];
+        var pe={idx:_treeIndex.paragraphs.length,el:p.el,text:p.text,node:p,_parent:node};_treeIndex.paragraphs.push(pe);
+        for(var si2=0;si2<p.sentences.length;si2++){
+          var s=p.sentences[si2];
+          var se={idx:_treeIndex.sentences.length,text:s.text,el:s.el,refs:s.refs,node:s,_paragraph:p,_parent:node};
+          _treeIndex.sentences.push(se);
+          s._idx=_treeIndex.sentences.length-1;
+        }
+      }
+    }
+    var kids=node.sections||node.subs||[];for(var ki=0;ki<kids.length;ki++)indexNode(kids[ki],lv+1,lv===0?node:parent);
+  }
+  for(var ti=0;ti<tree.length;ti++)indexNode(tree[ti],0,null);
+  console.log('[tree] Built:',tree.length,'ch,',_treeIndex.sections.length,'sec,',_treeIndex.subs.length,'sub,',_treeIndex.paragraphs.length,'paras,',_treeIndex.sentences.length,'sents');
+  return tree;
+}
+
 // INIT - this runs LAST, after all functions are defined
 (function(){
   var fi=document.getElementById('fileInput');
@@ -2243,103 +2351,9 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
       updLoad('标题校准...', '37');
       var calibrated = await startInlineCalibration(box, allHeadings);
       if (calibrated !== null) allHeadings = calibrated;
-      // ===== 第5步：从校准后的标题列表构建章节树（支持任意深度） =====
-      sections = [];
-      var stack = []; // [{node, level}]
-      var chCounter = 0;
-      for (var hi2 = 0; hi2 < allHeadings.length; hi2++) {
-        var hd = allHeadings[hi2];
-        if (hd.level < 0) continue;
-        // Pop to find parent (level < hd.level)
-        while (stack.length > 0 && stack[stack.length - 1].level >= hd.level) stack.pop();
-        // Extract clean title
-        var titleClean = hd.txt;
-        var numStr = detectHeadingNum(hd.txt);
-        if (numStr && titleClean.indexOf(numStr) === 0) {
-          titleClean = titleClean.substring(numStr.length).replace(/^[\s、，,.]*/, '');
-        }
-        if (hd.level === 0) {
-          chCounter++;
-          var chNum2 = detectChapterNum(hd.txt) || chCounter;
-          var dupCh = null;
-          for (var ci = 0; ci < sections.length; ci++) { if (sections[ci].ch === chNum2) { dupCh = sections[ci]; break; } }
-          if (dupCh) { if (hd.txt.length > dupCh.name.length) dupCh.name = hd.txt; if (hd.el && !dupCh.el) dupCh.el = hd.el; }
-          else { dupCh = { ch: chNum2, name: hd.txt, sections: [], el: hd.el }; sections.push(dupCh); }
-          stack = [{ node: dupCh, level: 0 }];
-        } else {
-          if (stack.length === 0) continue;
-          var node = { num: numStr, title: titleClean || hd.txt, el: hd.el, subs: [] };
-          // Walk the stack down to depth = hd.level - 1
-          var cursor = stack[0].node; // chapter node
-          var cursorLevel = 0;
-          for (var dl = 0; dl < hd.level - 1 && cursor; dl++) {
-            var kids = cursor.sections || cursor.subs || [];
-            cursor = kids.length > 0 ? kids[kids.length - 1] : null;
-            cursorLevel++;
-          }
-          if (cursor) {
-            if (cursor.sections) {
-              cursor.sections.push(node);
-            } else if (cursor.subs) {
-              cursor.subs.push(node);
-            } else {
-              cursor.sections = [node];
-            }
-          }
-          stack.push({ node: node, level: hd.level });
-        }
+      // ===== 第5步：构建完整 5 层树 + 全局索引 =====
+      sections = buildFullTree(box, allHeadings, bodyStartIdx, refBound);
       }
-    }
-    // ===== 第5.5步：填充每章/节/小节的正文内容（围栏架构）=====
-    if (sections.length) {
-      var bodyEls = box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
-      // 收集所有带 id 的标题锚点，按 DOM 顺序排
-      var hdAnchors = [];
-      for (var ai2 = 0; ai2 < bodyEls.length; ai2++) {
-        var aid = bodyEls[ai2].id || '';
-        if (aid.indexOf('ch-') === 0 || aid.indexOf('sec-') === 0 || aid.indexOf('sub-') === 0) {
-          hdAnchors.push({ el: bodyEls[ai2], id: aid, idx: ai2 });
-        }
-      }
-      // 辅助：根据锚点 id 匹配标题节点并递归填充文本（支持任意深度）
-      function fillNodeText(node, nodeLevel, anchorIdx) {
-        var nextIdx = bodyEls.length;
-        for (var ni = anchorIdx + 1; ni < hdAnchors.length; ni++) {
-          var naLevel = hdAnchors[ni].id.indexOf('ch-') === 0 ? 0 : (hdAnchors[ni].id.indexOf('sec-') === 0 ? 1 : (hdAnchors[ni].id.indexOf('sub-') === 0 ? 2 : hdAnchors[ni].id.split('-').length - 1));
-          if (naLevel <= nodeLevel) { nextIdx = hdAnchors[ni].idx; break; }
-        }
-        var txt = '';
-        for (var ti2 = anchorIdx + 1; ti2 < nextIdx && ti2 < bodyEls.length; ti2++) {
-          var et = (bodyEls[ti2].textContent || '').trim();
-          if (!et) continue;
-          if (/^\d{1,3}$/.test(et) || /^[ivxlcdmIVXLCDM]+$/.test(et)) continue;
-          if (/^[-—–]/.test(et) && et.length < 10) continue;
-          if (/\.{3,}\s*\d/.test(et) && et.length < 80) continue;
-          txt += et + '\n';
-        }
-        node.text = txt.trim();
-        // 递归填充所有子节点
-        var kids = node.sections || node.subs || [];
-        for (var ki = 0; ki < kids.length; ki++) {
-          var kidNode = kids[ki];
-          var kidId = (nodeLevel === 0 ? 'sec-' : 'sub-') + (kidNode.num || '').replace(/\./g, '-');
-          var kidAIdx = -1;
-          for (var ai3 = 0; ai3 < hdAnchors.length; ai3++) {
-            if (hdAnchors[ai3].id === kidId) { kidAIdx = ai3; break; }
-          }
-          if (kidAIdx >= 0) fillNodeText(kidNode, nodeLevel + 1, kidAIdx);
-        }
-      }
-      // 从每个章的锚点开始填充
-      for (var ci3 = 0; ci3 < sections.length; ci3++) {
-        var ch = sections[ci3];
-        var chAIdx = -1;
-        for (var ai5 = 0; ai5 < hdAnchors.length; ai5++) {
-          if (hdAnchors[ai5].id === 'ch-' + ch.ch) { chAIdx = ai5; break; }
-        }
-        if (chAIdx >= 0) fillNodeText(ch, 0, chAIdx);
-      }
-    }
     // ===== 第6步：调试日志 =====
     console.log('[chapters] Parsed', sections.length, 'chapters:');
     sections.forEach(function (cs) {
@@ -2653,7 +2667,7 @@ function structureThesisBox(){
 }
 function clearAll(){
   if(!confirm('确定要清空所有数据吗？这将重置文献检索结果。'))return;
-  existingRefs=[];mergedRefs=[];manuscriptText='';manuscriptHTML='';paperTopics=[];sections=[];
+  existingRefs=[];mergedRefs=[];manuscriptText='';manuscriptHTML='';paperTopics=[];sections=[];_treeIndex={chapters:[],sections:[],subs:[],paragraphs:[],sentences:[]};
   document.getElementById('thesisBox').innerHTML='<i style="color:#9ca3af">论文原文将在此显示</i>';
   document.getElementById('navTree').innerHTML='<i style="color:var(--m);font-size:.7rem;padding:8px;display:block">请先上传论文</i>';
   document.getElementById('refs').innerHTML='<div style="text-align:center;padding:60px;color:#9ca3af;font-size:.82rem">← 请先上传论文</div>';

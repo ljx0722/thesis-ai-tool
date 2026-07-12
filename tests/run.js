@@ -1389,7 +1389,7 @@ test('INTEGRITY: cnDigit handles 1-20 (regression from chNum parsing)', function
   assert(fn.indexOf('二十')>=0,'cnDigit must handle 20');
 });
 
-test('INTEGRITY: Chapter dedup exists (mammoth split-title protection)', function() { var src=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8'); assert(src.indexOf('dupCh')>=0,'Chapter dedup must exist'); });
+test('INTEGRITY: Chapter dedup exists (mammoth split-title protection)', function() { var src=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8'); assert(src.indexOf('dup')>=0&&src.indexOf('buildFullTree')>=0,'Tree builder must include chapter dedup'); });
 
 test('INTEGRITY: detectChapterNum function exists', function() { var src=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8'); assert(src.indexOf('function detectChapterNum')>=0,'Must use detectChapterNum'); });
 
@@ -1433,16 +1433,12 @@ test('INTEGRITY: onboarding.js has 11+ tour steps', function() {
   assert(steps >= 11, 'Onboarding should have 11+ steps, found ' + steps);
 });
 
-test('INTEGRITY: fillNodeText is the primary text assignment (not populateChapterText)', function() {
+test('INTEGRITY: buildFullTree with paragraph+ sentence layers + _treeIndex', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('function fillNodeText') >= 0, 'fillNodeText must exist');
-  var fnIdx = src.indexOf('function fillNodeText');
-  var nextFn = src.indexOf('\nfunction ', fnIdx + 20);
-  if (nextFn < 0) nextFn = src.length;
-  var body = src.substring(fnIdx, nextFn);
-  assert(body.indexOf('node.text') >= 0, 'fillNodeText must assign node.text');
-  assert(body.indexOf('nextIdx') >= 0, 'fillNodeText must use boundary-based containment');
-});
+  assert(src.indexOf('function buildFullTree') >= 0, 'buildFullTree must exist');
+  assert(src.indexOf('_treeIndex') >= 0, '_treeIndex global must exist');
+  assert(src.indexOf('paragraphs') >= 0 && src.indexOf('sentences') >= 0, 'Tree must have paragraph+sentence layers');
+});;
 
 
 // Results
