@@ -1895,14 +1895,27 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
           var styleId=m3[1],styleName=m3[2];
           var snLower=styleName.toLowerCase();
           var hdLevel=0;
-          // 匹配中英文标题样式名称（涵盖标准 Heading、自定义中文样式、自定义英文样式）
-          if(/heading\s*1/i.test(snLower)||/标题\s*1/i.test(snLower)||/一级标题/i.test(snLower))hdLevel=1;
-          else if(/heading\s*2/i.test(snLower)||/标题\s*2/i.test(snLower)||/二级标题/i.test(snLower))hdLevel=2;
-          else if(/heading\s*3/i.test(snLower)||/标题\s*3/i.test(snLower)||/三级标题/i.test(snLower))hdLevel=3;
-          else if(/heading\s*4/i.test(snLower)||/标题\s*4/i.test(snLower)||/四级标题/i.test(snLower))hdLevel=4;
-          else if(/heading\s*5/i.test(snLower)||/标题\s*5/i.test(snLower)||/五级标题/i.test(snLower))hdLevel=5;
-          else if(/heading\s*6/i.test(snLower)||/标题\s*6/i.test(snLower)||/六级标题/i.test(snLower))hdLevel=6;
-          else if(styleId==='1'||styleId==='2'||styleId==='3'||styleId==='4'||styleId==='5'||styleId==='6')hdLevel=parseInt(styleId);
+          // 优先匹配有明确级别的样式名
+          // 标准英文: "heading 1"→h1, "heading 2"→h2 ...
+          if(/heading\s*1/i.test(snLower)||/title\s*1/i.test(snLower))hdLevel=1;
+          else if(/heading\s*2/i.test(snLower)||/title\s*2/i.test(snLower))hdLevel=2;
+          else if(/heading\s*3/i.test(snLower)||/title\s*3/i.test(snLower))hdLevel=3;
+          else if(/heading\s*4/i.test(snLower)||/title\s*4/i.test(snLower))hdLevel=4;
+          else if(/heading\s*5/i.test(snLower)||/title\s*5/i.test(snLower))hdLevel=5;
+          else if(/heading\s*6/i.test(snLower)||/title\s*6/i.test(snLower))hdLevel=6;
+          // 中文自定义: "标题"=h1, "一级标题"=h2, "二级标题"=h3
+          else if(/^标题$|^标题[_\s]|[_\s]标题$|^标题$|^title$/i.test(snLower)&&!/[二三四五六七八九十]级/.test(snLower))hdLevel=1;
+          else if(/一级标题|一级标/i.test(snLower))hdLevel=2;
+          else if(/二级标题|二级标/i.test(snLower))hdLevel=3;
+          else if(/三级标题|三级标/i.test(snLower))hdLevel=4;
+          else if(/四级标题|四级标/i.test(snLower))hdLevel=5;
+          else if(/五级标题|五级标/i.test(snLower))hdLevel=6;
+          // 数字编号: "标题 1"→h1, "标题 2"→h2
+          else if(/标题\s*1/i.test(snLower))hdLevel=1;
+          else if(/标题\s*2/i.test(snLower))hdLevel=2;
+          else if(/标题\s*3/i.test(snLower))hdLevel=3;
+          // 纯数字 styleId（但排除 TOC 样式）
+          else if((styleId==='1'||styleId==='2'||styleId==='3'||styleId==='4'||styleId==='5'||styleId==='6')&&!/toc|目录|目次/i.test(snLower))hdLevel=parseInt(styleId);
           if(hdLevel>=1){
             var hTag='h'+hdLevel;
             // mammoth 用正则匹配段落样式名
