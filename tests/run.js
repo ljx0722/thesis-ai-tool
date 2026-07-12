@@ -1226,6 +1226,25 @@ test('HC: iclClick function for paragraph click handler exists', function() {
   assert(src.indexOf('function iclClick') >= 0, 'Missing iclClick');
 });
 
+test('HC: iclStyleFingerprint extracts font-size + weight + family', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('function iclStyleFingerprint') >= 0, 'Missing iclStyleFingerprint');
+  var fnStart = src.indexOf('function iclStyleFingerprint');
+  var fnBody = src.substring(fnStart, fnStart + 200);
+  assert(fnBody.indexOf('fontSize') >= 0, 'Must use fontSize in style fingerprint');
+  assert(fnBody.indexOf('fontWeight') >= 0, 'Must use fontWeight in style fingerprint');
+  assert(fnBody.indexOf('fontFamily') >= 0, 'Must use fontFamily in style fingerprint');
+});
+
+test('HC: iclClick auto-batches same-style elements', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var fnStart = src.indexOf('function iclClick');
+  var fnBody = src.substring(fnStart, src.indexOf('\nfunction icl', fnStart + 20));
+  assert(fnBody.indexOf('iclStyleFingerprint') >= 0, 'iclClick must use style fingerprinting');
+  assert(fnBody.indexOf('batchCount') >= 0, 'iclClick must batch auto-select same-style elements');
+  assert(fnBody.indexOf('bodyBoundaryEl') >= 0 || fnBody.indexOf('refBound') >= 0, 'iclClick must respect reference boundary');
+});
+
 test('HC: iclUpdatePreview generates live tree preview', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
   assert(src.indexOf('function iclUpdatePreview') >= 0, 'Missing iclUpdatePreview');
