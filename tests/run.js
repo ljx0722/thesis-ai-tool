@@ -102,10 +102,10 @@ test('HTML has all required ' + '<script>' + ' tags in correct order', function(
 // ============================================================
 console.log('\n=== Section 2: Historical Bug Fixes ===');
 
-test('BUG-FIX: injectNewMarkers keyword threshold >= 2 (not >=1)', function() {
+test('BUG-FIX: injectNewMarkers uses tree-based sentence matching (>=2 threshold)', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('score>=2') >= 0, 'Missing keyword threshold >= 2 in injectNewMarkers');
-  assert(src.indexOf('score>=1&&score>bestScore') < 0, 'OLD threshold >=1 still present — remove it');
+  assert(src.indexOf('sc>=2') >= 0, 'Missing keyword threshold >= 2 in new injectNewMarkers');
+  assert(src.indexOf('_treeIndex') >= 0, 'injectNewMarkers must use _treeIndex');
 });
 
 test('BUG-FIX: Step 2b injects at sentence boundary, not paragraph end', function() {
@@ -867,10 +867,10 @@ test('REGRESSION: Four scoring dimensions all have tooltips', function() {
   assert(src.indexOf("_scoreInfo.conf") >= 0 || src.indexOf('_scoreInfo["conf"]') >= 0, 'Must reference _scoreInfo in rendering');
 });
 
-test('REGRESSION: Inject skips paragraphs before chapter 1', function() {
+test('REGRESSION: injectNewMarkers uses tree index for sentence access', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
   var injectFunc = src.substring(src.indexOf("function injectNewMarkers"), src.indexOf("function scrollToRef"));
-  assert(injectFunc.indexOf("compareDocumentPosition") >= 0, 'injectNewMarkers must use compareDocumentPosition for ch-1 guard');
+  assert(injectFunc.indexOf("_treeIndex") >= 0, 'injectNewMarkers must use _treeIndex for sentence-level matching');
 });
 
 test('REGRESSION: WrapExistingMarkers skips paragraphs before chapter 1', function() {

@@ -130,138 +130,37 @@ function wrapExistingMarkers(refs){
   }catch(e){}
 }
 function injectNewMarkers(refs){
-  var box=document.getElementById('thesisBox');if(!box||!refs.length)return;
-  if(!firstBodyChEl())return;
-
-  // Group refs by chapter
-  var byCh={};refs.forEach(function(r){var ck=r.ch||1;if(!byCh[ck])byCh[ck]=[];byCh[ck].push(r)});
-  console.log('[inject] Total refs:',refs.length,'byCh keys:',Object.keys(byCh));
-
-  // For each chapter, process sentences
-  Object.keys(byCh).sort(function(a,b){return parseInt(a)-parseInt(b)}).forEach(function(chNum){
-    var chRefs=byCh[chNum];if(!chRefs.length)return;
-    var chEl=document.getElementById('ch-'+chNum);
-    if(!chEl){
-      console.warn('[inject] Chapter element ch-'+chNum+' not found, skipping');
-      return
-    }
-    console.log('[inject] Processing chapter',chNum,'with',chRefs.length,'refs');
-
-    // Find next chapter element to know boundary
-    var nextChEl=null,found=false;
-    var allChEls=box.querySelectorAll('[id^="ch-"]');
-    for(var i=0;i<allChEls.length;i++){
-      if(found){nextChEl=allChEls[i];break}
-      if(allChEls[i]===chEl)found=true
-    }
-
-    // Collect all paragraph/sentence nodes in this chapter
-    var paras=[];
-    var cur=chEl.nextSibling;
-    while(cur){
-      if(nextChEl&&cur===nextChEl)break;
-      if(cur.nodeType===1){
-        var tag=(cur.tagName||'').toLowerCase();
-        if(/^p$/.test(tag)){
-          var bb2=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
-          var ch1=document.getElementById('ch-1');
-          if(ch1&&cur!==ch1&&(cur.compareDocumentPosition(ch1)&Node.DOCUMENT_POSITION_FOLLOWING)){cur=cur.nextSibling;continue;}
-          if(bb2&&(cur.compareDocumentPosition(bb2)&Node.DOCUMENT_POSITION_FOLLOWING)){cur=cur.nextSibling;continue;}
-          if(cur.querySelector&&cur.querySelector('.cite-marker')){cur=cur.nextSibling;continue}
-          paras.push(cur)
-        }
-      }
-      cur=cur.nextSibling
-    }
-
-    // Extract sentences from paragraphs
-    var allSentences=[];
-    paras.forEach(function(p){
-      var txt=p.textContent||'';
-      var sentences=[],re3=/[。；！？\.\?\!]/g,m3,last2=0;
-      while((m3=re3.exec(txt))!==null){
-        var st=txt.substring(last2,m3.index+1).trim();
-        if(st.length>=10)sentences.push({text:st,endPos:m3.index+1,para:p})
-        last2=m3.index+1
-      }
-      var tl=txt.substring(last2).trim();
-      if(tl.length>=10)sentences.push({text:tl,endPos:txt.length,para:p})
-      allSentences=allSentences.concat(sentences)
-    });
-
-    // Match refs to sentences by keyword overlap
-    var usedRefs=new Set();
-    allSentences.forEach(function(sen){
-      if(usedRefs.size>=chRefs.length)return;
-      var bestRef=null,bestScore=0,bestDupRate=0;
-      chRefs.forEach(function(r){
-        if(usedRefs.has(r))return;
-        // Calculate keyword match score
-        var kw=extractTitleKws(r.title);
-        var score=kw.reduce(function(s,w){return s+(sen.text.toLowerCase().indexOf(w)>=0?1:0)},0);
-        // 重合度 = 句子关键词 ∩ 文献关键词 / 双向平均
-        var sk=extractTitleKws(sen.text);
-        var o2=sk.filter(function(w){return kw.indexOf(w)>=0}).length;
-        var dupRate=kw.length>0?Math.round(o2/Math.max(1,(sk.length+kw.length)/2)*100):0;
-        if(score>=2&&score>bestScore){bestScore=score;bestRef=r;bestDupRate=dupRate}
-      });
-      if(bestRef){
-        usedRefs.add(bestRef);
-        sen.ref=bestRef;
-        sen.refScore=bestScore;
-        sen.dupRate=bestDupRate;
-        bestRef._dupRate=Math.max(bestRef._dupRate||0,bestDupRate)
-      }
-    });
-
-    // Insert markers at end of matched sentences
-    allSentences.forEach(function(sen){
-      if(!sen.ref)return;
-      var p=sen.para;if(!p)return;
-      var txt=p.textContent||'';
-      var markerText='['+(sen.ref.displayNum||'?')+']';
-      var markerHtml='<span class="cite-marker generated" data-ref="'+(sen.ref.displayNum||'')+'" onclick="scrollToRef('+(sen.ref.displayNum||0)+')" title="建议引用'+markerText+'">'+markerText+'</span>';
-
-      // Find the sentence in paragraph and insert marker before ending punctuation
-      var senStart=txt.indexOf(sen.text);
-      if(senStart<0)return;
-      var insertPos=senStart+sen.text.length;
-
-      // Find the last punctuation mark position
-      var punctMatch=sen.text.match(/[。；！？\.\?\!]\s*$/);
-      if(punctMatch){
-        insertPos=senStart+sen.text.length-punctMatch[0].length
-      }
-
-      // Create marker span element
-      var markerSpan=document.createElement('span');
-      markerSpan.className='cite-marker generated';
-      markerSpan.setAttribute('data-ref',sen.ref.displayNum||'');
-      markerSpan.textContent='['+(sen.ref.displayNum||'?')+']';
-      markerSpan.onclick=function(nn){return function(e){e.stopPropagation();scrollToRef(nn);};}(sen.ref.displayNum||0);
-      markerSpan.title='建议引用['+(sen.ref.displayNum||'?')+']';
-
-      // Insert marker into DOM at correct text position (preserves existing HTML)
-      var tw=document.createTreeWalker(p,NodeFilter.SHOW_TEXT,null,false);
-      var pos=0,targetNode=null,targetOffset=0,tn2;
-      while((tn2=tw.nextNode())!==null){var len=tn2.textContent.length;if(pos+len>insertPos){targetNode=tn2;targetOffset=insertPos-pos;break;}pos+=len;}
-      if(targetNode){var afterText=targetNode.splitText(targetOffset);targetNode.parentElement.insertBefore(markerSpan,afterText);}
-      else{p.appendChild(markerSpan);}
-
-      // Update ref DOM info
-      sen.ref._domEl=markerSpan;
-      var mel=markerSpan;
-      if(mel){
-        sen.ref._domEl=mel;
-        sen.ref._ctx=extractCtxBeforeMarker(txt,sen.ref.displayNum);
-        // Find section info
-        var sp=sectionPathFor(markerSpan,sen.ref.displayNum);
-        sen.ref._chName=sp.ch;
-        sen.ref._secName=sp.sec;
-        sen.ref._subName=sp.sub
-      }
+  if(!_treeIndex||!_treeIndex.sentences.length)return;
+  var byCh={};refs.forEach(function(r){var ck=r.ch||1;if(!byCh[ck])byCh[ck]=[];byCh[ck].push(r);});
+  var sentHit={};
+  Object.keys(byCh).forEach(function(chNum){
+    var chIdx=-1;for(var i=0;i<_treeIndex.chapters.length;i++){if(_treeIndex.chapters[i].ch===parseInt(chNum)){chIdx=i;break;}}
+    if(chIdx<0)return;
+    var chNode=_treeIndex.chapters[chIdx].node,chRefs=byCh[chNum];
+    var allSents=[];
+    (function walk(n){if(n.paragraphs)n.paragraphs.forEach(function(p){p.sentences.forEach(function(s){allSents.push({sent:s,para:p,parent:n});});});var kids=n.sections||n.subs||[];kids.forEach(function(k){walk(k);});})(chNode);
+    if(!allSents.length)return;
+    var used=new Set();
+    allSents.forEach(function(si){
+      if(used.size>=chRefs.length)return;
+      var br=null,bs=0;
+      chRefs.forEach(function(r){if(used.has(r))return;var kw=extractTitleKws(r.title||'');var sc=kw.reduce(function(s,w){return s+(si.sent.text.toLowerCase().indexOf(w)>=0?1:0)},0);if(sc>=2&&sc>bs){bs=sc;br=r;}});
+      if(br){used.add(br);var si2=si.sent._idx;if(!sentHit[si2])sentHit[si2]=[];sentHit[si2].push(br);br._sentence=si.sent;br._ctx=si.sent.text.substring(0,80);}
     });
   });
+  for(var si3 in sentHit){
+    var refs2=sentHit[si3],sent=_treeIndex.sentences[parseInt(si3)];
+    if(!sent||!sent._paragraph||!sent._paragraph.el)continue;
+    sent.refs=refs2.map(function(r){return r.displayNum||r.num;});
+    var paraEl=sent._paragraph.el;
+    refs2.forEach(function(r){
+      var n=r.displayNum||r.num;
+      var sp=document.createElement('span');sp.className='cite-marker generated';sp.textContent='['+n+']';
+      sp.onclick=function(nn){return function(e){e.stopPropagation();scrollToRef(nn);}}(n);
+      r._domEl=sp;paraEl.appendChild(sp);
+      r._chName=_treeIndex.chapters[chIdx]?_treeIndex.chapters[chIdx].name:'';
+    });
+  }
 }
 function scrollToRef(n){var el=document.getElementById('r'+(n-1))||document.getElementById('er'+(n-1));if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.transition='background .3s';el.style.background='#fef3c7';setTimeout(function(){el.style.background=''},2000)}else ttp('未找到['+n+']')}
 
