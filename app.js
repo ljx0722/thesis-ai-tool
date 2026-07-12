@@ -70,6 +70,7 @@ function firstBodyChEl(){return document.getElementById('ch-1')}
 function wrapExistingMarkers(refs){
   try{
   var box=document.getElementById('thesisBox');if(!box||!refs.length)return;
+  // DOM 标记：将 [N] 文本替换为可点击 span
   var refMap=new Map();refs.forEach(function(r){if(r.num)refMap.set(r.num,r)});
   var tw=document.createTreeWalker(box,NodeFilter.SHOW_TEXT,null,false),nodes=[];
   for(var tn=tw.nextNode();tn;tn=tw.nextNode())nodes.push(tn);
@@ -102,12 +103,9 @@ function wrapExistingMarkers(refs){
       span.title='引用['+newNum+']'+(matchRef.subType==='displaced'?' (原['+n+'])':'');
       span.onclick=function(nn){return function(e){e.stopPropagation();scrollToRef(nn)}}(newNum);
 
-      // Set _domEl and _ctx for the ref
       matchRef._domEl=span;
       matchRef._paraEl=node.parentElement;
-      // 已有文献已存_ctx的不覆盖
       if(!matchRef._isOriginal){matchRef._ctx=extractCtxBeforeMarker(txt,n);}
-      // Calculate duplicate rate
       var ctx1=matchRef._ctx;
       if(ctx1){
         var kw3=extractTitleKws(matchRef.title||'');
@@ -115,6 +113,20 @@ function wrapExistingMarkers(refs){
           var sk3=extractTitleKws(ctx1);
           var o3=sk3.filter(function(w){return kw3.indexOf(w)>=0}).length;
           matchRef._dupRate=Math.min(95,Math.round(o3/Math.max(1,(sk3.length+kw3.length)/2)*100));
+        }
+      }
+
+      // 关联到 _treeIndex 句子
+      if(_treeIndex&&_treeIndex.sentences.length){
+        for(var si=0;si<_treeIndex.sentences.length;si++){
+          var sent=_treeIndex.sentences[si];
+          if(!sent._paragraph||!sent._paragraph.el)continue;
+          if(sent._paragraph.el===node.parentElement||sent._paragraph.el.contains(span.firstChild||span)){
+            if(!sent.refs)sent.refs=[];
+            if(sent.refs.indexOf(newNum)<0)sent.refs.push(newNum);
+            if(!sent._paragraph.el.contains(span))matchRef._paragraphEl=sent._paragraph.el;
+            break;
+          }
         }
       }
 
@@ -127,7 +139,7 @@ function wrapExistingMarkers(refs){
     }
   }
 
-  }catch(e){}
+  }catch(e){console.warn('[wrap] error:',e.message);}
 }
 function injectNewMarkers(refs){
   if(!_treeIndex||!_treeIndex.sentences.length)return;
@@ -319,31 +331,50 @@ function findSectionForElement(el, refNum){
   return{ch:chName,sec:sec?(sec+(secTitle?' '+secTitle:'')):'',sub:sub?(sub+(subTitle?' '+subTitle:'')):'',ctx:ctx};
 }
 
-// sectionPathFor 兼容旧调用，内部转发到 findSectionForElement
-function sectionPathFor(el,refN){
-  var box=document.getElementById('thesisBox');
-  // 没有DOM元素时从数据取
-  if(!el||(el&&!el.textContent)){
-    var ref=mergedRefs.find(function(r){return r.displayNum===refN});
-    if(ref){
-      var chN2={};sections.forEach(function(cs){if(cs.ch&&cs.name)chN2[cs.ch]=cs.name});
-      for(var i=1;i<=10;i++)if(!chN2[i])chN2[i]='第'+i+'章';
-      var cn=ref.ch||1,sec2='',sub2='',st2='',sut2='';
-      var co=sections.find(function(s){return s.ch===cn});
-      if(co&&co.sections){
-        if(ref._bestSec){var so=co.sections.find(function(s){return s.num===ref._bestSec});if(so){sec2=so.num;st2=so.title;}}
-        if(ref._bestSub){co.sections.forEach(function(s){if(s.subs){var sso=s.subs.find(function(ss){return ss.num===ref._bestSub});if(sso){sub2=sso.num;sut2=sso.title;}}});}
+// 从 _treeIndex 查找引用的章节/节/小节位置（替代 DOM 查找）
+function lookupRefPosition(r){
+  // 优先用已存储的位置
+  if(r._chName) return {ch:r._chName||'',sec:r._secName||'',sub:r._subName||'',ctx:r._ctx||''};
+  // 从 _treeIndex 查找句子级关联
+  if(_treeIndex&&_treeIndex.sentences.length){
+    var refNum=r.displayNum||r.num;
+    for(var i=0;i<_treeIndex.sentences.length;i++){
+      var sent=_treeIndex.sentences[i];
+      if(sent.refs&&sent.refs.indexOf(refNum)>=0){
+        // 从句子往上找到章/节/小节
+        var node=sent._parent;
+        var chName='',secName='',subName='';
+        if(node){
+          if(node.ch!==undefined) chName=node.name||'';
+          // Traverse up through _treeIndex to find section and subsection parents
+          for(var ti=0;ti<_treeIndex.sections.length;ti++){
+            var se=_treeIndex.sections[ti];
+            if(se.node===node||(se.node.sections&&se.node.sections.indexOf(node)>=0)||(se.node.subs&&se.node.subs.indexOf(node)>=0)){
+              secName=se.num+' '+se.title;subName=se._chapter?se._chapter.name:'';
+              break;
+            }
+          }
+          for(var ti2=0;ti2<_treeIndex.subs.length;ti2++){
+            var su=_treeIndex.subs[ti2];
+            if(su.node===node){subName=su.num+' '+su.title;break;}
+          }
+        }
+        // Fallback to chapter index
+        for(var ti3=0;ti3<_treeIndex.chapters.length;ti3++){
+          if(!chName&&sent._paragraph&&sent._paragraph._parent){
+            var pn=sent._paragraph._parent;
+            if(pn.ch===_treeIndex.chapters[ti3].ch)chName=_treeIndex.chapters[ti3].name;
+          }
+        }
+        return {ch:chName||('第'+(r.ch||1)+'章'),sec:secName,sub:subName,ctx:sent.text?sent.text.substring(0,80):(r._ctx||'')};
       }
-      return{ch:chN2[cn]||('第'+cn+'章'),sec:sec2?(sec2+(st2?' '+st2:'')):'',sub:sub2?(sub2+(sut2?' '+sut2:'')):'',ctx:''};
     }
-    return{ch:'第1章',sec:'',sub:'',ctx:''};
   }
-  // 有DOM元素：找到父段落，然后找锚点
-  var paraEl=el;
-  while(paraEl&&paraEl!==box&&!/^(?:p|h[1-6]|div|li|td|blockquote)$/i.test(paraEl.tagName||'')){
-    paraEl=paraEl.parentElement;
+  // Fallback: DOM 查找
+  if(r._domEl){
+    try{return findSectionForElement(r._domEl,r.displayNum);}catch(e){}
   }
-  return findSectionForElement(paraEl||el,refN);
+  return {ch:'第'+(r.ch||1)+'章',sec:'',sub:'',ctx:r._ctx||''};
 }
 
 function jumpToDomEl(r){
@@ -1675,29 +1706,8 @@ function renderRefs(){
       var chObj=sections.find(function(s){return s.ch===chKey});
       var chName=chN[chKey]||('第'+chKey+'章');
 
-      // 确定位置：已有文献优先使用初始化时存储的章节/句子绑定
-      var sp;
-      if(r._chName && (r.subType==='unchanged' || r.subType==='displaced')){
-        sp={ch:r._chName||chName,sec:r._secName||'',sub:r._subName||'',ctx:r._ctx||''};
-      }else if(r._domEl){
-        try{sp=findSectionForElement(r._domEl,r.displayNum);}catch(e){sp={ch:chName,sec:'',sub:'',ctx:r._ctx||''};}
-      }else{
-        // 新文献：从_bestSec取
-        var _sec='',_sub='',_secTitle='',_subTitle='';
-        if(r._bestSec && chObj && chObj.sections){
-          var secObj=chObj.sections.find(function(s){return s.num===r._bestSec||s.num.startsWith(r._bestSec)});
-          if(secObj){_sec=secObj.num;_secTitle=secObj.title;}
-        }
-        if(r._bestSub && chObj && chObj.sections){
-          chObj.sections.forEach(function(s){if(s.subs){
-            var subObj=s.subs.find(function(ss){return ss.num===r._bestSub});
-            if(subObj){_sub=subObj.num;_subTitle=subObj.title;}
-          }});
-        }
-        r._hasSection=!!_sec;
-        if(!_sec){_sec='⚠ 未匹配';_secTitle='建议优化原文句子后重新检索'}
-        sp={ch:chName,sec:_sec?(_sec+(_secTitle?' '+_secTitle:'')):(_secTitle||''),sub:_sub?(_sub+(_subTitle?' '+_subTitle:'')):(_subTitle||''),ctx:r._ctx||''};
-      }
+      // 位置信息：统一从 _treeIndex 获取
+      var sp=lookupRefPosition(r);
       if(!sp.ch||sp.ch==='第1章')sp.ch=chName;
       var conf=r.conf||0,cl=conf>=70?'high':(conf>=40?'medium':'low');
       var dupRate=r._dupRate||0,drCl=dupRate>=80?'high':(dupRate>=50?'medium':'low');
@@ -1775,7 +1785,8 @@ function renderExistingOnly(){
       var r=item.r,i=item.i;
       var gb=r.ci||'';
       // 优先用初始解析时存储的位置信息
-      var sp={ch:r._chName||(chN[r.ch||1]||('第'+(r.ch||1)+'章')),sec:r._secName||'',sub:r._subName||'',ctx:r._ctx||''};
+      var sp=lookupRefPosition(r);
+      if(!sp.ch)sp.ch=chN[r.ch||1]||('第'+(r.ch||1)+'章');
       var conf=r.conf||0,cl=conf>=70?'high':(conf>=40?'medium':'low');
       var dupRate=r._dupRate||0,drCl=dupRate>=80?'high':(dupRate>=50?'medium':'low');
 
