@@ -1070,24 +1070,41 @@ function hcRender(){
     var lv=_hcLevels.find(function(l){return l.id===c.level})||_hcLevels[3];
     var txt=(c.txt||'').substring(0,80);
     if(c.txt&&c.txt.length>80)txt+='…';
+    // 获取下一个兄弟原文，作为上下文预览
+    var ctx='';
+    if(c.el){
+      var sib2=c.el.nextElementSibling;
+      for(var ci=0;ci<3&&sib2;ci++){
+        var st2=(sib2.textContent||'').trim();
+        // 跳过空/数字/页码
+        if(st2&&!/^\d{1,3}$/.test(st2)&&!/^[ivxlcdmIVXLCDM]+$/.test(st2)&&!/\.{3,}\s*\d/.test(st2)){
+          ctx=st2.replace(/\s+/g,' ').substring(0,120);
+          if(ctx.length>=120)ctx+='…';
+          break;
+        }
+        sib2=sib2.nextElementSibling;
+      }
+    }
     var bg=c.level>=0?'rgba(0,113,227,0.03)':'rgba(255,59,48,0.03)';
     if(c.bare)bg='rgba(255,159,10,0.05)';
-    h+='<div class="hc-row" style="display:flex;align-items:center;gap:8px;padding:4px 8px;margin:1px 0;border-radius:6px;background:'+bg+';transition:background .12s" onmouseenter="this.style.background=\''+(c.bare?'rgba(255,159,10,0.1)':c.level>=0?'rgba(0,113,227,0.07)':'rgba(255,59,48,0.07)')+'\'" onmouseleave="this.style.background=\''+bg+'\'">';
-    h+='<span style="font-size:.55rem;color:var(--m);min-width:20px;text-align:right;flex-shrink:0">'+(i+1)+'</span>';
-    // Merge button for bare entries
+    h+='<div class="hc-row" style="display:flex;align-items:flex-start;gap:8px;padding:4px 8px;margin:1px 0;border-radius:6px;background:'+bg+';transition:background .12s">';
+    h+='<span style="font-size:.55rem;color:var(--m);min-width:20px;text-align:right;flex-shrink:0;margin-top:3px">'+(i+1)+'</span>';
     if(c.bare&&i>0){
-      h+='<button onclick="hcMergeUp('+i+')" title="合并到上一条标题" style="background:rgba(255,159,10,0.15);color:#ff9f0a;border:none;border-radius:4px;padding:1px 5px;cursor:pointer;font-size:.5rem;flex-shrink:0">↑合并</button>';
+      h+='<button onclick="hcMergeUp('+i+')" title="合并到上一条标题" style="background:rgba(255,159,10,0.15);color:#ff9f0a;border:none;border-radius:4px;padding:1px 5px;cursor:pointer;font-size:.5rem;flex-shrink:0;margin-top:2px">↑合并</button>';
     }
-     h+='<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.7rem;color:'+(c.level>=0?'var(--t)':'var(--m)')+'" title="'+(c.txt||'').replace(/"/g,'&quot;')+'">'+txt+'</span>';
-    // Level dropdown
-    h+='<select onchange="hcSetLevel('+i+',parseInt(this.value))" style="border:1px solid '+lv.color+';border-radius:6px;padding:2px 4px;font-size:.58rem;background:var(--solid);color:'+lv.color+';cursor:pointer;flex-shrink:0;min-width:72px;font-weight:600">';
+    h+='<div style="flex:1;min-width:0">';
+    h+='<div style="font-size:.7rem;color:'+(c.level>=0?'var(--t)':'var(--m)')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(c.txt||'').replace(/"/g,'&quot;')+'">'+txt+'</div>';
+    if(ctx){
+      h+='<div style="font-size:.55rem;color:var(--m);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(ctx||'').replace(/"/g,'&quot;')+'">📄 '+ctx+'</div>';
+    }
+    h+='</div>';
+    h+='<select onchange="hcSetLevel('+i+',parseInt(this.value))" style="border:1px solid '+lv.color+';border-radius:6px;padding:2px 4px;font-size:.58rem;background:var(--solid);color:'+lv.color+';cursor:pointer;flex-shrink:0;min-width:72px;font-weight:600;margin-top:2px">';
     for(var li=0;li<_hcLevels.length;li++){
       var sel=_hcLevels[li].id===c.level?' selected':'';
       h+='<option value="'+_hcLevels[li].id+'"'+sel+'>'+_hcLevels[li].name+'</option>';
     }
     h+='</select>';
-    // Bare tag
-    if(c.bare)h+='<span style="font-size:.5rem;color:#ff9f0a;background:rgba(255,159,10,0.1);padding:1px 4px;border-radius:4px;flex-shrink:0">待合并</span>';
+    if(c.bare)h+='<span style="font-size:.5rem;color:#ff9f0a;background:rgba(255,159,10,0.1);padding:1px 4px;border-radius:4px;flex-shrink:0;margin-top:2px">待合并</span>';
     h+='</div>';
   }
   if(!shown)h='<div style="text-align:center;padding:20px;color:var(--m)">无匹配项</div>';
