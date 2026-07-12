@@ -5,11 +5,12 @@
 
 var APP_MODULES = [
   { id: 'format-check',    name: '格式检查',   icon: '✅', requiresThesis: true },
-  { id: 'terminology',     name: '术语分析',   icon: '🔤', requiresThesis: true },
   { id: 'paragraph',       name: '段落分析',   icon: '📝', requiresThesis: true },
+  { id: 'terminology',     name: '术语分析',   icon: '🔤', requiresThesis: true },
   { id: 'optimization',    name: '优化建议',   icon: '💡', requiresThesis: true },
   { id: 'knowledge-graph', name: '知识图谱',   icon: '🕸️', requiresThesis: true },
   { id: 'references',      name: '参考文献',   icon: '📋', requiresThesis: true },
+  { id: 'review',          name: '论文审阅',   icon: '🔍', requiresThesis: true },
 ];
 
 var _activeModule = 'references';
@@ -222,6 +223,7 @@ function switchPanel(moduleId) {
           else if (moduleId === 'format-check' && typeof runFormatCheck === 'function') runFormatCheck(mc);
           else if (moduleId === 'terminology' && typeof runTerminology === 'function') runTerminology(mc);
           else if (moduleId === 'paragraph' && typeof runParagraphAnalysis === 'function') runParagraphAnalysis(mc);
+          else if (moduleId === 'review') runReviewModule(mc);
         } catch (e) { mc.innerHTML = '<div style="text-align:center;padding:40px;color:var(--r)">分析出错: ' + e.message + '</div>'; }
         hideLoad();
       }, 100);
@@ -272,6 +274,22 @@ function onRefsChanged() {
     var mc = document.querySelector('#refPanel .module-panel');
     if (mc) mc.innerHTML = '<div style="text-align:center;padding:20px;color:#f59e0b;font-size:.78rem">🔄 文献已更新，点击模块标签刷新分析</div>';
   }
+}
+
+function runReviewModule(container) {
+  if (!(typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100)) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:#9ca3af">请先上传论文</div>';return;
+  }
+  container.innerHTML = '<div class="module-panel" style="display:flex;flex-wrap:wrap;gap:12px">'+
+    '<div id="reviewFormat" style="flex:1;min-width:300px;border:1px solid var(--bd);border-radius:10px;padding:12px;background:var(--card)"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">✅ 格式检查</div><div id="reviewFormatContent" style="font-size:.7rem;color:var(--m)">分析中...</div></div>'+
+    '<div id="reviewParagraph" style="flex:1;min-width:300px;border:1px solid var(--bd);border-radius:10px;padding:12px;background:var(--card)"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">📝 段落分析</div><div id="reviewParaContent" style="font-size:.7rem;color:var(--m)">分析中...</div></div>'+
+    '<div id="reviewOptimize" style="flex:1;min-width:300px;border:1px solid var(--bd);border-radius:10px;padding:12px;background:var(--card)"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">💡 优化建议</div><div id="reviewOptContent" style="font-size:.7rem;color:var(--m)">分析中...</div></div>'+
+    '</div>';
+  setTimeout(function(){
+    var fc=document.getElementById('reviewFormatContent');if(fc&&typeof runFormatCheck==='function')runFormatCheck(fc);
+    var pc=document.getElementById('reviewParaContent');if(pc&&typeof runParagraphAnalysis==='function')runParagraphAnalysis(pc);
+    var oc=document.getElementById('reviewOptContent');if(oc&&typeof runOptimization==='function')runOptimization(oc);
+  },50);
 }
 
 // ==================== 初始化 ====================

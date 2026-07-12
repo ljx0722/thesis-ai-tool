@@ -434,16 +434,15 @@ test('MODULE: dashboard.js integrates review scores', function() {
   assert(src.indexOf('showReviewInDashboard') >= 0, 'Missing review handler');
 });
 
-test('UI: Dashboard 3D button exists with pulse animation', function() {
+test('UI: Dashboard button exists in top bar', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  var css = fs.readFileSync(path.join(projectRoot, 'css/style.css'), 'utf8');
-  assert(html.indexOf('dashboard-btn') >= 0, 'Missing dashboard button');
-  assert(css.indexOf('db-breathe') >= 0, 'Missing pulse animation in CSS');
+  assert(html.indexOf('dashboardBtn') >= 0, 'Missing dashboard button');
+  assert(html.indexOf('showDashboard()') >= 0, 'Missing showDashboard call');
 });
 
 test('UI: Dashboard overlay has review report button', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(html.indexOf('dashboard-btn') >= 0, 'Missing dashboard button');
+  assert(html.indexOf('dashboardBtn') >= 0, 'Missing dashboard button');
   assert(html.indexOf('showDashboard') >= 0, 'Missing showDashboard reference');
 });
 

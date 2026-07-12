@@ -14,25 +14,44 @@ ipt>
 <script>if(window.location.protocol==='file:'){document.getElementById('fileBlock').style.display='block';document.querySelector('.main')&&(document.querySelector('.main').style.display='none');document.querySelector('.bar')&&(document.querySelector('.bar').style.display='none');fetch('http://localhost:5000/',{mode:'no-cors'}).then(function(r){window.location.href='http://localhost:5000/'}).catch(function(){});}</script>
 
 <!-- ====== 快捷键提示条 ====== -->
-<div class="kb-hint" id="kbHint">⌨ Ctrl+1~6 切换模块 | Ctrl+Enter 检索 | Ctrl+B 导出 | Ctrl+O 换论文 | Esc 关闭弹窗</div>
+<div class="kb-hint" id="kbHint">⌨ Ctrl+1~7 切换模块 | Ctrl+Enter 检索 | Ctrl+O 换论文 | Esc 关闭弹窗</div>
 
 <!-- ====== 顶栏 ====== -->
 <div class="bar">
-  <h1>论文AI利器</h1>
+  <div class="bar-left">
+    <h1>论文AI利器</h1>
+    <span id="statusBar" style="font-size:.62rem;color:var(--m)">等待上传论文…</span>
+  </div>
   <div class="module-tabs" id="moduleTabs"></div>
-  <!-- 中央看板按钮 -->
-  <div class="dashboard-btn-wrap"><button class="dashboard-btn" id="dashboardBtn" onclick="showDashboard()" disabled title="论文看板 · 综合评估报告"><svg class="db-btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M3 12h18M12 3v18"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/></svg><span class="db-btn-label">报告</span></button></div>
   <div class="bar-actions" id="barActions">
-    <button class="ba-btn ba-search" disabled id="baSearch" onclick="if(typeof searchRunning!=='undefined'&&searchRunning)return;startSearch()">🔍 检索</button>
+    <button class="ba-btn ba-search" disabled id="baSearch" onclick="startSearch()">🔍 检索</button>
     <button class="ba-btn ba-verify" disabled id="baVerify" onclick="batchVerify()">✅ 校验</button>
-    <button class="ba-btn ba-copy" disabled id="baCopy" onclick="copyBib()">📋 导出</button>
-    <button class="ba-btn ba-bib" disabled id="baBib" onclick="copyBibTeX()">📄 BibTeX</button>
-    <button class="ba-btn ba-doi" disabled id="baDOI" onclick="batchCompleteDOI()">🔗 DOI</button>
     <button class="ba-btn ba-change" onclick="changeThesis()">📎 换论文</button>
     <button class="ba-btn ba-reset" id="baReset" onclick="resetSearch()">↺ 重置</button>
+    <button class="ba-btn" id="dashboardBtn" onclick="showDashboard()" disabled style="background:rgba(0,113,227,.1);color:#0071e3;border:none">📊 报告</button>
   </div>
-  <span class="prog" id="statusBar">等待上传论文…</span>
 </div>
+
+<!-- ====== 更新日志按钮 ====== -->
+<div id="changelogBtn" onclick="toggleChangelog()" title="更新日志" style="position:fixed;top:6px;right:12px;z-index:200;font-size:.62rem;color:var(--m);cursor:pointer;background:rgba(0,0,0,.03);padding:2px 8px;border-radius:10px;border:1px solid transparent;transition:all .2s">📜 更新</div>
+<div id="changelogPanel" style="display:none;position:fixed;top:42px;right:12px;width:340px;max-height:75vh;overflow-y:auto;background:#fff;border-radius:12px;padding:16px;box-shadow:0 8px 40px rgba(0,0,0,.15);z-index:999;font-size:.68rem;line-height:1.7;color:#333;border:1px solid #e5e7eb">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-size:.8rem">📜 功能更新日志</b><span onclick="document.getElementById('changelogPanel').style.display='none'" style="cursor:pointer;font-size:.7rem;color:#999">✕</span></div>
+  <div style="border-left:2px solid #0071e3;padding-left:10px">
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-21</b> 文献检索结果确认区增加文献显示量控制与自动补充机制</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-20</b> Word样式名称识别：自动解析docx内标题样式并校准层级</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-19</b> 5层全文树结构（章→节→小节→段落→句子）+ 全局索引</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-18</b> 交互式文献检索：两步确认流程（文献确认 → 分配策略）</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-17</b> 标题层级校准（分步向导）：用户手动确认章/节/小节对应样式</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-15</b> 目录树解析重构：TOC跳过 + 页码过滤 + 多级标题合并</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-14</b> 格式检查增强：标题样式质量、章节内容缺失、图表标题格式</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-13</b> 术语一致性分析：拼写检查词典扩展至15对常见学术易错词</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-12</b> 15项模块增强 + 215条自动化回归测试</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-10</b> 段落分析模块：标题拆分残留检测 + 逻辑连贯性分析</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-08</b> 优化建议模块：目录结构对比 + 空章节警告</div>
+    <div style="color:#999">2026-07-05 初版发布：DOCX解析 / 多源文献检索 / 知识图谱</div>
+  </div>
+</div>
+<script>function toggleChangelog(){var p=document.getElementById('changelogPanel');p.style.display=p.style.display==='none'?'block':'none';}</script>
 
 <!-- ====== 三栏布局 ====== -->
 <div class="main">

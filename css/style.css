@@ -43,6 +43,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 .bar{background:var(--db-bg);backdrop-filter:saturate(180%) var(--blur);-webkit-backdrop-filter:saturate(180%) var(--blur);color:var(--db-text);padding:var(--sp-2) var(--sp-5);display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);flex-shrink:0;z-index:100;min-height:48px;border-bottom:1px solid var(--db-border);user-select:none}
 .bar h1{font-size:var(--fs-lg);font-weight:var(--fw-semibold);white-space:nowrap;letter-spacing:-.02em}
 .bar .prog{font-size:var(--fs-sm);color:var(--db-muted);font-weight:var(--fw-medium);white-space:nowrap;min-width:100px;text-align:right;transition:color var(--t-base)}
+.bar-left{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.bar-left h1{font-size:1rem;font-weight:700;margin:0}
+.bar-left span{font-size:.58rem;color:var(--m);white-space:nowrap}
+.bar-actions{display:flex;gap:4px;align-items:center;flex-shrink:0}
 
 /* Module tabs */
 .module-tabs{display:flex;gap:2px;align-items:center;flex:1;justify-content:center}
@@ -55,7 +59,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 
 /* Action buttons */
 .bar-actions{display:flex;gap:var(--sp-1);align-items:center}
-.ba-btn{font-size:var(--fs-xs);font-weight:var(--fw-medium);padding:5px 14px;border-radius:var(--r-full);border:none;cursor:pointer;white-space:nowrap;transition:all var(--t-base) ease;letter-spacing:.01em;position:relative;overflow:hidden}
+.ba-btn{font-size:.62rem;font-weight:var(--fw-medium);padding:4px 10px;border-radius:var(--r-full);border:none;cursor:pointer;white-space:nowrap;transition:all var(--t-base) ease;letter-spacing:.01em;position:relative;overflow:hidden;background:rgba(0,0,0,.04);color:var(--db-text)}
 .ba-btn::after{content:'';position:absolute;inset:0;background:transparent;transition:background var(--t-base)}
 .ba-btn:hover:not(:disabled)::after{background:rgba(255,255,255,0.08)}
 .ba-btn:active:not(:disabled){transform:scale(.96)}
