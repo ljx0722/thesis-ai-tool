@@ -1027,6 +1027,157 @@ function asSkip(){
 }
 
 
+// ========== 弹窗③: 标题层级校准 ==========
+var _hcCandidates=[],_hcCallback=null,_hcFilter='all';
+// Map: auto-detected level → display name + color
+var _hcLevels=[
+  {id:0, name:'章标题', color:'#0071e3', cls:'ch'},
+  {id:1, name:'节标题', color:'#af52de', cls:'sec'},
+  {id:2, name:'小节标题', color:'#30d158', cls:'sub'},
+  {id:-1,name:'非标题', color:'#ff3b30', cls:'none'},
+];
+
+function showHeadingCalibration(candidates,callback){
+  _hcCandidates=candidates.slice();
+  _hcCallback=callback;
+  _hcFilter='all';
+  // Render
+  var ch=0,sec=0,sub=0,bare=0,none=0;
+  _hcCandidates.forEach(function(c){
+    if(c.level===0)ch++;else if(c.level===1)sec++;else if(c.level===2)sub++;else if(c.level=== -1)none++;
+    if(c.bare)bare++;
+  });
+  document.getElementById('hcCount').textContent=
+    _hcCandidates.length+' 项 (章'+ch+' 节'+sec+' 小节'+sub+(bare?' 待合并'+bare:'')+')';
+  hcRender();
+  hcUpdatePreview();
+  document.getElementById('hcOverlay').style.display='flex';
+}
+
+function hcRender(){
+  var h='',cands=_hcCandidates;
+  var shown=0;
+  for(var i=0;i<cands.length;i++){
+    var c=cands[i];
+    if(_hcFilter==='ch'&&c.level!==0)continue;
+    if(_hcFilter==='sec'&&c.level!==1)continue;
+    if(_hcFilter==='sub'&&c.level!==2)continue;
+    if(_hcFilter==='none'&&c.level!== -1)continue;
+    if(_hcFilter==='bare'&&!c.bare)continue;
+    shown++;
+    var lv=_hcLevels.find(function(l){return l.id===c.level})||_hcLevels[3];
+    var txt=(c.txt||'').substring(0,80);
+    if(c.txt&&c.txt.length>80)txt+='…';
+    var bg=c.level>=0?'rgba(0,113,227,0.03)':'rgba(255,59,48,0.03)';
+    if(c.bare)bg='rgba(255,159,10,0.05)';
+    h+='<div class="hc-row" style="display:flex;align-items:center;gap:8px;padding:4px 8px;margin:1px 0;border-radius:6px;background:'+bg+';transition:background .12s" onmouseenter="this.style.background=\''+(c.bare?'rgba(255,159,10,0.1)':c.level>=0?'rgba(0,113,227,0.07)':'rgba(255,59,48,0.07)')+'\'" onmouseleave="this.style.background=\''+bg+'\'">';
+    h+='<span style="font-size:.55rem;color:var(--m);min-width:20px;text-align:right;flex-shrink:0">'+(i+1)+'</span>';
+    // Merge button for bare entries
+    if(c.bare&&i>0){
+      h+='<button onclick="hcMergeUp('+i+')" title="合并到上一条标题" style="background:rgba(255,159,10,0.15);color:#ff9f0a;border:none;border-radius:4px;padding:1px 5px;cursor:pointer;font-size:.5rem;flex-shrink:0">↑合并</button>';
+    }
+     h+='<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.7rem;color:'+(c.level>=0?'var(--t)':'var(--m)')+'" title="'+(c.txt||'').replace(/"/g,'&quot;')+'">'+txt+'</span>';
+    // Level dropdown
+    h+='<select onchange="hcSetLevel('+i+',parseInt(this.value))" style="border:1px solid '+lv.color+';border-radius:6px;padding:2px 4px;font-size:.58rem;background:var(--solid);color:'+lv.color+';cursor:pointer;flex-shrink:0;min-width:72px;font-weight:600">';
+    for(var li=0;li<_hcLevels.length;li++){
+      var sel=_hcLevels[li].id===c.level?' selected':'';
+      h+='<option value="'+_hcLevels[li].id+'"'+sel+'>'+_hcLevels[li].name+'</option>';
+    }
+    h+='</select>';
+    // Bare tag
+    if(c.bare)h+='<span style="font-size:.5rem;color:#ff9f0a;background:rgba(255,159,10,0.1);padding:1px 4px;border-radius:4px;flex-shrink:0">待合并</span>';
+    h+='</div>';
+  }
+  if(!shown)h='<div style="text-align:center;padding:20px;color:var(--m)">无匹配项</div>';
+  document.getElementById('hcList').innerHTML=h;
+}
+
+function hcSetLevel(idx,level){
+  _hcCandidates[idx].level=level;
+  if(level>=0)_hcCandidates[idx].bare=false;
+  hcRender();
+  hcUpdatePreview();
+}
+
+function hcMergeUp(idx){
+  if(idx<=0)return;
+  var cur=_hcCandidates[idx];
+  var prev=_hcCandidates[idx-1];
+  // Merge current text into previous
+  prev.txt=prev.txt+' '+((cur.txt||'').replace(/^\d+(?:\.\d+)*\s*/,''));
+  prev.title=prev.title?prev.title+' '+cur.title:cur.title;
+  prev.bare=false;
+  // Remove current
+  _hcCandidates.splice(idx,1);
+  hcRender();
+  hcUpdatePreview();
+}
+
+function hcFilter(f){
+  _hcFilter=f;
+  // Update button styles
+  var btns=document.querySelectorAll('.hc-filter-btn');
+  for(var i=0;i<btns.length;i++)btns[i].style.opacity='0.6';
+  hcRender();
+}
+
+function hcUpdatePreview(){
+  // Build tree from current _hcCandidates
+  var tree=[],curCh=null;
+  for(var i=0;i<_hcCandidates.length;i++){
+    var c=_hcCandidates[i];
+    if(c.level<0)continue; // skip non-headings
+    if(c.level===0){
+      curCh={ch:0,name:c.txt,sections:[]};
+      tree.push(curCh);
+    }else if(curCh){
+      if(c.level===1){
+        if(!curCh.sections)curCh.sections=[];
+        curCh.sections.push({num:c.num||'',title:c.title||c.txt,subs:[]});
+      }else if(c.level===2){
+        var secs=curCh.sections;
+        if(secs&&secs.length){
+          var lastSec=secs[secs.length-1];
+          if(!lastSec.subs)lastSec.subs=[];
+          lastSec.subs.push({num:c.num||'',title:c.title||c.txt});
+        }
+      }
+    }
+  }
+  // Assign chapter numbers
+  for(var ci=0;ci<tree.length;ci++)tree[ci].ch=ci+1;
+  // Render
+  var h='';
+  for(var ci=0;ci<tree.length;ci++){
+    var ch2=tree[ci];
+    h+='<div style="font-weight:700;color:#0071e3;margin-top:6px">第'+(ci+1)+'章 '+(ch2.name||'').substring(0,30)+'</div>';
+    (ch2.sections||[]).forEach(function(sec){
+      h+='<div style="padding-left:12px;color:#af52de">├ '+sec.num+' '+((sec.title||'').substring(0,25))+'</div>';
+      (sec.subs||[]).forEach(function(sub){
+        h+='<div style="padding-left:24px;color:#30d158;font-size:.62rem">│ └ '+sub.num+' '+((sub.title||'').substring(0,25))+'</div>';
+      });
+    });
+  }
+  if(!tree.length)h='<div style="color:var(--m)">未检测到章标题<br>请在左侧将至少一项设为"章标题"</div>';
+  document.getElementById('hcPreviewTree').innerHTML=h;
+}
+
+function hcAutoAccept(){
+  // Use current auto-detected levels as-is, close modal
+  hcConfirm();
+}
+
+function hcConfirm(){
+  document.getElementById('hcOverlay').style.display='none';
+  if(_hcCallback)_hcCallback(_hcCandidates.filter(function(c){return c.level>=0;}));
+}
+
+function hcSkip(){
+  document.getElementById('hcOverlay').style.display='none';
+  if(_hcCallback)_hcCallback(null); // null = use original auto-detected
+}
+
+
 async function startSearch(){
   if(!manuscriptText){alert('请先上传论文文件');return}
   if(searchRunning)return;searchRunning=true;
@@ -1726,51 +1877,66 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
           hc.bare=false;
         }
       }
-      // 第四步：构建多级树（去重：mammoth 可能把章节标题拆成多个元素）
-      var curCh4=null,curLvl={}; // level->parent
-      for(var hi=0;hi<headingCandidates.length;hi++){
-        var hc=headingCandidates[hi];
-        if(hc.level===0){
-          var chM4=hc.txt.match(/^第([一-鿿\d]+)章/);var chNum2=chM4?cnDigit(chM4[1]):(sections.length+1);
-          // 去重：同一章号只保留标题最长、有 DOM 锚点的条目
-          var dupCh=null;
-          for(var ci=0;ci<sections.length;ci++){if(sections[ci].ch===chNum2){dupCh=sections[ci];break;}}
-          if(dupCh){
-            if(hc.txt.length>dupCh.name.length){dupCh.name=hc.txt;}
-            if(hc.el&&!dupCh.el){dupCh.el=hc.el;}
-            curCh4=dupCh;curLvl={0:curCh4};
-          }else{
-            curCh4={ch:chNum2||(sections.length+1),name:hc.txt,sections:[],el:hc.el};
-            sections.push(curCh4);curLvl={0:curCh4};
-          }
-        }else if(curCh4){
-          var parent=curLvl[hc.level-1];
-          if(!parent){parent=curCh4;sections=sections;}
-          var node={num:hc.num,title:hc.title,el:hc.el};
-          if(hc.level===1){node.subs=[];parent.sections?parent.sections.push(node):(parent.subs=parent.subs||[],parent.subs.push(node));}
-          else{node.subs=[];parent.subs?parent.subs.push(node):(parent.subs=parent.subs||[],parent.subs.push(node));}
-          curLvl[hc.level]=node;
-        }
-      }
       // 统计裸编号数量，用于标题样式质量诊断
       _totalHeadingCount=headingCandidates.length;
       _bareHeadingCount=0;
       for(var bi=0;bi<headingCandidates.length;bi++){
         if(headingCandidates[bi].bare)_bareHeadingCount++;
       }
+
+    // === 标题层级校准弹窗 ===
+    updLoad('标题校准...','37');
+    var calibratedCandidates=await new Promise(function(resolve){
+      // Also include undetected short text elements as candidates (user might want to mark them as headings)
+      // But for simplicity, just pass the auto-detected list
+      showHeadingCalibration(headingCandidates,resolve);
+    });
+
+    if(calibratedCandidates!==null){
+      // User confirmed - use their choices
+      headingCandidates=calibratedCandidates;
     }
-    // 调试日志：打印解析到的章节树结构
-    console.log('[chapters] Parsed',sections.length,'chapters:');
-    sections.forEach(function(cs){
-      console.log('  ch-'+cs.ch,cs.name,'sections:',(cs.sections||[]).length);
-      (cs.sections||[]).forEach(function(sec){
-        console.log('    sec-'+sec.num,sec.title,'subs:',(sec.subs||[]).length);
-        (sec.subs||[]).forEach(function(sub){
-          console.log('      sub-'+sub.num,sub.title);
-        });
+    // else: user skipped, use auto-detected headingCandidates
+
+    // 构建多级树（从 headingCandidates）
+    sections=[];
+    var curCh4=null,curLvl={};
+    for(var hi=0;hi<headingCandidates.length;hi++){
+      var hc=headingCandidates[hi];
+      if(hc.level===0){
+        var chM4=hc.txt.match(/^第([一-鿿\d]+)章/);var chNum2=chM4?cnDigit(chM4[1]):(sections.length+1);
+        var dupCh=null;
+        for(var ci=0;ci<sections.length;ci++){if(sections[ci].ch===chNum2){dupCh=sections[ci];break;}}
+        if(dupCh){
+          if(hc.txt.length>dupCh.name.length){dupCh.name=hc.txt;}
+          if(hc.el&&!dupCh.el){dupCh.el=hc.el;}
+          curCh4=dupCh;curLvl={0:curCh4};
+        }else{
+          curCh4={ch:chNum2||(sections.length+1),name:hc.txt,sections:[],el:hc.el};
+          sections.push(curCh4);curLvl={0:curCh4};
+        }
+      }else if(curCh4&&hc.level>0){
+        var parent=curLvl[hc.level-1];
+        if(!parent){parent=curCh4;}
+        var node={num:hc.num,title:hc.title||hc.txt,el:hc.el};
+        if(hc.level===1||!parent.sections){node.subs=[];if(!parent.sections)parent.sections=[];parent.sections.push(node);}
+        else{node.subs=[];if(!parent.subs)parent.subs=[];parent.subs.push(node);}
+        curLvl[hc.level]=node;
+      }
+    }
+  }
+  // 调试日志
+  console.log('[chapters] Parsed',sections.length,'chapters:');
+  sections.forEach(function(cs){
+    console.log('  ch-'+cs.ch,cs.name,'sections:',(cs.sections||[]).length);
+    (cs.sections||[]).forEach(function(sec){
+      console.log('    sec-'+sec.num,sec.title,'subs:',(sec.subs||[]).length);
+      (sec.subs||[]).forEach(function(sub){
+        console.log('      sub-'+sub.num,sub.title);
       });
     });
-    // 正则回退
+  });
+  // 正则回退
     if (!sections.length) {
       var chMap2 = {}, re2 = /第([一-鿿\d]+)章/g, m2;
       while ((m2 = re2.exec(manuscriptText)) !== null) {

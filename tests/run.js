@@ -1206,6 +1206,62 @@ test('FLOW: assign modal has mode selector (auto/uniform/weighted)', function() 
 });
 
 
+// ============================================================
+// SECTION 22: Heading Calibration Modal
+// ============================================================
+console.log('\n=== Section 22: Heading Calibration ===');
+
+test('HC: showHeadingCalibration function exists', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('function showHeadingCalibration') >= 0, 'Missing showHeadingCalibration');
+});
+
+test('HC: hcOverlay modal HTML exists', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(src.indexOf('id="hcOverlay"') >= 0, 'Missing hcOverlay modal');
+});
+
+test('HC: calibration has level dropdown (章/节/小节/非标题)', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('章标题') >= 0 && src.indexOf('节标题') >= 0 && src.indexOf('小节标题') >= 0, 'Missing level labels');
+});
+
+test('HC: calibration has merge button for bare entries', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('hcMergeUp') >= 0, 'Missing merge-up function');
+});
+
+test('HC: calibration has filter buttons (all/ch/sec/sub/none/bare)', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(src.indexOf('hcFilter') >= 0, 'Missing hcFilter function');
+});
+
+test('HC: calibration has live tree preview panel', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(src.indexOf('hcPreviewTree') >= 0, 'Missing preview tree');
+});
+
+test('HC: calibration has auto-accept and confirm buttons', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(src.indexOf('hcAutoAccept') >= 0 && src.indexOf('hcConfirm') >= 0, 'Missing auto-accept/confirm');
+});
+
+test('HC: calibration has skip button', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(src.indexOf('hcSkip') >= 0, 'Missing skip button');
+});
+
+test('HC: upload flow calls showHeadingCalibration', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('showHeadingCalibration(headingCandidates') >= 0, 'Upload handler must call calibration');
+});
+
+test('HC: calibration sets hc.bare=false after merge', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('hc.bare=false') >= 0, 'bare must be cleared after merge');
+});
+
+
 // Results
 // ============================================================
 console.log('\n=== RESULTS ===');
