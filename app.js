@@ -1127,8 +1127,8 @@ function showCalibrationModal(){
 
 function renderMcList(){
   var h="";
-  var colors=['#0071e3','#af52de','#30d158','#ff9f0a','#ff375f','#5ac8fa','#bf5af2'];
-  var labels=['章','节','小节','深3','深4','深5','深6','深7'];
+  var colors=['#0071e3','#af52de','#30d158'];
+  var labels=['章','节','小节'];
   for(var i=0;i<_mcCandidates.length;i++){
     var c=_mcCandidates[i],lv=c.level>=0?c.level:-1;
     var cl=colors[lv]||"#94a3b8";
@@ -1152,9 +1152,9 @@ function renderMcList(){
     if(ctx)h+='<div style="font-size:.58rem;color:#999;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📄 '+ctx+'</div>';
     h+='</div>';
     h+='<select onchange="mcSetLevel('+i+',parseInt(this.value))" onclick="event.stopPropagation()" style="border:1px solid '+cl+';border-radius:6px;padding:3px 6px;font-size:.62rem;background:#fff;color:'+cl+';cursor:pointer;flex-shrink:0;font-weight:600">';
-    for(var li=-1;li<7;li++){
+    for(var li=-1;li<3;li++){
       var sel=li===lv?' selected':'';
-      var ln=li>=0?(labels[li]||('深'+(li+1))):'非标题(排除)';
+      var ln=li>=0?labels[li]:'非标题(排除)';
       h+='<option value="'+li+'"'+sel+'>'+ln+'</option>';
     }
     h+='</select></div>';
@@ -1782,21 +1782,29 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
     updLoad('构建章节树...','35');
 
     // ====== 标题层级检测辅助函数 ======
-    // 返回 -1(非标题) / 0(章) / 1(节) / 2(小节) / 3+(更深)
+    // 返回 -1(非标题) / 0(章) / 1(节) / 2(小节)
+    // 严格策略：只有明确的标题模式才返回 >= 0
     function detectHeadingLevel(txt) {
       if (!txt || txt.length < 2) return -1;
-      // 章标题: 第X章
+      // 章标题: 第X章 / 第X章 XXX
       if (/^第[一二三四五六七八九十123456789]+章/.test(txt) || /^Chapter\s+\d/.test(txt)) return 0;
-      // 数字编号: 深度 = 点数
-      var nm = txt.match(/^(\d+(?:\.\d+)+)/);
-      if (nm) { var d = nm[1].split('.').length - 1; return d; }
-      // 单数字 + 标题（如 "1 绪论"）
-      var sm = txt.match(/^(\d+)[\s、，,.]+\S/);
-      if (sm && sm[1] === '1') return 0; // 第1个数字章可能没有"第X章"标记
-      if (sm && sm[1] !== '1') return 1;
-      // 中文序号: 一、xxx → 节; (一)xxx → 小节
-      if (/^[\(（]?[一二三四五六七八九十]+[\)）]?[\s、，,.]/.test(txt)) {
-        return txt.indexOf('(') >= 0 || txt.indexOf('（') >= 0 ? 2 : 1;
+      // 数字编号 + 标题文字（至少2个字）：1.1 研究背景 / 2.1.3 智慧工地
+      var nm = txt.match(/^(\d+(?:\.\d+)+)\s+(\S.{1,})/);
+      if (nm && nm[2] && nm[2].length >= 3) {
+        var dots = nm[1].split('.').length - 1;
+        // 最多3级：1.x→节(1), 1.x.x→小节(2), 更深→忽略
+        return dots <= 2 ? dots : -1;
+      }
+      // 纯数字 + 标题（至少3字）："1 绪论" / "2 文献综述"
+      var sm = txt.match(/^(\d+)[\s、，,.]+\s*(\S.{2,})/);
+      if (sm && sm[2] && sm[2].length >= 3) {
+        // 只保留标题长度 < 60字（正文段落不可能这么短）
+        if (sm[2].length < 60) return sm[1] === '1' ? 0 : 1;
+      }
+      // 中文序号：一、xxx → 节; (一)xxx → 小节（标题至少3字）
+      var cnm = txt.match(/^([\(（]?[一二三四五六七八九十]+[\)）]?)[\s、，,.]+\s*(\S.{2,})/);
+      if (cnm && cnm[2] && cnm[2].length >= 3 && cnm[2].length < 60) {
+        return cnm[1].indexOf('(') >= 0 || cnm[1].indexOf('（') >= 0 ? 2 : 1;
       }
       return -1;
     }
@@ -1847,20 +1855,19 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
           if (/^(摘要|Abstract)/.test(ts2)) { tocIdx = ti2; break; }
         }
       }
-      // 2b. 从 tocIdx 往后扫，找到第一个真正的正文标题（不含结尾页码）
+      // 2b. 从 tocIdx 往后扫，找到第一个真正的正文标题
       for (var bi = Math.max(0, tocIdx); bi < allEls.length; bi++) {
         var bt = (allEls[bi].textContent || '').trim();
         if (!bt || bt.length < 2) continue;
         if (refBound && (allEls[bi].compareDocumentPosition(refBound) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
-        // 检测是否是标题模式
-        var isHd = /^第[一二三四五六七八九十123456789]+章/.test(bt) ||
-                   /^Chapter\s+\d/.test(bt) ||
-                   /^(1\.|1\s+)Introduction/.test(bt) ||
-                   /^(?:1|[一二三四五六七八九十]+)[\s、，,.]/.test(bt);
-        if (!isHd) continue;
-        // 检测是否 TOC 条目（结尾有页码：tab + 数字 或 空格 + 1-3位数字）
+        // 用 detectHeadingLevel 判定，要求必须是章级别（0）或节级别（1）且编号以1开头
+        var hdLv = detectHeadingLevel(bt);
+        var isFirstCh = hdLv === 0 ||
+                        (hdLv === 1 && /^1(?:\.\d+)*\s/.test(bt)) ||
+                        (hdLv === 1 && /^一[\s、，,.]/.test(bt));
+        if (!isFirstCh) continue;
+        // TOC 条目：结尾有页码（tab/空格 + 数字）
         if (/\t\d{1,3}$/.test(bt) || /[\s\.]{2,}\d{1,3}$/.test(bt)) continue;
-        // 这是真正的正文标题！
         bodyStartIdx = bi;
         break;
       }
