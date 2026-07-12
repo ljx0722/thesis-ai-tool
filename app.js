@@ -1166,47 +1166,23 @@ function cwAutoMatch(sname){
   cwShowConfirmPopup(sname);
 }
 
-// 确认弹窗：显示勾选列表
+// 确认弹窗：显示该样式下的所有文本条目，供用户勾选
 function cwShowConfirmPopup(sname){
   var oldD=document.getElementById('cwConfirmPopup');if(oldD)oldD.parentElement.removeChild(oldD);
   var phases=['章','节','小节'],ph=_cwPhase;
   var colors=['#0071e3','#af52de','#30d158'];
-  var cached=window._docxStyleGroups||[];
 
-  // 获取该样式在正文范围内的所有文本
-  var box=document.getElementById('thesisBox');
-  var refBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
-  var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
-  var items=[],sampleTexts=[],sampleSet={};
   // 从预解析数据中提取该样式的所有文本
-  if(cached.length){
-    for(var ci=0;ci<cached.length;ci++){
-      if(cached[ci].name===sname&&cached[ci]._texts){
-        cached[ci]._texts.forEach(function(tx){if(!sampleSet[tx]){sampleSet[tx]=true;sampleTexts.push(tx);}});
+  var items=[],cached=window._docxStyleGroups||[];
+  for(var ci=0;ci<cached.length;ci++){
+    if(cached[ci].name===sname&&cached[ci]._texts){
+      var txts=cached[ci]._texts,seen2={};
+      for(var ti=0;ti<txts.length;ti++){
+        var tx=txts[ti];if(!tx||tx.length<2||seen2[tx])continue;
+        seen2[tx]=true;
+        items.push({txt:tx,checked:true,idx:items.length});
       }
-    }
-  }
-
-  // 如果预解析没有存储全文，从 DOM 扫描
-  if(!sampleTexts.length){
-    for(var j=0;j<els.length;j++){
-      if(refBound&&(els[j].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
-      var t=(els[j].textContent||'').trim();if(!t||t.length<2)continue;
-      // 从 example texts 匹配（近似）
-      if(!sampleSet[t]){sampleSet[t]=true;items.push({el:els[j],txt:t,checked:true,idx:items.length});}
-    }
-  } else {
-    // 从 DOM 找到对应的元素
-    for(var k=0;k<sampleTexts.length;k++){
-      var foundEl=null;
-      for(var l=0;l<els.length;l++){
-        if(refBound&&(els[l].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
-        var et=(els[l].textContent||'').trim();
-        if(et===sampleTexts[k]||(et.length>=10&&sampleTexts[k].length>=10&&et.substring(0,20)===sampleTexts[k].substring(0,20))){
-          foundEl=els[l];break;
-        }
-      }
-      if(foundEl)items.push({el:foundEl,txt:sampleTexts[k],checked:true,idx:items.length});
+      break;
     }
   }
 
@@ -1229,6 +1205,7 @@ function cwShowConfirmPopup(sname){
   // List
   var dl=document.createElement('div');dl.style.cssText='flex:1;overflow-y:auto;padding:6px 12px';
   window._cwConfirmItems=items;
+  window._cwConfirmStyle=sname;
   for(var i=0;i<items.length;i++){
     (function(){
       var it=items[i];
@@ -1244,40 +1221,45 @@ function cwShowConfirmPopup(sname){
   }
   popup.appendChild(dl);
   document.body.appendChild(popup);
-  window._cwConfirmStyle=sname;
 }
 
 function cwConfirmSelectAll(){if(window._cwConfirmItems){window._cwConfirmItems.forEach(function(x){x.checked=true;});cwConfirmRefreshList();}}
 function cwConfirmDeselectAll(){if(window._cwConfirmItems){window._cwConfirmItems.forEach(function(x){x.checked=!x.checked;});cwConfirmRefreshList();}}
 function cwConfirmRefreshList(){
-  var dl=document.querySelector('#cwConfirmPopup div:last-child');
-  if(!dl)return;
-  var rows=dl.querySelectorAll('div');
+  var rows=document.querySelectorAll('#cwConfirmPopup div div');if(!rows)return;
   for(var i=0;i<Math.min(rows.length,window._cwConfirmItems.length);i++){
-    rows[i].getElementsByTagName('span')[0].textContent=window._cwConfirmItems[i].checked?'☑':'☐';
+    var sp=rows[i].querySelector('span');if(sp)sp.textContent=window._cwConfirmItems[i].checked?'☑':'☐';
   }
 }
 function cwConfirmAccept(sname){
   if(_cwPhase>=3)return;
-  // 将勾选的文本对应到 DOM 元素，收集 candidates
+  // 将勾选的文本写入 _cwConfirmed，并尝试匹配 DOM 元素
   var items=window._cwConfirmItems||[];
-  var checkedEls=[];
-  for(var i=0;i<items.length;i++){if(items[i].checked&&items[i].el)checkedEls.push(items[i].el);}
-  // 写入 _cwConfirmed
   _cwConfirmed[_cwPhase]=_cwConfirmed[_cwPhase]||new Set();
   _cwConfirmed[_cwPhase].add(sname);
-  // 从其他层级移除
   [0,1,2].forEach(function(l){if(l!==_cwPhase&&_cwConfirmed[l])_cwConfirmed[l].delete(sname);});
-  // 将选中的元素标记为已确认层级（存到全局，cwFinish 时使用）
+
+  // 尝试匹配 DOM 元素
+  var box=document.getElementById('thesisBox');
+  var refBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
+  var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
   if(!window._cwCheckedEls)window._cwCheckedEls={};
   if(!window._cwCheckedEls[_cwPhase])window._cwCheckedEls[_cwPhase]=[];
-  checkedEls.forEach(function(el){
-    var dup=false;
-    for(var d=0;d<window._cwCheckedEls[_cwPhase].length;d++){if(window._cwCheckedEls[_cwPhase][d]===el){dup=true;break;}}
-    if(!dup)window._cwCheckedEls[_cwPhase].push(el);
-  });
-  // 从其他层级移除该元素
-  [0,1,2].forEach(function(l){if(l!==_cwPhase&&window._cwCheckedEls[l])window._cwCheckedEls[l]=window._cwCheckedEls[l].filter(function(e){return e!==el;});});
+  for(var k=0;k<items.length;k++){
+    if(!items[k].checked)continue;
+    var tx=items[k].txt;
+    for(var l=0;l<els.length;l++){
+      if(refBound&&(els[l].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
+      var et=(els[l].textContent||'').trim();
+      if(et===tx||(tx.length>=10&&et.length>=10&&et.substring(0,20)===tx.substring(0,20))){
+        var dup=false;
+        for(var d=0;d<window._cwCheckedEls[_cwPhase].length;d++){if(window._cwCheckedEls[_cwPhase][d]===els[l]){dup=true;break;}}
+        if(!dup)window._cwCheckedEls[_cwPhase].push(els[l]);
+        break;
+      }
+    }
+  }
+  console.log('[cal] Confirmed phase',_cwPhase,'style',sname,'kept',window._cwCheckedEls[_cwPhase].length,'elements');
   cwConfirmClose();
   renderCalibrationModal();
 }
