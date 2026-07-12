@@ -1258,7 +1258,7 @@ function cwEnsureAllParaTexts(){
 function cwFinish(){
   var ov=document.getElementById('cwOverlay');if(ov)ov.parentElement.removeChild(ov);
 
-  // 从 _cwCheckedEls 中取出每一层确认的元素，构建 candidates
+  // 构建 candidates：优先从 cwCheckedEls 取，兜底从 DOM text pattern
   _cwCandidates=[];
   if(window._cwCheckedEls){
     for(var lv=0;lv<3;lv++){
@@ -1267,7 +1267,6 @@ function cwFinish(){
         var el=list[i];
         var txt=(el.textContent||'').trim();
         if(txt&&txt.length>=2){
-          // 去重：如果同一元素被多个层级选中，保留最低层级
           var dupLv=-1;
           for(var dl=0;dl<lv;dl++){
             var dlList=window._cwCheckedEls[dl]||[];
@@ -1278,8 +1277,37 @@ function cwFinish(){
         }
       }
     }
-    console.log('[cal] Collected',_cwCandidates.length,'heading candidates from confirmed selections');
   }
+  // 兜底：如果 cwCheckedEls 为空，直接从 CW 样式确认中匹配 DOM 元素
+  if(!_cwCandidates.length){
+    console.warn('[cal] No checked elements — falling back to style-name DOM scan');
+    var box=document.getElementById('thesisBox');
+    if(box){
+      var refBound2=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
+      var els3=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+      for(var j=0;j<els3.length;j++){
+        if(refBound2&&(els3[j].compareDocumentPosition(refBound2)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
+        var et3=(els3[j].textContent||'').trim();if(!et3||et3.length<2)continue;
+        // 确定层级
+        var assignedLv=-1;
+        for(var lv=0;lv<3;lv++){
+          if(_cwConfirmed[lv]&&_cwConfirmed[lv].size>0){
+            // 检查该元素的文本是否匹配已确认样式的任意示例
+            var gs=cwGetStyleGroups();
+            for(var gi=0;gi<gs.length;gi++){
+              if(_cwConfirmed[lv].has(gs[gi].name)&&(gs[gi]._els||[]).some(function(e){return e===els3[j];})){
+                assignedLv=lv;break;
+              }
+            }
+          }
+          if(assignedLv>=0)break;
+        }
+        if(assignedLv<0)assignedLv=detectHeadingLevel(et3);
+        if(assignedLv>=0)_cwCandidates.push({el:els3[j],txt:et3,level:assignedLv,tagLevel:-1,bare:false});
+      }
+    }
+  }
+  console.log('[cal] Collected',_cwCandidates.length,'heading candidates from confirmed selections');
   // 重置状态
   _cwSelections={'0':new Set(),'1':new Set(),'2':new Set()};
   _cwConfirmed={'0':new Set(),'1':new Set(),'2':new Set()};

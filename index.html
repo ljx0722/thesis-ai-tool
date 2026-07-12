@@ -24,16 +24,16 @@ ipt>
   </div>
   <div class="module-tabs" id="moduleTabs"></div>
   <div class="bar-actions" id="barActions">
+    <button id="dashboardBtn" onclick="showDashboard()" disabled style="background:#0071e3;color:#fff;border:none;border-radius:18px;padding:6px 14px;cursor:pointer;font-weight:700;font-size:.7rem;box-shadow:0 2px 8px rgba(0,113,227,.3)">📊 论文看板</button>
     <button class="ba-btn ba-search" disabled id="baSearch" onclick="startSearch()">🔍 检索</button>
     <button class="ba-btn ba-verify" disabled id="baVerify" onclick="batchVerify()">✅ 校验</button>
     <button class="ba-btn ba-change" onclick="changeThesis()">📎 换论文</button>
-    <button class="ba-btn ba-reset" id="baReset" onclick="resetSearch()">↺ 重置</button>
-    <button id="dashboardBtn" onclick="showDashboard()" disabled style="background:#0071e3;color:#fff;border:none;border-radius:18px;padding:6px 16px;cursor:pointer;font-weight:700;font-size:.68rem;box-shadow:0 2px 8px rgba(0,113,227,.25)">📊 报告</button>
+    <button class="ba-btn ba-reset" id="baReset" onclick="resetSearch()">↺ 重…置</button>
   </div>
 </div>
 
 <!-- ====== 更新日志按钮 ====== -->
-<div id="changelogBtn" onclick="toggleChangelog()" title="更新日志" style="position:fixed;top:52px;right:12px;z-index:1000;font-size:.62rem;color:#0071e3;cursor:pointer;background:rgba(0,113,227,.08);padding:3px 10px;border-radius:12px;border:1px solid rgba(0,113,227,.2);transition:all .2s;font-weight:600" onmouseenter="this.style.background='rgba(0,113,227,.15)'" onmouseleave="this.style.background='rgba(0,113,227,.08)'">📜 更新</div>
+<div id="changelogBtn" onclick="toggleChangelog()" title="更新日志" style="position:fixed;top:52px;right:12px;z-index:1000;font-size:.62rem;color:#0071e3;cursor:pointer;background:rgba(0,113,227,.08);padding:3px 10px;border-radius:12px;border:1px solid rgba(0,113,227,.2);transition:all .2s;font-weight:600" onmouseenter="this.style.background='rgba(0,113,227,.15)'" onmouseleave="this.style.background='rgba(0,113,227,.08)'">📜 更新日志</div>
 <div id="changelogPanel" style="display:none;position:fixed;top:88px;right:12px;width:340px;max-height:70vh;overflow-y:auto;background:#fff;border-radius:12px;padding:16px;box-shadow:0 8px 40px rgba(0,0,0,.15);z-index:1001;font-size:.68rem;line-height:1.7;color:#333;border:1px solid #e5e7eb">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-size:.8rem">📜 功能更新日志</b><span onclick="document.getElementById('changelogPanel').style.display='none'" style="cursor:pointer;font-size:.7rem;color:#999">✕</span></div>
   <div style="border-left:2px solid #0071e3;padding-left:10px">
