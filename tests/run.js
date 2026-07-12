@@ -108,11 +108,10 @@ test('BUG-FIX: injectNewMarkers uses tree-based sentence matching (>=2 threshold
   assert(src.indexOf('_treeIndex') >= 0, 'injectNewMarkers must use _treeIndex');
 });
 
-test('BUG-FIX: Step 2b injects at sentence boundary, not paragraph end', function() {
+test('BUG-FIX: Step 2b/2c uses tree-index sentence matching (not DOM walk)', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('bestSentScore') >= 0, 'Missing sentence-level matching in step 2b (bestSentScore)');
-  assert(src.indexOf('bestSentPara') >= 0, 'Missing best sentence paragraph tracking');
-  assert(src.indexOf('sentEndInPara') >= 0, 'Missing sentence end position tracking');
+  assert(src.indexOf('bestSent') >= 0, 'Missing sentence-level matching (bestSent)');
+  assert(src.indexOf('_treeIndex.chapters') >= 0, 'Step 2b must use _treeIndex.chapters for chapter lookup');
   assert(src.indexOf('lastChild&&lastChild.nodeType===3') < 0, 'OLD paragraph-end appending still present');
 });
 

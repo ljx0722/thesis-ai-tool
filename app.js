@@ -1090,9 +1090,6 @@ function cwGetStyleParagraphs(sname){
 
 function cwAutoMatch(sname){
   if(_cwPhase>=3)return;
-  // 暂存选择（未确认状态），等用户点确认后才写入 _cwConfirmed
-  _cwPendingStyle=sname;
-  // 显示确认子窗口
   cwShowConfirmPopup(sname);
 }
 
@@ -1105,7 +1102,7 @@ function cwShowConfirmPopup(sname){
   // 从预解析数据中提取该样式的所有文本
   var items=[],cached=window._docxStyleGroups||[];
   for(var ci=0;ci<cached.length;ci++){
-    if(cached[ci].name===sname&&cached[ci]._texts){
+    if(cached[ci].name===sname&&cached[ci]._texts&&cached[ci]._texts.length){
       var txts=cached[ci]._texts,seen2={};
       for(var ti=0;ti<txts.length;ti++){
         var tx=txts[ti];if(!tx||tx.length<2||seen2[tx])continue;
@@ -1113,6 +1110,18 @@ function cwShowConfirmPopup(sname){
         items.push({txt:tx,checked:true,idx:items.length});
       }
       break;
+    }
+  }
+  // 兜底：如果预解析没有该样式的详细数据，从 DOM 中按文本模式匹配
+  if(!items.length){
+    var box=document.getElementById('thesisBox');if(box){
+      var refBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
+      var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+      for(var j=0;j<els.length;j++){
+        if(refBound&&(els[j].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
+        var et=(els[j].textContent||'').trim();if(!et||et.length<2)continue;
+        items.push({txt:et,checked:true,idx:items.length});
+      }
     }
   }
 
@@ -1539,70 +1548,43 @@ async function startSearch(){
   updLoad('关联句子...',94);
   await sleep(0);
 
-  // 2b. 未匹配到的文献：在最佳段落的最相关句子末尾插入标记（不替换原文，末尾插入）
+  // 2b. 未匹配到的文献：用 _treeIndex 找最佳句子注入
   try{mergedRefs.forEach(function(r){
-    if(r.source==="existing"||r._domEl||!r.ch)return;
-    var chEl=document.getElementById("ch-"+r.ch);if(!chEl||!chEl.parentElement)return;
-    var bodyBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
-    var paras=[],sib=chEl.nextSibling;
-    while(sib){if(sib.nodeType===1&&sib._slevel==="ch")break;
-      if(sib.nodeType===1&&/^p$/i.test(sib.tagName)&&sib.textContent&&sib.textContent.length>20){
-        if(bodyBound&&(sib.compareDocumentPosition(bodyBound)&Node.DOCUMENT_POSITION_FOLLOWING)){sib=sib.nextSibling;continue;}
-        paras.push(sib);
-      }
-      sib=sib.nextSibling;}
-    var rtKws=extractTitleKws(r.title||"");
-    // 在所有段落的所有句子中找最佳匹配句
-    var bestSentText=null,bestSentPara=null,bestSentScore=0,sentStartInPara=0,sentEndInPara=0;
-    paras.forEach(function(pr){
-      var pt=pr.textContent||"";
-      var re3=/[。；！？\.\?\!]/g,m3,last3=0;
-      while((m3=re3.exec(pt))!==null){
-        var st=pt.substring(last3,m3.index+1).trim();
-        if(st.length<10){last3=m3.index+1;continue;}
-        var sc=rtKws.reduce(function(s,w){return s+(st.toLowerCase().indexOf(w)>=0?1:0)},0);
-        if(sc>bestSentScore){bestSentScore=sc;bestSentText=st;bestSentPara=pr;sentStartInPara=last3;sentEndInPara=m3.index+1;}
-        last3=m3.index+1;
-      }
-      var tl2=pt.substring(last3).trim();
-      if(tl2.length>=10){var sc2=rtKws.reduce(function(s,w){return s+(tl2.toLowerCase().indexOf(w)>=0?1:0)},0);if(sc2>bestSentScore){bestSentScore=sc2;bestSentText=tl2;bestSentPara=pr;sentStartInPara=last3;sentEndInPara=pt.length;}}
-    });
-    if(!bestSentPara||bestSentScore<1)return;
-    // 在最佳匹配句末尾（标点符号之后）插入引用标记
-    var mrkSpan3=document.createElement('span');mrkSpan3.className='cite-marker generated';
-    mrkSpan3.textContent='['+r.displayNum+']';
-    mrkSpan3.onclick=function(nn){return function(e){e.stopPropagation();scrollToRef(nn);};}(r.displayNum);
-    // 用 TreeWalker 定位句末文本节点，在标点后插入
-    var tw4=document.createTreeWalker(bestSentPara,NodeFilter.SHOW_TEXT,null,false);
-    var pos4=0,tgNode=null,tgOff=0;
-    var tn4;
-    while((tn4=tw4.nextNode())!==null){var ln4=tn4.textContent.length;if(pos4+ln4>=sentEndInPara){tgNode=tn4;tgOff=sentEndInPara-pos4;break;}pos4+=ln4;}
-    if(tgNode){
-      tgNode.splitText(tgOff);
-      var afterNode=tgNode.nextSibling;
-      tgNode.parentElement.insertBefore(mrkSpan3,afterNode);
-    }else{bestSentPara.appendChild(mrkSpan3);}
-    r._domEl=mrkSpan3;
-    r._ctx=bestSentText||((bestSentPara.textContent||'').substring(0,80));
-    r._hasSection=true;
-  })}catch(es){console.warn("[auto] skip:",es.message);}
-  // 2c. 极少数仍未匹配的：追加到章节下第一个段落的句末
+    if(r.source==="existing"||r._domEl||!r.ch||!_treeIndex||!_treeIndex.sentences.length)return;
+    var rtKws=extractTitleKws(r.title||"");if(!rtKws.length)return;
+    // 找属于该章的句子
+    var chIdx=-1;for(var ci=0;ci<_treeIndex.chapters.length;ci++){if(_treeIndex.chapters[ci].ch===r.ch){chIdx=ci;break;}}
+    if(chIdx<0)return;
+    var chNode=_treeIndex.chapters[chIdx].node;
+    var bestSent=null,bestScore=0;
+    (function walk(n){if(n.paragraphs)n.paragraphs.forEach(function(p){p.sentences.forEach(function(s){
+      var sc=rtKws.reduce(function(sum,w){return sum+(s.text.toLowerCase().indexOf(w)>=0?1:0)},0);
+      if(sc>bestScore){bestScore=sc;bestSent=s;}
+    });});var kids=n.sections||n.subs||[];kids.forEach(function(k){walk(k);});})(chNode);
+    if(!bestSent||bestScore<1)return;
+    var paraEl=bestSent._paragraph.el;if(!paraEl)return;
+    var n=r.displayNum||r.num;
+    var mrk=document.createElement('span');mrk.className='cite-marker generated';mrk.textContent='['+n+']';
+    mrk.onclick=function(nn){return function(e){e.stopPropagation();scrollToRef(nn);}}(n);
+    paraEl.appendChild(mrk);
+    r._domEl=mrk;r._ctx=bestSent.text.substring(0,80);r._hasSection=true;
+    if(!bestSent.refs)bestSent.refs=[];bestSent.refs.push(n);
+  })}catch(es){console.warn("[auto2b] skip:",es.message);}
+  // 2c. 极少数仍未匹配的：追加到章树节点下第一个段落的最后
   try{mergedRefs.forEach(function(r){
-    if(r.source==="existing"||r._domEl||!r.ch)return;
-    var chEl2=document.getElementById("ch-"+r.ch);if(!chEl2)return;
-    var firstPara=chEl2.nextSibling;
-    while(firstPara&&firstPara.nodeType!==1)firstPara=firstPara.nextSibling;
-    if(!firstPara||!/^p$/i.test(firstPara.tagName||''))return;
-    // 找到段落第一句的末尾
-    var fpt=firstPara.textContent||"",mEnd=fpt.search(/[。！？\.\?\!]/),insertAt=mEnd>=0?mEnd+1:fpt.length;
-    var tw5=document.createTreeWalker(firstPara,NodeFilter.SHOW_TEXT,null,false);
-    var pos5=0,tgN2=null,tgO2=0,tn5;
-    while((tn5=tw5.nextNode())!==null){var ln5=tn5.textContent.length;if(pos5+ln5>=insertAt){tgN2=tn5;tgO2=insertAt-pos5;break;}pos5+=ln5;}
-    var mrk2=document.createElement('span');mrk2.className='cite-marker generated';
-    mrk2.textContent='['+r.displayNum+']';mrk2.onclick=function(nn){return function(e){e.stopPropagation();scrollToRef(nn);};}(r.displayNum);
-    if(tgN2){tgN2.splitText(tgO2);tgN2.parentElement.insertBefore(mrk2,tgN2.nextSibling);}else{firstPara.appendChild(mrk2);}
-    r._domEl=mrk2;r._ctx=(firstPara.textContent||'').substring(0,60);r._hasSection=true;
-  })}catch(es2){}
+    if(r.source==="existing"||r._domEl||!r.ch||!_treeIndex||!_treeIndex.chapters.length)return;
+    var chIdx2=-1;for(var ci=0;ci<_treeIndex.chapters.length;ci++){if(_treeIndex.chapters[ci].ch===r.ch){chIdx2=ci;break;}}
+    if(chIdx2<0)return;
+    var chNode2=_treeIndex.chapters[chIdx2].node;
+    var firstPara=null;
+    (function walk2(n){if(!firstPara&&n.paragraphs&&n.paragraphs.length)firstPara=n.paragraphs[0];if(!firstPara){var kids=n.sections||n.subs||[];kids.forEach(function(k){walk2(k);});}})(chNode2);
+    if(!firstPara||!firstPara.el)return;
+    var n=r.displayNum||r.num;
+    var mrk2=document.createElement('span');mrk2.className='cite-marker generated';mrk2.textContent='['+n+']';
+    mrk2.onclick=function(nn){return function(e){e.stopPropagation();scrollToRef(nn);}}(n);
+    firstPara.el.appendChild(mrk2);
+    r._domEl=mrk2;r._ctx=(firstPara.el.textContent||'').substring(0,60);r._hasSection=true;
+  })}catch(es2){console.warn("[auto2c] skip:",es2.message);}
 
   // 3.
   var refBoundary2=bodyBoundaryEl();
@@ -1997,7 +1979,11 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
   fi.addEventListener('change',async function(e){
     var f=e.target.files[0];if(!f)return;
     var ext=(f.name||'').toLowerCase().split('.').pop();
-    if(ext!=='docx'){alert('不支持 .'+ext+', 请上传 .docx 文件');return}
+    if(ext!=='docx'){
+      if(ext==='doc'){alert('旧版 .doc 格式不支持。\n\n请用 Word 打开后另存为 .docx 格式再上传。');}
+      else{alert('不支持 .'+ext+', 请上传 .docx 文件');}
+      return
+    }
 
     // 立即显示加载遮罩，不等库加载
     showLoad('准备解析...', 2, f.name);
@@ -2429,7 +2415,45 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     document.getElementById('statusBar').innerHTML='✅ '+sections.length+'章 | 已有'+existingRefs.length+'条文献';
     // 通知模块系统：论文已加载
     if(typeof onThesisLoaded==='function')onThesisLoaded();
+    // 会话持久化：备份基础数据防刷新丢失
+    try{sessionStorage.setItem('thesis_backup_text',manuscriptText.substring(0,500000));sessionStorage.setItem('thesis_backup_html',manuscriptHTML.substring(0,800000));}catch(e2){}
     }catch(err){console.error('Parse error:',err);hideLoad();if(typeof onThesisLoaded==='function')onThesisLoaded();alert('解析失败: '+err.message+'\n\n建议用Word另存为新的.docx后重试')}
+
+// 页面加载时恢复上次的论文数据（如刷新后）
+(function(){
+  try{var savedT=sessionStorage.getItem('thesis_backup_text');var savedH=sessionStorage.getItem('thesis_backup_html');
+  if(savedT&&savedH&&savedT.length>100&&(!(typeof manuscriptText!=='undefined'&&manuscriptText&&manuscriptText.length>100))){
+    console.log('[session] Restoring thesis from sessionStorage:',Math.round(savedT.length/1000)+'k chars');
+    manuscriptText=savedT;manuscriptHTML=savedH;
+    document.getElementById('thesisBox').innerHTML=manuscriptHTML;
+    try{
+      var box2=document.getElementById('thesisBox');
+      sections=[];var allEls5=box2.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+      var refBound2=null;
+      for(var ri2=0;ri2<allEls5.length;ri2++){var rt2=(allEls5[ri2].textContent||'').replace(/\s+/g,'');if(rt2.indexOf('参考文献')===0&&rt2.length<20){refBound2=allEls5[ri2];break;}}
+      var bodyStart2=Math.max(0,Math.floor(allEls5.length*0.08));
+      var allHd2=[];
+      for(var ei2=bodyStart2;ei2<allEls5.length;ei2++){
+        var el2=allEls5[ei2],txt2=(el2.textContent||'').trim();
+        if(!txt2||txt2.length<2)continue;
+        if(refBound2&&(el2.compareDocumentPosition(refBound2)&Node.DOCUMENT_POSITION_FOLLOWING))break;
+        if(/^H[1-6]$/.test((el2.tagName||'').toUpperCase())){
+          allHd2.push({el:el2,txt:txt2,level:-1,tagLevel:parseInt(el2.tagName.charAt(1)),bare:false});
+        }
+      }
+      for(var ei22=bodyStart2;ei22<allEls5.length;ei22++){
+        var ef2=allEls5[ei22],tf2=(ef2.textContent||'').trim();
+        if(!tf2||tf2.length<2||(refBound2&&(ef2.compareDocumentPosition(refBound2)&Node.DOCUMENT_POSITION_FOLLOWING)))continue;
+        var dup2=false;for(var di2=0;di2<allHd2.length;di2++){if(allHd2[di2].el===ef2){dup2=true;break;}}if(dup2)continue;
+        allHd2.push({el:ef2,txt:tf2,level:-1,tagLevel:-1,bare:false});
+      }
+      sections=buildFullTree(box2,allHd2,bodyStart2,refBound2);
+      paperTopics=extractTopics(manuscriptText);renderNavTree(sections);
+      if(typeof onThesisLoaded==='function')onThesisLoaded();
+      document.getElementById('statusBar').textContent='🔄 已恢复 '+(sections.length||0)+'章（刷新恢复）';
+    }catch(e){console.warn('[session] Auto-restore tree failed:',e.message);}
+  }}catch(e3){}
+})();
     // 结构化面板放在try外面，出错不影响正文展示
     try{structureThesisBox();}catch(e){console.warn('[struct] 跳过结构化:',e.message);}
   });
