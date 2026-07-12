@@ -1113,9 +1113,9 @@ function cwGetTagGroups(){
     groups[tag].els.push(els[i]);
     if(groups[tag].samples.length<2)groups[tag].samples.push(t.substring(0,60));
   }
-  // 去除非正文区域内的重复
   var result=[];
   ['H1','H2','H3','H4','H5','H6','P','LI','DIV'].forEach(function(t){if(groups[t]&&groups[t].count>0)result.push(groups[t]);});
+  console.log('[cw] tag groups:',result.map(function(g){return g.tag+'×'+g.count;}).join(', '),'| headingCandidates:',_cwCandidates.length,'| phase:',_cwPhase);
   return result;
 }
 
@@ -1943,6 +1943,11 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
       }
       // 2c. 兜底：找不到时从 15% 位置开始
       if (bodyStartIdx < 0) bodyStartIdx = Math.max(0, Math.floor(allEls.length * 0.15));
+      // 诊断日志
+      console.log('[detect] bodyStartIdx='+bodyStartIdx+' tocIdx='+tocIdx+' allEls.length='+allEls.length+' refBound='+!!refBound);
+      // 统计标签分布
+      var tagStats={};for(var ti=tocIdx;ti<Math.min(tocIdx+30,allEls.length);ti++){var tn=(allEls[ti].tagName||'').toUpperCase();tagStats[tn]=(tagStats[tn]||0)+1;}
+      console.log('[detect] first 30 tags after tocIdx:',JSON.stringify(tagStats));
       // ===== 第3步：纯标签标题收集 =====
       var allHeadings = [];
       for (var ei = bodyStartIdx; ei < allEls.length; ei++) {
@@ -1982,6 +1987,13 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
           if (dup3) continue;
           allHeadings.push({ el: ef2, txt: tf2, level: -1, tagLevel: -1, bare: false });
         }
+      }
+      console.log('[detect] allHeadings count='+allHeadings.length);
+      if(allHeadings.length>0){
+        var lvs={'-1':0,'0':0,'1':0,'2':0};
+        allHeadings.forEach(function(h){lvs[h.level]=(lvs[h.level]||0)+1;});
+        console.log('[detect] level breakdown:',JSON.stringify(lvs));
+        console.log('[detect] first 5 headings:',allHeadings.slice(0,5).map(function(h){return'<'+((h.el.tagName||'').toUpperCase())+'> lv='+h.level+' '+h.txt.substring(0,60);}));
       }
       // ===== 第4步：合并 split 标签标题（h1 "第2章" + 后面的 p 标题文字） =====
       for (var hi = 0; hi < allHeadings.length; hi++) {
