@@ -1309,6 +1309,11 @@ function cwFinish(){
       }
     }
   }
+  // 按 DOM 文档序排序（cwFinish 按层级分组构建会打乱文档顺序，必须重排）
+  _cwCandidates.sort(function(a,b){
+    if(!a.el||!b.el)return 0;
+    return (a.el.compareDocumentPosition(b.el)&Node.DOCUMENT_POSITION_FOLLOWING)?-1:1;
+  });
   console.log('[cal] Collected',_cwCandidates.length,'heading candidates from confirmed selections');
   // 重置状态
   _cwSelections={'0':new Set(),'1':new Set(),'2':new Set()};
