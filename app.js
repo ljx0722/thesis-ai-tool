@@ -1882,8 +1882,41 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
     // 清空跨文件缓存
     searchCache={};mergedRefs=[];
     updLoad('解析正文...','10',f.name);
-    // mammoth 转换
-    var result=await mammoth.convertToHtml({arrayBuffer:buf},{includeDefaultStyleMap:true,transformDocument:function(doc){return doc;}});
+
+    // === 预解析：读取 Word 样式定义，构建 mammoth 自定义 styleMap ===
+    var customStyleMap=[];
+    try{
+      var docxZip=await JSZip.loadAsync(buf);
+      var stylesXml=await docxZip.file('word/styles.xml').async('string');
+      if(stylesXml){
+        // 解析 styles.xml 中所有标题样式，构建自定义 styleMap
+        var re2=/<w:style[^>]*w:styleId="([^"]*)"[^>]*>[\s\S]*?<w:name[^>]*w:val="([^"]*)"[\s\S]*?<\/w:style>/g,m3;
+        while((m3=re2.exec(stylesXml))!==null){
+          var styleId=m3[1],styleName=m3[2];
+          var snLower=styleName.toLowerCase();
+          var hdLevel=0;
+          // 匹配中英文标题样式名称（涵盖标准 Heading、自定义中文样式、自定义英文样式）
+          if(/heading\s*1/i.test(snLower)||/标题\s*1/i.test(snLower)||/一级标题/i.test(snLower))hdLevel=1;
+          else if(/heading\s*2/i.test(snLower)||/标题\s*2/i.test(snLower)||/二级标题/i.test(snLower))hdLevel=2;
+          else if(/heading\s*3/i.test(snLower)||/标题\s*3/i.test(snLower)||/三级标题/i.test(snLower))hdLevel=3;
+          else if(/heading\s*4/i.test(snLower)||/标题\s*4/i.test(snLower)||/四级标题/i.test(snLower))hdLevel=4;
+          else if(/heading\s*5/i.test(snLower)||/标题\s*5/i.test(snLower)||/五级标题/i.test(snLower))hdLevel=5;
+          else if(/heading\s*6/i.test(snLower)||/标题\s*6/i.test(snLower)||/六级标题/i.test(snLower))hdLevel=6;
+          else if(styleId==='1'||styleId==='2'||styleId==='3'||styleId==='4'||styleId==='5'||styleId==='6')hdLevel=parseInt(styleId);
+          if(hdLevel>=1){
+            var hTag='h'+hdLevel;
+            // mammoth 用正则匹配段落样式名
+            var escapedName=styleName.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+            customStyleMap.push({from:new RegExp('^'+escapedName+'$','i'),to:hTag});
+          }
+        }
+        console.log('[styles] Detected',customStyleMap.length,'heading styles from docx');
+      }
+    }catch(e){console.warn('[styles] Parse failed:',e.message);}
+
+    // mammoth 转换（传入自定义 styleMap + 默认样式映射）
+    var result=await mammoth.convertToHtml({arrayBuffer:buf},
+      {includeDefaultStyleMap:true,styleMap:customStyleMap,transformDocument:function(doc){return doc;}});
     manuscriptHTML=result.value;
     // 后处理：图片响应式 + 表格样式 + 公式保留
     manuscriptHTML=manuscriptHTML
