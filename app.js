@@ -2287,6 +2287,19 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
       updLoad('标题校准...', '37');
       var calibrated = await startInlineCalibration(box, allHeadings);
       if (calibrated !== null) allHeadings = calibrated;
+      // 兜底：如果校准后仍然没有标题数据，扫描全文所有短元素作为候选
+      if (!allHeadings.length){
+        console.warn('[cal] No headings after calibration — scanning all body elements');
+        for(var si2=bodyStartIdx;si2<allEls.length;si2++){
+          var es2=allEls[si2],ts2=(es2.textContent||'').trim();
+          if(!ts2||ts2.length<2||ts2.length>200)continue;
+          if(refBound&&(es2.compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))break;
+          if(/^\d{1,3}$/.test(ts2)||/^[ivxlcdm]+$/i.test(ts2))continue;
+          if(/[\t\s]+\d{1,3}$/.test(ts2)||/\.{3,}\d{1,3}$/.test(ts2))continue;
+          var lv=detectHeadingLevel(ts2);
+          allHeadings.push({el:es2,txt:ts2,level:lv,tagLevel:-1,bare:false});
+        }
+      }
       // ===== 第5步：构建完整 5 层树 + 全局索引 =====
       sections = buildFullTree(box, allHeadings, bodyStartIdx, refBound);
       }
