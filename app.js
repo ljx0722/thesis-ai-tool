@@ -490,14 +490,27 @@ function populateChapterText(){
     }
     if(!el){cs.text=manuscriptText;return}
     // Collect text after this heading until next chapter heading
-    var t='',n=el.nextSibling,nextCh=si+1<bodyChs.length?('ch-'+bodyChs[si+1].ch):null;
+    // Skip: empty nodes, page numbers, single digits, pure dates, TOC-like entries
+    var t='',n=el.nextSibling,nextCh=si+1<bodyChs.length?('ch-'+bodyChs[si+1].ch):null,skipped=0;
     while(n){
       var nextId=n.id||'';
       if(nextCh&&nextId===nextCh)break;
-      if(n.nodeType===3)t+=n.textContent+' ';
-      else if(n.nodeType===1&&!n.id)t+=(n.textContent||'')+' ';
+      // stop at next chapter or section anchor
+      if(nextId.indexOf('ch-')===0||nextId.indexOf('sec-')===0||nextId.indexOf('sub-')===0)break;
+      var nodeTxt=(n.textContent||'').trim();
+      if(nodeTxt){
+        // Skip page numbers (1-3 pure digits or Roman numerals)
+        if(/^[ivxlcdmIVXLCDM]+$/.test(nodeTxt)||/^\d{1,3}$/.test(nodeTxt)){n=n.nextSibling;skipped++;continue}
+        // Skip TOC-like entries: short lines starting with numbers followed by dots/spaces
+        if(/^\d+(\.\d+)*[\s\.]+[一-鿿]/.test(nodeTxt)&&nodeTxt.length<80){n=n.nextSibling;skipped++;continue}
+        // Skip bare page number suffixes like "- 42 -"
+        if(/^[-—–]\s*\d+\s*[-—–]$/.test(nodeTxt)){n=n.nextSibling;skipped++;continue}
+        if(n.nodeType===3)t+=n.textContent+' ';
+        else if(n.nodeType===1&&!nextId)t+=(nodeTxt+' ');
+      }
       n=n.nextSibling
     }
+    if(skipped>0)console.log('[populate] Skipped',skipped,'page-num/TOC nodes for ch',cs.ch);
     cs.text=t.trim()
   });
   // If all chapters got same/fallback text, split by chapter pattern
@@ -1657,6 +1670,8 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
         var isBareNumber=!numMatch&&!isChapterText&&/^(\d+(?:\.\d+)+)\s*$/.test(txt2);
         var isNumberedHeading=numMatch!==null;
         if(isChapterText||isNumberedHeading||isBareNumber){
+          // Skip TOC entries: lines with long dot leaders ending in page numbers
+          if(/\.{3,}\s*\d+$|[\s\.]{5,}\d+$/.test(txt2))continue;
           var level=0,num='',title='';
           if(isChapterText){level=0;num=txt2;title=txt2;}
           else if(isBareNumber){var bnm=txt2.match(/^(\d+(?:\.\d+)+)\s*$/);level=bnm[1].split('.').length-1;num=txt2.trim();title='';}
