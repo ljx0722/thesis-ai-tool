@@ -1811,8 +1811,8 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
         if(refBound&&el2===refBound)break;
         if(refBound&&(el2.compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))break;
         // 多种第一章标记：第X章 / Chapter / 数字编号章 / 中文序号章
-        var isFirstCh=/^第[一二三四五六七八九十\d]+章/.test(txt2)||/^Chapter\s+\d/.test(txt2)||/^(1\.|1\s+)Introduction/.test(txt2)||/^1[\s、,.]/.test(txt2)||/^一[\s、,.]/.test(txt2);
-        if(isFirstCh||bodyStarted===false&&ai>Math.max(10,Math.floor(allEls3.length*0.3)))bodyStarted=true;
+        var isFirstCh=/^第[一二三四五六七八九十123456789]+章/.test(txt2)||/^Chapter\s+\d/.test(txt2)||/^(1\.|1\s+)Introduction/.test(txt2)||/^1[\s、,.]/.test(txt2)||/^一[\s、,.]/.test(txt2);
+        if(isFirstCh||bodyStarted===false&&ai>Math.max(8,Math.floor(allEls3.length*0.15)))bodyStarted=true;
         if(!bodyStarted)continue;
         // 判断标题级别（支持多种中文论文常见格式）
         // 格式1: "1.1 研究背景" / "1.1研究背景" / "1.1、研究背景"
@@ -1922,12 +1922,12 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
         // 多种第一章标记，或过了前30%位置直接开始收集
         var isChLike=/^第[一二三四五六七八九十\d]+章/.test(ft)||/^Chapter\s+\d/.test(ft)||/^(1\.|1\s+)Introduction/.test(ft)||/^1[\s、,.]/.test(ft)||/^一[\s、,.]/.test(ft);
         if(isChLike)fbPast=true;
-        if(!fbPast&&fbi>Math.max(10,Math.floor(fbEls.length*0.3)))fbPast=true;
+        if(!fbPast&&fbi>Math.max(8,Math.floor(fbEls.length*0.15)))fbPast=true;
         if(!fbPast)continue;
         // 自动猜级
         var guessLv=-1;
         if(ft.length<80){
-          if(/^第[一二三四五六七八九十\d]+章/.test(ft))guessLv=0;
+          if(/^第[一二三四五六七八九十123456789]+章/.test(ft))guessLv=0;
           else if(/^\d+(?:\.\d+){1,2}[\s、，,.]/.test(ft))guessLv=ft.match(/^\d+(?:\.\d+){1}/)?1:(ft.match(/^\d+(?:\.\d+){2}/)?2:-1);
           else if(/^[\(（]?[一二三四五六七八九十]+[\)）]?[\s、]/.test(ft))guessLv=1;
         }
