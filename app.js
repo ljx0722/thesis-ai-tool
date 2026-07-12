@@ -1095,18 +1095,19 @@ function asSkip(){
 // ========== 弹窗③: 标题层级校准（分步向导） ==========
 var _cwCandidates=[],_cwCallback=null,_cwPhase=0;
 
-function startInlineCalibration(box,autoDetected){_cwCandidates=autoDetected;_cwPhase=0;return new Promise(function(resolve){_cwCallback=resolve;showCalibrationWizard();});}
+function startInlineCalibration(box,autoDetected){_cwCandidates=autoDetected;_cwPhase=0;window._cwAllParaTexts=null;return new Promise(function(resolve){_cwCallback=resolve;showCalibrationWizard();});}
 function showCalibrationWizard(){_cwPhase=0;renderCalibrationModal();hideLoad();}
 
 
-// ========== 弹窗③: 标题层级校准（样式名驱动，不预判） ==========
+// ========== 弹窗③: 标题层级校准（样式名驱动 + 确认子窗口） ==========
+// 全局状态
+var _cwSelections={'0':new Set(),'1':new Set(),'2':new Set()},_cwConfirmed={'0':new Set(),'1':new Set(),'2':new Set()},_cwPhase=0,_cwCandidates=[],_cwCallback=null;
 
-// 从 mammoth 输出的 HTML 中提取所有 Word 样式名及其出现次数
+// 从预解析的 docx 数据中取出样式组
 function cwGetStyleGroups(){
-  // 直接用预解析的 docx 样式数据，不走 DOM 猜测
   var cached=window._docxStyleGroups||[];
   if(cached.length)return cached;
-  // 兜底：从 HTML class 提取（仅当预解析失败时）
+  // 兜底：从 HTML class 提取
   var box=document.getElementById('thesisBox');if(!box)return[];
   var refBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
   var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6'),groups={};
@@ -1124,82 +1125,217 @@ function cwGetStyleGroups(){
   return Object.values(groups).sort(function(a,b){return b.count-a.count;});
 }
 
-function startInlineCalibration(box,autoDetected){
-  _cwCandidates=autoDetected;_cwPhase=0;
-  // 从 HTML 提取样式组信息，存到全局供渲染
-  return new Promise(function(resolve){_cwCallback=resolve;showCalibrationWizard();});
-}
-function showCalibrationWizard(){_cwPhase=0;renderCalibrationModal();hideLoad();}
-
+// 获取某个层级已确认的段落数量（修复：使用正确的 p 参数）
 function cwGetPhaseCount(p){
-  // 已分配该级别数量
   var gs=cwGetStyleGroups(),cnt=0;
-  if(!_cwSelections[_cwPhase])return 0;
-  gs.forEach(function(g){if(_cwSelections[_cwPhase].has(g.name))cnt+=g.count;});
+  var sel=_cwConfirmed[p]||new Set();
+  gs.forEach(function(g){if(sel.has(g.name))cnt+=g.count;});
   return cnt;
 }
 
-// 全局：用户的选择 {0: Set('heading 1','标题_TJ'), 1: Set('heading 2'), 2: Set('heading 3')}
-var _cwSelections={'0':new Set(),'1':new Set(),'2':new Set()},_cwPhase=0;
+// 获取某个样式中属于正文范围的所有段落文本列表
+function cwGetStyleParagraphs(sname){
+  var box=document.getElementById('thesisBox');
+  if(!box)return[];
+  // 尝试从预解析数据中取出该样式的所有文本
+  var cached=window._docxStyleGroups||[];
+  var result=[];
+  if(cached.length){
+    var g2=null;
+    for(var i=0;i<cached.length;i++){if(cached[i].name===sname&&cached[i]._texts){g2=cached[i];break;}}
+    if(g2&&g2._texts)return g2._texts;
+  }
+  // 兜底：从 DOM 匹配
+  var refBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
+  var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+  for(var j=0;j<els.length;j++){
+    if(refBound&&(els[j].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
+    var t=(els[j].textContent||'').trim();if(!t||t.length<2)continue;
+    result.push({el:els[j],txt:t});
+  }
+  return result;
+}
 
 function cwAutoMatch(sname){
   if(_cwPhase>=3)return;
-  if(_cwSelections[_cwPhase].has(sname))_cwSelections[_cwPhase].delete(sname);
-  else _cwSelections[_cwPhase].add(sname);
-  // 从其他层级中移除
-  [0,1,2].forEach(function(l){if(l!==_cwPhase)_cwSelections[l].delete(sname);});
+  // 暂存选择（未确认状态），等用户点确认后才写入 _cwConfirmed
+  _cwPendingStyle=sname;
+  // 显示确认子窗口
+  cwShowConfirmPopup(sname);
+}
+
+// 确认弹窗：显示勾选列表
+function cwShowConfirmPopup(sname){
+  var oldD=document.getElementById('cwConfirmPopup');if(oldD)oldD.parentElement.removeChild(oldD);
+  var phases=['章','节','小节'],ph=_cwPhase;
+  var colors=['#0071e3','#af52de','#30d158'];
+  var cached=window._docxStyleGroups||[];
+
+  // 获取该样式在正文范围内的所有文本
+  var box=document.getElementById('thesisBox');
+  var refBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
+  var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+  var items=[],sampleTexts=[],sampleSet={};
+  // 从预解析数据中提取该样式的所有文本
+  if(cached.length){
+    for(var ci=0;ci<cached.length;ci++){
+      if(cached[ci].name===sname&&cached[ci]._texts){
+        cached[ci]._texts.forEach(function(tx){if(!sampleSet[tx]){sampleSet[tx]=true;sampleTexts.push(tx);}});
+      }
+    }
+  }
+
+  // 如果预解析没有存储全文，从 DOM 扫描
+  if(!sampleTexts.length){
+    for(var j=0;j<els.length;j++){
+      if(refBound&&(els[j].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
+      var t=(els[j].textContent||'').trim();if(!t||t.length<2)continue;
+      // 从 example texts 匹配（近似）
+      if(!sampleSet[t]){sampleSet[t]=true;items.push({el:els[j],txt:t,checked:true,idx:items.length});}
+    }
+  } else {
+    // 从 DOM 找到对应的元素
+    for(var k=0;k<sampleTexts.length;k++){
+      var foundEl=null;
+      for(var l=0;l<els.length;l++){
+        if(refBound&&(els[l].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
+        var et=(els[l].textContent||'').trim();
+        if(et===sampleTexts[k]||(et.length>=10&&sampleTexts[k].length>=10&&et.substring(0,20)===sampleTexts[k].substring(0,20))){
+          foundEl=els[l];break;
+        }
+      }
+      if(foundEl)items.push({el:foundEl,txt:sampleTexts[k],checked:true,idx:items.length});
+    }
+  }
+
+  // 构建弹窗
+  var popup=document.createElement('div');popup.id='cwConfirmPopup';
+  popup.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:14px;padding:0;width:85%;height:80%;max-width:950px;display:flex;flex-direction:column;box-shadow:0 25px 80px rgba(0,0,0,.35);z-index:100000;overflow:hidden';
+  popup.onclick=function(e){e.stopPropagation();};
+
+  // Header
+  var dh=document.createElement('div');dh.style.cssText='padding:12px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between';
+  dh.innerHTML='<div><b style="font-size:.9rem;color:'+colors[ph]+'">确认 '+phases[ph]+'标题 — '+sname+'</b> <span style="font-size:.7rem;color:#999">('+items.length+' 条)</span></div>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button onclick="cwConfirmSelectAll()" style="background:rgba(0,0,0,.06);color:#333;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:.65rem">全选</button>'+
+    '<button onclick="cwConfirmDeselectAll()" style="background:rgba(0,0,0,.06);color:#333;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:.65rem">反选</button>'+
+    '<button onclick="cwConfirmAccept(\''+sname.replace(/'/g,'\\\x27')+'\')" style="background:'+colors[ph]+';color:#fff;border:none;border-radius:8px;padding:6px 16px;cursor:pointer;font-weight:600;font-size:.68rem">✅ 确认</button>'+
+    '<button onclick="cwConfirmClose()" style="background:rgba(0,0,0,.06);color:#333;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:.68rem">✕ 取消</button>'+
+    '</div>';
+  popup.appendChild(dh);
+
+  // List
+  var dl=document.createElement('div');dl.style.cssText='flex:1;overflow-y:auto;padding:6px 12px';
+  window._cwConfirmItems=items;
+  for(var i=0;i<items.length;i++){
+    (function(){
+      var it=items[i];
+      var row2=document.createElement('div');
+      row2.style.cssText='cursor:pointer;display:flex;align-items:flex-start;gap:8px;padding:5px 8px;margin:1px 0;border-radius:6px;font-size:.72rem;color:#1d1d1f;transition:background .1s';
+      row2.onmouseenter=function(){row2.style.background='rgba(0,0,0,.02)';};
+      row2.onmouseleave=function(){row2.style.background='';};
+      row2.onclick=function(){it.checked=!it.checked;row2.getElementsByTagName('span')[0].textContent=it.checked?'☑':'☐';};
+      var cb=document.createElement('span');cb.style.cssText='font-size:.7rem;min-width:18px;flex-shrink:0';cb.textContent=it.checked?'☑':'☐';row2.appendChild(cb);
+      var txtSpan=document.createElement('span');txtSpan.textContent=it.txt;row2.appendChild(txtSpan);
+      dl.appendChild(row2);
+    })();
+  }
+  popup.appendChild(dl);
+  document.body.appendChild(popup);
+  window._cwConfirmStyle=sname;
+}
+
+function cwConfirmSelectAll(){if(window._cwConfirmItems){window._cwConfirmItems.forEach(function(x){x.checked=true;});cwConfirmRefreshList();}}
+function cwConfirmDeselectAll(){if(window._cwConfirmItems){window._cwConfirmItems.forEach(function(x){x.checked=!x.checked;});cwConfirmRefreshList();}}
+function cwConfirmRefreshList(){
+  var dl=document.querySelector('#cwConfirmPopup div:last-child');
+  if(!dl)return;
+  var rows=dl.querySelectorAll('div');
+  for(var i=0;i<Math.min(rows.length,window._cwConfirmItems.length);i++){
+    rows[i].getElementsByTagName('span')[0].textContent=window._cwConfirmItems[i].checked?'☑':'☐';
+  }
+}
+function cwConfirmAccept(sname){
+  if(_cwPhase>=3)return;
+  // 将勾选的文本对应到 DOM 元素，收集 candidates
+  var items=window._cwConfirmItems||[];
+  var checkedEls=[];
+  for(var i=0;i<items.length;i++){if(items[i].checked&&items[i].el)checkedEls.push(items[i].el);}
+  // 写入 _cwConfirmed
+  _cwConfirmed[_cwPhase]=_cwConfirmed[_cwPhase]||new Set();
+  _cwConfirmed[_cwPhase].add(sname);
+  // 从其他层级移除
+  [0,1,2].forEach(function(l){if(l!==_cwPhase&&_cwConfirmed[l])_cwConfirmed[l].delete(sname);});
+  // 将选中的元素标记为已确认层级（存到全局，cwFinish 时使用）
+  if(!window._cwCheckedEls)window._cwCheckedEls={};
+  if(!window._cwCheckedEls[_cwPhase])window._cwCheckedEls[_cwPhase]=[];
+  checkedEls.forEach(function(el){
+    var dup=false;
+    for(var d=0;d<window._cwCheckedEls[_cwPhase].length;d++){if(window._cwCheckedEls[_cwPhase][d]===el){dup=true;break;}}
+    if(!dup)window._cwCheckedEls[_cwPhase].push(el);
+  });
+  // 从其他层级移除该元素
+  [0,1,2].forEach(function(l){if(l!==_cwPhase&&window._cwCheckedEls[l])window._cwCheckedEls[l]=window._cwCheckedEls[l].filter(function(e){return e!==el;});});
+  cwConfirmClose();
   renderCalibrationModal();
+}
+function cwConfirmClose(){
+  var d=document.getElementById('cwConfirmPopup');if(d)d.parentElement.removeChild(d);
+  window._cwConfirmItems=null;window._cwConfirmStyle=null;
 }
 
 function cwNextPhase(){if(_cwPhase<2){_cwPhase++;renderCalibrationModal();}else{cwFinish();}}
 function cwPrevPhase(){if(_cwPhase>0){_cwPhase--;renderCalibrationModal();}}
 
+// 从预解析 docx 数据中收集所有正文范围的段落内容
+function cwEnsureAllParaTexts(){
+  if(window._cwAllParaTexts)return;
+  window._cwAllParaTexts=[];
+  var box=document.getElementById('thesisBox');if(!box)return;
+  var refBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
+  var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+  for(var i=0;i<els.length;i++){
+    if(refBound&&(els[i].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
+    var t=(els[i].textContent||'').trim();if(!t||t.length<2)continue;
+    if(/^\d{1,3}$/.test(t)||/^[ivxlcdm]+$/i.test(t))continue;
+    window._cwAllParaTexts.push({el:els[i],txt:t});
+  }
+}
+
 function cwFinish(){
   var ov=document.getElementById('cwOverlay');if(ov)ov.parentElement.removeChild(ov);
 
-  // 用预解析 docx 数据：重建 allHeadings
+  // 从 _cwCheckedEls 中取出每一层确认的元素，构建 candidates
   _cwCandidates=[];
-  var box=document.getElementById('thesisBox');
-  if(box&&window._docxStyleGroups&&window._docxStyleGroups.length){
-    var refBound2=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
-    var els2=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
-    // 为每个样式名建立文本示例集合（用于快速匹配）
-    var styleSamples={},styleLv={};
-    window._docxStyleGroups.forEach(function(g){
-      styleSamples[g.name]=g.samples||[];
-      for(var lv=0;lv<3;lv++){if(_cwSelections[lv]&&_cwSelections[lv].has(g.name))styleLv[g.name]=lv;}
-    });
-
-    for(var j=0;j<els2.length;j++){
-      if(refBound2&&(els2[j].compareDocumentPosition(refBound2)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
-      var et=(els2[j].textContent||'').trim();
-      if(!et||et.length<2)continue;
-      // 尝试匹配：遍历所有样式，检查当前元素的文本是否在样式示例里
-      var matchedStyle=null;
-      for(var sn2 in styleSamples){
-        if(styleLv[sn2]===undefined)continue;
-        var samples=styleSamples[sn2];
-        var found=false;
-        for(var si=0;si<samples.length;si++){
-          if(et===samples[si]||(et.length>=10&&samples[si].length>=10&&et.substring(0,20)===samples[si].substring(0,20))){
-            found=true;break;
+  if(window._cwCheckedEls){
+    for(var lv=0;lv<3;lv++){
+      var list=window._cwCheckedEls[lv]||[];
+      for(var i=0;i<list.length;i++){
+        var el=list[i];
+        var txt=(el.textContent||'').trim();
+        if(txt&&txt.length>=2){
+          // 去重：如果同一元素被多个层级选中，保留最低层级
+          var dupLv=-1;
+          for(var dl=0;dl<lv;dl++){
+            var dlList=window._cwCheckedEls[dl]||[];
+            for(var di=0;di<dlList.length;di++){if(dlList[di]===el){dupLv=dl;break;}}
+            if(dupLv>=0)break;
           }
+          if(dupLv<0)_cwCandidates.push({el:el,txt:txt,level:lv,tagLevel:-1,bare:false});
         }
-        if(found){matchedStyle=sn2;break;}
-      }
-      if(matchedStyle!==null){
-        var lv=styleLv[matchedStyle];
-        _cwCandidates.push({el:els2[j],txt:et,level:lv,tagLevel:-1,bare:false});
       }
     }
-    console.log('[cal] Matched',_cwCandidates.length,'headings from pre-parsed styles');
+    console.log('[cal] Collected',_cwCandidates.length,'heading candidates from confirmed selections');
   }
-
+  // 重置状态
   _cwSelections={'0':new Set(),'1':new Set(),'2':new Set()};
+  _cwConfirmed={'0':new Set(),'1':new Set(),'2':new Set()};
+  window._cwCheckedEls=null;
+  window._cwAllParaTexts=null;
   if(_cwCallback)_cwCallback(_cwCandidates);
 }
 
-function mcClose(){var ov=document.getElementById('cwOverlay');if(ov)ov.parentElement.removeChild(ov);_cwSelections={'0':new Set(),'1':new Set(),'2':new Set()};if(_cwCallback)_cwCallback(null);}
+function mcClose(){var ov=document.getElementById('cwOverlay');if(ov)ov.parentElement.removeChild(ov);_cwSelections={'0':new Set(),'1':new Set(),'2':new Set()};_cwConfirmed={'0':new Set(),'1':new Set(),'2':new Set()};window._cwCheckedEls=null;if(_cwCallback)_cwCallback(null);}
 function mcAcceptAll(){cwFinish();}
 function showCalibrationModal(){showCalibrationWizard();}
 
@@ -1218,15 +1354,15 @@ function renderCalibrationModal(){
   card.style.cssText='background:#fff;border-radius:18px;padding:0;width:95%;height:88%;max-width:1100px;display:flex;flex-direction:column;box-shadow:0 25px 80px rgba(0,0,0,.3);overflow:hidden';
   ov.appendChild(card);
 
-  // Header
+  // Header — counter for EACH phase independently
   var hdr=document.createElement('div');hdr.style.cssText='padding:14px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between';card.appendChild(hdr);
   var hdrL=document.createElement('div');hdrL.style.cssText='display:flex;align-items:center;gap:8px';hdr.appendChild(hdrL);
   hdrL.appendChild(Object.assign(document.createElement('b'),{style:'font-size:1rem',textContent:'📐 标题校准'}));
-  for(var pi=0;pi<3;pi++){
-    var cnt=cwGetPhaseCount(pi);
-    var b=document.createElement('span');b.style.cssText='font-size:.68rem;font-weight:'+(pi===ph?'700':'400')+';color:'+(pi===ph?colors[pi]:'#999')+';background:'+(pi===ph?colors[pi]+'15':'transparent')+';padding:4px 10px;border-radius:8px';
-    b.textContent=phases[pi]+'×'+cnt;hdrL.appendChild(b);
-    if(pi<2){var ar=document.createElement('span');ar.style.cssText='color:#ccc';ar.textContent='→';hdrL.appendChild(ar);}
+  for(var pi2=0;pi2<3;pi2++){
+    var cnt=cwGetPhaseCount(pi2);
+    var b=document.createElement('span');b.style.cssText='font-size:.68rem;font-weight:'+(pi2===ph?'700':'400')+';color:'+(pi2===ph?colors[pi2]:'#999')+';background:'+(pi2===ph?colors[pi2]+'15':'transparent')+';padding:4px 10px;border-radius:8px';
+    b.textContent=phases[pi2]+'×'+cnt;hdrL.appendChild(b);
+    if(pi2<2){var ar=document.createElement('span');ar.style.cssText='color:#ccc';ar.textContent='→';hdrL.appendChild(ar);}
   }
   var hdrR=document.createElement('div');hdrR.style.cssText='display:flex;gap:8px';hdr.appendChild(hdrR);
   if(ph>0){var pb=document.createElement('button');pb.style.cssText='background:rgba(0,0,0,.06);color:#333;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-weight:500;font-size:.72rem';pb.textContent='← 上一步';pb.onclick=cwPrevPhase;hdrR.appendChild(pb);}
@@ -1235,7 +1371,7 @@ function renderCalibrationModal(){
 
   // Instruction
   var instr=document.createElement('div');instr.style.cssText='padding:10px 20px;border-bottom:1px solid #f0f0f0;font-size:.72rem;color:#666';
-  instr.innerHTML='<b style="color:'+colors[ph]+'">'+phaseNames[ph]+'</b>';
+  instr.innerHTML='<b style="color:'+colors[ph]+'">'+phaseNames[ph]+'</b> <span style="font-size:.62rem">点击样式名 → 弹窗勾选确认</span>';
   card.appendChild(instr);
 
   // List
@@ -1248,13 +1384,13 @@ function renderCalibrationModal(){
     var shown=0;
     for(var i=0;i<groups.length;i++){
       var g=groups[i];
-      // 跳过已被选为其他层级的样式
+      // 已被其他层级确认的样式跳过
       var assignedOther=false;
-      [0,1,2].forEach(function(l){if(l!==ph&&_cwSelections[l].has(g.name))assignedOther=true;});
+      [0,1,2].forEach(function(l){if(l!==ph&&_cwConfirmed[l]&&_cwConfirmed[l].has(g.name))assignedOther=true;});
       if(assignedOther)continue;
-      var isCurrent=_cwSelections[ph].has(g.name);
+      var isConfirmed=_cwConfirmed[ph]?!!_cwConfirmed[ph].has(g.name):false;
       var isTOC=/toc|目录|目次/i.test(g.name);
-      if(isTOC&&g.count<20)continue; // 隐藏少量TOC样式行
+      if(isTOC&&g.count<20)continue;
       shown++;
       (function(sname,count,samples,active,toc){
         var rowCl=active?colors[ph]:'#ccc';
@@ -1277,20 +1413,18 @@ function renderCalibrationModal(){
 
         var bgHex=rowCl==='#ccc'?'rgba(0,0,0,0.05)':(rowCl+'10');
         var cntEl=document.createElement('span');cntEl.style.cssText='font-size:.68rem;color:'+rowCl+';background:'+bgHex+';padding:4px 12px;border-radius:10px;font-weight:700;flex-shrink:0';cntEl.textContent='×'+count;row.appendChild(cntEl);
-        if(active){var chk=document.createElement('span');chk.style.cssText='font-size:.52rem;color:#30d158;background:rgba(48,209,88,.1);padding:3px 8px;border-radius:6px;flex-shrink:0;font-weight:600';chk.textContent='已选';row.appendChild(chk);}
+        if(active){var chk=document.createElement('span');chk.style.cssText='font-size:.52rem;color:#30d158;background:rgba(48,209,88,.1);padding:3px 8px;border-radius:6px;flex-shrink:0;font-weight:600';chk.textContent='已确认';row.appendChild(chk);}
         list.appendChild(row);
-      })(g.name,g.count,g.samples,isCurrent,/toc|目录|目次/i.test(g.name));
+      })(g.name,g.count,g.samples,isConfirmed,/toc|目录|目次/i.test(g.name));
     }
   }
   document.body.appendChild(ov);
 }
 
-// Old compat stubs — calibration uses cwGetStyleGroups directly
+// Compat stubs
 function cwGetItemsForPhase(){return[];}
 function cwGetUnassigned(){return[];}
 
-
-// ========== 弹窗④: 检索结果确认 ==========
 
 // ========== 弹窗④: 检索结果确认 ==========
 async function startSearch(){
@@ -1907,9 +2041,10 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
           var txt=tx.join('').trim();
           if(!txt||txt.length<2)continue;
           if(/^\d{1,3}$/.test(txt)||/^[ivxlcdm]+$/i.test(txt))continue;
-          if(!sg[sname])sg[sname]={name:sname,count:0,samples:[]};
+          if(!sg[sname])sg[sname]={name:sname,count:0,samples:[],_texts:[]};
           sg[sname].count++;
           if(sg[sname].samples.length<2)sg[sname].samples.push(txt.substring(0,80));
+          sg[sname]._texts.push(txt); // 存储全文供确认弹窗展示
         }
         window._docxStyleGroups=Object.values(sg).sort(function(a,b){return b.count-a.count;});
         console.log('[docx] Pre-parsed',window._docxStyleGroups.length,'style groups');
