@@ -1417,6 +1417,41 @@ test('INTEGRITY: All modules accept container parameter', function() {
 });
 
 
+test('INTEGRITY: updateSrPanel dead reference removed from app.js', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('updateSrPanel') < 0, 'Dead updateSrPanel calls must be removed');
+});
+
+test('INTEGRITY: structureThesisBox guards against double arrow insertion', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("querySelector('.toggle-arrow')") >= 0, 'structureThesisBox must check for existing arrows');
+});
+
+test('INTEGRITY: onboarding.js covers new calibration/interactive features', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/onboarding.js'), 'utf8');
+  assert(src.indexOf('标题层级校准') >= 0, 'Onboarding must cover heading calibration');
+  assert(src.indexOf('交互式文献检索') >= 0, 'Onboarding must cover interactive search');
+  assert(src.indexOf('标题样式质量') >= 0, 'Onboarding must mention heading style QA');
+});
+
+test('INTEGRITY: onboarding.js has 11+ tour steps', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/onboarding.js'), 'utf8');
+  var steps = (src.match(/title:/g) || []).length;
+  assert(steps >= 11, 'Onboarding should have 11+ steps, found ' + steps);
+});
+
+test('INTEGRITY: fillNodeText is the primary text assignment (not populateChapterText)', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('function fillNodeText') >= 0, 'fillNodeText must exist');
+  var fnIdx = src.indexOf('function fillNodeText');
+  var nextFn = src.indexOf('\nfunction ', fnIdx + 20);
+  if (nextFn < 0) nextFn = src.length;
+  var body = src.substring(fnIdx, nextFn);
+  assert(body.indexOf('node.text') >= 0, 'fillNodeText must assign node.text');
+  assert(body.indexOf('nextIdx') >= 0, 'fillNodeText must use boundary-based containment');
+});
+
+
 // Results
 // ============================================================
 console.log('\n=== RESULTS ===');

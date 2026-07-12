@@ -542,7 +542,10 @@ function extractTitleKws(title){
 
 async function assignChapters(refs,mode,total){
   if(!refs.length||!sections.length)return;
-  if(!sections[0].text||sections[0].text===manuscriptText)populateChapterText();
+  // Use fillNodeText-based text (set during upload), populateChapterText only as fallback
+  if(!sections[0].text||sections[0].text===manuscriptText){
+    if(typeof populateChapterText==='function')populateChapterText();
+  }
   // Only use body chapters (excluding 参考文献/附录/致谢/获奖等)
   var bodyChs=sections.filter(function(s){return !/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name)});
   var n2=bodyChs.length,lastCh=bodyChs[n2-1].ch;
@@ -1287,7 +1290,7 @@ async function startSearch(){
   var completed=0,total=allTerms3.length;
   function searchOneWord(word){
     return fetch('/search_api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:[word],max_per_query:100})})
-      .then(function(r){return r.json()}).then(function(rj){if(rj.success&&rj.results){rj.results.forEach(function(rr){var nk=norm(rr.title).substring(0,60);if(!seen.has(nk)){seen.add(nk);pool.push(rr);}})}completed++;updLoad('搜索中('+completed+'/'+total+')...',15+Math.round(completed/total*15));updateSrPanel();})
+      .then(function(r){return r.json()}).then(function(rj){if(rj.success&&rj.results){rj.results.forEach(function(rr){var nk=norm(rr.title).substring(0,60);if(!seen.has(nk)){seen.add(nk);pool.push(rr);}})}completed++;updLoad('搜索中('+completed+'/'+total+')...',15+Math.round(completed/total*15));})
       .catch(function(){completed++;});
   }
   // 并发池：同时跑 concurrency 个请求
@@ -2350,11 +2353,13 @@ function structureThesisBox(){
     else if(id.indexOf('sub-')===0)lv='sub';
     el._slevel=lv;
 
-    // 加箭头icon
-    var ar=document.createElement('span');
-    ar.className='toggle-arrow open';ar.innerHTML='&#9654;';
-    ar.style.cssText='display:inline-flex;align-items:center;margin-right:4px;font-size:.7rem;cursor:pointer;vertical-align:middle';
-    el.insertBefore(ar,el.firstChild);
+    // 加箭头icon（如果已有则跳过，避免重复）
+    if(!el.querySelector('.toggle-arrow')){
+      var ar=document.createElement('span');
+      ar.className='toggle-arrow open';ar.innerHTML='&#9654;';
+      ar.style.cssText='display:inline-flex;align-items:center;margin-right:4px;font-size:.7rem;cursor:pointer;vertical-align:middle';
+      el.insertBefore(ar,el.firstChild);
+    }
     el.classList.add(lv+'-head');
     el.classList.add(lv+'-panel'); // 用标题本身当panel标记
 

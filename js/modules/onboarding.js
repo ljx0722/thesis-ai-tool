@@ -10,59 +10,62 @@ function buildTourSteps() {
   _tourSteps = [
     {
       title: '欢迎使用 论文AI利器',
-      body: '一站式论文写作辅助平台。<br>上传你的 .docx 论文后，即可使用全部功能。<br><br><b>本指南将带你快速了解所有核心功能。</b>',
-      el: null, pos: 'center',
-      icon: '👋'
+      body: '一站式论文写作辅助平台。上传你的 .docx 论文后，即可使用全部功能。<br><br><b>本指南将带你快速了解所有核心功能。</b>',
+      el: null, pos: 'center', icon: '👋'
     },
     {
       title: '📎 上传论文',
-      body: '首先上传你的论文文件（仅支持 .docx 格式）。<br>文件仅在本机解析，不会上传到任何服务器。<br><br>上传完成后自动进入系统。',
+      body: '首先上传你的论文文件（仅支持 .docx 格式）。<br>文件仅在本机解析，不会上传到任何服务器。<br><br>上传完成后会自动弹出<b>标题层级校准弹窗</b>。',
       el: function() { return document.getElementById('uploadOverlay') || document.getElementById('uploadDrop'); },
-      pos: 'center',
-      icon: '📎'
+      pos: 'center', icon: '📎'
+    },
+    {
+      title: '📐 标题层级校准（新功能）',
+      body: '上传后自动弹出校准弹窗：<br>• 左侧显示检测到的各级标题<br>• 右侧实时预览目录树<br>• 下拉菜单修改层级：<b>章→节→小节→非标题</b><br>• <b>↑合并</b> 按钮可将拆分的标题合并<br>• 点击 <b>⚡一键接受</b> 直接使用自动检测结果',
+      el: null, pos: 'center', icon: '📐'
     },
     {
       title: '模块切换',
-      body: '上传论文后，顶栏中央会显示所有功能模块。<br>点击标签即可切换，也可以使用快捷键 <b>Ctrl+1~6</b>。<br><br>模块从左到右：格式检查 → 术语分析 → 段落分析 → 优化建议 → 知识图谱 → 参考文献',
+      body: '顶栏中央显示所有功能模块。<br>点击标签切换，或使用快捷键 <b>Ctrl+1~6</b>。<br><br>模块：格式检查 → 术语分析 → 段落分析 → 优化建议 → 知识图谱 → 参考文献',
       el: function() { return document.getElementById('moduleTabs'); },
-      pos: 'bottom',
-      icon: '🏷️'
+      pos: 'bottom', icon: '🏷️'
+    },
+    {
+      title: '🔍 交互式文献检索（新功能）',
+      body: '点击检索后分为两步确认：<br>1. <b>检索结果确认</b> — 全选/筛选/勾选文献，<br> 每条有置信度分数（绿≥70/黄≥40/红<40）<br>2. <b>分配策略确认</b> — 预览每章分配数量，<br> 可修改分配模式或手动调整归属<br><br>按 <b>Ctrl+Enter</b> 或点击 🔍检索 启动。',
+      el: function() { return document.getElementById('baSearch'); },
+      pos: 'bottom', icon: '🔍'
     },
     {
       title: '操作按钮',
-      body: '顶栏右侧是全局操作按钮：<br><b>🔍 检索文献</b> — 自动搜索匹配论文主题的文献<br><b>✅ 批量校验</b> — 验证文献真实性<br><b>📋 导出</b> — 复制 GB/T 7714 格式参考文献<br><b>📎 换论文</b> — 上传新的论文文件',
+      body: '顶栏右侧是全局操作按钮：<br><b>🔍 检索文献</b> — 启动交互式文献搜索<br><b>✅ 批量校验</b> — 验证文献真实性<br><b>📋 导出</b> — 复制 GB/T 7714 格式参考文献<br><b>📎 换论文</b> — 上传新的论文文件',
       el: function() { return document.getElementById('barActions'); },
-      pos: 'bottom',
-      icon: '🔧'
+      pos: 'bottom', icon: '🔧'
     },
     {
       title: '📋 参考文献 — 核心功能',
-      body: '切换到参考文献模块后：<br>1. 查看已自动识别的原文引用<br>2. 点击 <b>🔍 检索文献</b> 自动搜索新文献<br>3. 新文献自动按章节分配并注入正文<br>4. 点击 <b>📋 导出</b> 一键复制全部参考文献',
-      el: null, pos: 'center',
-      icon: '📋'
+      body: '切换到参考文献模块后：<br>1. 查看已自动识别的原文引用<br>2. 点击 <b>🔍 检索文献</b> 启动交互式检索<br>3. 在弹窗中确认文献列表 → 分配策略<br>4. 新文献自动注入正文并重新编号<br>5. 点击 <b>📋 导出</b> 一键复制全部参考文献',
+      el: null, pos: 'center', icon: '📋'
     },
     {
       title: '🕸️ 知识图谱',
-      body: '切换到知识图谱模块 → 点击"打开知识图谱"。<br>包含三种视图：<br>☁️ <b>词云</b> — 交互式关键词可视化<br>🔗 <b>网络图</b> — 力导向节点关系图<br>📅 <b>时间线</b> — 文献按年份分布<br><br>点击词汇可高亮关联节点。',
-      el: null, pos: 'center',
-      icon: '🕸️'
+      body: '切换到知识图谱 → 点击"打开知识图谱"。<br>包含三种视图：<br>☁️ <b>词云</b> — 交互式关键词可视化<br>🔗 <b>网络图</b> — 力导向节点关系图<br>📅 <b>时间线</b> — 文献按年份分布<br><br>点击词汇可高亮关联节点，支持PNG导出。',
+      el: null, pos: 'center', icon: '🕸️'
     },
     {
       title: '分析模块',
-      body: '四个分析模块帮助优化论文：<br>✅ <b>格式检查</b> — 标题层级、图表编号<br>🔤 <b>术语分析</b> — 术语一致性、缩写检查<br>📝 <b>段落分析</b> — 可读性评分、过渡词<br>💡 <b>优化建议</b> — 结构诊断、文献密度、摘要评估',
-      el: null, pos: 'center',
-      icon: '🔍'
+      body: '四个分析模块帮助优化论文：<br>✅ <b>格式检查</b> — 标题样式质量、图表编号、摘要完整性<br>🔤 <b>术语分析</b> — 术语一致性、缩写检查、拼写校对<br>📝 <b>段落分析</b> — 可读性评分、标题拆分残留检测<br>💡 <b>优化建议</b> — 结构诊断、文献密度、摘要评估',
+      el: null, pos: 'center', icon: '🔍'
     },
     {
       title: '📊 论文看板',
-      body: '点击顶栏中央的圆形按钮打开 <b>论文看板</b>。<br>综合评估报告：五维雷达图、综合评分、<br>章节分布、优先建议，一页纵览论文全局。',
+      body: '点击顶栏中央的圆形按钮打开。<br>综合评估报告：五维雷达图、综合评分、<br>章节分布、优先建议，一页纵览论文全局。',
       el: null, pos: 'center', icon: '📊'
     },
     {
       title: '💡 小提示',
-      body: '⌨ <b>快捷键</b>：Ctrl+1~6 切换模块 | Ctrl+Enter 检索 | Ctrl+B 导出 | Ctrl+O 换论文<br>📄 <b>知识图谱中可导出分析报告</b><br>🔗 <b>顶栏补全DOI按钮可自动补全缺失信息</b><br><br>点击右上角 <b>?</b> 按钮可随时重新查看本指南。',
-      el: null, pos: 'center',
-      icon: '💡'
+      body: '⌨ <b>快捷键</b>：Ctrl+1~6 切换模块 | Ctrl+Enter 检索 | Ctrl+B 导出 | Ctrl+O 换论文<br>📐 <b>上传后检查标题层级</b>，可大幅提升目录树精度<br>📊 <b>格式检查模块的"标题样式质量"</b> 会提示 Word 排版问题<br>🔗 <b>DOI补全按钮可自动补全缺失信息</b><br><br>点击右上角 <b>?</b> 按钮可随时重新查看本指南。',
+      el: null, pos: 'center', icon: '💡'
     }
   ];
 }
