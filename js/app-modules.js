@@ -242,7 +242,7 @@ function updateStatusBar2() {
   if (typeof mergedRefs !== 'undefined' && mergedRefs.length) refCount = mergedRefs.length;
   else if (typeof existingRefs !== 'undefined' && existingRefs.length) refCount = existingRefs.length;
   if (_thesisLoaded && refCount > 0) { var chCount = (typeof sections !== 'undefined' && sections) ? sections.length : 0; sb.textContent = chCount + '章 | ' + refCount + '条文献'; }
-  else if (_thesisLoaded) sb.textContent = '已加载论文，请检索文献';
+  else if (_thesisLoaded) sb.textContent = '';
   else sb.textContent = '等待上传论文…';
 }
 

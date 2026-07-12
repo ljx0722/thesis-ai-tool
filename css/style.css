@@ -89,13 +89,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 /* ====== Sidebar ====== */
 .nav-sidebar{width:228px;min-width:180px;max-width:320px;flex-shrink:0;background:var(--glass);backdrop-filter:saturate(180%) var(--blur);-webkit-backdrop-filter:saturate(180%) var(--blur);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
 .nav-sidebar h3{font-size:.64rem;font-weight:var(--fw-semibold);padding:var(--sp-3) var(--sp-4) var(--sp-2);color:var(--t);letter-spacing:.03em;text-transform:uppercase;opacity:.5}
-.nav-tree{flex:1;overflow-y:auto;padding:var(--sp-1) var(--sp-2)}
-.tree-node{padding:3px 12px;cursor:pointer;font-size:var(--fs-sm);border-radius:var(--r-xs);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:2;transition:all var(--t-fast) ease;position:relative}
-.tree-node:hover{background:rgba(0,0,0,0.04);transform:translateX(2px)}
+.nav-tree{flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--sp-1) var(--sp-2)}
+.tree-node{padding:4px 10px;cursor:pointer;font-size:var(--fs-sm);border-radius:var(--r-xs);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.8;transition:all var(--t-fast) ease;position:relative;user-select:none}
+.tree-node:hover{background:rgba(128,128,128,0.1);transform:translateX(1px)}
 .tree-node.sel{background:var(--accent);color:#fff;font-weight:var(--fw-semibold);box-shadow:0 2px 8px rgba(0,122,255,0.25)}
-.tree-node.ch{font-weight:var(--fw-semibold);color:var(--t);font-size:.73rem;padding:5px 12px;margin-top:2px}
-.tree-node.sec{padding-left:22px;color:var(--t2)}
-.tree-node.sub{padding-left:36px;color:var(--m1);font-size:.65rem}
+.tree-node.ch{font-weight:var(--fw-semibold);color:var(--t);font-size:.73rem;padding-top:5px;padding-bottom:5px;margin-top:2px}
+.tree-node.sec{color:var(--t2)}
+.tree-node.sub{color:var(--m1);font-size:.65rem}
 
 /* ====== Thesis Panel ====== */
 .thesis-panel{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
