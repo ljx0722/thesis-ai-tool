@@ -1661,21 +1661,37 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
         var isStart= /^第[一1一二三四五六七八九十\d]+章/.test(txt2) || /^Chapter\s+\d/.test(txt2) || /^(1\.|1\s+)Introduction/.test(txt2);
         if(isStart)pastCh1=true;
         if(!pastCh1)continue;
-        // 判断标题级别：数字编号层级（1. / 1.1 / 1.1.1 / ...）
-        // mammoth 经常把标题拆成多个元素，如 <p>2.1</p><p>文献综述</p>
-        // 所以需要检测"裸编号"元素并后续与下一个元素合并
-        var numMatch=txt2.match(/^((?:\d+\.)*\d+)\s+(.*)/);
+        // 判断标题级别（支持多种中文论文常见格式）
+        // 格式1: "1.1 研究背景" / "1.1研究背景" / "1.1、研究背景"
+        // 格式2: "1.1.1 概念" / "1.1.1概念"
+        // 格式3: 裸编号 "2.1"、"2.1.3"（mammoth拆分了标题）
+        // 格式4: 中文序号 "一、研究背景" / "(一)研究背景"
+        var numMatch=txt2.match(/^((?:\d+\.)*\d+)\s+(.*)/);  // 标准空格
+        if(!numMatch)numMatch=txt2.match(/^((?:\d+\.)*\d+)[\s、，,.]*(.*)/);  // 无空格/顿号/逗号
         var isChapterText=/^第([一-鿿\d]+)章/.test(txt2);
-        // 裸编号：仅有数字编号没有标题文字，如 "2.1"（mammoth 拆分了标题）
-        var isBareNumber=!numMatch&&!isChapterText&&/^(\d+(?:\.\d+)+)\s*$/.test(txt2);
-        var isNumberedHeading=numMatch!==null;
-        if(isChapterText||isNumberedHeading||isBareNumber){
-          // Skip TOC entries: lines with long dot leaders ending in page numbers
+        // 中文序号格式："一、xxx" "(一)xxx" "① xxx" → 视为节标题
+        var cnNumMatch=txt2.match(/^([\(（]?[一二三四五六七八九十]+[\)）]?)[\s、，,.]*(.*)/);
+        var isCNNumbered=cnNumMatch&&cnNumMatch[2]&&cnNumMatch[2].length>=2&&
+                         !/^第[一二三四五六七八九十\d]+章/.test(txt2)&&
+                         !/^(?:摘要|Abstract|关键词|目录|参考文献|致谢|附录)/.test(txt2);
+        // 裸编号：仅有数字编号没有标题文字
+        var isBareNumber=!numMatch&&!isChapterText&&!isCNNumbered&&/^(\d+(?:\.\d+)+)\s*$/.test(txt2);
+        var isNumberedHeading=numMatch!==null&&(numMatch[2]||'').length>=2; // 必须有实质标题
+        // 如果 numMatch 匹配到但标题为空，降级为 bare
+        if(numMatch&&(!numMatch[2]||numMatch[2].length<2))isBareNumber=true;
+        if(isChapterText||isNumberedHeading||isBareNumber||isCNNumbered){
+          // Skip TOC entries
           if(/\.{3,}\s*\d+$|[\s\.]{5,}\d+$/.test(txt2))continue;
           var level=0,num='',title='';
-          if(isChapterText){level=0;num=txt2;title=txt2;}
-          else if(isBareNumber){var bnm=txt2.match(/^(\d+(?:\.\d+)+)\s*$/);level=bnm[1].split('.').length-1;num=txt2.trim();title='';}
-          else{level=numMatch[1].split('.').length-1;num=numMatch[1];title=numMatch[2]||txt2;}
+          if(isChapterText){
+            level=0;num=txt2;title=txt2;
+          }else if(isCNNumbered){
+            level=1;num=cnNumMatch[1];title=cnNumMatch[2];
+          }else if(isBareNumber){
+            var bnm=txt2.match(/^(\d+(?:\.\d+)+)\s*$/);level=bnm[1].split('.').length-1;num=txt2.trim();title='';
+          }else{
+            level=numMatch[1].split('.').length-1;num=numMatch[1];title=numMatch[2]||txt2;
+          }
           headingCandidates.push({el:el2,txt:txt2,num:num,title:title,level:level,bare:isBareNumber||false});
         }
       }
