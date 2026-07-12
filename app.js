@@ -1881,22 +1881,20 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
       if (!txt || txt.length < 2) return -1;
       // 章标题: 第X章 / 第X章 XXX
       if (/^第[一二三四五六七八九十123456789]+章/.test(txt) || /^Chapter\s+\d/.test(txt)) return 0;
-      // 数字编号 + 标题文字（至少2个字）：1.1 研究背景 / 2.1.3 智慧工地
+      // 数字编号 + 标题文字：1.1 研究背景 / 2.1.3 智慧工地
       var nm = txt.match(/^(\d+(?:\.\d+)+)\s+(\S.{1,})/);
-      if (nm && nm[2] && nm[2].length >= 3) {
+      if (nm && nm[2] && nm[2].length >= 2) {
         var dots = nm[1].split('.').length - 1;
-        // 最多3级：1.x→节(1), 1.x.x→小节(2), 更深→忽略
         return dots <= 2 ? dots : -1;
       }
-      // 纯数字 + 标题（至少3字）："1 绪论" / "2 文献综述"
-      var sm = txt.match(/^(\d+)[\s、，,.]+\s*(\S.{2,})/);
-      if (sm && sm[2] && sm[2].length >= 3) {
-        // 只保留标题长度 < 60字（正文段落不可能这么短）
-        if (sm[2].length < 60) return sm[1] === '1' ? 0 : 1;
+      // 纯数字 + 标题："1 绪论" / "2 文献综述"（标题≥2字即可）
+      var sm = txt.match(/^(\d+)[\s、，,.]+\s*(\S.{1,})/);
+      if (sm && sm[2] && sm[2].length >= 2 && sm[2].length < 80) {
+        return sm[1] === '1' ? 0 : 1;
       }
-      // 中文序号：一、xxx → 节; (一)xxx → 小节（标题至少3字）
-      var cnm = txt.match(/^([\(（]?[一二三四五六七八九十]+[\)）]?)[\s、，,.]+\s*(\S.{2,})/);
-      if (cnm && cnm[2] && cnm[2].length >= 3 && cnm[2].length < 60) {
+      // 中文序号：一、xxx → 节; (一)xxx → 小节
+      var cnm = txt.match(/^([\(（]?[一二三四五六七八九十]+[\)）]?)[\s、，,.]+\s*(\S.{1,})/);
+      if (cnm && cnm[2] && cnm[2].length >= 2 && cnm[2].length < 80) {
         return cnm[1].indexOf('(') >= 0 || cnm[1].indexOf('（') >= 0 ? 2 : 1;
       }
       return -1;
@@ -1984,19 +1982,31 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
           allHeadings.push({ el: el2, txt: txt2, level: lv, tagLevel: lv, bare: false });
         }
       }
-      // 兜底：如果标签检测不到足够的标题，用文本模式补充收集
-      if (allHeadings.length < 3) {
-        for (var ei2 = bodyStartIdx; ei2 < allEls.length; ei2++) {
-          var ef = allEls[ei2], tf = (ef.textContent || '').trim();
-          if (!tf || tf.length < 2) continue;
-          if (refBound && (ef.compareDocumentPosition(refBound) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
-          var tfLv = detectHeadingLevel(tf);
-          if (tfLv >= 0) {
-            // 去重：不重复添加已有元素
-            var dup2 = false;
-            for (var di = 0; di < allHeadings.length; di++) { if (allHeadings[di].el === ef) { dup2 = true; break; } }
-            if (!dup2) allHeadings.push({ el: ef, txt: tf, level: tfLv, tagLevel: -1, bare: false });
-          }
+      // 兜底：文本模式收集（始终执行，作为补全）
+      for (var ei2 = bodyStartIdx; ei2 < allEls.length; ei2++) {
+        var ef = allEls[ei2], tf = (ef.textContent || '').trim();
+        if (!tf || tf.length < 2) continue;
+        if (refBound && (ef.compareDocumentPosition(refBound) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+        // 已经通过标签模式收集的跳过
+        var dup2 = false;
+        for (var di = 0; di < allHeadings.length; di++) { if (allHeadings[di].el === ef) { dup2 = true; break; } }
+        if (dup2) continue;
+        var tfLv = detectHeadingLevel(tf);
+        if (tfLv >= 0) {
+          allHeadings.push({ el: ef, txt: tf, level: tfLv, tagLevel: -1, bare: false });
+        }
+      }
+      // 终极兜底：如果收集到的依然太少，把所有正文短元素作为未分类候选
+      if (allHeadings.length < 5) {
+        for (var ei3 = bodyStartIdx; ei3 < allEls.length; ei3++) {
+          var ef2 = allEls[ei3], tf2 = (ef2.textContent || '').trim();
+          if (!tf2 || tf2.length < 2 || tf2.length > 200) continue;
+          if (refBound && (ef2.compareDocumentPosition(refBound) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+          if (/^\d{1,3}$/.test(tf2)) continue;
+          var dup3 = false;
+          for (var dj = 0; dj < allHeadings.length; dj++) { if (allHeadings[dj].el === ef2) { dup3 = true; break; } }
+          if (dup3) continue;
+          allHeadings.push({ el: ef2, txt: tf2, level: -1, tagLevel: -1, bare: false });
         }
       }
       // ===== 第4步：合并 split 标签标题（h1 "第2章" + 后面的 p 标题文字） =====
