@@ -1027,7 +1027,7 @@ function asSkip(){
 // ========== 弹窗③: 标题层级校准（分步向导） ==========
 var _cwCandidates=[],_cwCallback=null,_cwPhase=0;
 
-function startInlineCalibration(box,autoDetected){_cwCandidates=autoDetected;_cwPhase=0;window._cwAllParaTexts=null;return new Promise(function(resolve){_cwCallback=resolve;showCalibrationWizard();});}
+function startInlineCalibration(box,autoDetected){_cwCandidates=autoDetected;_cwPhase=0;window._cwAllParaTexts=null;window._cwCheckedEls=null;_cwConfirmed={'0':new Set(),'1':new Set(),'2':new Set()};return new Promise(function(resolve){_cwCallback=resolve;showCalibrationWizard();});}
 function showCalibrationWizard(){_cwPhase=0;renderCalibrationModal();hideLoad();}
 
 
@@ -1059,6 +1059,9 @@ function cwGetStyleGroups(){
 
 // 获取某个层级已确认的段落数量（修复：使用正确的 p 参数）
 function cwGetPhaseCount(p){
+  var checkedEls=window._cwCheckedEls&&window._cwCheckedEls[p]?window._cwCheckedEls[p].length:0;
+  // 如果已有勾选记录，直接用实际勾选数；否则用样式组全量估算
+  if(checkedEls>0)return checkedEls;
   var gs=cwGetStyleGroups(),cnt=0;
   var sel=_cwConfirmed[p]||new Set();
   gs.forEach(function(g){if(sel.has(g.name))cnt+=g.count;});
@@ -1172,18 +1175,31 @@ function cwConfirmRefreshList(){
 }
 function cwConfirmAccept(sname){
   if(_cwPhase>=3)return;
-  // 将勾选的文本写入 _cwConfirmed，并尝试匹配 DOM 元素
   var items=window._cwConfirmItems||[];
+
+  // 写入样式层级确认状态
   _cwConfirmed[_cwPhase]=_cwConfirmed[_cwPhase]||new Set();
   _cwConfirmed[_cwPhase].add(sname);
   [0,1,2].forEach(function(l){if(l!==_cwPhase&&_cwConfirmed[l])_cwConfirmed[l].delete(sname);});
 
-  // 尝试匹配 DOM 元素
+  // 先清除当前样式在本层的所有已选元素（重新确认意味着重置）
+  if(!window._cwCheckedEls)window._cwCheckedEls={};
+  if(!window._cwCheckedEls[_cwPhase])window._cwCheckedEls[_cwPhase]=[];
+
+  // 找出当前样式的所有示例文本，用于清除匹配
+  var styleSampleSet={};
+  if(items.length)items.forEach(function(it){styleSampleSet[it.txt]=true;});
+
+  // 从本层已选列表中移除匹配该样式的所有元素
+  window._cwCheckedEls[_cwPhase]=window._cwCheckedEls[_cwPhase].filter(function(el){
+    var et=(el.textContent||'').trim();
+    return !styleSampleSet[et]&&!items.some(function(it){return it.txt===et||(it.txt.length>=10&&et.length>=10&&it.txt.substring(0,20)===et.substring(0,20));});
+  });
+
+  // 重新添加本次勾选的元素
   var box=document.getElementById('thesisBox');
   var refBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
   var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
-  if(!window._cwCheckedEls)window._cwCheckedEls={};
-  if(!window._cwCheckedEls[_cwPhase])window._cwCheckedEls[_cwPhase]=[];
   for(var k=0;k<items.length;k++){
     if(!items[k].checked)continue;
     var tx=items[k].txt;
