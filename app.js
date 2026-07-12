@@ -1168,12 +1168,18 @@ function renderCalibrationModal(){
   instr.innerHTML='<b style="color:'+colors[ph]+'">第'+(ph+1)+'步：确认'+phases[ph]+'标题</b> — '+instrTexts[ph];
   card.appendChild(instr);
 
-  // Warning: if a tag type has been partially assigned across different levels
+  // Warning: only for heading tags (P/LI/DIV naturally appear at all levels)
   var mixedTags=[];
-  for(var i=0;i<groups.length;i++){var g=groups[i];var lvs=new Set();_cwCandidates.forEach(function(c){if((c.el.tagName||'').toUpperCase()===g.tag&&c.level>=0)lvs.add(c.level);});if(lvs.size>1)mixedTags.push(g.tag);}
+  for(var i=0;i<groups.length;i++){
+    var g=groups[i];
+    if(!/^H\d$/.test(g.tag)) continue; // skip P, LI, DIV etc.
+    var lvs=new Set();
+    _cwCandidates.forEach(function(c){if((c.el.tagName||'').toUpperCase()===g.tag&&c.level>=0)lvs.add(c.level);});
+    if(lvs.size>1)mixedTags.push(g.tag);
+  }
   if(mixedTags.length>0){
     var warn=document.createElement('div');warn.style.cssText='padding:8px 20px;background:#fff3cd;border-bottom:1px solid #ffc107;font-size:.65rem;color:#856404';
-    warn.innerHTML='⚠ 标签 <b>'+mixedTags.join(', ')+'</b> 被分配到多个层级，说明 Word 中未使用统一标题样式。请回 Word 修正后重新上传。';
+    warn.innerHTML='⚠ 标题标签 <b>'+mixedTags.join(', ')+'</b> 被分配到多个层级，说明 Word 中未使用统一标题样式。请回 Word 修正后重新上传。';
     card.appendChild(warn);
   }
 
@@ -1184,8 +1190,10 @@ function renderCalibrationModal(){
   var shown=0;
   for(var i=0;i<groups.length;i++){
     var g=groups[i];
-    // 跳过已被分配到其他层级的标签
-    var assignedOther=_cwCandidates.some(function(c){return(c.el.tagName||'').toUpperCase()===g.tag&&c.level>=0&&c.level!==ph;});
+    // 标题标签（H1-H6）：如果已在其他层级分配则跳过
+    // 正文标签（P/LI/DIV）：始终显示，因为同一正文标签可能出现在所有层级
+    var isHeadingTag=/^H\d$/.test(g.tag);
+    var assignedOther=isHeadingTag&&_cwCandidates.some(function(c){return(c.el.tagName||'').toUpperCase()===g.tag&&c.level>=0&&c.level!==ph;});
     if(assignedOther)continue;
     var isCurrent=_cwCandidates.some(function(c){return(c.el.tagName||'').toUpperCase()===g.tag&&c.level===ph;});
     shown++;
