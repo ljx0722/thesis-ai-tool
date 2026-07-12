@@ -1097,18 +1097,29 @@ var _cwCandidates=[],_cwCallback=null,_cwPhase=0;
 
 function _cwStyleFingerprint(el){
   if(!el)return'';
-  // 优先用 mammoth 保留的结构信息，而非浏览器 computed style
-  var tag=(el.tagName||'').toUpperCase(); // H1/H2/H3... 或 P
-  var cls=el.className||''; // mammoth 可能注入的 CSS class
-  var inline=el.getAttribute('style')||'';
-  // 提取 Word 样式 ID（如 mammoth 的 styleMap 输出）
-  var dataId=el.getAttribute('data-style-id')||'';
-  // 标签 + class + 是否为 heading 标签 已足够区分层级
-  // 用 computed font-weight 做辅助（heading 标签天然 bold）
-  var fw='';
-  try{fw=getComputedStyle(el).fontWeight||'400'}catch(e){}
-  return [tag,cls.substring(0,30),dataId,fw,inline.indexOf('font-size')>=0?inline:''].join('|');
+  var tag=(el.tagName||'').toUpperCase();
+  var txt=(el.textContent||'').trim();
+  var prefix='other';
+  if(/^第[一二三四五六七八九十123456789]+章/.test(txt))prefix='chapter-num';
+  else if(/^Chapter\\s+\\d/.test(txt))prefix='chapter-en';
+  else if(/^\\d+(?:\\.\\d+)+[\\s、,]+/.test(txt))prefix='numbered-sec';
+  else if(/^\\d+[\\s、,.]/.test(txt))prefix='digit-title';
+  else if(/^[\\(（]?[一二三四五六七八九十]+[\\)）]?[\\s、,.]/.test(txt))prefix='cn-num';
+  var lenClass=txt.length<80?'short':'long';
+  return tag+'|'+prefix+'|'+lenClass;
 }
+
+function _cwFpLabel(fp){
+  var parts=fp.split('|');
+  var tag=parts[0];
+  var prefix=parts[1];
+  var tagMap={'H1':'一级标题 H1','H2':'二级标题 H2','H3':'三级标题 H3','H4':'四级 H4','H5':'五级 H5','H6':'六级 H6'};
+  var tagLabel=tagMap[tag]||(tag==='P'?'段落 P':tag);
+  var prefixMap={'chapter-num':'第X章','chapter-en':'Chapter','numbered-sec':'X.X编号','digit-title':'数字+标题','cn-num':'中文序号','other':'正文'};
+  var prefixLabel=prefixMap[prefix]||'未知';
+  return tagLabel+' · '+prefixLabel;
+}
+
 
 function startInlineCalibration(box, autoDetected){
   _cwCandidates=autoDetected;_cwPhase=0;
@@ -1132,8 +1143,12 @@ function cwGetUnassigned(){
 function cwCountSame(fp){
   var count=0,box=document.getElementById('thesisBox');
   if(!box)return 0;
+  var refBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
   var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
-  for(var i=0;i<els.length;i++){if(_cwStyleFingerprint(els[i])===fp)count++;}
+  for(var i=0;i<els.length;i++){
+    if(refBound&&(els[i].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
+    if(_cwStyleFingerprint(els[i])===fp)count++;
+  }
   return count;
 }
 
@@ -1144,8 +1159,10 @@ function cwGetPhaseCount(p){
 function cwAutoMatch(fp){
   if(_cwPhase>=3)return;
   var box=document.getElementById('thesisBox');if(!box)return;
+  var refBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
   var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6'),matched=0;
   for(var i=0;i<els.length;i++){
+    if(refBound&&(els[i].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
     if(_cwStyleFingerprint(els[i])!==fp)continue;
     var t=(els[i].textContent||'').trim();if(!t||t.length<1)continue;
     for(var j=0;j<_cwCandidates.length;j++){
@@ -1933,7 +1950,7 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
     searchCache={};mergedRefs=[];
     updLoad('解析正文...','10',f.name);
     // mammoth 转换
-    var result=await mammoth.convertToHtml({arrayBuffer:buf});
+    var result=await mammoth.convertToHtml({arrayBuffer:buf},{includeDefaultStyleMap:true,transformDocument:function(doc){return doc;}});
     manuscriptHTML=result.value;
     // 后处理：图片响应式 + 表格样式 + 公式保留
     manuscriptHTML=manuscriptHTML
