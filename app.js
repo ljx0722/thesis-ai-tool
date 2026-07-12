@@ -145,7 +145,8 @@ function injectNewMarkers(refs){
       if(used.size>=chRefs.length)return;
       var br=null,bs=0;
       chRefs.forEach(function(r){if(used.has(r))return;var kw=extractTitleKws(r.title||'');var sc=kw.reduce(function(s,w){return s+(si.sent.text.toLowerCase().indexOf(w)>=0?1:0)},0);if(sc>=2&&sc>bs){bs=sc;br=r;}});
-      if(br){used.add(br);var si2=si.sent._idx;if(!sentHit[si2])sentHit[si2]=[];sentHit[si2].push(br);br._sentence=si.sent;br._ctx=si.sent.text.substring(0,80);}
+      if(br){used.add(br);var si2=si.sent._idx;if(!sentHit[si2])sentHit[si2]=[];sentHit[si2].push(br);br._sentence=si.sent;br._ctx=si.sent.text.substring(0,80);
+        br._chName=_treeIndex.chapters[chIdx]?(_treeIndex.chapters[chIdx].name||''):'';}
     });
   });
   for(var si3 in sentHit){
@@ -158,7 +159,6 @@ function injectNewMarkers(refs){
       var sp=document.createElement('span');sp.className='cite-marker generated';sp.textContent='['+n+']';
       sp.onclick=function(nn){return function(e){e.stopPropagation();scrollToRef(nn);}}(n);
       r._domEl=sp;paraEl.appendChild(sp);
-      r._chName=_treeIndex.chapters[chIdx]?_treeIndex.chapters[chIdx].name:'';
     });
   }
 }
