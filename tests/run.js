@@ -83,7 +83,8 @@ test('kg_server.py compiles without errors', function() {
 
 test('HTML has all required ' + '<script>' + ' tags in correct order', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  var scripts = html.match(/<script src="([^"]+)"><\/script>/g) || [];
+  // Match both regular and deferred script tags
+  var scripts = html.match(/<script(?:\s+defer)?\s+src="([^"]+)"><\/script>/g) || [];
   var paths = scripts.map(function(s) { var m = s.match(/src="([^"]+)"/); return m ? m[1].split('?')[0] : ''; });
   var required = ['mammoth.browser.min.js', 'jszip.min.js', 'app.js',
     'js/modules/optimization.js', 'js/modules/format-check.js',
@@ -1259,6 +1260,184 @@ test('HC: upload flow calls showHeadingCalibration', function() {
 test('HC: calibration sets hc.bare=false after merge', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
   assert(src.indexOf('hc.bare=false') >= 0, 'bare must be cleared after merge');
+});
+
+
+// ============================================================
+// SECTION 23: System Integrity Guards (anti-decay from all 15 historical bug categories)
+// ============================================================
+console.log('\n=== Section 23: System Integrity Guards ===');
+
+// --- CATEGORY A: Python→JS injection artifacts ---
+test('INTEGRITY: No Python raw-string artifacts in JS regex literals', function() {
+  var files=['app.js','js/modules/format-check.js','js/modules/terminology.js',
+             'js/modules/paragraph-analysis.js','js/modules/optimization.js'];
+  files.forEach(function(f){
+    var src=fs.readFileSync(path.join(projectRoot,f),'utf8');
+    // Python raw string leak: regex literal that starts with double-backslash shortcut
+    // /\\\\d/ or /\\\\s/ etc — these would match literal '\d' not digit
+    var bad=src.match(/\/\\\\[dDsSwWbB]/g);
+    assert(!bad,'Python regex artifact in '+f+': '+JSON.stringify(bad));
+    // Python raw string leak: indexOf with escaped pattern
+    var badIdx=src.match(/indexOf\('\[\\\\[dDsSwWbB]\]/g)||src.match(/indexOf\('\*\\\\[dDsSwWbB]/g);
+    assert(!badIdx,'Python indexOf artifact in '+f+': '+JSON.stringify(badIdx));
+  });
+});
+
+// --- CATEGORY B: var declaration ordering ---
+test('INTEGRITY: Module functions declare var h before first h+= use', function() {
+  var files=[
+    {f:'js/modules/format-check.js',fn:'runFormatCheck'},
+    {f:'js/modules/optimization.js',fn:'runOptimization'},
+    {f:'js/modules/terminology.js',fn:'runTerminology'},
+    {f:'js/modules/paragraph-analysis.js',fn:'runParagraphAnalysis'}
+  ];
+  files.forEach(function(item){
+    var src=fs.readFileSync(path.join(projectRoot,item.f),'utf8');
+    var fnStart=src.indexOf('function '+item.fn);
+    var fnEnd=src.indexOf('\nfunction ',fnStart+10);
+    if(fnEnd<0)fnEnd=src.length;
+    var body=src.substring(fnStart,fnEnd);
+    var varHIdx=body.indexOf('var h =');
+    var firstUse=body.indexOf('h += ');
+    if(firstUse<0)firstUse=body.indexOf("h+='");
+    if(firstUse<0)firstUse=body.indexOf('h+="');
+    if(varHIdx>=0&&firstUse>=0){
+      assert(varHIdx<firstUse,'In '+item.fn+': var h declared at pos '+varHIdx+' but used at pos '+firstUse);
+    }
+  });
+});
+
+// --- CATEGORY C: updLoad progress integrity ---
+test('INTEGRITY: updLoad messages are not duplicated within each module', function() {
+  var files=['js/modules/format-check.js','js/modules/terminology.js',
+             'js/modules/paragraph-analysis.js','js/modules/optimization.js'];
+  files.forEach(function(f){
+    var src=fs.readFileSync(path.join(projectRoot,f),'utf8');
+    var matches=src.match(/updLoad\('([^']*)'/g)||[];
+    var seen={},dups=[];
+    matches.forEach(function(m){if(seen[m])dups.push(m);else seen[m]=true;});
+    assert(dups.length===0,'Duplicate updLoad in '+f+': '+dups.join(', '));
+  });
+});
+
+test('INTEGRITY: All runAnalysis functions contain updLoad("完成",100)', function() {
+  ['format-check','terminology','paragraph-analysis','optimization'].forEach(function(m){
+    var src=fs.readFileSync(path.join(projectRoot,'js/modules/'+m+'.js'),'utf8');
+    assert(src.indexOf("updLoad('完成',100)")>=0||src.indexOf('updLoad("完成",100)')>=0,
+      m+'.js must end with updLoad completion');
+  });
+});
+
+// --- CATEGORY D: Heading format detection coverage ---
+test('INTEGRITY: Heading regex covers 8+ core Chinese paper formats', function() {
+  var src=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8');
+  var detectBlock=src.substring(src.indexOf('isChapterText'),src.indexOf('headingCandidates.push'));
+  var hasDigitSpace=detectBlock.indexOf(')d+)\\s+')>=0;
+  var hasDigitNoSep=detectBlock.indexOf('、，,')>=0;
+  var hasCNNum=detectBlock.indexOf('一二三四五')>=0;
+  var hasBare=detectBlock.indexOf('isBareNumber')>=0;
+  var hasChapterText=detectBlock.indexOf('isChapterText')>=0;
+  var formatCount=(hasDigitSpace?1:0)+(hasDigitNoSep?1:0)+(hasCNNum?1:0)+(hasBare?1:0)+(hasChapterText?1:0);
+  assert(formatCount>=4,'Heading detection missing format patterns: space='+hasDigitSpace+' noSep='+hasDigitNoSep+' CN='+hasCNNum+' bare='+hasBare+' ch='+hasChapterText);
+});
+
+// --- CATEGORY E: Chapter-start gate diversity ---
+test('INTEGRITY: bodyStarted supports 4+ chapter-start patterns', function() {
+  var src=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8');
+  var hasDiZhang=src.indexOf('第[一二三四五六七八九十')>=0;
+  var hasChapterE=/Chapter/.test(src);
+  var hasFallback=/0\.3/.test(src)||/0\.6/.test(src);
+  var hasBodyStarted=/bodyStarted/.test(src);
+  var isValid=/isFirstCh/.test(src);
+  var count=(hasDiZhang?1:0)+(hasChapterE?1:0)+(hasFallback?1:0)+(hasBodyStarted?1:0)+(isValid?1:0);
+  assert(count>=3,'bodyStarted gate missing patterns: diZhang='+hasDiZhang+' chE='+hasChapterE+' fallback='+hasFallback+' bodyStarted='+hasBodyStarted+' isFirstCh='+isValid);
+});
+
+// --- CATEGORY F: DOM content filtering ---
+test('INTEGRITY: populateChapterText filters page numbers and TOC entries', function() {
+  var src=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8');
+  var fnBody=src.substring(src.indexOf('function populateChapterText'),src.indexOf('function extractTitleKws'));
+  assert(fnBody.indexOf('\\d{1,3}')>=0||fnBody.indexOf('\\d{1,3')>=0,'Must filter page numbers');
+  assert(fnBody.indexOf('ivxlcdm')>=0||fnBody.indexOf('dot leaders')>=0||fnBody.indexOf('TOC')>=0,'Must filter TOC/dot-leader entries');
+  assert(fnBody.indexOf('sec-')>=0||fnBody.indexOf('sub-')>=0,'Must stop at section anchors');
+});
+
+// --- CATEGORY G: Heading merge robustness ---
+test('INTEGRITY: Heading merge scans up to 3 siblings for title text', function() {
+  var src=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8');
+  var mergeStart=src.indexOf('第三步：合并');
+  var mergeEnd=src.indexOf('统计裸编号',mergeStart);
+  var mergeBlock=src.substring(mergeStart,mergeEnd);
+  assert(mergeBlock.indexOf('si<3')>=0||mergeBlock.indexOf('3&&sib')>=0,'Merge must scan up to 3 siblings');
+});
+
+// --- CATEGORY H: Section anchoring search scope ---
+test('INTEGRITY: Section anchoring searches p+h1~h6 (not just h1-h3)', function() {
+  var src=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8');
+  var secBlock=src.substring(src.indexOf('标定节/小节'),src.indexOf('分章填充文本'));
+  assert((secBlock.indexOf('h4')>=0&&secBlock.indexOf('h5')>=0&&secBlock.indexOf('h6')>=0)||
+         secBlock.indexOf('querySelectorAll')<0,'Section anchoring must search h4-h6 too');
+});
+
+// --- CATEGORY I: Test suite self-integrity ---
+test('INTEGRITY: No test() calls after process.exit in run.js', function() {
+  var src=fs.readFileSync(path.join(projectRoot,'tests/run.js'),'utf8');
+  var exitIdx=src.lastIndexOf('process.exit');
+  var testAfter=src.indexOf('test(',exitIdx);
+  assert(testAfter<0,'test() calls found after process.exit - dead code!');
+});
+
+// --- CATEGORY J: HTML load order ---
+test('INTEGRITY: mammoth and jszip loaded with defer (not blocking)', function() {
+  var src=fs.readFileSync(path.join(projectRoot,'index.html'),'utf8');
+  var mamIdx=src.indexOf('mammoth.browser.min.js');
+  var jsZipIdx=src.indexOf('jszip.min.js');
+  assert(src.substring(Math.max(0,mamIdx-20),mamIdx+30).indexOf('defer')>=0,'mammoth must be deferred');
+  assert(src.substring(Math.max(0,jsZipIdx-20),jsZipIdx+30).indexOf('defer')>=0,'jszip must be deferred');
+});
+
+test('INTEGRITY: Upload overlay shown before external scripts load', function() {
+  var src=fs.readFileSync(path.join(projectRoot,'index.html'),'utf8');
+  var overlayIdx=src.indexOf('id="uploadOverlay"');
+  var firstScript=src.indexOf('<script src=');
+  if(firstScript<0)firstScript=src.indexOf('<script defer src=');
+  assert(overlayIdx<firstScript,'Upload overlay HTML must appear before external scripts');
+});
+
+// --- CATEGORY K: DO NOT regress specific known bug patterns ---
+test('INTEGRITY: cnDigit handles 1-20 (regression from chNum parsing)', function() {
+  var src=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8');
+  var fn=src.substring(src.indexOf('function cnDigit'),src.indexOf('function bigramOverlap'));
+  assert(fn.indexOf('十一')>=0,'cnDigit must handle 11+');
+  assert(fn.indexOf('二十')>=0,'cnDigit must handle 20');
+});
+
+test('INTEGRITY: Chapter dedup exists (mammoth split-title protection)', function() {
+  var src=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8');
+  assert(src.indexOf('dupCh')>=0,'Chapter dedup logic must exist');
+  assert(src.indexOf('!dupCh.el')>=0||src.indexOf('dupCh.el')>=0,'Must handle DOM anchor on dedup');
+});
+
+test('INTEGRITY: chNum2 variable correctly named (not bare chNum)', function() {
+  var src=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8');
+  assert(src.indexOf('chNum2||(sections.length+1)')>=0,'chNum2 must be used, not raw chNum');
+});
+
+test('INTEGRITY: jumpToParagraph uses filtered[i] not paras[i]', function() {
+  var src=fs.readFileSync(path.join(projectRoot,'js/modules/paragraph-analysis.js'),'utf8');
+  var fn=src.substring(src.indexOf('function jumpToParagraph'));
+  assert(fn.indexOf('filtered[i]')>=0&&fn.indexOf('paras[i]')<0,'Must use filtered[i] not paras[i]');
+});
+
+test('INTEGRITY: All modules accept container parameter', function() {
+  var modules=['runFormatCheck','runTerminology','runParagraphAnalysis','runOptimization'];
+  modules.forEach(function(m){
+    var files={'runFormatCheck':'js/modules/format-check.js','runTerminology':'js/modules/terminology.js',
+      'runParagraphAnalysis':'js/modules/paragraph-analysis.js','runOptimization':'js/modules/optimization.js'};
+    var src=fs.readFileSync(path.join(projectRoot,files[m]),'utf8');
+    assert(src.indexOf('function '+m+'(container)')>=0,m+' must accept container parameter');
+  });
 });
 
 

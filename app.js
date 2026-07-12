@@ -624,9 +624,11 @@ async function assignChapters(refs,mode,total){
     // 如果节匹配不到，用章节内容文本再试
     if(!bestSec&&cs2&&cs2.text&&cs2.sections){
       cs2.sections.forEach(function(sec){
-        var st=(cs2.text||'').toLowerCase();
-        var pat=(sec.num+'[\\s]*'+sec.title).toLowerCase();
-        var idx2=st.indexOf(pat);
+        // Search chapter text for section number + title (ignore whitespace differences)
+        var st=(cs2.text||'').replace(/\s+/g,'').toLowerCase();
+        var searchNum=(sec.num||'').replace(/\s+/g,'');
+        var searchTitle=(sec.title||'').replace(/\s+/g,'');
+        var idx2=st.indexOf(searchNum+searchTitle);
         if(idx2>=0){
           // 检查节标题附近有没有关键词
           var nearby=st.substring(Math.max(0,idx2-200),Math.min(st.length,idx2+500));
