@@ -1440,6 +1440,75 @@ test('INTEGRITY: buildFullTree with paragraph+ sentence layers + _treeIndex', fu
 });;
 
 
+
+// ============================================================
+// SECTION 24: Audit Regression (batch analysis findings)
+// ============================================================
+console.log('\n=== Section 24: Audit Regression ===');
+
+test('AUDIT: detectHeadingLevel filters TOC (d{1,3})', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var fnBody = src.substring(src.indexOf('function detectHeadingLevel'), src.indexOf('function detectChapterNum'));
+  assert(fnBody.indexOf('d{1,3}') >= 0, 'detectHeadingLevel must filter TOC entries');
+});
+
+test('AUDIT: heading scan has broad TOC filter', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var scanBlock = src.substring(src.indexOf('第3步：收集标题候选'), src.indexOf('第4步'));
+  assert(scanBlock.indexOf('d{1,3}') >= 0, 'Heading scan must filter TOC');
+});
+
+test('AUDIT: pre-parse has TOC filter', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  // Search near the pre-parse TOC comments
+  var tocIdx = src.indexOf('TOC 过滤：结尾带页码');
+  assert(tocIdx >= 0, 'Pre-parse TOC filter comment must exist');
+  var nearby = src.substring(tocIdx - 80, tocIdx + 100);
+  assert(nearby.indexOf('d{1,3}') >= 0 || nearby.indexOf('d{1,3}$') >= 0 || nearby.indexOf('continue') >= 0, 'TOC filter pattern must exist near comment');
+});
+
+test('AUDIT: bodyStartIdx uses detectHeadingLevel', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var bsBlock = src.substring(src.indexOf('2b. 从 tocIdx'), src.indexOf('2c. 兜底'));
+  assert(bsBlock.indexOf('detectHeadingLevel') >= 0, 'bodyStartIdx must use detectHeadingLevel');
+});
+
+test('AUDIT: wrapExistingMarkers writes sent.refs', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var wfBlock = src.substring(src.indexOf('function wrapExistingMarkers'), src.indexOf('function injectNewMarkers'));
+  assert(wfBlock.indexOf('sent.refs') >= 0, 'wrapExistingMarkers must write sent.refs');
+});
+
+test('AUDIT: injectNewMarkers sets sent.refs', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var fnBody = src.substring(src.indexOf('function injectNewMarkers(refs)'), src.indexOf('function scrollToRef'));
+  assert(fnBody.indexOf('sent.refs') >= 0, 'injectNewMarkers must set sent.refs');
+});
+
+test('AUDIT: lookupRefPosition scans _treeIndex.sentences', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('function lookupRefPosition') >= 0, 'lookupRefPosition must exist');
+  var fnBody = src.substring(src.indexOf('function lookupRefPosition'), src.indexOf('function jumpToDomEl'));
+  assert(fnBody.indexOf('_treeIndex.sentences') >= 0, 'Must scan _treeIndex.sentences');
+});
+
+test('AUDIT: sectionPathFor function removed', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('function sectionPathFor') < 0, 'sectionPathFor must be removed');
+});
+
+test('AUDIT: renderRefs uses lookupRefPosition', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var rfBlock = src.substring(src.indexOf('function renderRefs'), src.indexOf('function renderExistingOnly'));
+  assert(rfBlock.indexOf('lookupRefPosition') >= 0, 'renderRefs must use lookupRefPosition');
+});
+
+test('AUDIT: renderExistingOnly uses lookupRefPosition', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var reBlock = src.substring(src.indexOf('function renderExistingOnly'), src.indexOf('function copyOneExisting'));
+  assert(reBlock.indexOf('lookupRefPosition') >= 0, 'renderExistingOnly must use lookupRefPosition');
+});
+
 // Results
 // ============================================================
 console.log('\n=== RESULTS ===');

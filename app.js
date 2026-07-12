@@ -2041,6 +2041,8 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
           var txt=tx.join('').trim();
           if(!txt||txt.length<2)continue;
           if(/^\d{1,3}$/.test(txt)||/^[ivxlcdm]+$/i.test(txt))continue;
+          // TOC 过滤：结尾带页码
+          if(/[\t\s]+\d{1,3}$/.test(txt)||/\.{3,}\d{1,3}$/.test(txt))continue;
           if(!sg[sname])sg[sname]={name:sname,count:0,samples:[],_texts:[]};
           sg[sname].count++;
           if(sg[sname].samples.length<2)sg[sname].samples.push(txt.substring(0,80));
@@ -2075,15 +2077,19 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     // 严格策略：只有明确的标题模式才返回 >= 0
     function detectHeadingLevel(txt) {
       if (!txt || txt.length < 2) return -1;
-      // 章标题: 第X章 / 第X章 XXX
+      // TOC 条目过滤：结尾带页码（tab/空格 + 1-3位数字）
+      if (/[\t\s]+\d{1,3}$/.test(txt)||/\.{3,}\d{1,3}$/.test(txt)||/[\s\.]{5,}\d{1,3}$/.test(txt)) return -1;
+      // 纯页码（1-3位数字或罗马数字）
+      if (/^\d{1,3}$/.test(txt)||/^[ivxlcdm]+$/i.test(txt)) return -1;
+      // 章标题
       if (/^第[一二三四五六七八九十123456789]+章/.test(txt) || /^Chapter\s+\d/.test(txt)) return 0;
-      // 数字编号 + 标题文字：1.1 研究背景 / 2.1.3 智慧工地
+      // 数字编号 + 标题文字
       var nm = txt.match(/^(\d+(?:\.\d+)+)\s+(\S.{1,})/);
       if (nm && nm[2] && nm[2].length >= 2) {
         var dots = nm[1].split('.').length - 1;
         return dots <= 2 ? dots : -1;
       }
-      // 纯数字 + 标题："1 绪论" / "2 文献综述"（标题≥2字即可）
+      // 纯数字 + 标题
       var sm = txt.match(/^(\d+)[\s、，,.]+\s*(\S.{1,})/);
       if (sm && sm[2] && sm[2].length >= 2 && sm[2].length < 80) {
         return sm[1] === '1' ? 0 : 1;
@@ -2170,7 +2176,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
         if (!txt2 || txt2.length < 2) continue;
         if (refBound && (el2.compareDocumentPosition(refBound) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
         if (/^\d{1,3}$/.test(txt2) || /^[ivxlcdmIVXLCDM]+$/.test(txt2)) continue;
-        if (/\t\d{1,3}$/.test(txt2) || /[\s\.]{2,}\d{1,3}$/.test(txt2)) continue;
+        if (/\t\d{1,3}$/.test(txt2) || /[\s\.]{2,}\d{1,3}$/.test(txt2) || /[\s]+\d{1,3}$/.test(txt2)) continue;
         var tagName = (el2.tagName || '').toUpperCase();
         if (/^H[1-6]$/.test(tagName)) {
           allHeadings.push({ el: el2, txt: txt2, level: -1, tagLevel: parseInt(tagName.charAt(1)), bare: false });
