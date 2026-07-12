@@ -1,4 +1,4 @@
-"use strict";var existingRefs=[],manuscriptText='',manuscriptHTML='',mergedRefs=[],paperTopics=[],zoomLevel=1,sections=[],selNavIdx=-1,searchRunning=false,appReady=false;
+"use strict";var existingRefs=[],manuscriptText='',manuscriptHTML='',mergedRefs=[],paperTopics=[],zoomLevel=1,sections=[],selNavIdx=-1,searchRunning=false,appReady=false,_bareHeadingCount=0,_totalHeadingCount=0;
 window.onerror=function(m,s,l,c,e){console.error(m,'@',s,':',l);document.getElementById('statusBar')&&(document.getElementById('statusBar').textContent='⚠ 出现错误，请刷新页面');return true};
 // 评分维度的解释提示
 var _scoreInfo={conf:'🔍 真实度：文献在数据库中是否真实存在。DOI精确匹配=高可信；多源标题匹配=可信；无法匹配=低。',topicRel:'🎯 主题相关度：文献标题关键词与论文全文关键词的交集比例。分数越高，文献越贴合论文主题。',secFit:'📂 章节适配度：文献标题关键词与所在章节内容的交叉匹配比例。反映该文献是否适合放在此章。',dupRate:'📝 句子重合度：文献关键词与插入位置上下文关键词的交集。数值高=插入的句子和文献主题高度吻合。'};
@@ -1337,6 +1337,12 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
           else{node.subs=[];parent.subs?parent.subs.push(node):(parent.subs=parent.subs||[],parent.subs.push(node));}
           curLvl[hc.level]=node;
         }
+      }
+      // 统计裸编号数量，用于标题样式质量诊断
+      _totalHeadingCount=headingCandidates.length;
+      _bareHeadingCount=0;
+      for(var bi=0;bi<headingCandidates.length;bi++){
+        if(headingCandidates[bi].bare)_bareHeadingCount++;
       }
     }
     // 正则回退

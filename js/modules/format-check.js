@@ -55,6 +55,31 @@ function runFormatCheck(container) {
   if (h1Count > 1) issues.warnings.push({ msg: '检测到 ' + h1Count + ' 个 H1 标签，建议统一为章节标题格式（论文标题通常为1个H1属正常）' });
   else if (h1Count === 1) issues.ok.push({ msg: '检测到 1 个 H1 标签（通常为论文标题，正常）' });
 
+  // 标题样式质量：检测 Word 是否套用了正确标题样式
+  h += '<h4>📐 标题样式质量</h4>';
+  var allHeadings=html.match(/<(h[1-6])[ >]/gi)||[];
+  var headingTagCount=allHeadings.length;
+  var bareCount=typeof _bareHeadingCount!=='undefined'?_bareHeadingCount:0;
+  var totalHd=typeof _totalHeadingCount!=='undefined'?_totalHeadingCount:0;
+  if(totalHd>0){
+    var barePct=Math.round(bareCount/totalHd*100);
+    if(barePct>=50){
+      h+='<div class="finding err">❗ 超过 '+barePct+'%（'+bareCount+'/'+totalHd+'个）的标题/节编号与正文分离，原因：Word 中未套用"标题1/2/3"等样式。请选中所有章/节/小节标题，统一设置为对应标题样式后重新上传。</div>';
+    }else if(barePct>=20){
+      h+='<div class="finding warn">⚠ 约 '+barePct+'%（'+bareCount+'/'+totalHd+'个）标题与正文分离，建议在 Word 中套用标题样式以提升解析精度。</div>';
+    }else if(bareCount>0){
+      h+='<div class="finding info">📌 少量标题（'+bareCount+'/'+totalHd+'个）使用非标准样式，不影响整体解析。</div>';
+    }else{
+      h+='<div class="finding ok">✅ 所有标题样式规范，解析精度最佳。</div>';
+    }
+    if(headingTagCount<totalHd){
+      var plainPct=Math.round((totalHd-headingTagCount)/totalHd*100);
+      h+='<div class="finding info">📌 约 '+plainPct+'% 标题使用非标准段落标签（Word 未套用标题样式），解析时依赖编号模式匹配。建议在 Word 中设置统一的标题样式以获得最佳效果。</div>';
+    }
+  }else if(headingTagCount>0){
+    h+='<div class="finding ok">✅ 检测到 '+headingTagCount+' 个 HTML 标题标签，样式使用良好。</div>';
+  }
+
     // 引用位置检测
   h += '<h4>📍 引用位置检测</h4>';
   var badRefs=0;

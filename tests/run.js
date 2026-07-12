@@ -1100,6 +1100,18 @@ test('AUDIT: structureThesisBox uses compareDocumentPosition', function() {
   assert(src.indexOf('compareDocumentPosition') >= 0, 'structureThesisBox uses DOM-order sort');
 });
 
+test('AUDIT: _bareHeadingCount global exists for heading style QA', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('_bareHeadingCount') >= 0, '_bareHeadingCount global missing');
+  assert(src.indexOf('_totalHeadingCount') >= 0, '_totalHeadingCount global missing');
+});
+
+test('AUDIT: format-check has heading style quality section', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
+  assert(src.indexOf('标题样式质量') >= 0, 'Missing heading style quality check in format-check.js');
+  assert(src.indexOf('_bareHeadingCount') >= 0 || src.indexOf('bareCount') >= 0, 'format-check must read _bareHeadingCount');
+});
+
 
 // Results
 // ============================================================
