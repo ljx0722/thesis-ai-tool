@@ -263,7 +263,7 @@ function injectNewMarkers(refs){
 }
 function scrollToRef(n){var el=document.getElementById('r'+(n-1))||document.getElementById('er'+(n-1));if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.transition='background .3s';el.style.background='#fef3c7';setTimeout(function(){el.style.background=''},2000)}else ttp('未找到['+n+']')}
 
-function renderNavTree(tree){var c=document.getElementById('navTree');if(!tree||!tree.length){c.innerHTML='<i style="color:var(--m);font-size:.7rem;padding:8px;display:block">未检测到章节</i>';return}var h='',idx=0;for(var ci=0;ci<tree.length;ci++){var ch=tree[ci];h+='<div class="tree-node ch" data-idx="'+(idx++)+'" data-id="ch-'+ch.ch+'" onclick="navClick2(this)">'+ch.name+'</div>';for(var si=0;si<ch.sections.length;si++){var sec=ch.sections[si],sid='sec-'+sec.num.replace(/[.]/g,'-');h+='<div class="tree-node sec" data-idx="'+(idx++)+'" data-id="'+sid+'" onclick="navClick2(this)">'+sec.num+' '+sec.title+'</div>';for(var ui=0;ui<sec.subs.length;ui++){var sub=sec.subs[ui],uid='sub-'+sub.num.replace(/[.]/g,'-');h+='<div class="tree-node sub" data-idx="'+(idx++)+'" data-id="'+uid+'" onclick="navClick2(this)">'+sub.num+' '+sub.title+'</div>'}}}c.innerHTML=h}
+function renderNavTree(tree){var c=document.getElementById('navTree');if(!tree||!tree.length){c.innerHTML='<i style="color:var(--m);font-size:.7rem;padding:8px;display:block">未检测到章节</i>';return}var h='',idx=0;function rnr(nodes,level){for(var i=0;i<nodes.length;i++){var n=nodes[i];var cls=level===0?'ch':(level===1?'sec':'sub');var id=level===0?('ch-'+n.ch):((level===1?'sec-':'sub-')+(n.num||'').replace(/[.]/g,'-'));h+='<div class="tree-node '+cls+'" data-idx="'+(idx++)+'" data-id="'+id+'" onclick="navClick2(this)" style="padding-left:'+(level*14+8)+'px">';if(level===0)h+=n.name;else h+=(n.num||'')+' '+(n.title||'');h+='</div>';var kids=n.sections||n.subs||[];if(kids.length)rnr(kids,level+1);}}rnr(tree,0);c.innerHTML=h}
 
 
 function navClick2(el){
@@ -1032,19 +1032,100 @@ function asSkip(){
 }
 
 
-// ========== 内联标题校准：点击原文段落指定层级 ==========
+// ========== 内联标题校准：点击原文段落指定层级（支持任意深度） ==========
 var _iclMode=null, _iclSelections=[], _iclCallback=null, _iclToolbar=null, _iclPreview=null, _iclLastMatch='';
+var _iclLevels=['章','节','小节']; // 可扩展的层级名
+var _iclMaxLevel=2; // 当前最大层级（0=章, 1=节, 2=小节, 3=深1, 4=深2...）
+var _iclColors=['#0071e3','#af52de','#30d158','#ff9f0a','#ff375f','#5ac8fa','#bf5af2','#ffd60a']; // 8色
 
-function startInlineCalibration(box,autoDetected){_iclSelections=[];autoDetected.forEach(function(a){if(a.level>=0)_iclSelections.push({el:a.el,level:a.level,txt:a.txt});});_iclMode='ch';return new Promise(function(resolve){_iclCallback=resolve;showInlineCalibrationUI(box);});}
-function showInlineCalibrationUI(box){var tb=document.createElement('div');tb.id='iclToolbar';tb.style.cssText='position:sticky;top:0;z-index:100;background:#fff;border-bottom:2px solid #0071e3;padding:10px 16px;margin:-8px -8px 12px -8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 1px 4px rgba(0,0,0,.08)';tb.innerHTML='<b style="font-size:.82rem;color:#0071e3">📐 标题校准</b> ';tb.innerHTML+='<span style="font-size:.65rem;color:#666">点击论文正文段落标记层级：</span> ';tb.innerHTML+='<button id="iclBtnCh" onclick="iclSetMode(\'ch\')" style="background:#0071e3;color:#fff;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.65rem;font-weight:600">章</button>';tb.innerHTML+='<button id="iclBtnSec" onclick="iclSetMode(\'sec\')" style="background:rgba(0,0,0,.06);color:#333;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.65rem;font-weight:600">节</button>';tb.innerHTML+='<button id="iclBtnSub" onclick="iclSetMode(\'sub\')" style="background:rgba(0,0,0,.06);color:#333;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.65rem;font-weight:600">小节</button>';tb.innerHTML+='<button id="iclBtnNone" onclick="iclSetMode(\'none\')" style="background:rgba(255,59,48,.08);color:#ff3b30;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.65rem;font-weight:600">非标题(清除)</button>';tb.innerHTML+='<span style="flex:1"></span>';tb.innerHTML+='<button onclick="iclClearAll()" style="background:rgba(0,0,0,.06);color:#333;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.65rem">↺ 清空</button>';tb.innerHTML+='<button onclick="iclFinish()" style="background:#30d158;color:#fff;border:none;border-radius:8px;padding:5px 16px;cursor:pointer;font-weight:700;font-size:.65rem">✅ 完成</button>';tb.innerHTML+='<span id="iclCount" style="font-size:.62rem;color:#666"></span>';box.parentElement.insertBefore(tb,box);_iclToolbar=tb;var pv=document.createElement('div');pv.id='iclPreview';pv.style.cssText='position:fixed;top:80px;right:12px;width:240px;max-height:70vh;overflow-y:auto;background:#fff;border-radius:12px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,.12);z-index:101;font-size:.65rem;line-height:1.6;border:1px solid #e5e7eb';pv.innerHTML='<div style="font-weight:700;margin-bottom:6px;color:#0071e3">📑 目录实时预览</div><div id="iclTree" style="color:#666">等待选取标题…</div>';document.body.appendChild(pv);_iclPreview=pv;box.style.outline='2px dashed #0071e3';box.style.outlineOffset='-2px';box.style.cursor='crosshair';var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');for(var i=0;i<els.length;i++){els[i].style.transition='background .15s';els[i].addEventListener('mouseenter',iclHoverIn);els[i].addEventListener('mouseleave',iclHoverOut);els[i].addEventListener('click',iclClick);}iclRefreshMarkers();iclUpdateCount();iclUpdatePreview();hideLoad();}
-function iclSetMode(m){_iclMode=m;var ids={ch:'iclBtnCh',sec:'iclBtnSec',sub:'iclBtnSub',none:'iclBtnNone'};Object.keys(ids).forEach(function(k){var b=document.getElementById(ids[k]);if(!b)return;var active=k===m;b.style.background=active?'#0071e3':(k==='none'?'rgba(255,59,48,.08)':'rgba(0,0,0,.06)');b.style.color=active?'#fff':(k==='none'?'#ff3b30':'#333');});}
+function startInlineCalibration(box,autoDetected){
+  _iclSelections=[];autoDetected.forEach(function(a){if(a.level>=0)_iclSelections.push({el:a.el,level:a.level,txt:a.txt});});
+  _iclMode='ch';_iclMaxLevel=2;_iclLevels=['章','节','小节'];
+  return new Promise(function(resolve){_iclCallback=resolve;showInlineCalibrationUI(box);});
+}
+
+function showInlineCalibrationUI(box){
+  var tb=document.createElement('div');tb.id='iclToolbar';
+  tb.style.cssText='position:sticky;top:0;z-index:100;background:#fff;border-bottom:2px solid #0071e3;padding:10px 16px;margin:-8px -8px 12px -8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;box-shadow:0 1px 4px rgba(0,0,0,.08)';
+  renderIclToolbar(tb);
+  box.parentElement.insertBefore(tb,box);_iclToolbar=tb;
+  var pv=document.createElement('div');pv.id='iclPreview';
+  pv.style.cssText='position:fixed;top:80px;right:12px;width:240px;max-height:70vh;overflow-y:auto;background:#fff;border-radius:12px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,.12);z-index:101;font-size:.65rem;line-height:1.6;border:1px solid #e5e7eb';
+  pv.innerHTML='<div style="font-weight:700;margin-bottom:6px;color:#0071e3">📑 目录实时预览</div><div id="iclTree" style="color:#666">等待选取标题…</div>';
+  document.body.appendChild(pv);_iclPreview=pv;
+  box.style.outline='2px dashed #0071e3';box.style.outlineOffset='-2px';box.style.cursor='crosshair';
+  var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+  for(var i=0;i<els.length;i++){els[i].style.transition='background .15s';els[i].addEventListener('mouseenter',iclHoverIn);els[i].addEventListener('mouseleave',iclHoverOut);els[i].addEventListener('click',iclClick);}
+  iclRefreshMarkers();iclUpdateCount();iclUpdatePreview();hideLoad();
+}
+
+function renderIclToolbar(tb){
+  var h='<b style="font-size:.82rem;color:#0071e3">📐 标题校准</b> ';
+  h+='<span style="font-size:.63rem;color:#666">点击段落标记层级：</span> ';
+  // 动态层级按钮
+  for(var li=0;li<=_iclMaxLevel;li++){
+    var nm=_iclLevels[li]||('更深级'+(li-1));
+    var kl=li===0?'ch':(li===1?'sec':'lvl'+li);
+    var id='iclBtn'+(li===0?'Ch':(li===1?'Sec':'Lvl'+li));
+    var bg=_iclMode===kl?'#0071e3':'rgba(0,0,0,.06)';
+    var fg=_iclMode===kl?'#fff':'#333';
+    h+='<button id="'+id+'" onclick="iclSetMode('+li+')" style="background:'+bg+';color:'+fg+';border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.65rem;font-weight:600">'+nm+'</button> ';
+  }
+  // 加一层按钮
+  h+='<button onclick="iclAddLevel()" title="新增更深一层级" style="background:rgba(0,0,0,.03);color:#666;border:1px dashed #ccc;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:.65rem;line-height:1">+</button>';
+  // 减去一层按钮（至少保留2层）
+  h+='<button onclick="iclRemoveLevel()" title="移除最后一层" style="background:rgba(255,59,48,.06);color:#999;border:none;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:.65rem;line-height:1">-</button>';
+  // 非标题(清除)
+  h+='<button id="iclBtnNone" onclick="iclSetMode('+(-1)+')" style="background:'+(_iclMode=== -1?'rgba(255,59,48,.2)':'rgba(255,59,48,.06)')+';color:'+(_iclMode=== -1?'#ff3b30':'#ff3b30')+';border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.65rem;font-weight:600;margin-left:4px">非标题(清除)</button>';
+  h+='<span style="flex:1"></span>';
+  h+='<button onclick="iclClearAll()" style="background:rgba(0,0,0,.06);color:#333;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.65rem">↺ 清空</button>';
+  h+='<button onclick="iclFinish()" style="background:#30d158;color:#fff;border:none;border-radius:8px;padding:5px 16px;cursor:pointer;font-weight:700;font-size:.65rem">✅ 完成</button>';
+  h+='<span id="iclCount" style="font-size:.62rem;color:#666"></span>';
+  tb.innerHTML=h;
+  _iclToolbar=tb;
+}
+
+function iclAddLevel(){
+  _iclMaxLevel++;
+  _iclLevels[_iclMaxLevel]='深'+(1+Math.floor((_iclMaxLevel-2)/2))+'-'+(1+(_iclMaxLevel-2)%2);
+  _iclMode='lvl'+_iclMaxLevel;
+  renderIclToolbar(_iclToolbar);
+  iclUpdateCount();
+}
+
+function iclRemoveLevel(){
+  if(_iclMaxLevel<=2)return; // 至少保留章/节/小节三层
+  _iclMaxLevel--;
+  if(_iclMode==='lvl'+(_iclMaxLevel+1))_iclMode='sub';
+  _iclLevels.length=_iclMaxLevel+1;
+  renderIclToolbar(_iclToolbar);
+  iclUpdateCount();
+}
+function iclSetMode(m){_iclMode=(typeof m==='number'?('lvl'+m):m);renderIclToolbar(_iclToolbar);}
 function iclHoverIn(e){if(_iclMode)e.currentTarget.style.background='rgba(0,113,227,.06)';}
 function iclHoverOut(e){e.currentTarget.style.background='';}
 function iclStyleFingerprint(el){if(!el)return'';var cs;try{cs=getComputedStyle(el)}catch(e){return el.tagName+':'+(el.getAttribute('style')||'')}return[cs.fontFamily,cs.fontSize,cs.fontWeight,cs.color||'',cs.textAlign||''].join('|')}
-function iclClick(e){e.stopPropagation();if(!_iclMode)return;var el=e.currentTarget,t=(el.textContent||'').trim();if(!t||t.length<1)return;
-  // 同字体指纹批量选择：正文范围内所有相同样式的段落自动标记为同一层级
-  if(_iclMode!=='none'){
-    var lv=_iclMode==='ch'?0:(_iclMode==='sec'?1:2);
+function iclLevelFromMode(mode){if(typeof mode==="number")return mode;if(mode==="ch")return 0;if(mode==="sec")return 1;if(mode==="sub")return 2;var m=mode.match(/^lvl(\d+)$/);return m?parseInt(m[1]):-1;}
+
+
+function iclLevelFromMode(mode){
+  if(typeof mode==='number')return mode;
+  if(mode==='ch')return 0;
+  if(mode==='sec')return 1;
+  if(mode==='sub')return 2;
+  var m=mode.match(/^lvl(\d+)$/);
+  return m?parseInt(m[1]):-1;
+}
+
+function iclClick(e){
+  e.stopPropagation();
+  if(!_iclMode||_iclMode===-1)return;
+  var lv=iclLevelFromMode(_iclMode);
+  if(lv<0)return;
+  var el=e.currentTarget,t=(el.textContent||'').trim();
+  if(!t||t.length<1)return;
+  // 同字体指纹批量选择
+  if(lv>=0){
     var fp=iclStyleFingerprint(el);
     var box=document.getElementById('thesisBox');
     var refBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
@@ -1053,7 +1134,6 @@ function iclClick(e){e.stopPropagation();if(!_iclMode)return;var el=e.currentTar
       for(var bi=0;bi<els.length;bi++){
         var be=els[bi];if(be===el)continue;
         if(refBound&&(be.compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
-        // 只匹配相同标签类型且有相同样式的元素
         if((be.tagName||'').toUpperCase()!==targetTag)continue;
         var bfp=iclStyleFingerprint(be);
         if(bfp===fp&&bfp.indexOf('|')>0){
@@ -1063,21 +1143,40 @@ function iclClick(e){e.stopPropagation();if(!_iclMode)return;var el=e.currentTar
           be.style.background='rgba(48,209,88,.15)';setTimeout(function(){be.style.background='';},500);
         }
       }
-      console.log('[icl] Style auto-match: '+batchCount+' elements with same formatting as "'+t.substring(0,20)+'" → level '+lv);
-      _iclLastMatch='自动匹配 +'+batchCount+' 同字体段落';
+      console.log('[icl] Style auto-match: '+batchCount+' elements → level '+lv+' ('+(_iclLevels[lv]||'深')+')');
+      _iclLastMatch='自动匹配 +'+batchCount+' 同字体';
     }
   }
   _iclSelections=_iclSelections.filter(function(s){return s.el!==el;});
-  if(_iclMode!=='none'){
-    var lv2=_iclMode==='ch'?0:(_iclMode==='sec'?1:2);
-    _iclSelections.push({el:el,level:lv2,txt:t});
-    el.style.background='rgba(48,209,88,.2)';setTimeout(function(){el.style.background='';},400);
-  }
+  _iclSelections.push({el:el,level:lv,txt:t});
+  el.style.background='rgba(48,209,88,.2)';setTimeout(function(){el.style.background='';},400);
   iclRefreshMarkers();iclUpdateCount();iclUpdatePreview();
 }
-function iclRefreshMarkers(){var colors={0:'#0071e3',1:'#af52de',2:'#30d158'};var old=document.querySelectorAll('.icl-marker');for(var i=0;i<old.length;i++)old[i].parentElement.removeChild(old[i]);_iclSelections.forEach(function(s){if(!s.el||!s.el.parentElement)return;if(s.el.style.position===''||s.el.style.position==='static')s.el.style.position='relative';s.el.style.borderLeft='3px solid '+colors[s.level];s.el.style.paddingLeft='6px';});}
+
+function iclRefreshMarkers(){
+  var old=document.querySelectorAll('.icl-marker');
+  for(var i=0;i<old.length;i++)old[i].parentElement.removeChild(old[i]);
+  _iclSelections.forEach(function(s){
+    if(!s.el||!s.el.parentElement)return;
+    if(s.el.style.position===''||s.el.style.position==='static')s.el.style.position='relative';
+    s.el.style.borderLeft='3px solid '+(_iclColors[s.level]||'#94a3b8');
+    s.el.style.paddingLeft='6px';
+  });
+}
+
 function iclClearAll(){_iclSelections=[];_iclLastMatch='';var old=document.querySelectorAll('.icl-marker');for(var i=0;i<old.length;i++)old[i].parentElement.removeChild(old[i]);var box=document.getElementById('thesisBox');if(box){var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');for(var j=0;j<els.length;j++){els[j].style.borderLeft='';els[j].style.paddingLeft='';els[j].style.position='';}}iclUpdateCount();iclUpdatePreview();}
-function iclUpdateCount(){var el=document.getElementById('iclCount');if(!el)return;var ch=0,sec=0,sub=0;_iclSelections.forEach(function(s){if(s.level===0)ch++;else if(s.level===1)sec++;else sub++;});var extra=_iclLastMatch?' | '+_iclLastMatch:'';el.textContent='已选: 章×'+ch+' 节×'+sec+' 小节×'+sub+extra;}
+function iclUpdateCount(){
+  var el=document.getElementById('iclCount');if(!el)return;
+  var cnts={};for(var i=0;i<=_iclMaxLevel;i++)cnts[i]=0;
+  _iclSelections.forEach(function(s){cnts[s.level]=(cnts[s.level]||0)+1;});
+  var parts=[];for(var i=0;i<=_iclMaxLevel;i++){
+    parts.push((_iclLevels[i]||('深'+(i-1)))+'×'+cnts[i]);
+  }
+  var extra=_iclLastMatch?' | '+_iclLastMatch:'';
+  el.textContent='已选: '+parts.join(' ')+extra;
+}
+
+
 function iclUpdatePreview(){var el=document.getElementById('iclTree');if(!el)return;var sorted=_iclSelections.slice().sort(function(a,b){return(a.el.compareDocumentPosition(b.el)&Node.DOCUMENT_POSITION_FOLLOWING)?-1:1;});var h='',ci=0;for(var i=0;i<sorted.length;i++){var s=sorted[i];if(s.level===0){ci++;h+='<div style="color:#0071e3;font-weight:600;margin-top:4px">'+ci+'. '+s.txt.substring(0,25)+'</div>';}else if(s.level===1){h+='<div style="padding-left:10px;color:#af52de">├ '+s.txt.substring(0,22)+'</div>';}else{h+='<div style="padding-left:20px;color:#30d158;font-size:.6rem">│ └ '+s.txt.substring(0,22)+'</div>';}}if(!sorted.length)h='<div style="color:#999">等待选取…<br><br>点击正文段落<br>然后选章/节/小节</div>';el.innerHTML=h;}
 function iclFinish(){cleanupInlineCalibration();var sorted=_iclSelections.slice().sort(function(a,b){return(a.el.compareDocumentPosition(b.el)&Node.DOCUMENT_POSITION_FOLLOWING)?-1:1;});var result=sorted.map(function(s){return{el:s.el,txt:s.txt,level:s.level,tagLevel:-1,bare:false};});if(_iclCallback)_iclCallback(result);}
 function cleanupInlineCalibration(){var box=document.getElementById('thesisBox');if(box){box.style.outline='';box.style.cursor='';var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');for(var i=0;i<els.length;i++){els[i].removeEventListener('mouseenter',iclHoverIn);els[i].removeEventListener('mouseleave',iclHoverOut);els[i].removeEventListener('click',iclClick);els[i].style.transition='';els[i].style.borderLeft='';els[i].style.paddingLeft='';els[i].style.position='';}}var oldMk=document.querySelectorAll('.icl-marker');for(var j=0;j<oldMk.length;j++)oldMk[j].parentElement.removeChild(oldMk[j]);if(_iclToolbar&&_iclToolbar.parentElement)_iclToolbar.parentElement.removeChild(_iclToolbar);if(_iclPreview&&_iclPreview.parentElement)_iclPreview.parentElement.removeChild(_iclPreview);_iclToolbar=null;_iclPreview=null;_iclSelections=[];_iclMode=null;_iclCallback=null;}
@@ -1847,61 +1946,50 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
       // 让用户在原文中点选段落来标记层级
       var calibrated = await startInlineCalibration(box, allHeadings);
       if (calibrated !== null) allHeadings = calibrated;
-      // ===== 第5步：从校准后的标题列表构建章节树 =====
+      // ===== 第5步：从校准后的标题列表构建章节树（支持任意深度） =====
       sections = [];
-      var stack = []; // [{ch, sec, sub, level}]
+      var stack = []; // [{node, level}]
       var chCounter = 0;
       for (var hi2 = 0; hi2 < allHeadings.length; hi2++) {
         var hd = allHeadings[hi2];
-        if (hd.level < 0) continue; // 用户标记为非标题
-        // Pop stack until we find a parent (level < current level)
+        if (hd.level < 0) continue;
+        // Pop to find parent (level < hd.level)
         while (stack.length > 0 && stack[stack.length - 1].level >= hd.level) stack.pop();
-        var parent = stack.length > 0 ? stack[stack.length - 1] : null;
+        // Extract clean title
+        var titleClean = hd.txt;
+        var numStr = detectHeadingNum(hd.txt);
+        if (numStr && titleClean.indexOf(numStr) === 0) {
+          titleClean = titleClean.substring(numStr.length).replace(/^[\s、，,.]*/, '');
+        }
         if (hd.level === 0) {
-          // 新章
           chCounter++;
           var chNum2 = detectChapterNum(hd.txt) || chCounter;
-          // 去重同章号
           var dupCh = null;
           for (var ci = 0; ci < sections.length; ci++) { if (sections[ci].ch === chNum2) { dupCh = sections[ci]; break; } }
-          if (dupCh) {
-            // 保留标题更完整的版本
-            if (hd.txt.length > dupCh.name.length) dupCh.name = hd.txt;
-            if (hd.el && !dupCh.el) dupCh.el = hd.el;
-          } else {
-            dupCh = { ch: chNum2, name: hd.txt, sections: [], el: hd.el };
-            sections.push(dupCh);
-          }
+          if (dupCh) { if (hd.txt.length > dupCh.name.length) dupCh.name = hd.txt; if (hd.el && !dupCh.el) dupCh.el = hd.el; }
+          else { dupCh = { ch: chNum2, name: hd.txt, sections: [], el: hd.el }; sections.push(dupCh); }
           stack = [{ node: dupCh, level: 0 }];
         } else {
-          if (!parent) continue; // 没有父节点，跳过
-          var titleClean = hd.txt;
-          // 如果标题已包含编号前缀，去掉它（避免 renderNavTree 拼接时重复）
-          var numStr = detectHeadingNum(hd.txt);
-          if (numStr && titleClean.indexOf(numStr) === 0) {
-            titleClean = titleClean.substring(numStr.length).replace(/^[\s、，,.]*/, '');
+          if (stack.length === 0) continue;
+          var node = { num: numStr, title: titleClean || hd.txt, el: hd.el, subs: [] };
+          // Walk the stack down to depth = hd.level - 1
+          var cursor = stack[0].node; // chapter node
+          var cursorLevel = 0;
+          for (var dl = 0; dl < hd.level - 1 && cursor; dl++) {
+            var kids = cursor.sections || cursor.subs || [];
+            cursor = kids.length > 0 ? kids[kids.length - 1] : null;
+            cursorLevel++;
           }
-          var node = { num: numStr, title: titleClean || hd.txt, el: hd.el };
-          if (hd.level === 1) {
-            node.subs = [];
-            if (!parent.node.sections) parent.node.sections = [];
-            parent.node.sections.push(node);
-            stack.push({ node: node, level: 1 });
-          } else {
-            // level >= 2: 挂在当前最深节的 subs 下
-            var targetParent = parent.node;
-            for (var si2 = 0; si2 < hd.level - 1; si2++) {
-              var subs = targetParent.subs || (targetParent.sections && targetParent.sections.length ? targetParent.sections[targetParent.sections.length - 1].subs : null);
-              if (!subs || !subs.length) { node.subs = []; if (!targetParent.subs) targetParent.subs = []; targetParent.subs.push(node); targetParent = null; break; }
-              targetParent = subs[subs.length - 1];
+          if (cursor) {
+            if (cursor.sections) {
+              cursor.sections.push(node);
+            } else if (cursor.subs) {
+              cursor.subs.push(node);
+            } else {
+              cursor.sections = [node];
             }
-            if (targetParent) {
-              node.subs = [];
-              if (!targetParent.subs) targetParent.subs = [];
-              targetParent.subs.push(node);
-            }
-            stack.push({ node: node, level: hd.level });
           }
+          stack.push({ node: node, level: hd.level });
         }
       }
     }
@@ -1916,46 +2004,33 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
           hdAnchors.push({ el: bodyEls[ai2], id: aid, idx: ai2 });
         }
       }
-      // 辅助：根据锚点 id 匹配标题节点并填充文本
+      // 辅助：根据锚点 id 匹配标题节点并递归填充文本（支持任意深度）
       function fillNodeText(node, nodeLevel, anchorIdx) {
         var nextIdx = bodyEls.length;
-        // 找下一个同级或更高级的锚点作为边界
         for (var ni = anchorIdx + 1; ni < hdAnchors.length; ni++) {
-          var na = hdAnchors[ni];
-          var naLevel = na.id.indexOf('ch-') === 0 ? 0 : (na.id.indexOf('sec-') === 0 ? 1 : 2);
-          if (naLevel <= nodeLevel) { nextIdx = na.idx; break; }
+          var naLevel = hdAnchors[ni].id.indexOf('ch-') === 0 ? 0 : (hdAnchors[ni].id.indexOf('sec-') === 0 ? 1 : (hdAnchors[ni].id.indexOf('sub-') === 0 ? 2 : hdAnchors[ni].id.split('-').length - 1));
+          if (naLevel <= nodeLevel) { nextIdx = hdAnchors[ni].idx; break; }
         }
-        // 收集 [anchorIdx, nextIdx) 之间的文本
         var txt = '';
         for (var ti2 = anchorIdx + 1; ti2 < nextIdx && ti2 < bodyEls.length; ti2++) {
           var et = (bodyEls[ti2].textContent || '').trim();
           if (!et) continue;
-          // 过滤页码/TOC残留
           if (/^\d{1,3}$/.test(et) || /^[ivxlcdmIVXLCDM]+$/.test(et)) continue;
           if (/^[-—–]/.test(et) && et.length < 10) continue;
+          if (/\.{3,}\s*\d/.test(et) && et.length < 80) continue;
           txt += et + '\n';
         }
         node.text = txt.trim();
-        // 递归填子节点
-        if (node.sections) {
-          for (var si3 = 0; si3 < node.sections.length; si3++) {
-            var secNode = node.sections[si3];
-            var secAIdx = -1;
-            for (var ai3 = 0; ai3 < hdAnchors.length; ai3++) {
-              if (hdAnchors[ai3].id === 'sec-' + (secNode.num || '').replace(/\./g, '-')) { secAIdx = ai3; break; }
-            }
-            if (secAIdx >= 0) fillNodeText(secNode, 1, secAIdx);
-            if (secNode.subs) {
-              for (var ui2 = 0; ui2 < secNode.subs.length; ui2++) {
-                var subNode = secNode.subs[ui2];
-                var subAIdx = -1;
-                for (var ai4 = 0; ai4 < hdAnchors.length; ai4++) {
-                  if (hdAnchors[ai4].id === 'sub-' + (subNode.num || '').replace(/\./g, '-')) { subAIdx = ai4; break; }
-                }
-                if (subAIdx >= 0) fillNodeText(subNode, 2, subAIdx);
-              }
-            }
+        // 递归填充所有子节点
+        var kids = node.sections || node.subs || [];
+        for (var ki = 0; ki < kids.length; ki++) {
+          var kidNode = kids[ki];
+          var kidId = (nodeLevel === 0 ? 'sec-' : 'sub-') + (kidNode.num || '').replace(/\./g, '-');
+          var kidAIdx = -1;
+          for (var ai3 = 0; ai3 < hdAnchors.length; ai3++) {
+            if (hdAnchors[ai3].id === kidId) { kidAIdx = ai3; break; }
           }
+          if (kidAIdx >= 0) fillNodeText(kidNode, nodeLevel + 1, kidAIdx);
         }
       }
       // 从每个章的锚点开始填充
@@ -2018,28 +2093,35 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
         ar.innerHTML = '&#9654;';
         el3.insertBefore(ar, el3.firstChild);
       }
-      // 标定节/小节 DOM 锚点
+      // 递归锚点设置（支持任意深度）
       function setSecAnchors(parentNode, level) {
-        var items = level === 1 ? (parentNode.sections || []) : (parentNode.subs || []);
-        for (var si2 = 0; si2 < items.length; si2++) {
-          var sec = items[si2];
-          if (sec.el) {
-            var idPrefix = level === 1 ? 'sec-' : 'sub-';
-            sec.el.id = idPrefix + (sec.num || '').replace(/\./g, '-');
-            sec.el.style.cssText = 'cursor:pointer';
+        var kids = parentNode.sections || parentNode.subs || [];
+        for (var si2 = 0; si2 < kids.length; si2++) {
+          var node = kids[si2];
+          var idPrefix = level === 0 ? 'ch-' : (level <= 2 ? (level === 1 ? 'sec-' : 'sub-') : ('sub-'));
+          if (level === 0) {
+            idPrefix = 'ch-';
+          } else if (level === 1) {
+            idPrefix = 'sec-';
+          } else {
+            idPrefix = 'sub-'; // 2+ 级都归为 sub
+          }
+          if (node.el) {
+            node.el.id = idPrefix + (node.num || '').replace(/\./g, '-');
+            node.el.style.cssText = 'cursor:pointer';
           } else {
             var allElsS = box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
             for (var ei2s = 0; ei2s < allElsS.length; ei2s++) {
-              if ((allElsS[ei2s].textContent || '').replace(/\s+/g, '') === (sec.num + ' ' + sec.title).replace(/\s+/g, '')) {
-                sec.el = allElsS[ei2s];
-                var idP = level === 1 ? 'sec-' : 'sub-';
-                allElsS[ei2s].id = idP + (sec.num || '').replace(/\./g, '-');
+              if ((allElsS[ei2s].textContent || '').replace(/\s+/g, '') === ((node.num || '') + ' ' + (node.title || '')).replace(/\s+/g, '')) {
+                node.el = allElsS[ei2s];
+                allElsS[ei2s].id = idPrefix + (node.num || '').replace(/\./g, '-');
                 allElsS[ei2s].style.cssText = 'cursor:pointer';
                 break;
               }
             }
           }
-          if (sec.subs) setSecAnchors(sec, 2);
+          var grandkids = node.sections || node.subs || [];
+          if (grandkids.length) setSecAnchors(node, level + 1);
         }
       }
       if (cs.sections) setSecAnchors(cs, 1);
