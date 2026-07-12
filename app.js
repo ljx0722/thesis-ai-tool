@@ -1278,17 +1278,20 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
         var isStart= /^第[一1一二三四五六七八九十\d]+章/.test(txt2) || /^Chapter\s+\d/.test(txt2) || /^(1\.|1\s+)Introduction/.test(txt2);
         if(isStart)pastCh1=true;
         if(!pastCh1)continue;
-        // 判断标题级别：数字编号层级（1. / 1.1 / 1.1.1 / 1.1.1.1 / ...）
+        // 判断标题级别：数字编号层级（1. / 1.1 / 1.1.1 / ...）
+        // mammoth 经常把标题拆成多个元素，如 <p>2.1</p><p>文献综述</p>
+        // 所以需要检测"裸编号"元素并后续与下一个元素合并
         var numMatch=txt2.match(/^((?:\d+\.)*\d+)\s+(.*)/);
         var isChapterText=/^第([一-鿿\d]+)章/.test(txt2);
+        // 裸编号：仅有数字编号没有标题文字，如 "2.1"（mammoth 拆分了标题）
+        var isBareNumber=!numMatch&&!isChapterText&&/^(\d+(?:\.\d+)+)\s*$/.test(txt2);
         var isNumberedHeading=numMatch!==null;
-        if(isChapterText||isNumberedHeading){
-          var level=0;
-          if(isChapterText){level=0;} // 章
-          else{level=numMatch[1].split('.').length-1;} // 1.1→1级, 1.1.1→2级, ...
-          var num=isChapterText?txt2:numMatch[1];
-          var title=isChapterText?txt2:(numMatch[2]||txt2);
-          headingCandidates.push({el:el2,txt:txt2,num:num,title:title,level:level});
+        if(isChapterText||isNumberedHeading||isBareNumber){
+          var level=0,num='',title='';
+          if(isChapterText){level=0;num=txt2;title=txt2;}
+          else if(isBareNumber){var bnm=txt2.match(/^(\d+(?:\.\d+)+)\s*$/);level=bnm[1].split('.').length-1;num=txt2.trim();title='';}
+          else{level=numMatch[1].split('.').length-1;num=numMatch[1];title=numMatch[2]||txt2;}
+          headingCandidates.push({el:el2,txt:txt2,num:num,title:title,level:level,bare:isBareNumber||false});
         }
       }
       // 第三步：合并 mammoth 拆分的标题（如 <p>第2章</p><p>文献综述</p> → "第2章 文献综述"）
@@ -1296,7 +1299,7 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
         var hc=headingCandidates[hi];
         var nextEl=hc.el?hc.el.nextElementSibling:null;
         // 如果当前标题文本以编号结束（如 "第2章" 或 "2.1"），且下一个兄弟元素的文本不是标题模式，合并
-        if(nextEl&&/^(第[一二三四五六七八九十\d]+章|\d+(?:\.\d+)*)\s*$/.test(hc.txt)){
+        if(nextEl&&(hc.bare||/^(第[一二三四五六七八九十\d]+章|\d+(?:\.\d+)*)\s*$/.test(hc.txt))){
           var nextTxt=(nextEl.textContent||'').trim();
           if(nextTxt&&nextTxt.length>1&&nextTxt.length<60&&
              !/^第[一二三四五六七八九十\d]+章/.test(nextTxt)&&
