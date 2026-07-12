@@ -1218,26 +1218,31 @@ test('HC: startInlineCalibration wrapper exists', function() {
 
 test('HC: showCalibrationModal function exists', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('function showCalibrationModal') >= 0, 'Missing showCalibrationModal');
+  assert(src.indexOf('function showCalibrationWizard') >= 0, 'Missing showCalibrationWizard');
+  assert(src.indexOf('function showCalibrationModal') >= 0, 'Missing showCalibrationModal alias');
 });
 
-test('HC: renderMcList renders candidate rows with context', function() {
+test('HC: renderCalibrationModal uses DOM-based rendering', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('function renderMcList') >= 0, 'Missing renderMcList');
-  var fnBody = src.substring(src.indexOf('function renderMcList'), src.indexOf('function mcToggle'));
-  assert(fnBody.indexOf('nextElementSibling') >= 0, 'Modal must show next-paragraph context');
+  assert(src.indexOf('function renderCalibrationModal') >= 0, 'Missing renderCalibrationModal');
 });
 
-test('HC: mcToggle cycles level on click', function() {
+test('HC: cwAutoMatch style fingerprint matching exists', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('function mcToggle') >= 0, 'Missing mcToggle');
+  assert(src.indexOf('function cwAutoMatch') >= 0, 'Missing cwAutoMatch');
+  assert(src.indexOf('function _cwStyleFingerprint') >= 0, 'Missing _cwStyleFingerprint');
 });
 
-test('HC: mcAcceptAll / mcClose / mcCleanup exist', function() {
+test('HC: cwNextPhase/cwPrevPhase 3-step wizard flow exists', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('function cwNextPhase') >= 0, 'Missing cwNextPhase');
+  assert(src.indexOf('function cwPrevPhase') >= 0, 'Missing cwPrevPhase');
+});
+
+test('HC: mcAcceptAll / mcClose exist as compat aliases', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
   assert(src.indexOf('function mcAcceptAll') >= 0, 'Missing mcAcceptAll');
   assert(src.indexOf('function mcClose') >= 0, 'Missing mcClose');
-  assert(src.indexOf('function mcCleanup') >= 0, 'Missing mcCleanup');
 });
 
 test('HC: upload flow calls startInlineCalibration', function() {
