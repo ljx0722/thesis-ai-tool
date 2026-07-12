@@ -1195,7 +1195,10 @@ function renderCalibrationModal(){
   var items=cwGetItemsForPhase();
   var unassigned=cwGetUnassigned();
 
-  // Build overlay container
+  // 指纹去重：同格式只展示第一条
+  var seenFp={},deduped=[];
+  for(var i=0;i<items.length;i++){var fp=_cwStyleFingerprint(items[i].el);if(!seenFp[fp]){seenFp[fp]=true;deduped.push(items[i]);}}
+
   var ov=document.createElement('div');
   ov.id='cwOverlay';
   ov.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(30,30,32,.92);backdrop-filter:blur(12px);z-index:99999;display:flex;align-items:center;justify-content:center';
@@ -1209,118 +1212,59 @@ function renderCalibrationModal(){
   var hdr=document.createElement('div');
   hdr.style.cssText='padding:14px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between';
   card.appendChild(hdr);
-
-  var hdrLeft=document.createElement('div');
-  hdrLeft.style.cssText='display:flex;align-items:center;gap:8px';
-  hdr.appendChild(hdrLeft);
-
-  var titleEl=document.createElement('b');
-  titleEl.style.cssText='font-size:1rem';
-  titleEl.textContent='📐 标题校准';
-  hdrLeft.appendChild(titleEl);
-
+  var hdrLeft=document.createElement('div');hdrLeft.style.cssText='display:flex;align-items:center;gap:8px';hdr.appendChild(hdrLeft);
+  var titleEl=document.createElement('b');titleEl.style.cssText='font-size:1rem';titleEl.textContent='📐 标题校准';hdrLeft.appendChild(titleEl);
   for(var pi=0;pi<3;pi++){
     var active=pi===ph,cnt=cwGetPhaseCount(pi);
     var badge=document.createElement('span');
     badge.style.cssText='font-size:.68rem;font-weight:'+(active?'700':'400')+';color:'+(active?colors[pi]:'#999')+';background:'+(active?colors[pi]+'15':'transparent')+';padding:4px 10px;border-radius:8px';
-    badge.textContent=phases[pi]+'×'+cnt;
-    hdrLeft.appendChild(badge);
+    badge.textContent=phases[pi]+'×'+cnt;hdrLeft.appendChild(badge);
     if(pi<2){var arr=document.createElement('span');arr.style.cssText='color:#ccc';arr.textContent='→';hdrLeft.appendChild(arr);}
   }
+  var hdrRight=document.createElement('div');hdrRight.style.cssText='display:flex;gap:8px';hdr.appendChild(hdrRight);
+  if(ph>0){var pb=document.createElement('button');pb.style.cssText='background:rgba(0,0,0,.06);color:#333;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-weight:500;font-size:.72rem';pb.textContent='← 上一步';pb.onclick=cwPrevPhase;hdrRight.appendChild(pb);}
+  var nb=document.createElement('button');
+  if(ph<2){nb.style.cssText='background:'+colors[ph]+';color:#fff;border:none;border-radius:8px;padding:7px 16px;cursor:pointer;font-weight:600;font-size:.72rem';nb.textContent='下一步 →';}else{nb.style.cssText='background:#30d158;color:#fff;border:none;border-radius:8px;padding:7px 16px;cursor:pointer;font-weight:700;font-size:.72rem';nb.textContent='✅ 完成';}
+  nb.onclick=cwNextPhase;hdrRight.appendChild(nb);
+  var sb=document.createElement('button');sb.style.cssText='background:rgba(0,0,0,.06);color:#333;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:.72rem';sb.textContent='跳过';sb.onclick=mcClose;hdrRight.appendChild(sb);
 
-  var hdrRight=document.createElement('div');
-  hdrRight.style.cssText='display:flex;gap:8px';
-  hdr.appendChild(hdrRight);
-
-  if(ph>0){
-    var prevBtn=document.createElement('button');
-    prevBtn.style.cssText='background:rgba(0,0,0,.06);color:#333;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-weight:500;font-size:.72rem';
-    prevBtn.textContent='← 上一步';
-    prevBtn.onclick=cwPrevPhase;
-    hdrRight.appendChild(prevBtn);
-  }
-
-  var nextBtn=document.createElement('button');
-  if(ph<2){
-    nextBtn.style.cssText='background:'+colors[ph]+';color:#fff;border:none;border-radius:8px;padding:7px 16px;cursor:pointer;font-weight:600;font-size:.72rem';
-    nextBtn.textContent='下一步 →';
-  }else{
-    nextBtn.style.cssText='background:#30d158;color:#fff;border:none;border-radius:8px;padding:7px 16px;cursor:pointer;font-weight:700;font-size:.72rem';
-    nextBtn.textContent='✅ 完成';
-  }
-  nextBtn.onclick=cwNextPhase;
-  hdrRight.appendChild(nextBtn);
-
-  var skipBtn=document.createElement('button');
-  skipBtn.style.cssText='background:rgba(0,0,0,.06);color:#333;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:.72rem';
-  skipBtn.textContent='跳过';
-  skipBtn.onclick=mcClose;
-  hdrRight.appendChild(skipBtn);
-
-  // === INSTRUCTION BAR ===
+  // === INSTRUCTION ===
   var instr=document.createElement('div');
   instr.style.cssText='padding:10px 20px;border-bottom:1px solid #f0f0f0;font-size:.72rem;color:#666';
-  instr.innerHTML='<b style="color:'+colors[ph]+'">'+phaseNames[ph]+'</b> — '+phaseDesc[ph];
+  instr.innerHTML='<b style="color:'+colors[ph]+'">'+phaseNames[ph]+'</b> — '+phaseDesc[ph]+' （点击查看全量 → 确认）';
   card.appendChild(instr);
 
   // === LIST ===
-  var list=document.createElement('div');
-  list.id='cwList';
-  list.style.cssText='flex:1;overflow-y:auto;padding:8px 12px';
-  card.appendChild(list);
+  var list=document.createElement('div');list.id='cwList';list.style.cssText='flex:1;overflow-y:auto;padding:8px 12px';card.appendChild(list);
 
-  if(items.length===0){
-    var empty=document.createElement('div');
-    empty.style.cssText='text-align:center;padding:40px;color:#999';
-    empty.innerHTML='✅ '+phases[ph]+'标题已全部确认。<br>点击"下一步"继续。';
-    list.appendChild(empty);
+  if(deduped.length===0){
+    var empty=document.createElement('div');empty.style.cssText='text-align:center;padding:40px;color:#999';
+    empty.innerHTML='✅ '+phases[ph]+'标题已全部确认。<br>点击"下一步"继续。';list.appendChild(empty);
   }else{
-    var box=document.getElementById('thesisBox');
-    for(var i=0;i<items.length;i++){
+    for(var i=0;i<deduped.length;i++){
       (function(){
-        var c2=items[i],txt=(c2.txt||'').substring(0,100);
+        var c2=deduped[i],txt=(c2.txt||'').substring(0,100);
         var fp=_cwStyleFingerprint(c2.el);
         var sameCount=cwCountSame(fp);
-function _cwFpLabel(fp){
-  var parts=fp.split('|');
-  var tag=parts[0]||'';
-  var cls=parts[1]||'';
-  var fw=parts[3]||'';
-  var label=tag+' '+(tag==='P'?'段落':(tag==='H1'?'一级标题':(tag==='H2'?'二级标题':(tag==='H3'?'三级标题':''))));
-  if(cls)label+=' class='+cls;
-  if(fw&&fw!='400')label+=' 加粗';
-  return label;
-}
-
         var fmtPreview=_cwFpLabel(fp);
 
         var row=document.createElement('div');
-        row.style.cssText='cursor:pointer;display:flex;align-items:center;gap:10px;padding:6px 10px;margin:1px 0;border-radius:8px;border-left:3px solid '+colors[ph]+';transition:background .1s';
+        row.style.cssText='cursor:pointer;display:flex;align-items:center;gap:10px;padding:8px 10px;margin:2px 0;border-radius:8px;border-left:3px solid '+colors[ph]+';transition:background .1s';
         row.onmouseenter=function(){row.style.background='rgba(0,113,227,.04)';};
         row.onmouseleave=function(){row.style.background='';};
-        row.title='点击匹配所有同格式的'+phases[ph]+'标题（'+fmtPreview+'）';
-        row.onclick=function(){cwAutoMatch(fp);};
+        row.title='点击查看该格式下全部 '+sameCount+' 条原文';
+        row.onclick=function(){cwShowFormatDetail(fp,cwCountSame(fp));};
 
-        var idxSpan=document.createElement('span');
-        idxSpan.style.cssText='font-size:.58rem;color:#999;min-width:18px';
-        idxSpan.textContent=i+1;
-        row.appendChild(idxSpan);
+        var idxSpan=document.createElement('span');idxSpan.style.cssText='font-size:.58rem;color:#999;min-width:18px';idxSpan.textContent=i+1;row.appendChild(idxSpan);
 
-        var infoDiv=document.createElement('div');
-        infoDiv.style.cssText='flex:1;min-width:0';
-        var titleLine=document.createElement('div');
-        titleLine.style.cssText='font-size:.76rem;font-weight:500;color:#1d1d1f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
-        titleLine.textContent=txt;
-        infoDiv.appendChild(titleLine);
-        var fmtLine=document.createElement('div');
-        fmtLine.style.cssText='font-size:.55rem;color:#999;margin-top:1px';
-        fmtLine.textContent=fmtPreview;
-        infoDiv.appendChild(fmtLine);
+        var infoDiv=document.createElement('div');infoDiv.style.cssText='flex:1;min-width:0';
+        var titleLine=document.createElement('div');titleLine.style.cssText='font-size:.76rem;font-weight:500;color:#1d1d1f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';titleLine.textContent=txt;infoDiv.appendChild(titleLine);
+        var fmtLine=document.createElement('div');fmtLine.style.cssText='font-size:.55rem;color:#999;margin-top:1px';fmtLine.textContent=fmtPreview;infoDiv.appendChild(fmtLine);
         row.appendChild(infoDiv);
 
         var countTag=document.createElement('span');
-        countTag.style.cssText='font-size:.62rem;color:'+colors[ph]+';background:'+colors[ph]+'10;padding:3px 8px;border-radius:10px;font-weight:600;flex-shrink:0';
-        countTag.textContent='同格式 ×'+sameCount;
+        countTag.style.cssText='font-size:.62rem;color:'+colors[ph]+';background:'+colors[ph]+'10;padding:4px 10px;border-radius:10px;font-weight:600;flex-shrink:0';
+        countTag.textContent='×'+sameCount+' ▶';
         row.appendChild(countTag);
 
         list.appendChild(row);
@@ -1328,31 +1272,90 @@ function _cwFpLabel(fp){
     }
   }
 
-  // === UNASSIGNED (last phase only) ===
+  // === UNASSIGNED ===
   if(unassigned.length>0&&ph===2){
-    var sep=document.createElement('div');
-    sep.style.cssText='margin-top:12px;padding-top:8px;border-top:1px solid #f0f0f0';
-    list.appendChild(sep);
-    var uLabel=document.createElement('div');
-    uLabel.style.cssText='font-size:.65rem;color:#999;margin-bottom:4px';
-    uLabel.textContent='⏳ 仍未分类的候选（点击归类为小节）：';
-    list.appendChild(uLabel);
+    var sep=document.createElement('div');sep.style.cssText='margin-top:12px;padding-top:8px;border-top:1px solid #f0f0f0';list.appendChild(sep);
+    var uL=document.createElement('div');uL.style.cssText='font-size:.65rem;color:#999;margin-bottom:4px';uL.textContent='⏳ 仍未分类的候选（点击归类为小节）：';list.appendChild(uL);
     for(var j=0;j<unassigned.length;j++){
-      (function(){
-        var u=unassigned[j];
-        var uRow=document.createElement('div');
-        uRow.style.cssText='cursor:pointer;display:flex;align-items:center;gap:8px;padding:4px 10px;margin:1px 0;border-radius:6px;font-size:.7rem;color:#999;border-left:2px solid #ddd';
-        uRow.onmouseenter=function(){uRow.style.background='rgba(0,0,0,.03)';};
-        uRow.onmouseleave=function(){uRow.style.background='';};
-        uRow.textContent=u.txt.substring(0,80);
-        uRow.onclick=function(){u.level=2;renderCalibrationModal();};
-        list.appendChild(uRow);
-      })();
+      (function(){var u=unassigned[j];var ur=document.createElement('div');ur.style.cssText='cursor:pointer;display:flex;align-items:center;gap:8px;padding:4px 10px;margin:1px 0;border-radius:6px;font-size:.7rem;color:#999;border-left:2px solid #ddd';ur.onmouseenter=function(){ur.style.background='rgba(0,0,0,.03)';};ur.onmouseleave=function(){ur.style.background='';};ur.textContent=u.txt.substring(0,80);ur.onclick=function(){u.level=2;renderCalibrationModal();};list.appendChild(ur);})();
     }
   }
 
   document.body.appendChild(ov);
 }
+
+function cwShowFormatDetail(fp,totalCount){
+  var box=document.getElementById('thesisBox');if(!box)return;
+  var refBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
+  var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6'),matches=[];
+  for(var i=0;i<els.length;i++){
+    if(refBound&&(els[i].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
+    if(_cwStyleFingerprint(els[i])===fp)matches.push(els[i]);
+  }
+
+  // Build detail popup
+  var oldD=document.getElementById('cwDetailPopup');if(oldD)oldD.parentElement.removeChild(oldD);
+  var phases=['章','节','小节'],ph=_cwPhase;
+  var colors=['#0071e3','#af52de','#30d158'];
+
+  var popup=document.createElement('div');popup.id='cwDetailPopup';
+  popup.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:14px;padding:0;width:85%;height:75%;max-width:900px;display:flex;flex-direction:column;box-shadow:0 25px 80px rgba(0,0,0,.35);z-index:100000;overflow:hidden';
+  popup.onclick=function(e){e.stopPropagation();};
+
+  // Header
+  var dh=document.createElement('div');
+  dh.style.cssText='padding:12px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between';
+  dh.innerHTML='<div><b style="font-size:.9rem;color:'+colors[ph]+'">'+matches.length+' 条 '+(ph===0?'章':ph===1?'节':'小节')+'标题</b></div>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button onclick="cwApplyFp(\''+fp.replace(/'/g,'\\x27')+'\')" style="background:'+colors[ph]+';color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:600;font-size:.7rem">✅ 全部确认为'+phases[ph]+'</button>'+
+    '<button onclick="cwCloseDetail()" style="background:rgba(0,0,0,.06);color:#333;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:.7rem">✕ 关闭</button>'+
+    '</div>';
+  popup.appendChild(dh);
+
+  // List
+  var dl=document.createElement('div');dl.style.cssText='flex:1;overflow-y:auto;padding:6px 12px';
+  for(var i=0;i<matches.length;i++){
+    (function(){
+      var el=matches[i];var t=(el.textContent||'').trim().substring(0,120);
+      var isSelected=cwIsElSelected(el,ph);
+      var row2=document.createElement('div');
+      row2.style.cssText='cursor:pointer;display:flex;align-items:flex-start;gap:8px;padding:5px 8px;margin:1px 0;border-radius:6px;font-size:.72rem;color:#1d1d1f;border-left:3px solid '+(isSelected?colors[ph]:'transparent')+';transition:background .1s';
+      row2.onmouseenter=function(){row2.style.background='rgba(0,0,0,.02)';};
+      row2.onmouseleave=function(){row2.style.background='';};
+      row2.onclick=function(){
+        cwToggleEl(el,ph);row2.style.borderLeftColor=cwIsElSelected(el,ph)?colors[ph]:'transparent';
+        row2.style.background=cwIsElSelected(el,ph)?'rgba(0,113,227,.04)':'';
+      };
+      var cb=document.createElement('span');cb.style.cssText='font-size:.7rem;min-width:18px;flex-shrink:0';cb.textContent=isSelected?'☑':'☐';row2.appendChild(cb);
+      var txtSpan=document.createElement('span');txtSpan.textContent=t;row2.appendChild(txtSpan);
+      dl.appendChild(row2);
+    })();
+  }
+  popup.appendChild(dl);
+  document.body.appendChild(popup);
+}
+
+function cwIsElSelected(el,level){
+  for(var i=0;i<_cwCandidates.length;i++){if(_cwCandidates[i].el===el&&_cwCandidates[i].level===level)return true;}
+  return false;
+}
+
+function cwToggleEl(el,level){
+  for(var i=0;i<_cwCandidates.length;i++){
+    if(_cwCandidates[i].el===el){_cwCandidates[i].level=_cwCandidates[i].level===level?-1:level;return;}
+  }
+}
+
+function cwApplyFp(fp){
+  cwAutoMatch(fp);
+  cwCloseDetail();
+  renderCalibrationModal();
+}
+
+function cwCloseDetail(){
+  var d=document.getElementById('cwDetailPopup');if(d)d.parentElement.removeChild(d);
+}
+
 
 
 // ========== 弹窗④: 检索结果确认 ==========
