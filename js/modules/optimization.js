@@ -39,6 +39,7 @@ function runOptimization(container) {
     h += '<div class="bar-wrap"><div class="bar-fill" style="width:' + pct + '%;background:' + barCl + '"></div></div>';
   });
 
+  var emptyChs=[];bodyChs.forEach(function(cs){var ct=(cs.text||"").length;if(ct<100)emptyChs.push(cs.name);});if(emptyChs.length>0){h+='<div class="finding err" style="margin-top:8px">❗ '+emptyChs.length+' 个章节内容为空：'+emptyChs.join("、")+'。原因：Word 标题样式未套用，mammoth 无法按标题分配正文内容。请回 Word 为所有标题设置“标题1/2/3”样式后重新上传。</div>';}
   // Structure
   if(typeof updLoad==='function')updLoad('结构诊断...',50);
   h += "<h4>📋 目录结构对比</h4>";

@@ -1112,6 +1112,35 @@ test('AUDIT: format-check has heading style quality section', function() {
   assert(src.indexOf('_bareHeadingCount') >= 0 || src.indexOf('bareCount') >= 0, 'format-check must read _bareHeadingCount');
 });
 
+test('AUDIT: format-check has empty chapter detection', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
+  assert(src.indexOf('章节内容缺失') >= 0, 'Missing empty chapter detection in format-check.js');
+});
+
+test('AUDIT: format-check has figure/table caption format check', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
+  assert(src.indexOf('图表标题格式') >= 0, 'Missing figure/table caption format check');
+});
+
+test('AUDIT: paragraph-analysis has debris paragraph detection', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/paragraph-analysis.js'), 'utf8');
+  assert(src.indexOf('debrisParas') >= 0, 'Missing debris paragraph detection');
+  assert(src.indexOf('标题拆分残留') >= 0, 'Missing debris warning section');
+});
+
+test('AUDIT: optimization has empty chapter warning', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/optimization.js'), 'utf8');
+  assert(src.indexOf('mammoth 无法按标题分配') >= 0, 'Missing mammoth empty chapter warning in optimization.js');
+});
+
+test('AUDIT: terminology spell dictionary expanded beyond 3 pairs', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/terminology.js'), 'utf8');
+  var match = src.match(/var sd=\{([^}]+)\}/);
+  assert(match, 'Missing spell dictionary');
+  var pairs = match[1].split(',').filter(function(p){return p.indexOf(':')>=0;});
+  assert(pairs.length >= 10, 'Spell dictionary too small: ' + pairs.length + ' pairs (need >= 10)');
+});
+
 
 // Results
 // ============================================================

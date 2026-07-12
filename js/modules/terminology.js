@@ -62,7 +62,7 @@ function runTerminology(container) {
 
   if(typeof updLoad==='function')updLoad('拼写检查...',80);
   h += '<h4>📖 术语拼写检查</h4>';
-  var sd={'神经网络':'神经网路','机器学习':'机器学习','深度学习':'深度学习'};var si=0;
+  var sd={'神经网络':'神经网路','卷积神经网络':'卷积神经网路','自然语言处理':'自然言语处理','特征提取':'特徵提取','随机森林':'随即森林','梯度下降':'梯度下将','过拟合':'过拟和','欠拟合':'欠拟和','正则化':'正则花','激活函数':'激活涵数','数据挖掘':'数据採掘','算法优化':'演算法优化','准确率':'准碓率','召回率':'找回率','归一化':'归壹化'};var si=0;
   Object.keys(sd).forEach(function(cr){var rx=new RegExp(sd[cr],'g');var ct=(text.match(rx)||[]).length;if(ct>0){si++;h+='<div class="finding warn">⚠ 可能拼错: '+sd[cr]+' ('+ct+'次)，应为 '+cr+'</div>';}});
   if(!si)h+='<div class="finding ok">✅ 未检测到常见术语拼写错误</div>';
 

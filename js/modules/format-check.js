@@ -80,6 +80,16 @@ function runFormatCheck(container) {
     h+='<div class="finding ok">✅ 检测到 '+headingTagCount+' 个 HTML 标题标签，样式使用良好。</div>';
   }
 
+  // 章节内容为空检测（Word 标题样式未套用导致 mammoth 解析失败）
+  var emptyChs=[];
+  bodyChs.forEach(function(cs){
+    if(!cs.text||cs.text.length<100) emptyChs.push(cs.name);
+  });
+  if(emptyChs.length>0){
+    h+='<h4>⚠ 章节内容缺失</h4>';
+    h+='<div class="finding err">❗ '+emptyChs.length+' 个章节内容为空或极短：'+emptyChs.join('、')+'。原因：Word 标题样式未套用，mammoth 无法将正文分配到对应章节。请为所有章/节/小节标题设置"标题1/2/3"样式后重新上传。</div>';
+  }
+
     // 引用位置检测
   h += '<h4>📍 引用位置检测</h4>';
   var badRefs=0;
@@ -160,6 +170,13 @@ function runFormatCheck(container) {
     else issues.ok.push({ msg: '表编号连续（表' + tblNums[0] + '-表' + tblNums[tblNums.length-1] + '，' + tblRaw.length + ' 个匹配）' });
   } else if (tblNums.length === 1) {
     issues.ok.push({ msg: '检测到 1 个表编号（表' + tblNums[0] + '），无法判断连续性' });
+  }
+  // 图表标题格式诊断：正文中含图/表关键词但未检测到规范编号
+  var hasFigMention=/图\s*\d|Fig\.?\s*\d|Figure\s*\d/i.test(text);
+  var hasTblMention=/表\s*\d|Table\s*\d/i.test(text);
+  if((hasFigMention&&figRaw.length===0)||(hasTblMention&&tblRaw.length===0)){
+    h+='<h4>📐 图表标题格式</h4>';
+    h+='<div class="finding warn">⚠ 正文提及图片/表格，但未检测到规范的图表标题编号。可能原因：Word 中图表标题使用文本框/非标准格式，mammoth 无法解析。建议使用 Word"插入题注"功能。</div>';
   }
 
     // 中英文摘要完整性
