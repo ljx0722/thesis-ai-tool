@@ -2084,11 +2084,11 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
         var txtLv = detectHeadingLevel(txt2);
         // 综合判断：HTML 标签优先，但文本模式可修正
         var hdLv = (tagLv >= 0) ? tagLv : txtLv;
-        // 标题判定：HTML 标签（h1-h6）或明确的文本标题模式
-        // 严格策略：不用 HTML 标签且文本模式不匹配 → 不是标题
+        // 标题判定
         var isHeadingEl = tagLv >= 0 || txtLv >= 0;
-        // 不做"乐观猜测"——正文段落即使短、以数字开头也不自动当标题
-        if (!isHeadingEl && tagLv < 0) continue; // 非标题，跳过收集
+        if (!isHeadingEl && tagLv < 0) continue;
+        // TOC 条目排除：tab/空格 + 页码后缀
+        if (/\t\d{1,3}$/.test(txt2) || /[\s\.]{2,}\d{1,3}$/.test(txt2)) continue;
         // 记录
         allHeadings.push({ el: el2, txt: txt2, level: hdLv, tagLevel: tagLv, bare: false });
       }
@@ -2096,7 +2096,6 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
       for (var hi = 0; hi < allHeadings.length; hi++) {
         var hc = allHeadings[hi];
         var hdTxt = hc.txt;
-        // 检测是否需要合并：纯编号结尾 或 HTML 标签显示是标题但文字很短
         if (!hc.el) continue;
         var isBare = /^(第[一二三四五六七八九十123456789]+章|\d+(?:\.\d+)*)\s*$/.test(hdTxt);
         if (isBare || (hc.tagLevel >= 0 && hdTxt.length < 10)) {
@@ -2105,6 +2104,11 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
             var st = (sib.textContent || '').trim();
             if (!st || /^\d{1,3}$/.test(st) || /^[ivxlcdmIVXLCDM]+$/.test(st) || /\.{3,}\s*\d/.test(st)) {
               sib = sib.nextElementSibling; continue;
+            }
+            // 如果下一个元素的文本已经包含当前编号前缀，不再拼
+            if (st.indexOf(hdTxt) >= 0 && st.length <= hdTxt.length + 60) {
+              hc.txt = st; hc.el = sib; hc.bare = false;
+              break;
             }
             if (st.length > 1 && st.length < 80 &&
                 !/^(?:第[一二三四五六七八九十123456789]+章|摘要|Abstract|关键词|目录|参考文献|致谢|附录)/.test(st)) {
