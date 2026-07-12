@@ -1207,58 +1207,58 @@ test('FLOW: assign modal has mode selector (auto/uniform/weighted)', function() 
 
 
 // ============================================================
-// SECTION 22: Heading Calibration Modal
+// SECTION 22: Inline Heading Calibration (click-to-select)
 // ============================================================
-console.log('\n=== Section 22: Heading Calibration ===');
+console.log('\n=== Section 22: Inline Heading Calibration ===');
 
-test('HC: showHeadingCalibration function exists', function() {
+test('HC: startInlineCalibration function exists', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('function showHeadingCalibration') >= 0, 'Missing showHeadingCalibration');
+  assert(src.indexOf('function startInlineCalibration') >= 0, 'Missing startInlineCalibration');
 });
 
-test('HC: hcOverlay modal HTML exists', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(src.indexOf('id="hcOverlay"') >= 0, 'Missing hcOverlay modal');
-});
-
-test('HC: calibration has level dropdown (章/节/小节/非标题)', function() {
+test('HC: iclSetMode function for level selection exists', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('章标题') >= 0 && src.indexOf('节标题') >= 0 && src.indexOf('小节标题') >= 0, 'Missing level labels');
+  assert(src.indexOf('function iclSetMode') >= 0, 'Missing iclSetMode');
 });
 
-test('HC: calibration has merge button for bare entries', function() {
+test('HC: iclClick function for paragraph click handler exists', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('hcMergeUp') >= 0, 'Missing merge-up function');
+  assert(src.indexOf('function iclClick') >= 0, 'Missing iclClick');
 });
 
-test('HC: calibration has filter buttons (all/ch/sec/sub/none/bare)', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(src.indexOf('hcFilter') >= 0, 'Missing hcFilter function');
-});
-
-test('HC: calibration has live tree preview panel', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(src.indexOf('hcPreviewTree') >= 0, 'Missing preview tree');
-});
-
-test('HC: calibration has auto-accept and confirm buttons', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(src.indexOf('hcAutoAccept') >= 0 && src.indexOf('hcConfirm') >= 0, 'Missing auto-accept/confirm');
-});
-
-test('HC: calibration has skip button', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(src.indexOf('hcSkip') >= 0, 'Missing skip button');
-});
-
-test('HC: upload flow calls showHeadingCalibration', function() {
+test('HC: iclUpdatePreview generates live tree preview', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('showHeadingCalibration(allHeadings') >= 0 || src.indexOf('showHeadingCalibration(headingCandidates') >= 0, 'Upload handler must call calibration');
+  assert(src.indexOf('function iclUpdatePreview') >= 0, 'Missing iclUpdatePreview');
 });
 
-test('HC: calibration sets hc.bare=false after merge', function() {
+test('HC: iclRefreshMarkers adds colored left borders', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('hc.bare') >= 0 && src.indexOf('bare') >= 0, 'bare flag must exist');
+  assert(src.indexOf('function iclRefreshMarkers') >= 0, 'Missing iclRefreshMarkers');
+});
+
+test('HC: iclClearAll resets selections', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('function iclClearAll') >= 0, 'Missing iclClearAll');
+});
+
+test('HC: upload flow calls startInlineCalibration', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('startInlineCalibration(box,') >= 0 || src.indexOf('startInlineCalibration(box, allHeadings') >= 0, 'Upload handler must call inline calibration');
+});
+
+test('HC: old hcOverlay removed from index.html', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(src.indexOf('id="hcOverlay"') < 0, 'Old hcOverlay must be removed');
+});
+
+test('HC: cleanupInlineCalibration removes event listeners', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('function cleanupInlineCalibration') >= 0, 'Missing cleanupInlineCalibration');
+});
+
+test('HC: iclFinish converts selections to heading candidates', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('function iclFinish') >= 0, 'Missing iclFinish');
 });
 
 

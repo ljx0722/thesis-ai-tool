@@ -1032,173 +1032,21 @@ function asSkip(){
 }
 
 
-// ========== 弹窗③: 标题层级校准 ==========
-var _hcCandidates=[],_hcCallback=null,_hcFilter='all';
-// Map: auto-detected level → display name + color
-var _hcLevels=[
-  {id:0, name:'章标题', color:'#0071e3', cls:'ch'},
-  {id:1, name:'节标题', color:'#af52de', cls:'sec'},
-  {id:2, name:'小节标题', color:'#30d158', cls:'sub'},
-  {id:-1,name:'非标题', color:'#ff3b30', cls:'none'},
-];
+// ========== 内联标题校准：点击原文段落指定层级 ==========
+var _iclMode=null, _iclSelections=[], _iclCallback=null, _iclToolbar=null, _iclPreview=null;
 
-function showHeadingCalibration(candidates,callback){
-  _hcCandidates=candidates.slice();
-  _hcCallback=callback;
-  _hcFilter='all';
-  // Render
-  var ch=0,sec=0,sub=0,bare=0,none=0;
-  _hcCandidates.forEach(function(c){
-    if(c.level===0)ch++;else if(c.level===1)sec++;else if(c.level===2)sub++;else if(c.level=== -1)none++;
-    if(c.bare)bare++;
-  });
-  document.getElementById('hcCount').textContent=
-    _hcCandidates.length+' 项 (章'+ch+' 节'+sec+' 小节'+sub+(bare?' 待合并'+bare:'')+')';
-  hcRender();
-  hcUpdatePreview();
-  document.getElementById('hcOverlay').style.display='flex';
-}
-
-function hcRender(){
-  var h='',cands=_hcCandidates;
-  var shown=0;
-  for(var i=0;i<cands.length;i++){
-    var c=cands[i];
-    if(_hcFilter==='ch'&&c.level!==0)continue;
-    if(_hcFilter==='sec'&&c.level!==1)continue;
-    if(_hcFilter==='sub'&&c.level!==2)continue;
-    if(_hcFilter==='none'&&c.level!== -1)continue;
-    if(_hcFilter==='bare'&&!c.bare)continue;
-    shown++;
-    var lv=_hcLevels.find(function(l){return l.id===c.level})||_hcLevels[3];
-    var txt=(c.txt||'').substring(0,80);
-    if(c.txt&&c.txt.length>80)txt+='…';
-    // 获取下一个兄弟原文，作为上下文预览
-    var ctx='';
-    if(c.el){
-      var sib2=c.el.nextElementSibling;
-      for(var ci=0;ci<3&&sib2;ci++){
-        var st2=(sib2.textContent||'').trim();
-        // 跳过空/数字/页码
-        if(st2&&!/^\d{1,3}$/.test(st2)&&!/^[ivxlcdmIVXLCDM]+$/.test(st2)&&!/\.{3,}\s*\d/.test(st2)){
-          ctx=st2.replace(/\s+/g,' ').substring(0,120);
-          if(ctx.length>=120)ctx+='…';
-          break;
-        }
-        sib2=sib2.nextElementSibling;
-      }
-    }
-    var bg=c.level>=0?'rgba(0,113,227,0.03)':'rgba(255,59,48,0.03)';
-    if(c.bare)bg='rgba(255,159,10,0.05)';
-    h+='<div class="hc-row" style="display:flex;align-items:flex-start;gap:8px;padding:4px 8px;margin:1px 0;border-radius:6px;background:'+bg+';transition:background .12s">';
-    h+='<span style="font-size:.55rem;color:var(--m);min-width:20px;text-align:right;flex-shrink:0;margin-top:3px">'+(i+1)+'</span>';
-    if(c.bare&&i>0){
-      h+='<button onclick="hcMergeUp('+i+')" title="合并到上一条标题" style="background:rgba(255,159,10,0.15);color:#ff9f0a;border:none;border-radius:4px;padding:1px 5px;cursor:pointer;font-size:.5rem;flex-shrink:0;margin-top:2px">↑合并</button>';
-    }
-    h+='<div style="flex:1;min-width:0">';
-    h+='<div style="font-size:.7rem;color:'+(c.level>=0?'var(--t)':'var(--m)')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(c.txt||'').replace(/"/g,'&quot;')+'">'+txt+'</div>';
-    if(ctx){
-      h+='<div style="font-size:.55rem;color:var(--m);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(ctx||'').replace(/"/g,'&quot;')+'">📄 '+ctx+'</div>';
-    }
-    h+='</div>';
-    h+='<select onchange="hcSetLevel('+i+',parseInt(this.value))" style="border:1px solid '+lv.color+';border-radius:6px;padding:2px 4px;font-size:.58rem;background:var(--solid);color:'+lv.color+';cursor:pointer;flex-shrink:0;min-width:72px;font-weight:600;margin-top:2px">';
-    for(var li=0;li<_hcLevels.length;li++){
-      var sel=_hcLevels[li].id===c.level?' selected':'';
-      h+='<option value="'+_hcLevels[li].id+'"'+sel+'>'+_hcLevels[li].name+'</option>';
-    }
-    h+='</select>';
-    if(c.bare)h+='<span style="font-size:.5rem;color:#ff9f0a;background:rgba(255,159,10,0.1);padding:1px 4px;border-radius:4px;flex-shrink:0;margin-top:2px">待合并</span>';
-    h+='</div>';
-  }
-  if(!shown)h='<div style="text-align:center;padding:20px;color:var(--m)">无匹配项</div>';
-  document.getElementById('hcList').innerHTML=h;
-}
-
-function hcSetLevel(idx,level){
-  _hcCandidates[idx].level=level;
-  if(level>=0)_hcCandidates[idx].bare=false;
-  hcRender();
-  hcUpdatePreview();
-}
-
-function hcMergeUp(idx){
-  if(idx<=0)return;
-  var cur=_hcCandidates[idx];
-  var prev=_hcCandidates[idx-1];
-  // Merge current text into previous
-  prev.txt=prev.txt+' '+((cur.txt||'').replace(/^\d+(?:\.\d+)*\s*/,''));
-  prev.title=prev.title?prev.title+' '+cur.title:cur.title;
-  prev.bare=false;
-  // Remove current
-  _hcCandidates.splice(idx,1);
-  hcRender();
-  hcUpdatePreview();
-}
-
-function hcFilter(f){
-  _hcFilter=f;
-  // Update button styles
-  var btns=document.querySelectorAll('.hc-filter-btn');
-  for(var i=0;i<btns.length;i++)btns[i].style.opacity='0.6';
-  hcRender();
-}
-
-function hcUpdatePreview(){
-  // Build tree from current _hcCandidates
-  var tree=[],curCh=null;
-  for(var i=0;i<_hcCandidates.length;i++){
-    var c=_hcCandidates[i];
-    if(c.level<0)continue; // skip non-headings
-    if(c.level===0){
-      curCh={ch:0,name:c.txt,sections:[]};
-      tree.push(curCh);
-    }else if(curCh){
-      if(c.level===1){
-        if(!curCh.sections)curCh.sections=[];
-        curCh.sections.push({num:c.num||'',title:c.title||c.txt,subs:[]});
-      }else if(c.level===2){
-        var secs=curCh.sections;
-        if(secs&&secs.length){
-          var lastSec=secs[secs.length-1];
-          if(!lastSec.subs)lastSec.subs=[];
-          lastSec.subs.push({num:c.num||'',title:c.title||c.txt});
-        }
-      }
-    }
-  }
-  // Assign chapter numbers
-  for(var ci=0;ci<tree.length;ci++)tree[ci].ch=ci+1;
-  // Render
-  var h='';
-  for(var ci=0;ci<tree.length;ci++){
-    var ch2=tree[ci];
-    h+='<div style="font-weight:700;color:#0071e3;margin-top:6px">第'+(ci+1)+'章 '+(ch2.name||'').substring(0,30)+'</div>';
-    (ch2.sections||[]).forEach(function(sec){
-      h+='<div style="padding-left:12px;color:#af52de">├ '+sec.num+' '+((sec.title||'').substring(0,25))+'</div>';
-      (sec.subs||[]).forEach(function(sub){
-        h+='<div style="padding-left:24px;color:#30d158;font-size:.62rem">│ └ '+sub.num+' '+((sub.title||'').substring(0,25))+'</div>';
-      });
-    });
-  }
-  if(!tree.length)h='<div style="color:var(--m)">未检测到章标题<br>请在左侧将至少一项设为"章标题"</div>';
-  document.getElementById('hcPreviewTree').innerHTML=h;
-}
-
-function hcAutoAccept(){
-  // Use current auto-detected levels as-is, close modal
-  hcConfirm();
-}
-
-function hcConfirm(){
-  document.getElementById('hcOverlay').style.display='none';
-  if(_hcCallback)_hcCallback(_hcCandidates.filter(function(c){return c.level>=0;}));
-}
-
-function hcSkip(){
-  document.getElementById('hcOverlay').style.display='none';
-  if(_hcCallback)_hcCallback(null); // null = use original auto-detected
-}
-
+function startInlineCalibration(box,autoDetected){_iclSelections=[];autoDetected.forEach(function(a){if(a.level>=0)_iclSelections.push({el:a.el,level:a.level,txt:a.txt});});_iclMode='ch';return new Promise(function(resolve){_iclCallback=resolve;showInlineCalibrationUI(box);});}
+function showInlineCalibrationUI(box){var tb=document.createElement('div');tb.id='iclToolbar';tb.style.cssText='position:sticky;top:0;z-index:100;background:#fff;border-bottom:2px solid #0071e3;padding:10px 16px;margin:-8px -8px 12px -8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 1px 4px rgba(0,0,0,.08)';tb.innerHTML='<b style="font-size:.82rem;color:#0071e3">📐 标题校准</b> ';tb.innerHTML+='<span style="font-size:.65rem;color:#666">点击论文正文段落标记层级：</span> ';tb.innerHTML+='<button id="iclBtnCh" onclick="iclSetMode(\'ch\')" style="background:#0071e3;color:#fff;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.65rem;font-weight:600">章</button>';tb.innerHTML+='<button id="iclBtnSec" onclick="iclSetMode(\'sec\')" style="background:rgba(0,0,0,.06);color:#333;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.65rem;font-weight:600">节</button>';tb.innerHTML+='<button id="iclBtnSub" onclick="iclSetMode(\'sub\')" style="background:rgba(0,0,0,.06);color:#333;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.65rem;font-weight:600">小节</button>';tb.innerHTML+='<button id="iclBtnNone" onclick="iclSetMode(\'none\')" style="background:rgba(255,59,48,.08);color:#ff3b30;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.65rem;font-weight:600">非标题(清除)</button>';tb.innerHTML+='<span style="flex:1"></span>';tb.innerHTML+='<button onclick="iclClearAll()" style="background:rgba(0,0,0,.06);color:#333;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.65rem">↺ 清空</button>';tb.innerHTML+='<button onclick="iclFinish()" style="background:#30d158;color:#fff;border:none;border-radius:8px;padding:5px 16px;cursor:pointer;font-weight:700;font-size:.65rem">✅ 完成</button>';tb.innerHTML+='<span id="iclCount" style="font-size:.62rem;color:#666"></span>';box.parentElement.insertBefore(tb,box);_iclToolbar=tb;var pv=document.createElement('div');pv.id='iclPreview';pv.style.cssText='position:fixed;top:80px;right:12px;width:240px;max-height:70vh;overflow-y:auto;background:#fff;border-radius:12px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,.12);z-index:101;font-size:.65rem;line-height:1.6;border:1px solid #e5e7eb';pv.innerHTML='<div style="font-weight:700;margin-bottom:6px;color:#0071e3">📑 目录实时预览</div><div id="iclTree" style="color:#666">等待选取标题…</div>';document.body.appendChild(pv);_iclPreview=pv;box.style.outline='2px dashed #0071e3';box.style.outlineOffset='-2px';box.style.cursor='crosshair';var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');for(var i=0;i<els.length;i++){els[i].style.transition='background .15s';els[i].addEventListener('mouseenter',iclHoverIn);els[i].addEventListener('mouseleave',iclHoverOut);els[i].addEventListener('click',iclClick);}iclRefreshMarkers();iclUpdateCount();iclUpdatePreview();hideLoad();}
+function iclSetMode(m){_iclMode=m;var ids={ch:'iclBtnCh',sec:'iclBtnSec',sub:'iclBtnSub',none:'iclBtnNone'};Object.keys(ids).forEach(function(k){var b=document.getElementById(ids[k]);if(!b)return;var active=k===m;b.style.background=active?'#0071e3':(k==='none'?'rgba(255,59,48,.08)':'rgba(0,0,0,.06)');b.style.color=active?'#fff':(k==='none'?'#ff3b30':'#333');});}
+function iclHoverIn(e){if(_iclMode)e.currentTarget.style.background='rgba(0,113,227,.06)';}
+function iclHoverOut(e){e.currentTarget.style.background='';}
+function iclClick(e){e.stopPropagation();if(!_iclMode)return;var el=e.currentTarget,t=(el.textContent||'').trim();if(!t||t.length<1)return;_iclSelections=_iclSelections.filter(function(s){return s.el!==el;});if(_iclMode!=='none'){var lv=_iclMode==='ch'?0:(_iclMode==='sec'?1:2);_iclSelections.push({el:el,level:lv,txt:t});el.style.background='rgba(48,209,88,.2)';setTimeout(function(){el.style.background='';},400);}iclRefreshMarkers();iclUpdateCount();iclUpdatePreview();}
+function iclRefreshMarkers(){var colors={0:'#0071e3',1:'#af52de',2:'#30d158'};var old=document.querySelectorAll('.icl-marker');for(var i=0;i<old.length;i++)old[i].parentElement.removeChild(old[i]);_iclSelections.forEach(function(s){if(!s.el||!s.el.parentElement)return;if(s.el.style.position===''||s.el.style.position==='static')s.el.style.position='relative';s.el.style.borderLeft='3px solid '+colors[s.level];s.el.style.paddingLeft='6px';});}
+function iclClearAll(){_iclSelections=[];var old=document.querySelectorAll('.icl-marker');for(var i=0;i<old.length;i++)old[i].parentElement.removeChild(old[i]);var box=document.getElementById('thesisBox');if(box){var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');for(var j=0;j<els.length;j++){els[j].style.borderLeft='';els[j].style.paddingLeft='';}}iclUpdateCount();iclUpdatePreview();}
+function iclUpdateCount(){var el=document.getElementById('iclCount');if(!el)return;var ch=0,sec=0,sub=0;_iclSelections.forEach(function(s){if(s.level===0)ch++;else if(s.level===1)sec++;else sub++;});el.textContent='已选: 章×'+ch+' 节×'+sec+' 小节×'+sub;}
+function iclUpdatePreview(){var el=document.getElementById('iclTree');if(!el)return;var sorted=_iclSelections.slice().sort(function(a,b){return(a.el.compareDocumentPosition(b.el)&Node.DOCUMENT_POSITION_FOLLOWING)?-1:1;});var h='',ci=0;for(var i=0;i<sorted.length;i++){var s=sorted[i];if(s.level===0){ci++;h+='<div style="color:#0071e3;font-weight:600;margin-top:4px">'+ci+'. '+s.txt.substring(0,25)+'</div>';}else if(s.level===1){h+='<div style="padding-left:10px;color:#af52de">├ '+s.txt.substring(0,22)+'</div>';}else{h+='<div style="padding-left:20px;color:#30d158;font-size:.6rem">│ └ '+s.txt.substring(0,22)+'</div>';}}if(!sorted.length)h='<div style="color:#999">等待选取…<br><br>点击正文段落<br>然后选章/节/小节</div>';el.innerHTML=h;}
+function iclFinish(){cleanupInlineCalibration();var sorted=_iclSelections.slice().sort(function(a,b){return(a.el.compareDocumentPosition(b.el)&Node.DOCUMENT_POSITION_FOLLOWING)?-1:1;});var result=sorted.map(function(s){return{el:s.el,txt:s.txt,level:s.level,tagLevel:-1,bare:false};});if(_iclCallback)_iclCallback(result);}
+function cleanupInlineCalibration(){var box=document.getElementById('thesisBox');if(box){box.style.outline='';box.style.cursor='';var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');for(var i=0;i<els.length;i++){els[i].removeEventListener('mouseenter',iclHoverIn);els[i].removeEventListener('mouseleave',iclHoverOut);els[i].removeEventListener('click',iclClick);els[i].style.transition='';els[i].style.borderLeft='';els[i].style.paddingLeft='';els[i].style.position='';}}var oldMk=document.querySelectorAll('.icl-marker');for(var j=0;j<oldMk.length;j++)oldMk[j].parentElement.removeChild(oldMk[j]);if(_iclToolbar&&_iclToolbar.parentElement)_iclToolbar.parentElement.removeChild(_iclToolbar);if(_iclPreview&&_iclPreview.parentElement)_iclPreview.parentElement.removeChild(_iclPreview);_iclToolbar=null;_iclPreview=null;_iclSelections=[];_iclMode=null;_iclCallback=null;}
 
 async function startSearch(){
   if(!manuscriptText){alert('请先上传论文文件');return}
@@ -1956,26 +1804,14 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
           if (hc.txt === hdTxt) hc.bare = true;
         }
       }
-      // ===== 第4.5步: 标题层级校准弹窗 =====
+      // ===== 第4.5步: 进入标题校准模式（点击原文选取）=====
       _totalHeadingCount = allHeadings.length;
-      _bareHeadingCount = 0; for (var bi2 = 0; bi2 < allHeadings.length; bi2++) { if (allHeadings[bi2].bare) _bareHeadingCount++; }
-      // 兜底：如果自动检测结果太少，从所有 body 元素中收集
-      if (allHeadings.length < 5) {
-        for (var ei3 = bodyStartIdx; ei3 < allEls.length; ei3++) {
-          var fe = allEls[ei3], ft = (fe.textContent || '').trim();
-          if (!ft || ft.length < 2) continue;
-          if (refBound && (fe.compareDocumentPosition(refBound) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
-          if (/^\d{1,3}$/.test(ft) || /^[ivxlcdmIVXLCDM]+$/.test(ft)) continue;
-          // 去重
-          var dup = false;
-          for (var di2 = 0; di2 < allHeadings.length; di2++) { if (allHeadings[di2].el === fe) { dup = true; break; } }
-          if (dup) continue;
-          var gl = detectHeadingLevel(ft);
-          allHeadings.push({ el: fe, txt: ft, level: gl, tagLevel: -1, bare: false });
-        }
-      }
+      _bareHeadingCount = 0;
+      for (var bi2 = 0; bi2 < allHeadings.length; bi2++) { if (allHeadings[bi2].bare) _bareHeadingCount++; }
+
       updLoad('标题校准...', '37');
-      var calibrated = await new Promise(function (resolve) { showHeadingCalibration(allHeadings, resolve); });
+      // 让用户在原文中点选段落来标记层级
+      var calibrated = await startInlineCalibration(box, allHeadings);
       if (calibrated !== null) allHeadings = calibrated;
       // ===== 第5步：从校准后的标题列表构建章节树 =====
       sections = [];
@@ -1994,14 +1830,24 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
           // 去重同章号
           var dupCh = null;
           for (var ci = 0; ci < sections.length; ci++) { if (sections[ci].ch === chNum2) { dupCh = sections[ci]; break; } }
-          if (!dupCh) {
+          if (dupCh) {
+            // 保留标题更完整的版本
+            if (hd.txt.length > dupCh.name.length) dupCh.name = hd.txt;
+            if (hd.el && !dupCh.el) dupCh.el = hd.el;
+          } else {
             dupCh = { ch: chNum2, name: hd.txt, sections: [], el: hd.el };
             sections.push(dupCh);
           }
           stack = [{ node: dupCh, level: 0 }];
         } else {
           if (!parent) continue; // 没有父节点，跳过
-          var node = { num: detectHeadingNum(hd.txt), title: hd.txt, el: hd.el };
+          var titleClean = hd.txt;
+          // 如果标题已包含编号前缀，去掉它（避免 renderNavTree 拼接时重复）
+          var numStr = detectHeadingNum(hd.txt);
+          if (numStr && titleClean.indexOf(numStr) === 0) {
+            titleClean = titleClean.substring(numStr.length).replace(/^[\s、，,.]*/, '');
+          }
+          var node = { num: numStr, title: titleClean || hd.txt, el: hd.el };
           if (hd.level === 1) {
             node.subs = [];
             if (!parent.node.sections) parent.node.sections = [];
