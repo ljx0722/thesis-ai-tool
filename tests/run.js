@@ -713,9 +713,9 @@ test('PAPER: Chapter extraction scans p+h1~h6 for chapter/section text patterns'
   assert(src.indexOf("isChapterText") >= 0, 'Must flag chapter candidates');
 });
 
-test('PAPER: Chapter extraction has boundary guards (pastCh1, refBound)', function() {
+test('PAPER: Chapter extraction has boundary guards (bodyStarted, refBound)', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf("pastCh1") >= 0, 'Must skip content before chapter 1');
+  assert(src.indexOf('bodyStarted') >= 0, 'Must skip content before chapter 1');
   assert(src.indexOf("refBound") >= 0, 'Must detect reference list boundary');
   assert(src.indexOf("sections.push(curCh4)") >= 0 || src.indexOf("sections.push") >= 0, 'Must push chapters into sections array');
   assert(src.indexOf("level===0") >= 0, 'Must detect chapter level (level 0)');

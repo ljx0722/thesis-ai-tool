@@ -1799,21 +1799,19 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
         var rt=(allEls3[ri].textContent||'').replace(/\s+/g,'');
         if(rt.indexOf('参考文献')===0&&rt.length<20){refBound=allEls3[ri];break;}
       }
-      // 第二步：收集在"第1章"→"参考文献"之间的标题候选
+      // 第二步：收集在第一个章标题到"参考文献"之间的所有标题候选
       var headingCandidates=[];
-      var pastCh1=false;
+      var bodyStarted=false;
       for(var ai=0;ai<allEls3.length;ai++){
         var el2=allEls3[ai],txt2=(el2.textContent||'').trim();
         if(!txt2)continue;
         // 到达参考文献就停止
         if(refBound&&el2===refBound)break;
         if(refBound&&(el2.compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))break;
-        // 标记/目录/摘要等第一章之前的内容全部跳过（兼容多种格式）
-        var isStart= /^第[一1一二三四五六七八九十\d]+章/.test(txt2) || /^Chapter\s+\d/.test(txt2) || /^(1\.|1\s+)Introduction/.test(txt2);
-        // 补充：如果到了 2/3 的位置还没找到第1章，从开头开始收集（兜底兼容非标准格式）
-        if(!pastCh1&&ai>Math.max(3,Math.floor(allEls3.length*0.6))){pastCh1=true;}
-        if(isStart)pastCh1=true;
-        if(!pastCh1)continue;
+        // 多种第一章标记：第X章 / Chapter / 数字编号章 / 中文序号章
+        var isFirstCh=/^第[一二三四五六七八九十\d]+章/.test(txt2)||/^Chapter\s+\d/.test(txt2)||/^(1\.|1\s+)Introduction/.test(txt2)||/^1[\s、,.]/.test(txt2)||/^一[\s、,.]/.test(txt2);
+        if(isFirstCh||bodyStarted===false&&ai>Math.max(10,Math.floor(allEls3.length*0.3)))bodyStarted=true;
+        if(!bodyStarted)continue;
         // 判断标题级别（支持多种中文论文常见格式）
         // 格式1: "1.1 研究背景" / "1.1研究背景" / "1.1、研究背景"
         // 格式2: "1.1.1 概念" / "1.1.1概念"
@@ -1901,7 +1899,7 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
       }
     }
     console.groupEnd();
-    console.log('[diag] headingCandidates:',headingCandidates.length,'pastCh1:',pastCh1,'refBound:',!!refBound);
+    console.log('[diag] headingCandidates:',headingCandidates.length,'bodyStarted:',bodyStarted,'refBound:',!!refBound);
     var lvls={'-1':0,'0':0,'1':0,'2':0};headingCandidates.forEach(function(h){lvls[h.level]=(lvls[h.level]||0)+1;});
     console.log('[diag] level breakdown:',JSON.stringify(lvls));
 
@@ -1919,9 +1917,10 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
         if(refBound&&(fe.compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))break;
         var ft=(fe.textContent||'').trim();
         if(!ft||ft.length<1)continue;
-        // 尝试找到第一章位置
-        var isFbStart=/^第[一二三四五六七八九十\d]+章/.test(ft)||/^Chapter\s+\d/.test(ft)||/^(1\.|1\s+)Introduction/.test(ft);
-        if(isFbStart)fbPast=true;
+        // 多种第一章标记，或过了前30%位置直接开始收集
+        var isChLike=/^第[一二三四五六七八九十\d]+章/.test(ft)||/^Chapter\s+\d/.test(ft)||/^(1\.|1\s+)Introduction/.test(ft)||/^1[\s、,.]/.test(ft)||/^一[\s、,.]/.test(ft);
+        if(isChLike)fbPast=true;
+        if(!fbPast&&fbi>Math.max(10,Math.floor(fbEls.length*0.3)))fbPast=true;
         if(!fbPast)continue;
         // 自动猜级
         var guessLv=-1;
