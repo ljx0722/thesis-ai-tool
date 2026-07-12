@@ -1039,7 +1039,7 @@ var _cwSelections={'0':new Set(),'1':new Set(),'2':new Set()},_cwConfirmed={'0':
 function cwGetStyleGroups(){
   var cached=window._docxStyleGroups||[];
   if(cached.length)return cached;
-  // 兜底：从 HTML class 提取
+  // 兜底：从 DOM 按文本模式分组（预解析失败时）
   var box=document.getElementById('thesisBox');if(!box)return[];
   var refBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
   var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6'),groups={};
@@ -1047,13 +1047,19 @@ function cwGetStyleGroups(){
     if(refBound&&(els[i].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
     var t=(els[i].textContent||'').trim();if(!t||t.length<2)continue;
     if(/^\d{1,3}$/.test(t)||/^[ivxlcdm]+$/i.test(t))continue;
-    var cls=els[i].className||'';
-    var snm=cls.match(/style-name\s*:\s*['\x22]?([^'\x22;\]]+)/i);
-    var sname=snm?snm[1].replace(/['\s\x22]+$/,'').trim():'Normal';
-    if(!groups[sname])groups[sname]={name:sname,count:0,samples:[]};
-    groups[sname].count++;
-    if(groups[sname].samples.length<2)groups[sname].samples.push(t.substring(0,80));
+    if(/[\t\s]+\d{1,3}$/.test(t)||/\.{3,}\d{1,3}$/.test(t))continue;
+    var gname='正文段落';
+    if(/^第[一二三四五六七八九十123456789]+章/.test(t))gname='第X章 格式';
+    else if(/^Chapter\s+\d/i.test(t))gname='Chapter 格式';
+    else if(/^\d+(?:\.\d+)+[\s、,]+/.test(t))gname='数字编号格式';
+    else if(t.length<80&&!/^[\(（]?(?:摘要|Abstract|关键词|Keywords|目录|参考文献|致谢|附录)/.test(t))gname='短文本(疑似标题)';
+    if(!groups[gname])groups[gname]={name:gname,count:0,samples:[],_texts:[],_els:[]};
+    groups[gname].count++;
+    if(groups[gname].samples.length<3)groups[gname].samples.push(t.substring(0,80));
+    groups[gname]._texts.push(t);
+    groups[gname]._els.push(els[i]);
   }
+  console.log('[cw] Fallback:',Object.values(groups).map(function(g){return g.name+'×'+g.count;}).join(', '));
   return Object.values(groups).sort(function(a,b){return b.count-a.count;});
 }
 
@@ -1103,14 +1109,14 @@ function cwShowConfirmPopup(sname){
   var colors=['#0071e3','#af52de','#30d158'];
 
   // 从预解析数据中提取该样式的所有文本
-  var items=[],cached=window._docxStyleGroups||[];
+  var items=[],cached=window._docxStyleGroups&&window._docxStyleGroups.length?window._docxStyleGroups:cwGetStyleGroups();
   for(var ci=0;ci<cached.length;ci++){
     if(cached[ci].name===sname&&cached[ci]._texts&&cached[ci]._texts.length){
       var txts=cached[ci]._texts,seen2={};
       for(var ti=0;ti<txts.length;ti++){
         var tx=txts[ti];if(!tx||tx.length<2||seen2[tx])continue;
         seen2[tx]=true;
-        items.push({txt:tx,checked:true,idx:items.length});
+        items.push({txt:tx,el:cached[ci]._els?cached[ci]._els[ti]:null,checked:true,idx:items.length});
       }
       break;
     }
@@ -1196,20 +1202,28 @@ function cwConfirmAccept(sname){
     return !styleSampleSet[et]&&!items.some(function(it){return it.txt===et||(it.txt.length>=10&&et.length>=10&&it.txt.substring(0,20)===et.substring(0,20));});
   });
 
-  // 重新添加本次勾选的元素
-  var box=document.getElementById('thesisBox');
-  var refBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
-  var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+  // 重新添加本次勾选的元素（优先用 items 自带的 el 引用）
   for(var k=0;k<items.length;k++){
     if(!items[k].checked)continue;
-    var tx=items[k].txt;
-    for(var l=0;l<els.length;l++){
-      if(refBound&&(els[l].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
-      var et=(els[l].textContent||'').trim();
-      if(et===tx||(tx.length>=10&&et.length>=10&&et.substring(0,20)===tx.substring(0,20))){
-        var dup=false;
-        for(var d=0;d<window._cwCheckedEls[_cwPhase].length;d++){if(window._cwCheckedEls[_cwPhase][d]===els[l]){dup=true;break;}}
-        if(!dup)window._cwCheckedEls[_cwPhase].push(els[l]);
+    var directEl=items[k].el;
+    if(directEl){
+      var dup2=false;
+      for(var d2=0;d2<window._cwCheckedEls[_cwPhase].length;d2++){if(window._cwCheckedEls[_cwPhase][d2]===directEl){dup2=true;break;}}
+      if(!dup2)window._cwCheckedEls[_cwPhase].push(directEl);
+      continue;
+    }
+    // 兜底：文本匹配查找 DOM
+    var tx2=items[k].txt;
+    var box2=document.getElementById('thesisBox');if(!box2)continue;
+    var refB2=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
+    var els2=box2.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+    for(var l2=0;l2<els2.length;l2++){
+      if(refB2&&(els2[l2].compareDocumentPosition(refB2)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
+      var et2=(els2[l2].textContent||'').trim();
+      if(et2===tx2||(tx2.length>=10&&et2.length>=10&&et2.substring(0,20)===tx2.substring(0,20))){
+        var dup3=false;
+        for(var d3=0;d3<window._cwCheckedEls[_cwPhase].length;d3++){if(window._cwCheckedEls[_cwPhase][d3]===els2[l2]){dup3=true;break;}}
+        if(!dup3)window._cwCheckedEls[_cwPhase].push(els2[l2]);
         break;
       }
     }
