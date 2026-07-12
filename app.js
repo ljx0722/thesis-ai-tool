@@ -1807,208 +1807,296 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
 
     updLoad('构建章节树...','35');
 
-    // === 章节解析：扫描 p+h1~h6，仅取第一章到参考文献之间的内容 ===
+    // ====== 标题层级检测辅助函数 ======
+    // 返回 -1(非标题) / 0(章) / 1(节) / 2(小节) / 3+(更深)
+    function detectHeadingLevel(txt) {
+      if (!txt || txt.length < 2) return -1;
+      // 章标题: 第X章
+      if (/^第[一二三四五六七八九十123456789]+章/.test(txt) || /^Chapter\s+\d/.test(txt)) return 0;
+      // 数字编号: 深度 = 点数
+      var nm = txt.match(/^(\d+(?:\.\d+)+)/);
+      if (nm) { var d = nm[1].split('.').length - 1; return d; }
+      // 单数字 + 标题（如 "1 绪论"）
+      var sm = txt.match(/^(\d+)[\s、，,.]+\S/);
+      if (sm && sm[1] === '1') return 0; // 第1个数字章可能没有"第X章"标记
+      if (sm && sm[1] !== '1') return 1;
+      // 中文序号: 一、xxx → 节; (一)xxx → 小节
+      if (/^[\(（]?[一二三四五六七八九十]+[\)）]?[\s、，,.]/.test(txt)) {
+        return txt.indexOf('(') >= 0 || txt.indexOf('（') >= 0 ? 2 : 1;
+      }
+      return -1;
+    }
+    function detectChapterNum(txt) {
+      var cm = txt.match(/^第([一二三四五六七八九十123456789]+)章/);
+      if (cm) return cnDigit(cm[1]);
+      var dm = txt.match(/^(\d+)[\s、，,.]/);
+      if (dm) return parseInt(dm[1]);
+      var cnm = txt.match(/^([一二三四五六七八九十]+)[\s、，,.]/);
+      if (cnm) return cnDigit(cnm[1]);
+      return 0;
+    }
+    function detectHeadingNum(txt) {
+      var nm = txt.match(/^((?:\d+\.)*\d+)/);
+      if (nm) return nm[1];
+      var cnm = txt.match(/^([\(（]?[一二三四五六七八九十]+[\)）]?)/);
+      if (cnm) return cnm[1];
+      return txt.substring(0, 8);
+    }
+
+    // =================================================================
+    // 新章节解析：围栏架构
+    // 策略：① 用 HTML 标题标签优先 ② 文本模式回退 ③ TOC 自动跳过
+    // 核心原则：同一层级的标题之间的内容归该标题所有
+    // =================================================================
     var box = document.getElementById('thesisBox');
     sections = [];
     if (box) {
-      // 第一步：找"参考文献"边界元素
-      var refBound=null;
-      var allEls3=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
-      for(var ri=0;ri<allEls3.length;ri++){
-        var rt=(allEls3[ri].textContent||'').replace(/\s+/g,'');
-        if(rt.indexOf('参考文献')===0&&rt.length<20){refBound=allEls3[ri];break;}
+      var allEls = box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+      // ===== 第1步：找"参考文献"边界 =====
+      var refBound = null;
+      for (var ri = 0; ri < allEls.length; ri++) {
+        var rt = (allEls[ri].textContent || '').replace(/\s+/g, '');
+        if (rt.indexOf('参考文献') === 0 && rt.length < 20) { refBound = allEls[ri]; break; }
       }
-      // 第二步：收集在第一个章标题到"参考文献"之间的所有标题候选
-      var headingCandidates=[];
-      var bodyStarted=false;
-      for(var ai=0;ai<allEls3.length;ai++){
-        var el2=allEls3[ai],txt2=(el2.textContent||'').trim();
-        if(!txt2)continue;
-        // 到达参考文献就停止
-        if(refBound&&el2===refBound)break;
-        if(refBound&&(el2.compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))break;
-        // 多种第一章标记：第X章 / Chapter / 数字编号章 / 中文序号章
-        var isFirstCh=/^第[一二三四五六七八九十123456789]+章/.test(txt2)||/^Chapter\s+\d/.test(txt2)||/^(1\.|1\s+)Introduction/.test(txt2)||/^1[\s、,.]/.test(txt2)||/^一[\s、,.]/.test(txt2);
-        if(isFirstCh||bodyStarted===false&&ai>Math.max(8,Math.floor(allEls3.length*0.15)))bodyStarted=true;
-        if(!bodyStarted)continue;
-        // 判断标题级别（支持多种中文论文常见格式）
-        // 格式1: "1.1 研究背景" / "1.1研究背景" / "1.1、研究背景"
-        // 格式2: "1.1.1 概念" / "1.1.1概念"
-        // 格式3: 裸编号 "2.1"、"2.1.3"（mammoth拆分了标题）
-        // 格式4: 中文序号 "一、研究背景" / "(一)研究背景"
-        var numMatch=txt2.match(/^((?:\d+\.)*\d+)\s+(.*)/);  // 标准空格
-        if(!numMatch)numMatch=txt2.match(/^((?:\d+\.)*\d+)[\s、，,.]*(.*)/);  // 无空格/顿号/逗号
-        var isChapterText=/^第([一-鿿\d]+)章/.test(txt2);
-        // 中文序号格式："一、xxx" "(一)xxx" "① xxx" → 视为节标题
-        var cnNumMatch=txt2.match(/^([\(（]?[一二三四五六七八九十]+[\)）]?)[\s、，,.]*(.*)/);
-        var isCNNumbered=cnNumMatch&&cnNumMatch[2]&&cnNumMatch[2].length>=2&&
-                         !/^第[一二三四五六七八九十\d]+章/.test(txt2)&&
-                         !/^(?:摘要|Abstract|关键词|目录|参考文献|致谢|附录)/.test(txt2);
-        // 裸编号：仅有数字编号没有标题文字
-        var isBareNumber=!numMatch&&!isChapterText&&!isCNNumbered&&/^(\d+(?:\.\d+)+)\s*$/.test(txt2);
-        var isNumberedHeading=numMatch!==null&&(numMatch[2]||'').length>=2; // 必须有实质标题
-        // 如果 numMatch 匹配到但标题为空，降级为 bare
-        if(numMatch&&(!numMatch[2]||numMatch[2].length<2))isBareNumber=true;
-        if(isChapterText||isNumberedHeading||isBareNumber||isCNNumbered){
-          // Skip TOC entries
-          if(/\.{3,}\s*\d+$|[\s\.]{5,}\d+$/.test(txt2))continue;
-          var level=0,num='',title='';
-          if(isChapterText){
-            level=0;num=txt2;title=txt2;
-          }else if(isCNNumbered){
-            level=1;num=cnNumMatch[1];title=cnNumMatch[2];
-          }else if(isBareNumber){
-            var bnm=txt2.match(/^(\d+(?:\.\d+)+)\s*$/);level=bnm[1].split('.').length-1;num=txt2.trim();title='';
-          }else{
-            level=numMatch[1].split('.').length-1;num=numMatch[1];title=numMatch[2]||txt2;
+      // ===== 第2步：找正文起始位置（跳过封面/摘要/TOC）=====
+      var bodyStartIdx = -1;
+      // 2a. 找"目录"所在元素
+      var tocIdx = -1;
+      for (var ti = 0; ti < allEls.length; ti++) {
+        var tt = (allEls[ti].textContent || '').replace(/\s+/g, '');
+        if (tt === '目录' || tt === '目 录' || tt === '目錄') { tocIdx = ti; break; }
+      }
+      if (tocIdx < 0) {
+        // 无目录：找"摘要"之后的第一个章标题
+        for (var ti2 = 0; ti2 < allEls.length; ti2++) {
+          var ts2 = (allEls[ti2].textContent || '').trim();
+          if (/^(摘要|Abstract)/.test(ts2)) { tocIdx = ti2; break; }
+        }
+      }
+      // 2b. 从 tocIdx 往后扫，找到第一个真正的正文标题（不含结尾页码）
+      for (var bi = Math.max(0, tocIdx); bi < allEls.length; bi++) {
+        var bt = (allEls[bi].textContent || '').trim();
+        if (!bt || bt.length < 2) continue;
+        if (refBound && (allEls[bi].compareDocumentPosition(refBound) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+        // 检测是否是标题模式
+        var isHd = /^第[一二三四五六七八九十123456789]+章/.test(bt) ||
+                   /^Chapter\s+\d/.test(bt) ||
+                   /^(1\.|1\s+)Introduction/.test(bt) ||
+                   /^(?:1|[一二三四五六七八九十]+)[\s、，,.]/.test(bt);
+        if (!isHd) continue;
+        // 检测是否 TOC 条目（结尾有页码：tab + 数字 或 空格 + 1-3位数字）
+        if (/\t\d{1,3}$/.test(bt) || /[\s\.]{2,}\d{1,3}$/.test(bt)) continue;
+        // 这是真正的正文标题！
+        bodyStartIdx = bi;
+        break;
+      }
+      // 2c. 兜底：找不到时从 15% 位置开始
+      if (bodyStartIdx < 0) bodyStartIdx = Math.max(0, Math.floor(allEls.length * 0.15));
+      // ===== 第3步：从正文起始位置，按 DOM 顺序构建层级树 =====
+      // 用栈模拟层级：stack[0]=当前章, stack[1]=当前节, stack[2]=当前小节...
+      var treeStack = []; // [{node, level, el}]
+      var allHeadings = []; // 收集所有标题节点（供校准弹窗）
+      for (var ei = bodyStartIdx; ei < allEls.length; ei++) {
+        var el2 = allEls[ei], txt2 = (el2.textContent || '').trim();
+        if (!txt2 || txt2.length < 1) continue;
+        if (refBound && (el2.compareDocumentPosition(refBound) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+        // 跳过目录残留、页码、纯数字行
+        if (/^\d{1,3}$/.test(txt2) || /^[ivxlcdmIVXLCDM]+$/.test(txt2) || /^[-—–]+\s*\d+\s*[-—–]+$/.test(txt2)) continue;
+        if (/^(?:摘要|Abstract|ABSTRACT|关键词|Keywords|KEY ?WORDS)$/.test(txt2.replace(/\s+/g, ''))) continue;
+        // 检测标题级别（HTML 标签优先）
+        var tagLv = -1;
+        var tagName = (el2.tagName || '').toUpperCase();
+        if (tagName === 'H1') tagLv = 0;
+        else if (tagName === 'H2') tagLv = 1;
+        else if (tagName === 'H3') tagLv = 2;
+        else if (tagName === 'H4') tagLv = 3;
+        else if (tagName === 'H5') tagLv = 4;
+        else if (tagName === 'H6') tagLv = 5;
+        // 文本模式回退
+        var txtLv = detectHeadingLevel(txt2);
+        // 综合判断：HTML 标签优先，但文本模式可修正
+        var hdLv = (tagLv >= 0) ? tagLv : txtLv;
+        // 标题判定：HTML 标签 或 文本模式匹配 或 短文本（<60字）可能被 mammoth 拆分
+        var isHeadingEl = tagLv >= 0 || txtLv >= 0;
+        if (!isHeadingEl && txt2.length < 60 && /^[\d一二三四五六七八九十\(（]/.test(txt2)) {
+          isHeadingEl = true; hdLv = 1; // 乐观猜测为节标题
+        }
+        // 过滤明显非标题的长文本（>100字基本不可能是标题）
+        if (!isHeadingEl && txt2.length > 100) isHeadingEl = false;
+        if (!isHeadingEl && tagLv < 0) continue; // 非标题，跳过收集
+        // 记录
+        allHeadings.push({ el: el2, txt: txt2, level: hdLv, tagLevel: tagLv, bare: false });
+      }
+      // ===== 第4步：合并 mammoth 拆分的标题 =====
+      for (var hi = 0; hi < allHeadings.length; hi++) {
+        var hc = allHeadings[hi];
+        var hdTxt = hc.txt;
+        // 检测是否需要合并：纯编号结尾 或 HTML 标签显示是标题但文字很短
+        if (!hc.el) continue;
+        var isBare = /^(第[一二三四五六七八九十123456789]+章|\d+(?:\.\d+)*)\s*$/.test(hdTxt);
+        if (isBare || (hc.tagLevel >= 0 && hdTxt.length < 10)) {
+          var sib = hc.el.nextElementSibling;
+          for (var si = 0; si < 3 && sib; si++) {
+            var st = (sib.textContent || '').trim();
+            if (!st || /^\d{1,3}$/.test(st) || /^[ivxlcdmIVXLCDM]+$/.test(st) || /\.{3,}\s*\d/.test(st)) {
+              sib = sib.nextElementSibling; continue;
+            }
+            if (st.length > 1 && st.length < 80 &&
+                !/^(?:第[一二三四五六七八九十123456789]+章|摘要|Abstract|关键词|目录|参考文献|致谢|附录)/.test(st)) {
+              hc.txt = hdTxt + ' ' + st;
+              hc.el = sib;
+              hc.bare = false;
+              break;
+            }
+            sib = sib.nextElementSibling;
           }
-          headingCandidates.push({el:el2,txt:txt2,num:num,title:title,level:level,bare:isBareNumber||false});
+          if (hc.txt === hdTxt) hc.bare = true;
         }
       }
-      // 第三步：合并 mammoth 拆分的标题（如 <p>第2章</p><p>文献综述</p> → "第2章 文献综述"）
-      for(var hi=0;hi<headingCandidates.length;hi++){
-        var hc=headingCandidates[hi];
-        // 检测是否为裸编号（bare）或纯编号结束（如 "第2章"、"2.1"）
-        var isBareLike=hc.bare||/^(第[一二三四五六七八九十\d]+章|\d+(?:\.\d+)*)\s*$/.test(hc.txt);
-        if(!isBareLike||!hc.el)continue;
-        // 往后扫描最多3个兄弟元素，跳过空的/页码/目录行，找到标题文字
-        var merged='',mergedEl=null;
-        var sib=hc.el.nextElementSibling;
-        for(var si=0;si<3&&sib;si++){
-          var st=(sib.textContent||'').trim();
-          if(!st||/^\d{1,3}$/.test(st)||/^[ivxlcdmIVXLCDM]+$/.test(st)){ sib=sib.nextElementSibling; continue; }
-          // TOC dot-leaders → skip
-          if(/\.{3,}\s*\d+$/.test(st)&&st.length<80){ sib=sib.nextElementSibling; continue; }
-          if(/^[-—–]\s*\d+\s*[-—–]$/.test(st)){ sib=sib.nextElementSibling; continue; }
-          // This looks like a title candidate
-          if(st.length>1&&st.length<60&&
-             !/^第[一二三四五六七八九十\d]+章/.test(st)&&
-             !/^(?:\d+\.)*\d+\s/.test(st)&&
-             !/^(?:摘要|Abstract|关键词|目录|参考文献|致谢|附录)/.test(st)){
-            merged=st;mergedEl=sib;break;
+      // ===== 第4.5步: 标题层级校准弹窗 =====
+      _totalHeadingCount = allHeadings.length;
+      _bareHeadingCount = 0; for (var bi2 = 0; bi2 < allHeadings.length; bi2++) { if (allHeadings[bi2].bare) _bareHeadingCount++; }
+      // 兜底：如果自动检测结果太少，从所有 body 元素中收集
+      if (allHeadings.length < 5) {
+        for (var ei3 = bodyStartIdx; ei3 < allEls.length; ei3++) {
+          var fe = allEls[ei3], ft = (fe.textContent || '').trim();
+          if (!ft || ft.length < 2) continue;
+          if (refBound && (fe.compareDocumentPosition(refBound) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+          if (/^\d{1,3}$/.test(ft) || /^[ivxlcdmIVXLCDM]+$/.test(ft)) continue;
+          // 去重
+          var dup = false;
+          for (var di2 = 0; di2 < allHeadings.length; di2++) { if (allHeadings[di2].el === fe) { dup = true; break; } }
+          if (dup) continue;
+          var gl = detectHeadingLevel(ft);
+          allHeadings.push({ el: fe, txt: ft, level: gl, tagLevel: -1, bare: false });
+        }
+      }
+      updLoad('标题校准...', '37');
+      var calibrated = await new Promise(function (resolve) { showHeadingCalibration(allHeadings, resolve); });
+      if (calibrated !== null) allHeadings = calibrated;
+      // ===== 第5步：从校准后的标题列表构建章节树 =====
+      sections = [];
+      var stack = []; // [{ch, sec, sub, level}]
+      var chCounter = 0;
+      for (var hi2 = 0; hi2 < allHeadings.length; hi2++) {
+        var hd = allHeadings[hi2];
+        if (hd.level < 0) continue; // 用户标记为非标题
+        // Pop stack until we find a parent (level < current level)
+        while (stack.length > 0 && stack[stack.length - 1].level >= hd.level) stack.pop();
+        var parent = stack.length > 0 ? stack[stack.length - 1] : null;
+        if (hd.level === 0) {
+          // 新章
+          chCounter++;
+          var chNum2 = detectChapterNum(hd.txt) || chCounter;
+          // 去重同章号
+          var dupCh = null;
+          for (var ci = 0; ci < sections.length; ci++) { if (sections[ci].ch === chNum2) { dupCh = sections[ci]; break; } }
+          if (!dupCh) {
+            dupCh = { ch: chNum2, name: hd.txt, sections: [], el: hd.el };
+            sections.push(dupCh);
           }
-          sib=sib.nextElementSibling;
+          stack = [{ node: dupCh, level: 0 }];
+        } else {
+          if (!parent) continue; // 没有父节点，跳过
+          var node = { num: detectHeadingNum(hd.txt), title: hd.txt, el: hd.el };
+          if (hd.level === 1) {
+            node.subs = [];
+            if (!parent.node.sections) parent.node.sections = [];
+            parent.node.sections.push(node);
+            stack.push({ node: node, level: 1 });
+          } else {
+            // level >= 2: 挂在当前最深节的 subs 下
+            var targetParent = parent.node;
+            for (var si2 = 0; si2 < hd.level - 1; si2++) {
+              var subs = targetParent.subs || (targetParent.sections && targetParent.sections.length ? targetParent.sections[targetParent.sections.length - 1].subs : null);
+              if (!subs || !subs.length) { node.subs = []; if (!targetParent.subs) targetParent.subs = []; targetParent.subs.push(node); targetParent = null; break; }
+              targetParent = subs[subs.length - 1];
+            }
+            if (targetParent) {
+              node.subs = [];
+              if (!targetParent.subs) targetParent.subs = [];
+              targetParent.subs.push(node);
+            }
+            stack.push({ node: node, level: hd.level });
+          }
         }
-        if(merged){
-          hc.txt=hc.txt+' '+merged;
-          hc.title=hc.title?hc.title+' '+merged:merged;
-          hc.el=mergedEl||hc.el;
-          hc.bare=false;
-        }
-      }
-      // 统计裸编号数量，用于标题样式质量诊断
-      _totalHeadingCount=headingCandidates.length;
-      _bareHeadingCount=0;
-      for(var bi=0;bi<headingCandidates.length;bi++){
-        if(headingCandidates[bi].bare)_bareHeadingCount++;
-      }
-
-
-    // ====== 诊断：打印所有扫描到的文本 ======
-    console.groupCollapsed('[diag] All body elements scanned');
-    var allEls4=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
-    for(var di=0;di<Math.min(allEls4.length,60);di++){
-      var dt=(allEls4[di].textContent||'').trim();
-      var tg=(allEls4[di].tagName||'').toLowerCase();
-      if(dt&&dt.length>1&&dt.length<120){
-        var isCH=/^第/.test(dt);
-        var isSEC=/^\d+\./.test(dt);
-        var tags=isCH?'CH ':(isSEC?'SEC ':'   ');
-        console.log(di,tags,'<'+tg+'>',dt.substring(0,80));
       }
     }
-    console.groupEnd();
-    console.log('[diag] headingCandidates:',headingCandidates.length,'bodyStarted:',bodyStarted,'refBound:',!!refBound);
-    var lvls={'-1':0,'0':0,'1':0,'2':0};headingCandidates.forEach(function(h){lvls[h.level]=(lvls[h.level]||0)+1;});
-    console.log('[diag] level breakdown:',JSON.stringify(lvls));
-
-    // === 标题层级校准弹窗 ===
-    updLoad('标题校准...','37');
-    // 兜底：如果有效标题太少（<3个），收集所有可见区段让用户手动标注
-    var validCands=0;
-    for(var vi=0;vi<headingCandidates.length;vi++){if(headingCandidates[vi].level>=0)validCands++;}
-    if(validCands<3){
-      console.warn('[calibration] Only',validCands,'valid candidates. Using fallback scan.');
-      var fbPast=false,fallbackCands=[];
-      var fbEls=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li');
-      for(var fbi=0;fbi<fbEls.length;fbi++){
-        var fe=fbEls[fbi];
-        if(refBound&&(fe.compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))break;
-        var ft=(fe.textContent||'').trim();
-        if(!ft||ft.length<1)continue;
-        // 多种第一章标记，或过了前30%位置直接开始收集
-        var isChLike=/^第[一二三四五六七八九十\d]+章/.test(ft)||/^Chapter\s+\d/.test(ft)||/^(1\.|1\s+)Introduction/.test(ft)||/^1[\s、,.]/.test(ft)||/^一[\s、,.]/.test(ft);
-        if(isChLike)fbPast=true;
-        if(!fbPast&&fbi>Math.max(8,Math.floor(fbEls.length*0.15)))fbPast=true;
-        if(!fbPast)continue;
-        // 自动猜级
-        var guessLv=-1;
-        if(ft.length<80){
-          if(/^第[一二三四五六七八九十123456789]+章/.test(ft))guessLv=0;
-          else if(/^\d+(?:\.\d+){1,2}[\s、，,.]/.test(ft))guessLv=ft.match(/^\d+(?:\.\d+){1}/)?1:(ft.match(/^\d+(?:\.\d+){2}/)?2:-1);
-          else if(/^[\(（]?[一二三四五六七八九十]+[\)）]?[\s、]/.test(ft))guessLv=1;
+    // ===== 第5.5步：填充每章/节/小节的正文内容（围栏架构）=====
+    if (sections.length) {
+      var bodyEls = box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+      // 收集所有带 id 的标题锚点，按 DOM 顺序排
+      var hdAnchors = [];
+      for (var ai2 = 0; ai2 < bodyEls.length; ai2++) {
+        var aid = bodyEls[ai2].id || '';
+        if (aid.indexOf('ch-') === 0 || aid.indexOf('sec-') === 0 || aid.indexOf('sub-') === 0) {
+          hdAnchors.push({ el: bodyEls[ai2], id: aid, idx: ai2 });
         }
-        fallbackCands.push({el:fe,txt:ft,num:'',title:ft,level:guessLv,bare:false});
       }
-      // 优先用已有检测结果 + 兜底扫描中不在已有列表里的项
-      var existingTxts={};
-      headingCandidates.forEach(function(h){existingTxts[h.txt]=true;});
-      fallbackCands.forEach(function(fc){
-        if(!existingTxts[fc.txt])headingCandidates.push(fc);
-      });
-      console.log('[calibration] After fallback:','total',headingCandidates.length,'candidates');
-    }
-    var calibratedCandidates=await new Promise(function(resolve){
-      // Also include undetected short text elements as candidates (user might want to mark them as headings)
-      // But for simplicity, just pass the auto-detected list
-      showHeadingCalibration(headingCandidates,resolve);
-    });
-
-    if(calibratedCandidates!==null){
-      // User confirmed - use their choices
-      headingCandidates=calibratedCandidates;
-    }
-    // else: user skipped, use auto-detected headingCandidates
-
-    // 构建多级树（从 headingCandidates）
-    sections=[];
-    var curCh4=null,curLvl={};
-    for(var hi=0;hi<headingCandidates.length;hi++){
-      var hc=headingCandidates[hi];
-      if(hc.level===0){
-        var chM4=hc.txt.match(/^第([一-鿿\d]+)章/);var chNum2=chM4?cnDigit(chM4[1]):(sections.length+1);
-        var dupCh=null;
-        for(var ci=0;ci<sections.length;ci++){if(sections[ci].ch===chNum2){dupCh=sections[ci];break;}}
-        if(dupCh){
-          if(hc.txt.length>dupCh.name.length){dupCh.name=hc.txt;}
-          if(hc.el&&!dupCh.el){dupCh.el=hc.el;}
-          curCh4=dupCh;curLvl={0:curCh4};
-        }else{
-          curCh4={ch:chNum2||(sections.length+1),name:hc.txt,sections:[],el:hc.el};
-          sections.push(curCh4);curLvl={0:curCh4};
+      // 辅助：根据锚点 id 匹配标题节点并填充文本
+      function fillNodeText(node, nodeLevel, anchorIdx) {
+        var nextIdx = bodyEls.length;
+        // 找下一个同级或更高级的锚点作为边界
+        for (var ni = anchorIdx + 1; ni < hdAnchors.length; ni++) {
+          var na = hdAnchors[ni];
+          var naLevel = na.id.indexOf('ch-') === 0 ? 0 : (na.id.indexOf('sec-') === 0 ? 1 : 2);
+          if (naLevel <= nodeLevel) { nextIdx = na.idx; break; }
         }
-      }else if(curCh4&&hc.level>0){
-        var parent=curLvl[hc.level-1];
-        if(!parent){parent=curCh4;}
-        var node={num:hc.num,title:hc.title||hc.txt,el:hc.el};
-        if(hc.level===1||!parent.sections){node.subs=[];if(!parent.sections)parent.sections=[];parent.sections.push(node);}
-        else{node.subs=[];if(!parent.subs)parent.subs=[];parent.subs.push(node);}
-        curLvl[hc.level]=node;
+        // 收集 [anchorIdx, nextIdx) 之间的文本
+        var txt = '';
+        for (var ti2 = anchorIdx + 1; ti2 < nextIdx && ti2 < bodyEls.length; ti2++) {
+          var et = (bodyEls[ti2].textContent || '').trim();
+          if (!et) continue;
+          // 过滤页码/TOC残留
+          if (/^\d{1,3}$/.test(et) || /^[ivxlcdmIVXLCDM]+$/.test(et)) continue;
+          if (/^[-—–]/.test(et) && et.length < 10) continue;
+          txt += et + '\n';
+        }
+        node.text = txt.trim();
+        // 递归填子节点
+        if (node.sections) {
+          for (var si3 = 0; si3 < node.sections.length; si3++) {
+            var secNode = node.sections[si3];
+            var secAIdx = -1;
+            for (var ai3 = 0; ai3 < hdAnchors.length; ai3++) {
+              if (hdAnchors[ai3].id === 'sec-' + (secNode.num || '').replace(/\./g, '-')) { secAIdx = ai3; break; }
+            }
+            if (secAIdx >= 0) fillNodeText(secNode, 1, secAIdx);
+            if (secNode.subs) {
+              for (var ui2 = 0; ui2 < secNode.subs.length; ui2++) {
+                var subNode = secNode.subs[ui2];
+                var subAIdx = -1;
+                for (var ai4 = 0; ai4 < hdAnchors.length; ai4++) {
+                  if (hdAnchors[ai4].id === 'sub-' + (subNode.num || '').replace(/\./g, '-')) { subAIdx = ai4; break; }
+                }
+                if (subAIdx >= 0) fillNodeText(subNode, 2, subAIdx);
+              }
+            }
+          }
+        }
+      }
+      // 从每个章的锚点开始填充
+      for (var ci3 = 0; ci3 < sections.length; ci3++) {
+        var ch = sections[ci3];
+        var chAIdx = -1;
+        for (var ai5 = 0; ai5 < hdAnchors.length; ai5++) {
+          if (hdAnchors[ai5].id === 'ch-' + ch.ch) { chAIdx = ai5; break; }
+        }
+        if (chAIdx >= 0) fillNodeText(ch, 0, chAIdx);
       }
     }
-  }
-  // 调试日志
-  console.log('[chapters] Parsed',sections.length,'chapters:');
-  sections.forEach(function(cs){
-    console.log('  ch-'+cs.ch,cs.name,'sections:',(cs.sections||[]).length);
-    (cs.sections||[]).forEach(function(sec){
-      console.log('    sec-'+sec.num,sec.title,'subs:',(sec.subs||[]).length);
-      (sec.subs||[]).forEach(function(sub){
-        console.log('      sub-'+sub.num,sub.title);
+    // ===== 第6步：调试日志 =====
+    console.log('[chapters] Parsed', sections.length, 'chapters:');
+    sections.forEach(function (cs) {
+      console.log('  ch-' + cs.ch, cs.name, 'sections:', (cs.sections || []).length, 'text:', Math.round((cs.text || '').length / 100) / 10 + 'k');
+      (cs.sections || []).forEach(function (sec) {
+        console.log('    sec-' + sec.num, sec.title, 'subs:', (sec.subs || []).length, 'text:', Math.round((sec.text || '').length / 100) / 10 + 'k');
+        (sec.subs || []).forEach(function (sub) {
+          console.log('      sub-' + sub.num, sub.title, 'text:', Math.round((sub.text || '').length / 100) / 10 + 'k');
+        });
       });
     });
-  });
-  // 正则回退
+    // ===== 第7步：正则回退（极少数情况） =====
     if (!sections.length) {
       var chMap2 = {}, re2 = /第([一-鿿\d]+)章/g, m2;
       while ((m2 = re2.exec(manuscriptText)) !== null) {
@@ -2019,79 +2107,60 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
         if (/PAGEREF|HYPERLINK|_Toc/.test(af2.substring(0, 250))) continue;
         chMap2[d2] = { dig: d2, pos: m2.index };
       }
-      var chs2 = Object.values(chMap2).sort(function(a, b) { return a.pos - b.pos; });
-      sections = chs2.map(function(hi, ii) {
+      var chs2 = Object.values(chMap2).sort(function (a, b) { return a.pos - b.pos; });
+      sections = chs2.map(function (hi, ii) {
         var af3 = manuscriptText.substring(hi.pos + 2), nl2 = af3.indexOf('\n');
         var t = (nl2 > 0 ? af3.substring(0, nl2) : af3.substring(0, 50)).trim().replace(/\s*\d+\.\d+.*$/, '').trim();
         return { ch: hi.dig, name: '第' + hi.dig + '章 ' + t, text: manuscriptText, sections: [] };
       });
       console.log('[chapters] using text fallback, found', sections.length);
     }
-    // 给每个 chapter 用 markAnchors 打 DOM 锚点
-    sections.forEach(function(cs) {
+    // ===== 第8步：给章节打 DOM 锚点 =====
+    sections.forEach(function (cs) {
       var el3 = cs.el;
       if (!el3) {
-        // 从 DOM 中按章节名查找对应元素
-        var allEls = box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
-        for (var ei = 0; ei < allEls.length; ei++) {
-          if ((allEls[ei].textContent || '').replace(/\s+/g, '') === cs.name.replace(/\s+/g, '')) {
-            el3 = allEls[ei]; break;
+        var allElsFb = box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+        for (var eiFb = 0; eiFb < allElsFb.length; eiFb++) {
+          if ((allElsFb[eiFb].textContent || '').replace(/\s+/g, '') === cs.name.replace(/\s+/g, '')) {
+            el3 = allElsFb[eiFb]; break;
           }
         }
       }
       if (el3) {
         el3.id = 'ch-' + cs.ch;
-        // 标记为可折叠
         el3._slevel = 'ch';
-        el3.classList.add('ch-head');el3.style.color='#e2e8f0';
+        el3.classList.add('ch-head'); el3.style.color = '#e2e8f0';
         var ar = document.createElement('span');
         ar.className = 'toggle-arrow open';
         ar.innerHTML = '&#9654;';
         el3.insertBefore(ar, el3.firstChild);
       }
-      // 标定节/小节 DOM 锚点（优先用解析阶段已绑定的 el，避免 mammoth 转 p 标签后找不到）
-      if (cs.sections) {
-        for (var si2 = 0; si2 < cs.sections.length; si2++) {
-          var sec = cs.sections[si2];
+      // 标定节/小节 DOM 锚点
+      function setSecAnchors(parentNode, level) {
+        var items = level === 1 ? (parentNode.sections || []) : (parentNode.subs || []);
+        for (var si2 = 0; si2 < items.length; si2++) {
+          var sec = items[si2];
           if (sec.el) {
-            sec.el.id = 'sec-' + sec.num.replace(/\./g,'-');
+            var idPrefix = level === 1 ? 'sec-' : 'sub-';
+            sec.el.id = idPrefix + (sec.num || '').replace(/\./g, '-');
             sec.el.style.cssText = 'cursor:pointer';
           } else {
-            // fallback: 宽搜索（p + h1~h6）
-            var allEls2 = box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
-            for (var ei2 = 0; ei2 < allEls2.length; ei2++) {
-              if ((allEls2[ei2].textContent||'').replace(/\s+/g,'') === (sec.num+' '+sec.title).replace(/\s+/g,'')) {
-                sec.el = allEls2[ei2];
-                allEls2[ei2].id = 'sec-' + sec.num.replace(/\./g,'-');
-                allEls2[ei2].style.cssText = 'cursor:pointer';
+            var allElsS = box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+            for (var ei2s = 0; ei2s < allElsS.length; ei2s++) {
+              if ((allElsS[ei2s].textContent || '').replace(/\s+/g, '') === (sec.num + ' ' + sec.title).replace(/\s+/g, '')) {
+                sec.el = allElsS[ei2s];
+                var idP = level === 1 ? 'sec-' : 'sub-';
+                allElsS[ei2s].id = idP + (sec.num || '').replace(/\./g, '-');
+                allElsS[ei2s].style.cssText = 'cursor:pointer';
                 break;
               }
             }
           }
-          if (sec.subs) {
-            for (var ui2 = 0; ui2 < sec.subs.length; ui2++) {
-              var sub = sec.subs[ui2];
-              if (sub.el) {
-                sub.el.id = 'sub-' + sub.num.replace(/\./g,'-');
-                sub.el.style.cssText = 'cursor:pointer';
-              } else {
-                var allEls3 = box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
-                for (var ei3 = 0; ei3 < allEls3.length; ei3++) {
-                  if ((allEls3[ei3].textContent||'').replace(/\s+/g,'') === (sub.num+' '+sub.title).replace(/\s+/g,'')) {
-                    sub.el = allEls3[ei3];
-                    allEls3[ei3].id = 'sub-' + sub.num.replace(/\./g,'-');
-                    allEls3[ei3].style.cssText = 'cursor:pointer';
-                    break;
-                  }
-                }
-              }
-            }
-          }
+          if (sec.subs) setSecAnchors(sec, 2);
         }
       }
+      if (cs.sections) setSecAnchors(cs, 1);
     });
-    // 分章填充文本
-    if (sections.length) populateChapterText();
 
     updLoad('提取参考文献...','60');
     var rawRefs=[];try{rawRefs=await extractRefsFromRawDocx(buf)}catch(er3){console.warn(er3)}
