@@ -344,7 +344,7 @@ console.log('\n=== Section 6: Module System & UX ===');
 
 test('MODULE: All 6 modules registered with icons', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/app-modules.js'), 'utf8');
-  var modules = ['format-check', 'terminology', 'paragraph', 'optimization', 'knowledge-graph', 'references'];
+  var modules = ['review', 'optimization', 'expand', 'data-analysis', 'knowledge-graph', 'references'];
   modules.forEach(function(m) {
     assert(src.indexOf("id: '" + m + "'") >= 0, 'Module not registered: ' + m);
   });
@@ -352,9 +352,10 @@ test('MODULE: All 6 modules registered with icons', function() {
 
 test('MODULE: switchPanel handles all module IDs', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/app-modules.js'), 'utf8');
-  assert(src.indexOf("moduleId === 'format-check'") >= 0, 'format-check not handled in switchPanel');
-  assert(src.indexOf("moduleId === 'references'") >= 0, 'references not handled in switchPanel');
-  assert(src.indexOf("moduleId === 'knowledge-graph'") >= 0, 'knowledge-graph not handled in switchPanel');
+  assert(src.indexOf("moduleId === 'review'") >= 0, 'review not handled in switchPanel');
+  assert(src.indexOf("moduleId === 'optimization'") >= 0, 'optimization not handled');
+  assert(src.indexOf("moduleId === 'expand'") >= 0, 'expand not handled');
+  assert(src.indexOf("moduleId === 'data-analysis'") >= 0, 'data-analysis not handled');
 });
 
 test('KEYBOARD: Ctrl+1~6 shortcuts registered', function() {
@@ -452,7 +453,7 @@ console.log('\n=== Section 8: Onboarding / Tour ===');
 
 test('ONBOARD: Tour covers all major modules', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/onboarding.js'), 'utf8');
-  var modules = ['上传论文','模块切换','参考文献','知识图谱','论文看板','小提示'];
+  var modules = ['上传论文','论文审阅','论文扩写','数据分析','参考文献','知识图谱','论文报告','小提示'];
   modules.forEach(function(m){assert(src.indexOf(m) >= 0, 'Tour missing: '+m);});
 });
 
@@ -1418,11 +1419,12 @@ test('INTEGRITY: structureThesisBox guards against double arrow insertion', func
   assert(src.indexOf("querySelector('.toggle-arrow')") >= 0, 'structureThesisBox must check for existing arrows');
 });
 
-test('INTEGRITY: onboarding.js covers new calibration/interactive features', function() {
+test('INTEGRITY: onboarding.js covers new modules (expand + data-analysis)', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/onboarding.js'), 'utf8');
   assert(src.indexOf('标题层级校准') >= 0, 'Onboarding must cover heading calibration');
   assert(src.indexOf('交互式文献检索') >= 0, 'Onboarding must cover interactive search');
-  assert(src.indexOf('标题样式质量') >= 0, 'Onboarding must mention heading style QA');
+  assert(src.indexOf('论文扩写') >= 0, 'Onboarding must cover expand module');
+  assert(src.indexOf('数据分析') >= 0, 'Onboarding must cover data analysis module');
 });
 
 test('INTEGRITY: onboarding.js has 11+ tour steps', function() {

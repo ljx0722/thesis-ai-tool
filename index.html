@@ -14,7 +14,7 @@ ipt>
 <script>if(window.location.protocol==='file:'){document.getElementById('fileBlock').style.display='block';document.querySelector('.main')&&(document.querySelector('.main').style.display='none');document.querySelector('.bar')&&(document.querySelector('.bar').style.display='none');fetch('http://localhost:5000/',{mode:'no-cors'}).then(function(r){window.location.href='http://localhost:5000/'}).catch(function(){});}</script>
 
 <!-- ====== 快捷键提示条 ====== -->
-<div class="kb-hint" id="kbHint">⌨ Ctrl+1~7 切换模块 | Ctrl+Enter 检索 | Ctrl+O 换论文 | Esc 关闭弹窗</div>
+<div class="kb-hint" id="kbHint">⌨ Ctrl+1~6 切换模块 | Ctrl+Enter 检索 | Ctrl+O 换论文 | Esc 关闭弹窗</div>
 
 <!-- ====== 顶栏 ====== -->
 <div class="bar">
@@ -28,15 +28,16 @@ ipt>
     <button class="ba-btn ba-verify" disabled id="baVerify" onclick="batchVerify()">✅ 校验</button>
     <button class="ba-btn ba-change" onclick="changeThesis()">📎 换论文</button>
     <button class="ba-btn ba-reset" id="baReset" onclick="resetSearch()">↺ 重置</button>
-    <button class="ba-btn" id="dashboardBtn" onclick="showDashboard()" disabled style="background:rgba(0,113,227,.1);color:#0071e3;border:none">📊 报告</button>
+    <button id="dashboardBtn" onclick="showDashboard()" disabled style="background:#0071e3;color:#fff;border:none;border-radius:18px;padding:6px 16px;cursor:pointer;font-weight:700;font-size:.68rem;box-shadow:0 2px 8px rgba(0,113,227,.25)">📊 报告</button>
   </div>
 </div>
 
 <!-- ====== 更新日志按钮 ====== -->
-<div id="changelogBtn" onclick="toggleChangelog()" title="更新日志" style="position:fixed;top:6px;right:12px;z-index:200;font-size:.62rem;color:var(--m);cursor:pointer;background:rgba(0,0,0,.03);padding:2px 8px;border-radius:10px;border:1px solid transparent;transition:all .2s">📜 更新</div>
-<div id="changelogPanel" style="display:none;position:fixed;top:42px;right:12px;width:340px;max-height:75vh;overflow-y:auto;background:#fff;border-radius:12px;padding:16px;box-shadow:0 8px 40px rgba(0,0,0,.15);z-index:999;font-size:.68rem;line-height:1.7;color:#333;border:1px solid #e5e7eb">
+<div id="changelogBtn" onclick="toggleChangelog()" title="更新日志" style="position:fixed;top:52px;right:12px;z-index:1000;font-size:.62rem;color:#0071e3;cursor:pointer;background:rgba(0,113,227,.08);padding:3px 10px;border-radius:12px;border:1px solid rgba(0,113,227,.2);transition:all .2s;font-weight:600" onmouseenter="this.style.background='rgba(0,113,227,.15)'" onmouseleave="this.style.background='rgba(0,113,227,.08)'">📜 更新</div>
+<div id="changelogPanel" style="display:none;position:fixed;top:88px;right:12px;width:340px;max-height:70vh;overflow-y:auto;background:#fff;border-radius:12px;padding:16px;box-shadow:0 8px 40px rgba(0,0,0,.15);z-index:1001;font-size:.68rem;line-height:1.7;color:#333;border:1px solid #e5e7eb">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-size:.8rem">📜 功能更新日志</b><span onclick="document.getElementById('changelogPanel').style.display='none'" style="cursor:pointer;font-size:.7rem;color:#999">✕</span></div>
   <div style="border-left:2px solid #0071e3;padding-left:10px">
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-22</b> 模块重构：论文审阅（三合一）+ 论文扩写 + 数据分析 + 会话持久化</div>
     <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-21</b> 文献检索结果确认区增加文献显示量控制与自动补充机制</div>
     <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-20</b> Word样式名称识别：自动解析docx内标题样式并校准层级</div>
     <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-19</b> 5层全文树结构（章→节→小节→段落→句子）+ 全局索引</div>

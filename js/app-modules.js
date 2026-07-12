@@ -4,13 +4,12 @@
  */
 
 var APP_MODULES = [
-  { id: 'format-check',    name: '格式检查',   icon: '✅', requiresThesis: true },
-  { id: 'paragraph',       name: '段落分析',   icon: '📝', requiresThesis: true },
-  { id: 'terminology',     name: '术语分析',   icon: '🔤', requiresThesis: true },
+  { id: 'review',          name: '论文审阅',   icon: '🔍', requiresThesis: true },
   { id: 'optimization',    name: '优化建议',   icon: '💡', requiresThesis: true },
+  { id: 'expand',          name: '论文扩写',   icon: '✍️', requiresThesis: true },
+  { id: 'data-analysis',   name: '数据分析',   icon: '📈', requiresThesis: false },
   { id: 'knowledge-graph', name: '知识图谱',   icon: '🕸️', requiresThesis: true },
   { id: 'references',      name: '参考文献',   icon: '📋', requiresThesis: true },
-  { id: 'review',          name: '论文审阅',   icon: '🔍', requiresThesis: true },
 ];
 
 var _activeModule = 'references';
@@ -220,10 +219,9 @@ function switchPanel(moduleId) {
         var mc = moduleArea.querySelector('.module-panel');
         try {
           if (moduleId === 'optimization' && typeof runOptimization === 'function') runOptimization(mc);
-          else if (moduleId === 'format-check' && typeof runFormatCheck === 'function') runFormatCheck(mc);
-          else if (moduleId === 'terminology' && typeof runTerminology === 'function') runTerminology(mc);
-          else if (moduleId === 'paragraph' && typeof runParagraphAnalysis === 'function') runParagraphAnalysis(mc);
-          else if (moduleId === 'review') runReviewModule(mc);
+          else if (moduleId === 'review' && typeof runReviewModule === 'function') runReviewModule(mc);
+          else if (moduleId === 'expand' && typeof runExpandModule === 'function') runExpandModule(mc);
+          else if (moduleId === 'data-analysis' && typeof runDataAnalysis === 'function') runDataAnalysis(mc);
         } catch (e) { mc.innerHTML = '<div style="text-align:center;padding:40px;color:var(--r)">分析出错: ' + e.message + '</div>'; }
         hideLoad();
       }, 100);
@@ -283,13 +281,104 @@ function runReviewModule(container) {
   container.innerHTML = '<div class="module-panel" style="display:flex;flex-wrap:wrap;gap:12px">'+
     '<div id="reviewFormat" style="flex:1;min-width:300px;border:1px solid var(--bd);border-radius:10px;padding:12px;background:var(--card)"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">✅ 格式检查</div><div id="reviewFormatContent" style="font-size:.7rem;color:var(--m)">分析中...</div></div>'+
     '<div id="reviewParagraph" style="flex:1;min-width:300px;border:1px solid var(--bd);border-radius:10px;padding:12px;background:var(--card)"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">📝 段落分析</div><div id="reviewParaContent" style="font-size:.7rem;color:var(--m)">分析中...</div></div>'+
-    '<div id="reviewOptimize" style="flex:1;min-width:300px;border:1px solid var(--bd);border-radius:10px;padding:12px;background:var(--card)"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">💡 优化建议</div><div id="reviewOptContent" style="font-size:.7rem;color:var(--m)">分析中...</div></div>'+
+    '<div id="reviewTerm" style="flex:1;min-width:300px;border:1px solid var(--bd);border-radius:10px;padding:12px;background:var(--card)"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">🔤 术语分析</div><div id="reviewTermContent" style="font-size:.7rem;color:var(--m)">分析中...</div></div>'+
     '</div>';
   setTimeout(function(){
     var fc=document.getElementById('reviewFormatContent');if(fc&&typeof runFormatCheck==='function')runFormatCheck(fc);
     var pc=document.getElementById('reviewParaContent');if(pc&&typeof runParagraphAnalysis==='function')runParagraphAnalysis(pc);
-    var oc=document.getElementById('reviewOptContent');if(oc&&typeof runOptimization==='function')runOptimization(oc);
+    var tc=document.getElementById('reviewTermContent');if(tc&&typeof runTerminology==='function')runTerminology(tc);
   },50);
+}
+
+function runExpandModule(container) {
+  if (!(typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100)) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:#9ca3af">请先上传论文</div>';return;
+  }
+  var bodyChs=(sections||[]).filter(function(s){return!/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name)});
+  container.innerHTML = '<div class="module-panel">'+
+    '<h4>✍️ 论文扩写建议</h4>'+
+    '<div style="padding:12px;background:rgba(0,113,227,.05);border-radius:8px;margin-bottom:12px;font-size:.75rem;color:#555">论文扩写模块帮助从大纲逐步填充完整论文。当前状态监测后给出各章节扩写建议。</div>'+
+    '<h4>📊 各章内容诊断</h4>';
+  bodyChs.forEach(function(cs){
+    var len=(cs.text||'').length,ratio=len/Math.max(1,(manuscriptText||'').length)*100;
+    var status=len<500?'⚠ 过少':(len<2000?'📝 可扩充':(len<5000?'✅ 适中':'🔴 过长'));
+    var suggest=len<500?'建议至少扩写至2000字（当前'+Math.round(len/100)/10+'千字）。可增加：文献综述、理论框架、案例支撑。':
+                (len<2000?'内容偏少，建议补充实证数据、案例分析和图表说明。':
+                (len<5000?'结构合理，可在结论部分增加未来展望和局限讨论。':'内容较充实，检查是否有冗余段落可精简。'));
+    container.innerHTML+='<div style="border-left:3px solid '+(len<500?'#ff3b30':len<2000?'#ff9f0a':len<5000?'#30d158':'#0071e3')+';padding:8px 12px;margin:6px 0;border-radius:6px;background:rgba(0,0,0,.02)">'+
+      '<div style="font-weight:600;font-size:.76rem">'+cs.name+' <span style="font-size:.62rem;color:var(--m)">('+Math.round(len/100)/10+'k字 | '+Math.round(ratio)+'%)</span> '+status+'</div>'+
+      '<div style="font-size:.68rem;color:#666;margin-top:4px">'+suggest+'</div>'+
+      '</div>';
+  });
+  container.innerHTML+='<h4>💡 通用扩写策略</h4>'+
+    '<div style="font-size:.7rem;color:#555;line-height:1.8">'+
+    '<b>1. 文献综述扩展：</b>检索近3-5年相关文献，按主题分类综述，每类3-5篇，总结研究空白。<br>'+
+    '<b>2. 理论框架完善：</b>明确核心概念的操作化定义，建立变量关系模型，补充假设推导过程。<br>'+
+    '<b>3. 方法论充实：</b>详细描述数据来源、样本量计算、问卷设计、变量测量、分析策略。<br>'+
+    '<b>4. 实证分析深化：</b>增加稳健性检验、异质性分析、机制检验，多角度验证结果。'+
+    '</div>'+
+    '</div>';
+}
+
+function runDataAnalysis(container) {
+  // Placeholder until user uploads Excel file
+  container.innerHTML = '<div class="module-panel">'+
+    '<h4>📈 数据分析</h4>'+
+    '<div style="padding:20px;border:2px dashed #ccc;border-radius:12px;text-align:center">'+
+    '<div style="font-size:3rem;margin-bottom:8px">📊</div>'+
+    '<div style="font-size:.8rem;font-weight:600;margin-bottom:4px">上传 Excel 数据进行智能分析</div>'+
+    '<div style="font-size:.7rem;color:#999;margin-bottom:12px">支持 .xlsx / .csv，自动识别变量类型与数据规律</div>'+
+    '<input type="file" id="dataFileInput" accept=".xlsx,.csv" style="display:none" onchange="handleDataFile(this)">'+
+    '<button onclick="document.getElementById(\'dataFileInput\').click()" style="background:#0071e3;color:#fff;border:none;border-radius:18px;padding:8px 24px;cursor:pointer;font-weight:600;font-size:.75rem">📁 选择数据文件</button>'+
+    '</div>'+
+    '<div id="dataAnalysisResult" style="margin-top:12px"></div>'+
+    '</div>';
+}
+
+function handleDataFile(input){
+  var f=input.files[0];if(!f)return;
+  var container=document.getElementById('dataAnalysisResult');if(!container)return;
+  container.innerHTML='<div style="text-align:center;padding:30px;color:var(--m)">⏳ 正在分析数据…</div>';
+  var ext=(f.name||'').toLowerCase().split('.').pop();
+  if(ext==='xlsx'){
+    container.innerHTML='<div style="padding:16px;background:#fff3cd;border-radius:8px;font-size:.72rem;color:#856404">⚠ XLSX 格式需要完整解析库。请将文件另存为 <b>CSV（逗号分隔）</b> 格式后重新上传。<br><br>或者，下面显示的是基础数据信息。</div>';
+    analyzeCSV(f,container);
+  } else {
+    analyzeCSV(f,container);
+  }
+}
+
+function analyzeCSV(f,container){
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var text=e.target.result;
+    var lines=text.split('\n').filter(function(l){return l.trim();});
+    if(lines.length<2){container.innerHTML='<div style="text-align:center;padding:30px;color:var(--m)">文件为空或格式不正确</div>';return;}
+    var headers=lines[0].split(/[,\t]/).map(function(h){return h.replace(/"/g,'').trim();});
+    var rows=lines.slice(1).map(function(l){var vals=l.split(/[,\t]/).map(function(v){return v.replace(/"/g,'').trim();});var obj={};headers.forEach(function(h,i){obj[h]=vals[i]||'';});return obj;});
+    // Basic analysis
+    var h='<h4>📊 数据概览 ('+f.name+')</h4>';
+    h+='<div class="dash-row">';
+    h+='<div class="dash-item"><div class="dv">'+headers.length+'</div><div class="dl">变量</div></div>';
+    h+='<div class="dash-item"><div class="dv">'+rows.length+'</div><div class="dl">观测值</div></div>';
+    h+='</div>';
+    h+='<h4>📋 变量详情</h4>';
+    headers.forEach(function(hdr){
+      var vals=rows.map(function(r){return r[hdr];}).filter(function(v){return v!=='';});
+      var nums=vals.map(function(v){var n=parseFloat(v);return isNaN(n)?null:n;}).filter(function(n){return n!==null;});
+      var isNum=nums.length>vals.length*0.7;
+      if(isNum){
+        var sum=nums.reduce(function(a,b){return a+b;},0),avg=sum/nums.length;
+        var min=Math.min.apply(null,nums),max=Math.max.apply(null,nums);
+        h+='<div style="padding:6px 8px;margin:2px 0;border-radius:6px;background:rgba(0,0,0,.02);font-size:.7rem"><b>'+hdr+'</b> (数值, '+nums.length+'个有效值) 平均:'+avg.toFixed(2)+' 范围:['+min.toFixed(2)+', '+max.toFixed(2)+']</div>';
+      } else {
+        var uVals={};vals.forEach(function(v){uVals[v]=(uVals[v]||0)+1;});var topKV=Object.entries(uVals).sort(function(a,b){return b[1]-a[1];}).slice(0,5).map(function(e){return e[0]+'('+e[1]+')';}).join(', ');
+        h+='<div style="padding:6px 8px;margin:2px 0;border-radius:6px;background:rgba(0,0,0,.02);font-size:.7rem"><b>'+hdr+'</b> (分类, '+vals.length+'个有效值) TOP: '+topKV+'</div>';
+      }
+    });
+    container.innerHTML=h;
+  };
+  reader.readAsText(f);
 }
 
 // ==================== 初始化 ====================

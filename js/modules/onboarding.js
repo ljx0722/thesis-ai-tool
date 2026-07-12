@@ -15,56 +15,56 @@ function buildTourSteps() {
     },
     {
       title: '📎 上传论文',
-      body: '首先上传你的论文文件（仅支持 .docx 格式）。<br>文件仅在本机解析，不会上传到任何服务器。<br><br>上传完成后会自动弹出<b>标题层级校准弹窗</b>。',
+      body: '首先上传你的论文文件（仅支持 .docx 格式）。<br>文件仅在本机解析，不会上传到任何服务器。<br><br>上传完成后会自动弹出<b>标题层级校准弹窗</b>，确认章/节/小节。',
       el: function() { return document.getElementById('uploadOverlay') || document.getElementById('uploadDrop'); },
       pos: 'center', icon: '📎'
     },
     {
-      title: '📐 标题层级校准（新功能）',
-      body: '上传后自动弹出校准弹窗：<br>• 左侧显示检测到的各级标题<br>• 右侧实时预览目录树<br>• 下拉菜单修改层级：<b>章→节→小节→非标题</b><br>• <b>↑合并</b> 按钮可将拆分的标题合并<br>• 点击 <b>⚡一键接受</b> 直接使用自动检测结果',
+      title: '📐 标题层级校准',
+      body: '上传后自动弹出校准弹窗：<br>• 展示文档中所有 Word 样式名及数量<br>• 分三步确认：章 → 节 → 小节<br>• 点击样式行弹出全量勾选确认<br>• 已确认样式自动在后续步骤隐藏',
       el: null, pos: 'center', icon: '📐'
     },
     {
-      title: '模块切换',
-      body: '顶栏中央显示所有功能模块。<br>点击标签切换，或使用快捷键 <b>Ctrl+1~6</b>。<br><br>模块：格式检查 → 术语分析 → 段落分析 → 优化建议 → 知识图谱 → 参考文献',
+      title: '🔍 论文审阅（核心模块）',
+      body: '顶栏 <b>Ctrl+1</b> 进入论文审阅。<br>整合了格式检查、段落分析、术语分析，<br>三列并排展示所有维度的检测结果。<br>另外 <b>Ctrl+2</b> 优化建议给出针对性改进方案。',
       el: function() { return document.getElementById('moduleTabs'); },
-      pos: 'bottom', icon: '🏷️'
+      pos: 'bottom', icon: '🔍'
     },
     {
-      title: '🔍 交互式文献检索（新功能）',
-      body: '点击检索后分为两步确认：<br>1. <b>检索结果确认</b> — 全选/筛选/勾选文献，<br> 每条有置信度分数（绿≥70/黄≥40/红<40）<br>2. <b>分配策略确认</b> — 预览每章分配数量，<br> 可修改分配模式或手动调整归属<br><br>按 <b>Ctrl+Enter</b> 或点击 🔍检索 启动。',
+      title: '✍️ 论文扩写（新功能）',
+      body: '顶栏 <b>Ctrl+3</b> 进入论文扩写。<br>• 自动检测各章文字量<br>• 标注不足章节并给出扩写方向建议<br>• 通用扩写策略：文献综述/理论框架/方法论',
+      el: null, pos: 'center', icon: '✍️'
+    },
+    {
+      title: '📈 数据分析（新功能）',
+      body: '顶栏 <b>Ctrl+4</b> 进入数据分析。<br>• 上传 Excel/CSV 数据文件<br>• 自动识别数值型/分类型变量<br>• 输出描述统计与数据规律',
+      el: null, pos: 'center', icon: '📈'
+    },
+    {
+      title: '📊 论文报告',
+      body: '顶栏右侧蓝色 <b>📊 报告</b> 按钮打开综合看板。<br>雷达图、章节分布、文献分析总览。',
+      el: function() { return document.getElementById('dashboardBtn'); },
+      pos: 'bottom', icon: '📊'
+    },
+    {
+      title: '🔍 交互式文献检索',
+      body: '检索时分为两步确认：<br>1. <b>检索结果确认</b> — 全选/筛选/勾选文献<br>2. <b>分配策略确认</b> — 预览每章分配<br>按 <b>Ctrl+Enter</b> 或点击 🔍检索 启动。',
       el: function() { return document.getElementById('baSearch'); },
       pos: 'bottom', icon: '🔍'
     },
     {
-      title: '操作按钮',
-      body: '顶栏右侧是全局操作按钮：<br><b>🔍 检索文献</b> — 启动交互式文献搜索<br><b>✅ 批量校验</b> — 验证文献真实性<br><b>📋 导出</b> — 复制 GB/T 7714 格式参考文献<br><b>📎 换论文</b> — 上传新的论文文件',
-      el: function() { return document.getElementById('barActions'); },
-      pos: 'bottom', icon: '🔧'
-    },
-    {
-      title: '📋 参考文献 — 核心功能',
-      body: '切换到参考文献模块后：<br>1. 查看已自动识别的原文引用<br>2. 点击 <b>🔍 检索文献</b> 启动交互式检索<br>3. 在弹窗中确认文献列表 → 分配策略<br>4. 新文献自动注入正文并重新编号<br>5. 点击 <b>📋 导出</b> 一键复制全部参考文献',
-      el: null, pos: 'center', icon: '📋'
-    },
-    {
       title: '🕸️ 知识图谱',
-      body: '切换到知识图谱 → 点击"打开知识图谱"。<br>包含三种视图：<br>☁️ <b>词云</b> — 交互式关键词可视化<br>🔗 <b>网络图</b> — 力导向节点关系图<br>📅 <b>时间线</b> — 文献按年份分布<br><br>点击词汇可高亮关联节点，支持PNG导出。',
+      body: '顶栏 <b>Ctrl+5</b> 进入知识图谱。<br>三种视图：☁️词云 🔗网络图 📅时间线<br>支持 PNG 导出。',
       el: null, pos: 'center', icon: '🕸️'
     },
     {
-      title: '分析模块',
-      body: '四个分析模块帮助优化论文：<br>✅ <b>格式检查</b> — 标题样式质量、图表编号、摘要完整性<br>🔤 <b>术语分析</b> — 术语一致性、缩写检查、拼写校对<br>📝 <b>段落分析</b> — 可读性评分、标题拆分残留检测<br>💡 <b>优化建议</b> — 结构诊断、文献密度、摘要评估',
-      el: null, pos: 'center', icon: '🔍'
-    },
-    {
-      title: '📊 论文看板',
-      body: '点击顶栏中央的圆形按钮打开。<br>综合评估报告：五维雷达图、综合评分、<br>章节分布、优先建议，一页纵览论文全局。',
-      el: null, pos: 'center', icon: '📊'
+      title: '📋 参考文献管理',
+      body: '顶栏 <b>Ctrl+6</b> 进入参考文献。<br>自动识别原文引用、文献检索与注入、GB/T 7714 格式。<br>文献卡片显示位置信息与评分维度。',
+      el: null, pos: 'center', icon: '📋'
     },
     {
       title: '💡 小提示',
-      body: '⌨ <b>快捷键</b>：Ctrl+1~6 切换模块 | Ctrl+Enter 检索 | Ctrl+B 导出 | Ctrl+O 换论文<br>📐 <b>上传后检查标题层级</b>，可大幅提升目录树精度<br>📊 <b>格式检查模块的"标题样式质量"</b> 会提示 Word 排版问题<br>🔗 <b>DOI补全按钮可自动补全缺失信息</b><br><br>点击右上角 <b>?</b> 按钮可随时重新查看本指南。',
+      body: '⌨ <b>快捷键</b>：Ctrl+1~6 切换模块 | Ctrl+Enter 检索 | Ctrl+O 换论文<br>📜 <b>右上角更新日志</b> 查看功能变更记录<br>🔄 <b>刷新页面可恢复</b> 上次导入的论文<br>📐 <b>上传后检查标题层级</b>，可大幅提升目录树精度<br>点击右上角 <b>?</b> 重新查看本指南。',
       el: null, pos: 'center', icon: '💡'
     }
   ];
