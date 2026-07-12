@@ -1682,19 +1682,32 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
       // 第三步：合并 mammoth 拆分的标题（如 <p>第2章</p><p>文献综述</p> → "第2章 文献综述"）
       for(var hi=0;hi<headingCandidates.length;hi++){
         var hc=headingCandidates[hi];
-        var nextEl=hc.el?hc.el.nextElementSibling:null;
-        // 如果当前标题文本以编号结束（如 "第2章" 或 "2.1"），且下一个兄弟元素的文本不是标题模式，合并
-        if(nextEl&&(hc.bare||/^(第[一二三四五六七八九十\d]+章|\d+(?:\.\d+)*)\s*$/.test(hc.txt))){
-          var nextTxt=(nextEl.textContent||'').trim();
-          if(nextTxt&&nextTxt.length>1&&nextTxt.length<60&&
-             !/^第[一二三四五六七八九十\d]+章/.test(nextTxt)&&
-             !/^(?:\d+\.)*\d+\s/.test(nextTxt)&&
-             !/^(?:摘要|Abstract|关键词|目录|参考文献|致谢|附录)/.test(nextTxt)){
-            // 合并：更新当前 heading 的文本和元素引用
-            hc.txt=hc.txt+' '+nextTxt;
-            hc.title=hc.title+' '+nextTxt;
-            hc.el=nextEl; // 指向合并后的元素，便于后续设置 ID
+        // 检测是否为裸编号（bare）或纯编号结束（如 "第2章"、"2.1"）
+        var isBareLike=hc.bare||/^(第[一二三四五六七八九十\d]+章|\d+(?:\.\d+)*)\s*$/.test(hc.txt);
+        if(!isBareLike||!hc.el)continue;
+        // 往后扫描最多3个兄弟元素，跳过空的/页码/目录行，找到标题文字
+        var merged='',mergedEl=null;
+        var sib=hc.el.nextElementSibling;
+        for(var si=0;si<3&&sib;si++){
+          var st=(sib.textContent||'').trim();
+          if(!st||/^\d{1,3}$/.test(st)||/^[ivxlcdmIVXLCDM]+$/.test(st)){ sib=sib.nextElementSibling; continue; }
+          // TOC dot-leaders → skip
+          if(/\.{3,}\s*\d+$/.test(st)&&st.length<80){ sib=sib.nextElementSibling; continue; }
+          if(/^[-—–]\s*\d+\s*[-—–]$/.test(st)){ sib=sib.nextElementSibling; continue; }
+          // This looks like a title candidate
+          if(st.length>1&&st.length<60&&
+             !/^第[一二三四五六七八九十\d]+章/.test(st)&&
+             !/^(?:\d+\.)*\d+\s/.test(st)&&
+             !/^(?:摘要|Abstract|关键词|目录|参考文献|致谢|附录)/.test(st)){
+            merged=st;mergedEl=sib;break;
           }
+          sib=sib.nextElementSibling;
+        }
+        if(merged){
+          hc.txt=hc.txt+' '+merged;
+          hc.title=hc.title?hc.title+' '+merged:merged;
+          hc.el=mergedEl||hc.el;
+          hc.bare=false;
         }
       }
       // 第四步：构建多级树（去重：mammoth 可能把章节标题拆成多个元素）
@@ -1730,6 +1743,17 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
         if(headingCandidates[bi].bare)_bareHeadingCount++;
       }
     }
+    // 调试日志：打印解析到的章节树结构
+    console.log('[chapters] Parsed',sections.length,'chapters:');
+    sections.forEach(function(cs){
+      console.log('  ch-'+cs.ch,cs.name,'sections:',(cs.sections||[]).length);
+      (cs.sections||[]).forEach(function(sec){
+        console.log('    sec-'+sec.num,sec.title,'subs:',(sec.subs||[]).length);
+        (sec.subs||[]).forEach(function(sub){
+          console.log('      sub-'+sub.num,sub.title);
+        });
+      });
+    });
     // 正则回退
     if (!sections.length) {
       var chMap2 = {}, re2 = /第([一-鿿\d]+)章/g, m2;
