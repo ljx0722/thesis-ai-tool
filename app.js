@@ -1095,30 +1095,53 @@ function asSkip(){
 // ========== 弹窗③: 标题层级校准（分步向导） ==========
 var _cwCandidates=[],_cwCallback=null,_cwPhase=0;
 
+
 function _cwStyleFingerprint(el){
   if(!el)return'';
   var tag=(el.tagName||'').toUpperCase();
   var txt=(el.textContent||'').trim();
+
+  var cls=(el.className||'').toString();
+  var styleAttr=el.getAttribute('style')||'';
+  var styleName='';
+  var mCls=cls.match(/style-name[:\x22\x27 ]*([^\x22\x27;\]\)]+)/i);
+  if(mCls)styleName=mCls[1].replace(/[\s'"]+$/,'').trim();
+  if(!styleName){
+    var mSt=styleAttr.match(/mso-style-name\s*:\s*([^;]+)/i);
+    if(mSt)styleName=mSt[1].trim();
+  }
+
+  var mt='0';
+  var mMT=styleAttr.match(/margin-top\s*:\s*([\d.]+)p?t?/i);
+  if(mMT)mt=parseFloat(mMT[1]).toFixed(0);
+
   var prefix='other';
   if(/^第[一二三四五六七八九十123456789]+章/.test(txt))prefix='chapter-num';
-  else if(/^Chapter\\s+\\d/.test(txt))prefix='chapter-en';
-  else if(/^\\d+(?:\\.\\d+)+[\\s、,]+/.test(txt))prefix='numbered-sec';
-  else if(/^\\d+[\\s、,.]/.test(txt))prefix='digit-title';
-  else if(/^[\\(（]?[一二三四五六七八九十]+[\\)）]?[\\s、,.]/.test(txt))prefix='cn-num';
+  else if(/^Chapter\s+\d/.test(txt))prefix='chapter-en';
+  else if(/^\d+(?:\.\d+)+[\s、,]+/.test(txt))prefix='numbered-sec';
+  else if(/^\d+[\s、,.]/.test(txt))prefix='digit-title';
+  else if(/^[\(（]?[一二三四五六七八九十]+[\)）]?[\s、,.]/.test(txt))prefix='cn-num';
+
   var lenClass=txt.length<80?'short':'long';
-  return tag+'|'+prefix+'|'+lenClass;
+  return tag+'|'+styleName+'|'+mt+'|'+prefix+'|'+lenClass;
 }
 
 function _cwFpLabel(fp){
   var parts=fp.split('|');
-  var tag=parts[0];
-  var prefix=parts[1];
-  var tagMap={'H1':'一级标题 H1','H2':'二级标题 H2','H3':'三级标题 H3','H4':'四级 H4','H5':'五级 H5','H6':'六级 H6'};
-  var tagLabel=tagMap[tag]||(tag==='P'?'段落 P':tag);
-  var prefixMap={'chapter-num':'第X章','chapter-en':'Chapter','numbered-sec':'X.X编号','digit-title':'数字+标题','cn-num':'中文序号','other':'正文'};
-  var prefixLabel=prefixMap[prefix]||'未知';
-  return tagLabel+' · '+prefixLabel;
+  var tag=parts[0]||'';
+  var styleName=parts[1]||'';
+  var marginTop=parts[2]||'0';
+  var prefix=parts[3]||'';
+  var tagLabel={'H1':'H1','H2':'H2','H3':'H3','H4':'H4','H5':'H5','H6':'H6'}[tag]||(tag==='P'?'P':tag);
+  var prefixMap={'chapter-num':'第X章','chapter-en':'Chapter','numbered-sec':'X.X编号','digit-title':'数字标题','cn-num':'中文序号','other':'正文'};
+  var prefixLabel=prefixMap[prefix]||'';
+  var result=[tagLabel];
+  if(styleName)result.push(styleName);
+  if(marginTop!=='0')result.push('段前'+marginTop+'pt');
+  result.push(prefixLabel);
+  return result.join(' · ');
 }
+
 
 
 function startInlineCalibration(box, autoDetected){
