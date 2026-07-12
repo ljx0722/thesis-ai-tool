@@ -1227,10 +1227,10 @@ test('HC: renderCalibrationModal uses DOM-based rendering', function() {
   assert(src.indexOf('function renderCalibrationModal') >= 0, 'Missing renderCalibrationModal');
 });
 
-test('HC: cwAutoMatch style fingerprint matching exists', function() {
+test('HC: cwAutoMatch style-name based matching exists', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
   assert(src.indexOf('function cwAutoMatch') >= 0, 'Missing cwAutoMatch');
-  assert(src.indexOf('function _cwStyleFingerprint') >= 0, 'Missing _cwStyleFingerprint');
+  assert(src.indexOf('function cwGetStyleGroups') >= 0, 'Missing cwGetStyleGroups');
 });
 
 test('HC: cwNextPhase/cwPrevPhase 3-step wizard flow exists', function() {
