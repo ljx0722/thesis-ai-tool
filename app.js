@@ -704,19 +704,39 @@ function calcRefConfidence(r){
 }
 
 // ========== 弹窗①: 检索结果确认 ==========
-var _rcPool=[],_rcSelected={},_rcCallback=null;
+var _rcPool=[],_rcSelected={},_rcFullPool=[],_rcOverflow=[],_rcTarget=0,_rcCallback=null;
+
+// Compute topic relevance: how many paperTopics bigrams appear in the title
+function rcTopicRelevance(title){
+  if(!title||!paperTopics||!paperTopics.length)return 0;
+  var t=(title||'').toLowerCase(),hits=0;
+  for(var i=0;i<Math.min(paperTopics.length,20);i++){
+    var kw=(paperTopics[i].label||'').toLowerCase();
+    if(kw.length>=2&&t.indexOf(kw)>=0)hits++;
+  }
+  return Math.min(99,Math.round(hits/Math.min(paperTopics.length,20)*100));
+}
 
 function showRefConfirmModal(pool,existingRefs,total,callback){
-  _rcPool=pool;_rcSelected={};_rcCallback=callback;
-  // 默认全选
-  for(var i=0;i<pool.length;i++)_rcSelected[i]=true;
-  // 按置信度排序
-  pool.sort(function(a,b){return calcRefConfidence(b)-calcRefConfidence(a)});
-  // 渲染
-  var cn=0,en=0;pool.forEach(function(r){if(r.isCN)cn++;else en++;});
-  document.getElementById('rcSummary').textContent=pool.length+' 篇文献（中 '+cn+' / 英 '+en+'）| 默认全选 | 按置信度排序';
+  _rcTarget=total;_rcCallback=callback;
+  _rcFullPool=pool.slice();
+  // 按 (置信度 + 主题相关度) / 2 综合排序
+  pool.sort(function(a,b){
+    var sa=(calcRefConfidence(a)+rcTopicRelevance(a.title))/2;
+    var sb=(calcRefConfidence(b)+rcTopicRelevance(b.title))/2;
+    return sb-sa;
+  });
+  // 显示上限 = 目标 × 1.25，至少多 20 条
+  var displayCap=Math.max(total+20,Math.ceil(total*1.25));
+  if(displayCap>=pool.length)displayCap=pool.length;
+  _rcPool=pool.slice(0,displayCap);
+  _rcOverflow=pool.slice(displayCap);
+  _rcSelected={};
+  for(var i=0;i<_rcPool.length;i++)_rcSelected[i]=true;
+  var cn=0,en=0;_rcPool.forEach(function(r){if(r.isCN)cn++;else en++;});
+  document.getElementById('rcSummary').textContent=_rcPool.length+' 篇文献（中 '+cn+' / 英 '+en+'）| 目标 '+total+' 条 | 默认全选 | 备选池 '+_rcOverflow.length+' 条';
   document.getElementById('rcStepLabel').textContent='第 1/2 步';
-  document.getElementById('rcSkipBtn').textContent='✅ 下一步';
+  document.getElementById('rcSkipBtn').textContent='✅ 下一步 ('+total+'条)';
   rcRenderList('all');
   document.getElementById('rcOverlay').style.display='flex';
 }
@@ -730,6 +750,9 @@ function rcRenderList(filter){
     // Apply filter
     if(filter==='cn'&&!r.isCN)continue;
     if(filter==='en'&&r.isCN)continue;
+    if(filter==='relevant'){
+      if(rcTopicRelevance(r.title)<30)continue;
+    }
     if(filter==='recent'){
       var yr2=parseInt(r.year)||0;
       if(yr2<now-5||calcRefConfidence(r)<50)continue;
@@ -737,7 +760,10 @@ function rcRenderList(filter){
     if(filter==='confidence'&&calcRefConfidence(r)<50)continue;
     shown++;
     var cf=calcRefConfidence(r);
-    var cfCl=cf>=70?'high':(cf>=40?'medium':'low');
+    var tr=rcTopicRelevance(r.title);
+    var composite=Math.round((cf+tr)/2);
+    var compositeCl=composite>=70?'high':(composite>=40?'medium':'low');
+    var compositeColor=composite>=70?'#30d158':(composite>=40?'#0071e3':'#ff9f0a');
     var cfColor=cf>=70?'#30d158':(cf>=40?'#ff9f0a':'#ff3b30');
     var yrTxt=r.year||'?';
     var jnTxt=(r.journal||'').substring(0,40);
@@ -751,25 +777,57 @@ function rcRenderList(filter){
     h+='<input type="checkbox" '+checked+' onclick="event.stopPropagation();rcToggle('+i+')" style="margin-top:3px;flex-shrink:0;accent-color:#0071e3;width:14px;height:14px">';
     h+='<div style="flex:1;min-width:0">';
     h+='<div style="font-size:.75rem;font-weight:500;color:var(--t);line-height:1.35;word-break:break-word">'+(r.title||'(无标题)')+'</div>';
-    h+='<div style="font-size:.62rem;color:var(--m);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+jnTxt+' · '+yrTxt+' · <span style="color:'+srcColor+';font-weight:600">'+srcTxt+'</span></div>';
+    h+='<div style="font-size:.62rem;color:var(--m);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+jnTxt+' · '+yrTxt+' · <span style="color:'+srcColor+';font-weight:600">'+srcTxt+'</span>';
+    // Topic relevance badge
+    var trLabel=tr>=70?'🎯 高度相关':(tr>=40?'📌 相关':(tr>=20?'🔹 弱相关':''));
+    if(trLabel)h+=' · <span style="color:'+(tr>=50?'#30d158':tr>=30?'#0071e3':'#86868b')+';font-size:.58rem">'+trLabel+' ('+tr+'%)</span>';
     h+='</div>';
-    h+='<div style="flex-shrink:0;text-align:center;min-width:36px">';
-    h+='<div style="display:inline-block;width:30px;height:30px;border-radius:50%;border:2px solid '+cfColor+';text-align:center;line-height:26px;font-size:.6rem;font-weight:700;color:'+cfColor+'">'+cf+'</div>';
-    h+='<div style="font-size:.45rem;color:var(--m);margin-top:1px">置信</div>';
+    h+='</div>';
+    // Composite score ring
+    h+='<div style="flex-shrink:0;text-align:center;min-width:42px">';
+    h+='<div style="display:inline-block;width:30px;height:30px;border-radius:50%;border:2px solid '+compositeColor+';text-align:center;line-height:26px;font-size:.57rem;font-weight:700;color:'+compositeColor+'" title="综合分='+composite+' (置信'+cf+'+相关'+tr+')/2">'+composite+'</div>';
+    h+='<div style="font-size:.42rem;color:var(--m);margin-top:1px">综合</div>';
     h+='</div>';
     h+='</div>';
   }
-  if(shown===0)h='<div style="text-align:center;padding:30px;color:var(--m)">无匹配文献</div>';
+  if(shown===0)h='<div style="text-align:center;padding:30px;color:var(--m)">无匹配文献（尝试切换筛选条件）</div>';
   document.getElementById('rcList').innerHTML=h;
-  // Update count
-  var sel=0;for(var k in _rcSelected){if(_rcSelected[k])sel++;}
-  document.getElementById('rcCount').textContent='已选 '+sel+'/'+pool.length;
+  rcUpdateCount();
 }
 
 function rcToggle(idx){
   _rcSelected[idx]=!_rcSelected[idx];
+  // 如果取消勾选后总数不足目标，自动从备选池中补充
+  if(!_rcSelected[idx])rcAutoRefill();
   rcUpdateCount();
 }
+
+function rcAutoRefill(){
+  if(!_rcOverflow.length)return;
+  var sel=0;for(var k in _rcSelected){if(_rcSelected[k])sel++;}
+  var need=_rcTarget-sel;
+  if(need<=0)return;
+  // 把 _rcOverflow 按综合分补排
+  _rcOverflow.sort(function(a,b){
+    var sa=(calcRefConfidence(a)+rcTopicRelevance(a.title))/2;
+    var sb=(calcRefConfidence(b)+rcTopicRelevance(b.title))/2;
+    return sb-sa;
+  });
+  var added=0;
+  for(var i=0;i<_rcOverflow.length&&added<need;i++){
+    var r=_rcOverflow[i];
+    if(r.alreadyShown)continue;
+    _rcPool.push(r);
+    _rcSelected[_rcPool.length-1]=true;
+    r.alreadyShown=true;
+    added++;
+  }
+  if(added>0){
+    rcRenderList('all');
+    document.getElementById('rcSummary').textContent=_rcPool.length+' 篇文献 | 目标 '+_rcTarget+' 条 | 已自动补充 '+added+' 条';
+  }
+}
+
 function rcSelectAll(){
   for(var i=0;i<_rcPool.length;i++)_rcSelected[i]=true;
   rcUpdateAllChecks();
@@ -783,15 +841,15 @@ function rcFilter(f){
 }
 function rcUpdateCount(){
   var sel=0;for(var k in _rcSelected){if(_rcSelected[k])sel++;}
-  document.getElementById('rcCount').textContent='已选 '+sel+'/'+_rcPool.length;
+  var tail=' / '+_rcPool.length;
+  if(_rcOverflow.length)tail+=' +备选 '+_rcOverflow.length;
+  if(sel<_rcTarget&&_rcOverflow.length)tail+=' (取消勾选将自动补足)';
+  document.getElementById('rcCount').textContent='已选 '+sel+tail;
 }
 function rcUpdateAllChecks(){
-  var sel=0;for(var k in _rcSelected){if(_rcSelected[k])sel++;}
-  document.getElementById('rcCount').textContent='已选 '+sel+'/'+_rcPool.length;
   rcRenderList('all');
 }
 function rcFinish(){
-  // Collect selected refs
   var selected=[];
   for(var i=0;i<_rcPool.length;i++){
     if(_rcSelected[i])selected.push(_rcPool[i]);
