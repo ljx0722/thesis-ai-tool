@@ -1033,7 +1033,7 @@ function showCalibrationWizard(){_cwPhase=0;renderCalibrationModal();hideLoad();
 
 // ========== 弹窗③: 标题层级校准（样式名驱动 + 确认子窗口） ==========
 // 全局状态
-var _cwSelections={'0':new Set(),'1':new Set(),'2':new Set()},_cwConfirmed={'0':new Set(),'1':new Set(),'2':new Set()},_cwPhase=0,_cwCandidates=[],_cwCallback=null;
+var _cwSelections={'0':new Set(),'1':new Set(),'2':new Set()},_cwConfirmed={'0':new Set(),'1':new Set(),'2':new Set()},_cwPhase=0,_cwCheckedEls=null,_cwCandidates=[],_cwCallback=null;
 
 // 从预解析的 docx 数据中取出样式组
 function cwGetStyleGroups(){
