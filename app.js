@@ -1156,7 +1156,25 @@ function showCalibrationWizard(){
 }
 
 function cwGetItemsForPhase(){
-  return _cwCandidates.filter(function(c){return c.level===_cwPhase;});
+  var ph=_cwPhase;
+  var exact=_cwCandidates.filter(function(c){return c.level===ph;});
+  // 如果精确匹配太少（≤2条），返回所有未分配的候选让用户选择
+  if(exact.length<=2){
+    var unassigned=_cwCandidates.filter(function(c){return c.level<0;});
+    // 按指纹去重后合并，未分配的排在后面
+    var seen={},all=exact.slice();
+    unassigned.forEach(function(c){
+      var fp=_cwStyleFingerprint(c.el);
+      if(!seen[fp]){seen[fp]=true;all.push(c);}
+    });
+    // 标记来源以便渲染时区分
+    for(var i=0;i<all.length;i++){
+      all[i]._isExact=(i<exact.length);
+    }
+    return all;
+  }
+  for(var i=0;i<exact.length;i++)exact[i]._isExact=true;
+  return exact;
 }
 
 function cwGetUnassigned(){
@@ -1212,7 +1230,7 @@ function renderCalibrationModal(){
   var old=document.getElementById('cwOverlay');if(old)old.parentElement.removeChild(old);
   var phases=['章','节','小节'];
   var phaseNames=['第1步：确认章标题','第2步：确认节标题','第3步：确认小节标题'];
-  var phaseDesc=['点击任意一排 → 自动匹配所有同格式的章标题','点击任意一排 → 自动匹配所有同格式的节标题','点击任意一排 → 自动匹配所有同格式的小节标题'];
+  var phaseDesc=['点击推荐格式 → 自动匹配所有同格式章标题（备选格式供参考）','点击推荐格式 → 自动匹配所有同格式节标题（备选格式供参考）','点击推荐格式 → 自动匹配所有同格式小节标题（备选格式供参考）'];
   var colors=['#0071e3','#af52de','#30d158'];
   var ph=_cwPhase;
   var items=cwGetItemsForPhase();
@@ -1289,6 +1307,14 @@ function renderCalibrationModal(){
         countTag.style.cssText='font-size:.62rem;color:'+colors[ph]+';background:'+colors[ph]+'10;padding:4px 10px;border-radius:10px;font-weight:600;flex-shrink:0';
         countTag.textContent='×'+sameCount+' ▶';
         row.appendChild(countTag);
+
+        // 推荐 vs 备选标记
+        if(c2._isExact===true){
+          var recTag=document.createElement('span');
+          recTag.style.cssText='font-size:.52rem;color:#30d158;background:rgba(48,209,88,.1);padding:2px 6px;border-radius:6px;flex-shrink:0;font-weight:600';
+          recTag.textContent='推荐';
+          row.appendChild(recTag);
+        }
 
         list.appendChild(row);
       })();
