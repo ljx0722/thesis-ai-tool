@@ -1808,8 +1808,10 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
         // 到达参考文献就停止
         if(refBound&&el2===refBound)break;
         if(refBound&&(el2.compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))break;
-        // 标记/目录/摘要等第一章之前的内容全部跳过（兼容中文"第X章"和英文"Chapter"模式）
+        // 标记/目录/摘要等第一章之前的内容全部跳过（兼容多种格式）
         var isStart= /^第[一1一二三四五六七八九十\d]+章/.test(txt2) || /^Chapter\s+\d/.test(txt2) || /^(1\.|1\s+)Introduction/.test(txt2);
+        // 补充：如果到了 2/3 的位置还没找到第1章，从开头开始收集（兜底兼容非标准格式）
+        if(!pastCh1&&ai>Math.max(3,Math.floor(allEls3.length*0.6))){pastCh1=true;}
         if(isStart)pastCh1=true;
         if(!pastCh1)continue;
         // 判断标题级别（支持多种中文论文常见格式）
@@ -1886,6 +1888,39 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
 
     // === 标题层级校准弹窗 ===
     updLoad('标题校准...','37');
+    // 兜底：如果有效标题太少（<3个），收集所有可见区段让用户手动标注
+    var validCands=0;
+    for(var vi=0;vi<headingCandidates.length;vi++){if(headingCandidates[vi].level>=0)validCands++;}
+    if(validCands<3){
+      console.warn('[calibration] Only',validCands,'valid candidates. Using fallback scan.');
+      var fbPast=false,fallbackCands=[];
+      var fbEls=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li');
+      for(var fbi=0;fbi<fbEls.length;fbi++){
+        var fe=fbEls[fbi];
+        if(refBound&&(fe.compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))break;
+        var ft=(fe.textContent||'').trim();
+        if(!ft||ft.length<1)continue;
+        // 尝试找到第一章位置
+        var isFbStart=/^第[一二三四五六七八九十\d]+章/.test(ft)||/^Chapter\s+\d/.test(ft)||/^(1\.|1\s+)Introduction/.test(ft);
+        if(isFbStart)fbPast=true;
+        if(!fbPast)continue;
+        // 自动猜级
+        var guessLv=-1;
+        if(ft.length<80){
+          if(/^第[一二三四五六七八九十\d]+章/.test(ft))guessLv=0;
+          else if(/^\d+(?:\.\d+){1,2}[\s、，,.]/.test(ft))guessLv=ft.match(/^\d+(?:\.\d+){1}/)?1:(ft.match(/^\d+(?:\.\d+){2}/)?2:-1);
+          else if(/^[\(（]?[一二三四五六七八九十]+[\)）]?[\s、]/.test(ft))guessLv=1;
+        }
+        fallbackCands.push({el:fe,txt:ft,num:'',title:ft,level:guessLv,bare:false});
+      }
+      // 优先用已有检测结果 + 兜底扫描中不在已有列表里的项
+      var existingTxts={};
+      headingCandidates.forEach(function(h){existingTxts[h.txt]=true;});
+      fallbackCands.forEach(function(fc){
+        if(!existingTxts[fc.txt])headingCandidates.push(fc);
+      });
+      console.log('[calibration] After fallback:','total',headingCandidates.length,'candidates');
+    }
     var calibratedCandidates=await new Promise(function(resolve){
       // Also include undetected short text elements as candidates (user might want to mark them as headings)
       // But for simplicity, just pass the auto-detected list
