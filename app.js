@@ -2084,9 +2084,11 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
           sg[sname]._texts.push(txt); // 存储全文供确认弹窗展示
         }
         window._docxStyleGroups=Object.values(sg).sort(function(a,b){return b.count-a.count;});
-        console.log('[docx] Pre-parsed',window._docxStyleGroups.length,'style groups');
-      }
-    }catch(e){console.warn('[docx] Pre-parse failed:',e.message);}
+        console.log('[docx] Pre-parsed',window._docxStyleGroups.length,'style groups:',window._docxStyleGroups.map(function(g){return g.name+'×'+g.count;}).slice(0,8).join(', '));
+      } else { console.warn('[docx] Pre-parse: stylesXml or docXml empty'); }
+    }catch(e){console.warn('[docx] Pre-parse failed:',e.message);
+      window._docxStyleGroups=[]; // ensure clean state
+    }
 
     // mammoth 转换
     var result=await mammoth.convertToHtml({arrayBuffer:buf},{includeDefaultStyleMap:true,transformDocument:function(doc){return doc;}});
