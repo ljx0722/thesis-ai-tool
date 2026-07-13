@@ -10,6 +10,39 @@
 
 </script>
 <link rel="stylesheet" href="css/style.css"></head><body>
+<!-- ====== 登录页 ====== -->
+<div id="loginOverlay">
+  <div class="login-bg">
+    <div class="login-shape login-shape-1"></div>
+    <div class="login-shape login-shape-2"></div>
+    <div class="login-shape login-shape-3"></div>
+    <div class="login-shape login-shape-4"></div>
+    <div class="login-particles" id="loginParticles"></div>
+  </div>
+  <div class="login-card">
+    <div class="login-icon">📋</div>
+    <h2 class="login-title">论文AI利器</h2>
+    <p class="login-subtitle">智能论文写作辅助平台</p>
+    <div class="login-form">
+      <div class="login-field">
+        <svg class="login-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+        <input type="text" id="loginUsername" placeholder="用户名" autocomplete="username" autofocus>
+      </div>
+      <div class="login-field">
+        <svg class="login-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <input type="password" id="loginPassword" placeholder="密码" autocomplete="current-password">
+      </div>
+      <div class="login-error" id="loginError"></div>
+      <button class="login-btn" id="loginBtn" onclick="doLogin()">
+        <span>登 录</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+    <div class="login-footer">默认账户 admin / admin123</div>
+  </div>
+</div>
+
+<div id="appShell" style="display:none">
 <div id="fileBlock"><b>⚠️ 请通过 HTTP 访问</b><br><br>本页面需要调用外部API检索文献，无法从 file:// 协议使用。<br><br><button onclick="window.open('http://localhost:5000/','_self')" style="font-size:1rem;padding:10px 30px;background:#0071e3;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700">🔗 一键跳转 HTTP</button><br><br><small style="color:var(--m)">或双击运行 <b>启动.bat</b> 后点击上方按钮</small></div>
 <script>if(window.location.protocol==='file:'){document.getElementById('fileBlock').style.display='block';document.querySelector('.main')&&(document.querySelector('.main').style.display='none');document.querySelector('.bar')&&(document.querySelector('.bar').style.display='none');fetch('http://localhost:5000/',{mode:'no-cors'}).then(function(r){window.location.href='http://localhost:5000/'}).catch(function(){});}</script>
 
@@ -249,6 +282,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
   var drop=document.getElementById('uploadDrop');if(drop){['dragenter','dragover','dragleave','drop'].forEach(function(ev){document.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();},false);});['dragenter','dragover'].forEach(function(ev){document.addEventListener(ev,function(){drop.classList.add('dragover');},false);});['dragleave','drop'].forEach(function(ev){document.addEventListener(ev,function(){drop.classList.remove('dragover');},false);});document.addEventListener('drop',function(e){var files=e.dataTransfer.files;if(files.length){var fi=document.getElementById('fileInput');var dt=new DataTransfer();dt.items.add(files[0]);fi.files=dt.files;fi.dispatchEvent(new Event('change'));}});}
 })();
 </script>
+</div>
 <script>
 // Dark mode toggle
 (function(){
@@ -267,6 +301,142 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
     var isDark=document.body.classList.contains('dark');
     setDark(!isDark);
     try{localStorage.setItem('thesis-ai-dark',isDark?'0':'1')}catch(e){}
+  };
+})();
+</script>
+
+<script>
+// ====== 登录逻辑 ======
+(function(){
+  var USERS = {admin:'admin123'};
+  var STORAGE_KEY = 'thesis_ai_login';
+  var loginOverlay = document.getElementById('loginOverlay');
+  var appShell = document.getElementById('appShell');
+  var bar = document.querySelector('.bar');
+  var main = document.querySelector('.main');
+  var kbHint = document.getElementById('kbHint');
+  var helpBtn = document.getElementById('helpBtn');
+  var darkToggle = document.getElementById('darkToggle');
+  var uploadOv = document.getElementById('uploadOverlay');
+
+  // Check existing session
+  try{
+    var saved = sessionStorage.getItem(STORAGE_KEY);
+    if (saved === 'true') { hideLogin(); return; }
+  } catch(e) {}
+
+  // Show login, hide app
+  if(loginOverlay) loginOverlay.style.display = 'flex';
+
+  // Particle background
+  (function(){
+    var canvas = document.createElement('canvas');
+    canvas.className = 'login-particles';
+    var bg = document.querySelector('.login-bg');
+    if (!bg) return;
+    bg.appendChild(canvas);
+    var ctx = canvas.getContext('2d');
+    canvas.width = canvas.parentElement.clientWidth || window.innerWidth;
+    canvas.height = canvas.parentElement.clientHeight || window.innerHeight;
+
+    var particles = [];
+    for (var i = 0; i < 60; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        r: Math.random() * 1.5 + .5,
+        vx: (Math.random() - .5) * .4,
+        vy: (Math.random() - .5) * .4,
+        opacity: Math.random() * .4 + .1
+      });
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (var i = 0; i < particles.length; i++) {
+        var p = particles[i];
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,' + p.opacity + ')';
+        ctx.fill();
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < -10) p.x = canvas.width + 10;
+        if (p.x > canvas.width + 10) p.x = -10;
+        if (p.y < -10) p.y = canvas.height + 10;
+        if (p.y > canvas.height + 10) p.y = -10;
+      }
+      // Draw connections
+      for (var i = 0; i < particles.length; i++) {
+        for (var j = i + 1; j < particles.length; j++) {
+          var dx = particles[i].x - particles[j].x;
+          var dy = particles[i].y - particles[j].y;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 100) {
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.strokeStyle = 'rgba(255,255,255,' + (0.04 * (1 - dist / 100)) + ')';
+            ctx.lineWidth = .5;
+            ctx.stroke();
+          }
+        }
+      }
+      requestAnimationFrame(draw);
+    }
+    draw();
+
+    window.addEventListener('resize', function() {
+      canvas.width = bg.clientWidth || window.innerWidth;
+      canvas.height = bg.clientHeight || window.innerHeight;
+    });
+  })();
+
+  // Login handler
+  window.doLogin = function() {
+    var u = document.getElementById('loginUsername').value.trim();
+    var p = document.getElementById('loginPassword').value;
+    var err = document.getElementById('loginError');
+    var btn = document.getElementById('loginBtn');
+
+    if (!u) { err.textContent = '请输入用户名'; return; }
+    if (!p) { err.textContent = '请输入密码'; return; }
+
+    if (USERS[u] && USERS[u] === p) {
+      err.textContent = '';
+      btn.style.opacity = '.7';
+      btn.style.pointerEvents = 'none';
+      setTimeout(function() {
+        try { sessionStorage.setItem(STORAGE_KEY, 'true'); } catch(e) {}
+        hideLogin();
+      }, 300);
+    } else {
+      err.textContent = '用户名或密码错误';
+      document.getElementById('loginPassword').value = '';
+      document.getElementById('loginPassword').focus();
+    }
+  };
+
+  // Enter key submits login
+  document.getElementById('loginPassword').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLogin();
+  });
+  document.getElementById('loginUsername').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { document.getElementById('loginPassword').focus(); }
+  });
+
+  function hideLogin() {
+    if (loginOverlay) {
+      loginOverlay.style.opacity = '0';
+      loginOverlay.style.transition = 'opacity .4s';
+      setTimeout(function() { loginOverlay.style.display = 'none'; }, 400);
+    }
+    if (appShell) appShell.style.display = '';
+  }
+
+  // Logout function (exposed globally)
+  window.doLogout = function() {
+    try { sessionStorage.removeItem(STORAGE_KEY); } catch(e) {}
+    location.reload();
   };
 })();
 </script>
