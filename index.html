@@ -28,51 +28,91 @@
 
   <!-- Body -->
   <div class="landing-body">
-    <!-- Left: Feature Slides -->
-    <div class="landing-showcase" id="landingShowcase">
-      <div class="showcase-slides" id="showcaseSlides">
-        <div class="showcase-slide active">
-          <div class="showcase-illustration">
-            <svg viewBox="0 0 220 140" fill="none"><rect x="8" y="6" width="204" height="128" rx="6" stroke="currentColor" stroke-width="1" opacity=".12"/><rect x="24" y="18" width="166" height="11" rx="3" fill="currentColor" opacity=".35"/><rect x="24" y="36" width="140" height="7" rx="2" fill="currentColor" opacity=".08"/><rect x="24" y="48" width="156" height="7" rx="2" fill="currentColor" opacity=".08"/><rect x="24" y="60" width="126" height="7" rx="2" fill="currentColor" opacity=".08"/><rect x="24" y="72" width="148" height="7" rx="2" fill="currentColor" opacity=".08"/><rect x="24" y="84" width="112" height="7" rx="2" fill="currentColor" opacity=".08"/><rect x="24" y="96" width="164" height="7" rx="2" fill="currentColor" opacity=".08"/><circle cx="180" cy="62" r="28" fill="currentColor" opacity=".06" stroke="currentColor" stroke-width="1.5" opacity=".25"/><path d="M173 62l4 4 8-9" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg>
+        <!-- Left: Feature Bento Grid -->
+    <div class="landing-showcase">
+      <div class="bento-grid">
+        <!-- Hero card: DOCX -->
+        <div class="bento-card bento-hero">
+          <div class="bento-card-art">
+            <svg viewBox="0 0 280 160" fill="none"><rect x="12" y="8" width="256" height="144" rx="8" stroke="currentColor" stroke-width="1" opacity=".08"/><rect x="28" y="22" width="200" height="12" rx="4" fill="currentColor" opacity=".3"/><rect x="28" y="42" width="170" height="8" rx="3" fill="currentColor" opacity=".06"/><rect x="28" y="56" width="190" height="8" rx="3" fill="currentColor" opacity=".06"/><rect x="28" y="70" width="150" height="8" rx="3" fill="currentColor" opacity=".06"/><rect x="28" y="84" width="180" height="8" rx="3" fill="currentColor" opacity=".06"/><rect x="28" y="98" width="140" height="8" rx="3" fill="currentColor" opacity=".06"/><rect x="28" y="112" width="200" height="8" rx="3" fill="currentColor" opacity=".06"/><rect x="210" y="52" width="44" height="44" rx="10" fill="currentColor" opacity=".04" stroke="currentColor" stroke-width="1" opacity=".15"/><path d="M225 74l5 4 8-10" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".6"/></svg>
           </div>
-          <div class="showcase-text">
-            <h3><span class="showcase-num">01</span> DOCX 智能解析</h3>
-            <p>上传论文 Word 文档，自动解析文本结构。从封面、目录到正文、参考文献，一键拆分章、节、小节，构建完整五层目录树。</p>
-          </div>
-        </div>
-        <div class="showcase-slide">
-          <div class="showcase-illustration">
-            <svg viewBox="0 0 220 140" fill="none"><rect x="8" y="6" width="204" height="128" rx="6" stroke="currentColor" stroke-width="1" opacity=".12"/><circle cx="62" cy="62" r="32" fill="currentColor" opacity=".04" stroke="currentColor" stroke-width="1" opacity=".2"/><circle cx="62" cy="62" r="18" fill="currentColor" opacity=".03" stroke="currentColor" stroke-width="1" opacity=".15"/><circle cx="62" cy="62" r="7" fill="currentColor" opacity=".2"/><line x1="84" y1="84" x2="114" y2="114" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".3"/><rect x="132" y="22" width="64" height="8" rx="2" fill="currentColor" opacity=".08"/><rect x="132" y="36" width="48" height="6" rx="2" fill="currentColor" opacity=".05"/><rect x="132" y="48" width="56" height="6" rx="2" fill="currentColor" opacity=".05"/><rect x="132" y="60" width="42" height="6" rx="2" fill="currentColor" opacity=".05"/><rect x="132" y="80" width="64" height="8" rx="4" fill="currentColor" opacity=".06"/></svg>
-          </div>
-          <div class="showcase-text">
-            <h3><span class="showcase-num">02</span> 12 源文献检索</h3>
-            <p>基于论文章节关键词，并发检索 OpenAlex、Crossref、Semantic Scholar 等 12 个学术数据库，智能平衡中文与外文、经典与前沿文献。</p>
+          <div class="bento-card-body">
+            <div class="bento-card-icon" style="--card-accent:#818cf8">📄</div>
+            <div class="bento-card-text">
+              <h4>DOCX 智能解析</h4>
+              <p>上传 Word 文档，自动识别章、节、小节层级，构建完整五层目录树</p>
+            </div>
           </div>
         </div>
-        <div class="showcase-slide">
-          <div class="showcase-illustration">
-            <svg viewBox="0 0 220 140" fill="none"><rect x="8" y="6" width="204" height="128" rx="6" stroke="currentColor" stroke-width="1" opacity=".12"/><circle cx="64" cy="40" r="18" fill="currentColor" opacity=".05" stroke="currentColor" stroke-width="1" opacity=".2"/><circle cx="42" cy="84" r="14" fill="currentColor" opacity=".04" stroke="currentColor" stroke-width="1" opacity=".18"/><circle cx="88" cy="78" r="14" fill="currentColor" opacity=".04" stroke="currentColor" stroke-width="1" opacity=".18"/><circle cx="32" cy="112" r="10" fill="currentColor" opacity=".03" stroke="currentColor" stroke-width="1" opacity=".14"/><circle cx="62" cy="116" r="10" fill="currentColor" opacity=".03" stroke="currentColor" stroke-width="1" opacity=".14"/><circle cx="96" cy="106" r="10" fill="currentColor" opacity=".03" stroke="currentColor" stroke-width="1" opacity=".14"/><line x1="56" y1="54" x2="42" y2="72" stroke="currentColor" stroke-width=".6" opacity=".1"/><line x1="68" y1="54" x2="90" y2="66" stroke="currentColor" stroke-width=".6" opacity=".1"/><line x1="38" y1="96" x2="30" y2="104" stroke="currentColor" stroke-width=".5" opacity=".08"/><line x1="48" y1="96" x2="62" y2="108" stroke="currentColor" stroke-width=".5" opacity=".08"/><line x1="92" y1="90" x2="98" y2="100" stroke="currentColor" stroke-width=".5" opacity=".08"/><rect x="132" y="22" width="64" height="8" rx="2" fill="currentColor" opacity=".08"/><rect x="132" y="36" width="42" height="6" rx="2" fill="currentColor" opacity=".05"/><rect x="132" y="48" width="54" height="6" rx="2" fill="currentColor" opacity=".05"/></svg>
+
+        <!-- Hero card: 文献检索 -->
+        <div class="bento-card bento-hero">
+          <div class="bento-card-art">
+            <svg viewBox="0 0 280 160" fill="none"><rect x="12" y="8" width="256" height="144" rx="8" stroke="currentColor" stroke-width="1" opacity=".08"/><circle cx="70" cy="72" r="36" fill="currentColor" opacity=".03" stroke="currentColor" stroke-width="1" opacity=".15"/><circle cx="70" cy="72" r="20" fill="currentColor" opacity=".02" stroke="currentColor" stroke-width="1" opacity=".1"/><circle cx="70" cy="72" r="8" fill="currentColor" opacity=".15"/><line x1="94" y1="96" x2="128" y2="130" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".25"/><rect x="150" y="26" width="90" height="9" rx="3" fill="currentColor" opacity=".06"/><rect x="150" y="42" width="70" height="7" rx="3" fill="currentColor" opacity=".04"/><rect x="150" y="55" width="78" height="7" rx="3" fill="currentColor" opacity=".04"/><rect x="150" y="68" width="60" height="7" rx="3" fill="currentColor" opacity=".04"/><rect x="150" y="88" width="90" height="9" rx="3" fill="currentColor" opacity=".06"/><rect x="150" y="103" width="65" height="7" rx="3" fill="currentColor" opacity=".04"/></svg>
           </div>
-          <div class="showcase-text">
-            <h3><span class="showcase-num">03</span> 知识图谱可视化</h3>
-            <p>自动提取论文主题词，构建关键词共现网络与章节关联矩阵。支持词云、力导向网络图、文献时间线三种交互视图。</p>
+          <div class="bento-card-body">
+            <div class="bento-card-icon" style="--card-accent:#a78bfa">🔍</div>
+            <div class="bento-card-text">
+              <h4>12 源文献检索</h4>
+              <p>并发检索全球 12 个学术数据库，智能平衡中英文比例与时效性</p>
+            </div>
           </div>
         </div>
-        <div class="showcase-slide">
-          <div class="showcase-illustration">
-            <svg viewBox="0 0 220 140" fill="none"><rect x="8" y="6" width="204" height="128" rx="6" stroke="currentColor" stroke-width="1" opacity=".12"/><circle cx="52" cy="52" r="36" fill="currentColor" opacity=".03" stroke="currentColor" stroke-width="24" opacity=".06"/><circle cx="52" cy="52" r="36" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="60 166" opacity=".3"/><text x="52" y="55" text-anchor="middle" fill="currentColor" font-size="16" font-weight="800" font-family="system-ui" opacity=".9">78</text><text x="52" y="72" text-anchor="middle" fill="currentColor" font-size="6" opacity=".35">综合评分</text><rect x="106" y="22" width="82" height="7" rx="3" fill="currentColor" opacity=".05"/><rect x="106" y="22" width="58" height="7" rx="3" fill="currentColor" opacity=".22"/><rect x="106" y="34" width="82" height="7" rx="3" fill="currentColor" opacity=".05"/><rect x="106" y="34" width="66" height="7" rx="3" fill="currentColor" opacity=".22"/><rect x="106" y="46" width="82" height="7" rx="3" fill="currentColor" opacity=".05"/><rect x="106" y="46" width="50" height="7" rx="3" fill="currentColor" opacity=".22"/><rect x="106" y="58" width="82" height="7" rx="3" fill="currentColor" opacity=".05"/><rect x="106" y="58" width="40" height="7" rx="3" fill="currentColor" opacity=".22"/><rect x="106" y="70" width="82" height="7" rx="3" fill="currentColor" opacity=".05"/><rect x="106" y="70" width="28" height="7" rx="3" fill="currentColor" opacity=".22"/><rect x="106" y="90" width="68" height="9" rx="5" fill="currentColor" opacity=".04"/></svg>
+
+        <!-- Medium: 知识图谱 -->
+        <div class="bento-card bento-med">
+          <div class="bento-card-body">
+            <div class="bento-card-icon" style="--card-accent:#22d3ee">🕸️</div>
+            <div class="bento-card-text">
+              <h4>知识图谱</h4>
+              <p>主题词共现网络、词云、文献时间线三种可视化视图</p>
+            </div>
           </div>
-          <div class="showcase-text">
-            <h3><span class="showcase-num">04</span> 十维评估报告</h3>
-            <p>覆盖选题价值、文献综述、研究方法等 10 个评审维度。自动生成评分雷达图、优先改进建议与章节字数分布分析。</p>
+        </div>
+
+        <!-- Medium: 评估报告 -->
+        <div class="bento-card bento-med">
+          <div class="bento-card-body">
+            <div class="bento-card-icon" style="--card-accent:#f59e0b">📊</div>
+            <div class="bento-card-text">
+              <h4>十维评估报告</h4>
+              <p>10 维度评分 + 雷达图 + 优先改进建议 + 章节分析</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Medium: 格式检查 -->
+        <div class="bento-card bento-med">
+          <div class="bento-card-body">
+            <div class="bento-card-icon" style="--card-accent:#34d399">✅</div>
+            <div class="bento-card-text">
+              <h4>格式检查</h4>
+              <p>标题样式质量、章节内容完整性、图表标题规范检测</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Medium: 术语分析 -->
+        <div class="bento-card bento-med">
+          <div class="bento-card-body">
+            <div class="bento-card-icon" style="--card-accent:#f472b6">🔤</div>
+            <div class="bento-card-text">
+              <h4>术语一致性</h4>
+              <p>拼写检查、术语演变追踪、翻译一致性校验</p>
+            </div>
           </div>
         </div>
       </div>
-      <div class="showcase-dots" id="showcaseDots">
-        <span class="showcase-dot active" data-idx="0"></span>
-        <span class="showcase-dot" data-idx="1"></span>
-        <span class="showcase-dot" data-idx="2"></span>
-        <span class="showcase-dot" data-idx="3"></span>
+
+      <!-- Stats bar -->
+      <div class="landing-stats">
+        <div class="landing-stat"><span class="stat-value">12</span><span class="stat-label">学术数据源</span></div>
+        <div class="landing-stat-divider"></div>
+        <div class="landing-stat"><span class="stat-value">221</span><span class="stat-label">回归测试</span></div>
+        <div class="landing-stat-divider"></div>
+        <div class="landing-stat"><span class="stat-value">6</span><span class="stat-label">功能模块</span></div>
+        <div class="landing-stat-divider"></div>
+        <div class="landing-stat"><span class="stat-value">10</span><span class="stat-label">评审维度</span></div>
       </div>
     </div>
 
@@ -412,40 +452,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
     }
   };
 
-  // Carousel logic
-  (function(){
-    var slides = document.querySelectorAll('.showcase-slide');
-    var dots = document.querySelectorAll('.showcase-dot');
-    if (!slides.length) return;
-    var current = 0, total = slides.length;
-    var timer = null;
-    var pauseOnHover = document.getElementById('landingShowcase');
 
-    function goTo(idx) {
-      slides[current].classList.remove('active');
-      dots[current].classList.remove('active');
-      current = ((idx % total) + total) % total;
-      slides[current].classList.add('active');
-      dots[current].classList.add('active');
-    }
-
-    function next() { goTo(current + 1); }
-
-    timer = setInterval(next, 4000);
-
-    dots.forEach(function(dot) {
-      dot.addEventListener('click', function() {
-        goTo(parseInt(dot.getAttribute('data-idx')));
-        clearInterval(timer);
-        timer = setInterval(next, 4000);
-      });
-    });
-
-    if (pauseOnHover) {
-      pauseOnHover.addEventListener('mouseenter', function() { clearInterval(timer); });
-      pauseOnHover.addEventListener('mouseleave', function() { timer = setInterval(next, 4000); });
-    }
-  })();
 
   // Enter key submits login
   document.getElementById('loginPassword').addEventListener('keydown', function(e) {

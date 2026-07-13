@@ -213,6 +213,10 @@ function tourEnd() {
   try { seen = sessionStorage.getItem('thesis_ai_tour_seen'); } catch (e) {}
 
   if (!seen) {
+    // 只在登录后启动（不在登录页触发）
+    var isLoggedIn = false;
+    try { isLoggedIn = sessionStorage.getItem('thesis_ai_login') === 'true'; } catch (e) {}
+    if (!isLoggedIn) return;
     // Wait for DOM + libraries
     var checks = 0;
     var timer = setInterval(function() {
