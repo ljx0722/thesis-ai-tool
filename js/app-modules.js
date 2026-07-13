@@ -383,7 +383,48 @@ function analyzeCSV(f,container){
 
 // ==================== 初始化 ====================
 (function() {
-  showUploadOverlay();
+  // 先尝试从 sessionStorage 恢复，恢复成功就不弹上传遮罩
+  try{
+    var savedT=sessionStorage.getItem('thesis_backup_text');
+    var savedH=sessionStorage.getItem('thesis_backup_html');
+    if(savedT&&savedH&&savedT.length>100){
+      console.log('[session] Restoring thesis from sessionStorage:',Math.round(savedT.length/1000)+'k chars');
+      manuscriptText=savedT;manuscriptHTML=savedH;
+      document.getElementById('thesisBox').innerHTML=manuscriptHTML;
+      try{
+        var box2=document.getElementById('thesisBox');
+        sections=[];var allEls5=box2.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+        var refBound2=null;
+        for(var ri2=0;ri2<allEls5.length;ri2++){var rt2=(allEls5[ri2].textContent||'').replace(/\s+/g,'');if(rt2.indexOf('参考文献')===0&&rt2.length<20){refBound2=allEls5[ri2];break;}}
+        var bodyStart2=Math.max(0,Math.floor(allEls5.length*0.08));
+        var allHd2=[];
+        for(var ei2=bodyStart2;ei2<allEls5.length;ei2++){
+          var el2=allEls5[ei2],txt2=(el2.textContent||'').trim();
+          if(!txt2||txt2.length<2)continue;
+          if(refBound2&&(el2.compareDocumentPosition(refBound2)&Node.DOCUMENT_POSITION_FOLLOWING))break;
+          if(/^H[1-6]$/.test((el2.tagName||'').toUpperCase())){
+            allHd2.push({el:el2,txt:txt2,level:-1,tagLevel:parseInt(el2.tagName.charAt(1)),bare:false});
+          }
+        }
+        for(var ei22=bodyStart2;ei22<allEls5.length;ei22++){
+          var ef2=allEls5[ei22],tf2=(ef2.textContent||'').trim();
+          if(!tf2||tf2.length<2||(refBound2&&(ef2.compareDocumentPosition(refBound2)&Node.DOCUMENT_POSITION_FOLLOWING)))continue;
+          var dup2=false;for(var di2=0;di2<allHd2.length;di2++){if(allHd2[di2].el===ef2){dup2=true;break;}}if(dup2)continue;
+          allHd2.push({el:ef2,txt:tf2,level:-1,tagLevel:-1,bare:false});
+        }
+        sections=buildFullTree(box2,allHd2,bodyStart2,refBound2);
+        paperTopics=extractTopics(manuscriptText);renderNavTree(sections);
+      }catch(e){console.warn('[session] Tree rebuild failed:',e.message);}
+      document.getElementById('statusBar').textContent='已恢复 '+(sections.length||0)+'章（刷新恢复）';
+    }
+  }catch(e3){}
+
+  // 页面刷新时已有论文数据就不弹上传遮罩
+  var hasData = (typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100)
+    || (typeof sections !== 'undefined' && sections && sections.length > 0);
+  if (!hasData) {
+    showUploadOverlay();
+  }
   renderModuleTabs(); updateBarActions(); updateStatusBar2();
   initKeyboard();
 
