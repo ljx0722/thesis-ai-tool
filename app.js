@@ -1314,7 +1314,7 @@ function cwFinish(){
           if(_cwConfirmed[slv].has(gs2[gi2].name)){
             set.groupNames.push(gs2[gi2].name);
             var txs=gs2[gi2]._texts||[];
-            for(var xi=0;xi<txs.length;xi++){if(txs[xi]&&txs[xi].length>=2)set.texts[txs[xi].replace(/\s+/g,' ').trim()]=true;}
+            for(var xi=0;xi<txs.length;xi++){if(txs[xi]&&txs[xi].length>=2)set.texts[txs[xi].replace(/[\s　 ]+/g,' ').replace(/ +/g,' ').trim()]=true;}
           }
         }
         if(set.groupNames.length)styleTextSets.push(set);
@@ -1323,7 +1323,7 @@ function cwFinish(){
       for(var j=0;j<els3.length;j++){
         if(refBound2&&(els3[j].compareDocumentPosition(refBound2)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
         var et3=(els3[j].textContent||'').trim();if(!et3||et3.length<2)continue;
-        var et3n=et3.replace(/\s+/g,' ');
+        var et3n=et3.replace(/[\s　 ]+/g,' ').replace(/ +/g,' ');
         var assignedLv=-1;
         for(var si3=0;si3<styleTextSets.length;si3++){
           if(styleTextSets[si3].texts[et3n]){assignedLv=styleTextSets[si3].lv;break;}
@@ -2378,7 +2378,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
       // ===== 第4.5步: 标题校准 =====
       updLoad('标题校准...', '37');
       var calibrated = await startInlineCalibration(box, allHeadings);
-      if (calibrated !== null) allHeadings = calibrated;
+      if (calibrated !== null && calibrated.length) allHeadings = calibrated;
       // 兜底：如果校准后仍然没有标题数据，扫描全文所有短元素作为候选
       if (!allHeadings.length){
         console.warn('[cal] No headings after calibration — scanning all body elements');
