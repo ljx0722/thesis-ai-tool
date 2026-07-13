@@ -1238,7 +1238,9 @@ function cwConfirmAccept(sname){
       }
     }
   }
-  console.log('[cal] Confirmed phase',_cwPhase,'style',sname,'kept',window._cwCheckedEls[_cwPhase].length,'elements');
+	  var itemsWithEl=items.filter(function(it){return it.el&&it.checked;}).length;
+  var itemsNoEl=items.filter(function(it){return !it.el&&it.checked;}).length;
+  console.log('[cal] Confirmed phase',_cwPhase,'style',sname,'checked',items.filter(function(it){return it.checked;}).length,'(withEl:',itemsWithEl,'noEl:',itemsNoEl,')','kept',window._cwCheckedEls[_cwPhase].length,'elements');
   cwConfirmClose();
   renderCalibrationModal();
 }
@@ -1268,6 +1270,13 @@ function cwEnsureAllParaTexts(){
 function cwFinish(){
   var ov=document.getElementById('cwOverlay');if(ov)ov.parentElement.removeChild(ov);
 
+  // 诊断：输出 cwCheckedEls 状态
+  if(window._cwCheckedEls){
+    console.log('[cal] cwFinish start: cwCheckedEls counts — L0:',(window._cwCheckedEls[0]||[]).length,'L1:',(window._cwCheckedEls[1]||[]).length,'L2:',(window._cwCheckedEls[2]||[]).length);
+  } else {
+    console.log('[cal] cwFinish start: cwCheckedEls is null/undefined');
+  }
+  console.log('[cal] cwFinish start: cwConfirmed — L0:',_cwConfirmed[0]?_cwConfirmed[0].size:0,'L1:',_cwConfirmed[1]?_cwConfirmed[1].size:0,'L2:',_cwConfirmed[2]?_cwConfirmed[2].size:0);
   // 构建 candidates：优先从 cwCheckedEls 取，兜底从 DOM text pattern
   _cwCandidates=[];
   if(window._cwCheckedEls){
@@ -1288,26 +1297,40 @@ function cwFinish(){
       }
     }
   }
-  // 兜底：如果 cwCheckedEls 为空，直接从 CW 样式确认中匹配 DOM 元素
+  // 兜底：用已确认样式组的 _texts 文本直接匹配 DOM 元素，不依赖 _els
   if(!_cwCandidates.length){
-    console.warn('[cal] No checked elements — falling back to style-name DOM scan');
+    console.warn('[cal] cwCheckedEls empty, falling back to text-based DOM scan');
     var box=document.getElementById('thesisBox');
     if(box){
       var refBound2=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
       var els3=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+      // 为每个已确认的层级构造样式文本集
+      var styleTextSets=[]; // [{lv:0, texts: {...}, groupNames: [...]}]
+      for(var slv=0;slv<3;slv++){
+        if(!_cwConfirmed[slv]||!_cwConfirmed[slv].size)continue;
+        var set={lv:slv,texts:{},groupNames:[]};
+        var gs2=cwGetStyleGroups();
+        for(var gi2=0;gi2<gs2.length;gi2++){
+          if(_cwConfirmed[slv].has(gs2[gi2].name)){
+            set.groupNames.push(gs2[gi2].name);
+            var txs=gs2[gi2]._texts||[];
+            for(var xi=0;xi<txs.length;xi++){if(txs[xi]&&txs[xi].length>=2)set.texts[txs[xi].replace(/\s+/g,' ').trim()]=true;}
+          }
+        }
+        if(set.groupNames.length)styleTextSets.push(set);
+      }
+      console.log('[cal] Fallback styleTextSets:',styleTextSets.map(function(s){return'L'+s.lv+':'+s.groupNames.join(',')+'('+Object.keys(s.texts).length+' texts)';}).join(' | '));
       for(var j=0;j<els3.length;j++){
         if(refBound2&&(els3[j].compareDocumentPosition(refBound2)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
         var et3=(els3[j].textContent||'').trim();if(!et3||et3.length<2)continue;
-        // 确定层级
+        var et3n=et3.replace(/\s+/g,' ');
         var assignedLv=-1;
-        for(var lv=0;lv<3;lv++){
-          if(_cwConfirmed[lv]&&_cwConfirmed[lv].size>0){
-            // 检查该元素的文本是否匹配已确认样式的任意示例
-            var gs=cwGetStyleGroups();
-            for(var gi=0;gi<gs.length;gi++){
-              if(_cwConfirmed[lv].has(gs[gi].name)&&(gs[gi]._els||[]).some(function(e){return e===els3[j];})){
-                assignedLv=lv;break;
-              }
+        for(var si3=0;si3<styleTextSets.length;si3++){
+          if(styleTextSets[si3].texts[et3n]){assignedLv=styleTextSets[si3].lv;break;}
+          // Try substring match for long texts
+          if(et3n.length>=10){
+            for(var key3 in styleTextSets[si3].texts){
+              if(key3.length>=10&&et3n.substring(0,20)===key3.substring(0,20)){assignedLv=styleTextSets[si3].lv;break;}
             }
           }
           if(assignedLv>=0)break;
