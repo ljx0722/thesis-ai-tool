@@ -1461,11 +1461,12 @@ test('AUDIT: heading scan has broad TOC filter', function() {
 
 test('AUDIT: pre-parse has TOC filter', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  // Search near the pre-parse TOC comments
-  var tocIdx = src.indexOf('TOC 过滤：结尾带页码');
-  assert(tocIdx >= 0, 'Pre-parse TOC filter comment must exist');
-  var nearby = src.substring(tocIdx - 80, tocIdx + 100);
-  assert(nearby.indexOf('d{1,3}') >= 0 || nearby.indexOf('d{1,3}$') >= 0 || nearby.indexOf('continue') >= 0, 'TOC filter pattern must exist near comment');
+  // The TOC filter moved to the DOM text-pattern grouping (no longer a separate pre-parse)
+  var tocIdx = src.indexOf('TOC 过滤');
+  if(tocIdx<0){tocIdx=src.indexOf('d{1,3}$');}
+  assert(tocIdx >= 0, 'TOC filter pattern must exist in heading detection or group builder');
+  var nearby = src.substring(Math.max(0,tocIdx-80), tocIdx+100);
+  assert(nearby.indexOf('d{1,3}') >= 0 || nearby.indexOf('continue') >= 0, 'TOC filter must exist near detected location');
 });
 
 test('AUDIT: bodyStartIdx uses detectHeadingLevel', function() {

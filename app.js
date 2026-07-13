@@ -1037,33 +1037,29 @@ var _cwSelections={'0':new Set(),'1':new Set(),'2':new Set()},_cwConfirmed={'0':
 
 // 从预解析的 docx 数据中取出样式组
 function cwGetStyleGroups(){
-  var cached=window._docxStyleGroups||[];
-  if(cached.length)return cached;
-  // 兜底：从 DOM 按文本模式分组（预解析失败时）
+  if(window._docxStyleGroups&&window._docxStyleGroups.length)return window._docxStyleGroups;
+  // 极端兜底（_docxStyleGroups 未初始化时现场扫描）
   var box=document.getElementById('thesisBox');if(!box)return[];
-  var refBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
-  var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6'),groups={};
+  var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li'),gs={};
   for(var i=0;i<els.length;i++){
-    if(refBound&&(els[i].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
-    var t=(els[i].textContent||'').trim();if(!t||t.length<2)continue;
+    var el=els[i],t=(el.textContent||'').trim();
+    if(!t||t.length<2)continue;
     if(/^\d{1,3}$/.test(t)||/^[ivxlcdm]+$/i.test(t))continue;
     if(/[\t\s]+\d{1,3}$/.test(t)||/\.{3,}\d{1,3}$/.test(t))continue;
-    var gname='正文段落';
-    if(/^第[一二三四五六七八九十123456789]+章/.test(t))gname='第X章 格式';
-    else if(/^Chapter\s+\d/i.test(t))gname='Chapter 格式';
-    else if(/^\d+(?:\.\d+)+[\s、,]+/.test(t))gname='数字编号格式';
-    else if(t.length<80&&!/^[\(（]?(?:摘要|Abstract|关键词|Keywords|目录|参考文献|致谢|附录)/.test(t))gname='短文本(疑似标题)';
-    if(!groups[gname])groups[gname]={name:gname,count:0,samples:[],_texts:[],_els:[]};
-    groups[gname].count++;
-    if(groups[gname].samples.length<3)groups[gname].samples.push(t.substring(0,80));
-    groups[gname]._texts.push(t);
-    groups[gname]._els.push(els[i]);
+    var g='正文段落';
+    if(/^第[一二三四五六七八九十123456789]+章/.test(t))g='第X章 格式';
+    else if(/^Chapter\s+\d/i.test(t))g='Chapter 格式';
+    else if(/^\d+(?:\.\d+)+[\s、,，]+/.test(t))g='数字编号格式';
+    else if(t.length<80&&!/^[\(（]?(?:摘要|Abstract|关键词|Keywords|目录|参考文献|致谢|附录)/.test(t))g='短文本(疑似标题)';
+    if(!gs[g])gs[g]={name:g,count:0,samples:[],_texts:[],_els:[]};
+    gs[g].count++;
+    if(gs[g].samples.length<3)gs[g].samples.push(t.substring(0,80));
+    gs[g]._texts.push(t);
+    gs[g]._els.push(el);
   }
-  console.log('[cw] Fallback:',Object.values(groups).map(function(g){return g.name+'×'+g.count;}).join(', '));
-  return Object.values(groups).sort(function(a,b){return b.count-a.count;});
+  window._docxStyleGroups=Object.values(gs).sort(function(a,b){return b.count-a.count;});
+  return window._docxStyleGroups;
 }
-
-// 获取某个层级已确认的段落数量（修复：使用正确的 p 参数）
 function cwGetPhaseCount(p){
   var checkedEls=window._cwCheckedEls&&window._cwCheckedEls[p]?window._cwCheckedEls[p].length:0;
   // 如果已有勾选记录，直接用实际勾选数；否则用样式组全量估算
@@ -2120,42 +2116,6 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
 
     // === .docx 格式：本地解析 ===
     if(ext==='docx'){
-    // === 预处理：从 docx ZIP 直接解析 Word 样式名+数量+示例 ===
-    window._docxStyleGroups=[];
-    try{
-      var docxZip=await JSZip.loadAsync(buf);
-      var stylesXml=await docxZip.file('word/styles.xml').async('string');
-      var docXml=await docxZip.file('word/document.xml').async('string');
-      if(stylesXml&&docXml){
-        var styleNameMap={};
-        var reS=/<w:style[^>]*w:styleId="([^"]*)"[^>]*>[\s\S]*?<w:name[^>]*w:val="([^"]*)"[\s\S]*?<\/w:style>/g,mS;
-        while((mS=reS.exec(stylesXml))!==null)styleNameMap[mS[1]]=mS[2];
-        var sg={};
-        var reP=/<w:p[ >][\s\S]*?<\/w:p>/g,mP;
-        while((mP=reP.exec(docXml))!==null){
-          var p=mP[0];
-          var sm=p.match(/<w:pStyle[^>]*w:val="([^"]*)"/);
-          var sid=sm?sm[1]:'Normal';
-          var sname=styleNameMap[sid]||sid;
-          var tx=[],tr=/<w:t[^>]*>([^<]*)<\/w:t>/g,tm;
-          while((tm=tr.exec(p))!==null)tx.push(tm[1]);
-          var txt=tx.join('').trim();
-          if(!txt||txt.length<2)continue;
-          if(/^\d{1,3}$/.test(txt)||/^[ivxlcdm]+$/i.test(txt))continue;
-          // TOC 过滤：结尾带页码
-          if(/[\t\s]+\d{1,3}$/.test(txt)||/\.{3,}\d{1,3}$/.test(txt))continue;
-          if(!sg[sname])sg[sname]={name:sname,count:0,samples:[],_texts:[]};
-          sg[sname].count++;
-          if(sg[sname].samples.length<2)sg[sname].samples.push(txt.substring(0,80));
-          sg[sname]._texts.push(txt); // 存储全文供确认弹窗展示
-        }
-        window._docxStyleGroups=Object.values(sg).sort(function(a,b){return b.count-a.count;});
-        console.log('[docx] Pre-parsed',window._docxStyleGroups.length,'style groups:',window._docxStyleGroups.map(function(g){return g.name+'×'+g.count;}).slice(0,8).join(', '));
-      } else { console.warn('[docx] Pre-parse: stylesXml or docXml empty'); }
-    }catch(e){console.warn('[docx] Pre-parse failed:',e.message);
-      window._docxStyleGroups=[]; // ensure clean state
-    }
-
     // mammoth 转换
     var result=await mammoth.convertToHtml({arrayBuffer:buf},{includeDefaultStyleMap:true,transformDocument:function(doc){return doc;}});
     manuscriptHTML=result.value;
@@ -2173,56 +2133,32 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     var thesisBoxEl=document.getElementById('thesisBox');
     thesisBoxEl.innerHTML=manuscriptHTML;
     var tbs=thesisBoxEl.querySelectorAll('table');for(var ti=0;ti<tbs.length;ti++)tbs[ti].style.display='';
-    // === 从 mammoth 段落信息 + DOM 元素按文档顺序构建 _docxStyleGroups ===
-    // 核心：mammoth AST 遍历顺序 = DOM 渲染顺序，用文本验证对齐，无须跨源匹配
-    // _mammothParaInfo 已在 mammoth transformDocument 渲染时同步采集
+    // === 构建 _docxStyleGroups：纯 DOM 文本模式分组 ===
+    // _texts 和 _els 同时来自同一个 DOM 元素，不存在跨源匹配
+    // 用户在校准向导里看到的是中文分类名，不是 Word 样式名
     window._docxStyleGroups=[];
-    if(window._mammothParaInfo&&window._mammothParaInfo.length){
-      var domEls=thesisBoxEl.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li');
-      var sg={},pi=0;
-      for(var dei=0;dei<domEls.length&&pi<window._mammothParaInfo.length;dei++){
-        var del=domEls[dei],dt=(del.textContent||'').replace(/\s+/g,' ').trim();
-        if(!dt||dt.length<2)continue;
-        if(/^\d{1,3}$/.test(dt)||/^[ivxlcdm]+$/i.test(dt))continue;
-        if(/[\t\s]+\d{1,3}$/.test(dt)||/\.{3,}\d{1,3}$/.test(dt))continue;
-        var info=window._mammothParaInfo[pi];
-        var it=(info.text||'').replace(/\s+/g,' ').trim();
-        if(dt===it||(dt.length>=10&&it.length>=10&&dt.substring(0,20)===it.substring(0,20))){
-          var sn=info.styleName||'Normal';
-          if(!sg[sn])sg[sn]={name:sn,count:0,samples:[],_texts:[],_els:[]};
-          sg[sn].count++;
-          if(sg[sn].samples.length<3)sg[sn].samples.push(dt.substring(0,80));
-          sg[sn]._texts.push(dt);
-          sg[sn]._els.push(del);
-          pi++;
-        }
+    (function(){
+      var gs={};
+      var allE=thesisBoxEl.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li');
+      for(var i=0;i<allE.length;i++){
+        var el=allE[i],t=(el.textContent||'').trim();
+        if(!t||t.length<2)continue;
+        if(/^\d{1,3}$/.test(t)||/^[ivxlcdm]+$/i.test(t))continue;
+        if(/[\t\s]+\d{1,3}$/.test(t)||/\.{3,}\d{1,3}$/.test(t))continue;
+        var g='正文段落';
+        if(/^第[一二三四五六七八九十123456789]+章/.test(t))g='第X章 格式';
+        else if(/^Chapter\s+\d/i.test(t))g='Chapter 格式';
+        else if(/^\d+(?:\.\d+)+[\s、,，]+/.test(t))g='数字编号格式';
+        else if(t.length<80&&!/^[\(（]?(?:摘要|Abstract|关键词|Keywords|目录|参考文献|致谢|附录|Key words)/.test(t))g='短文本(疑似标题)';
+        if(!gs[g])gs[g]={name:g,count:0,samples:[],_texts:[],_els:[]};
+        gs[g].count++;
+        if(gs[g].samples.length<3)gs[g].samples.push(t.substring(0,80));
+        gs[g]._texts.push(t);
+        gs[g]._els.push(el);
       }
-      window._docxStyleGroups=Object.values(sg).sort(function(a,b){return b.count-a.count;});
-      console.log('[docx] Built',window._docxStyleGroups.length,'style groups from mammoth ('+pi+'/'+window._mammothParaInfo.length+' paragraphs aligned)');
-    }
-    // 兜底：如果位置匹配产出太少，扫描 DOM 按标题模式分组（_els 直接取自 DOM，绝不出错）
-    if(!window._docxStyleGroups.length||window._docxStyleGroups.length<2){
-      console.warn('[docx] Low group count, falling back to DOM pattern scan');
-      var fbG={};
-      var allD=thesisBoxEl.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li');
-      for(var dei2=0;dei2<allD.length;dei2++){
-        var elFb=allD[dei2],tFb=(elFb.textContent||'').trim();
-        if(!tFb||tFb.length<2)continue;
-        if(/^\d{1,3}$/.test(tFb)||/^[ivxlcdm]+$/i.test(tFb))continue;
-        if(/[\t\s]+\d{1,3}$/.test(tFb)||/\.{3,}\d{1,3}$/.test(tFb))continue;
-        var gFb='正文段落';
-        if(/^第[一二三四五六七八九十123456789]+章/.test(tFb))gFb='第X章 格式';
-        else if(/^Chapter\s+\d/i.test(tFb))gFb='Chapter 格式';
-        else if(/^\d+(?:\.\d+)+[\s、,]+/.test(tFb))gFb='数字编号格式';
-        else if(tFb.length<80&&!/^[\(（]?(?:摘要|Abstract|关键词|Keywords|目录|参考文献|致谢|附录)/.test(tFb))gFb='短文本(疑似标题)';
-        if(!fbG[gFb])fbG[gFb]={name:gFb,count:0,samples:[],_texts:[],_els:[]};
-        fbG[gFb].count++;
-        if(fbG[gFb].samples.length<3)fbG[gFb].samples.push(tFb.substring(0,80));
-        fbG[gFb]._texts.push(tFb);
-        fbG[gFb]._els.push(elFb);
-      }
-      window._docxStyleGroups=Object.values(fbG).sort(function(a,b){return b.count-a.count;});
-    }
+      window._docxStyleGroups=Object.values(gs).sort(function(a,b){return b.count-a.count;});
+      console.log('[docx] Built',window._docxStyleGroups.length,'style groups from DOM text patterns:',window._docxStyleGroups.map(function(g){return g.name+'×'+g.count;}).join(', '));
+    })();
     // 全局文本规范化函数
     window._normText=function(s){return(s||'').replace(/[\s\u3000\u00A0\u2000-\u200A]+/g,' ').replace(/ +/g,' ').trim();};
     updLoad('构建章节树...','35');
