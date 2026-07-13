@@ -16,29 +16,148 @@
     <div class="login-shape login-shape-1"></div>
     <div class="login-shape login-shape-2"></div>
     <div class="login-shape login-shape-3"></div>
-    <div class="login-shape login-shape-4"></div>
-    <div class="login-particles" id="loginParticles"></div>
   </div>
-  <div class="login-card">
-    <div class="login-icon">📋</div>
-    <h2 class="login-title">论文AI利器</h2>
-    <p class="login-subtitle">智能论文写作辅助平台</p>
-    <div class="login-form">
-      <div class="login-field">
-        <svg class="login-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
-        <input type="text" id="loginUsername" placeholder="用户名" autocomplete="username" autofocus>
+  <!-- Particle canvas injected by JS -->
+
+  <!-- Brand Header -->
+  <div class="landing-header">
+    <div class="landing-brand-icon">\u{1F4CB}</div>
+    <h1 class="landing-brand-title">\u8bba\u6587AI\u5229\u5668</h1>
+    <p class="landing-brand-sub">\u667a\u80fd\u8bba\u6587\u5199\u4f5c\u8f85\u52a9\u5e73\u53f0</p>
+  </div>
+
+  <!-- Body: Left Carousel + Right Login -->
+  <div class="landing-body">
+    <!-- Left: Feature Carousel -->
+    <div class="landing-showcase" id="landingShowcase">
+      <div class="showcase-slides" id="showcaseSlides">
+        <!-- Slide 0 -->
+        <div class="showcase-slide">
+          <div class="showcase-illustration">
+            <svg viewBox="0 0 200 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="15" y="10" width="170" height="110" rx="8" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
+              <rect x="30" y="22" width="140" height="10" rx="4" fill="rgba(99,102,241,.3)"/>
+              <rect x="30" y="38" width="120" height="7" rx="3" fill="rgba(255,255,255,.05)"/>
+              <rect x="30" y="50" width="134" height="7" rx="3" fill="rgba(255,255,255,.05)"/>
+              <rect x="30" y="62" width="108" height="7" rx="3" fill="rgba(255,255,255,.05)"/>
+              <rect x="30" y="74" width="126" height="7" rx="3" fill="rgba(255,255,255,.05)"/>
+              <rect x="30" y="86" width="98" height="7" rx="3" fill="rgba(255,255,255,.05)"/>
+              <rect x="30" y="98" width="140" height="7" rx="3" fill="rgba(255,255,255,.05)"/>
+              <circle cx="160" cy="60" r="22" fill="rgba(99,102,241,.12)" stroke="rgba(99,102,241,.25)" stroke-width="1.5"/>
+              <path d="M154 60l4 4 7-8" stroke="rgba(99,102,241,.7)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              <rect x="30" y="28" width="0" height="40" fill="none"><animate attributeName="width" from="0" to="120" dur="1.5s" fill="freeze"/></rect>
+            </svg>
+          </div>
+          <div class="showcase-text">
+            <h3>\u{1F4C4} DOCX \u667a\u80fd\u89e3\u6790</h3>
+            <p>\u4e0a\u4f20\u8bba\u6587 Word \u6587\u6863\uff0c\u7cfb\u7edf\u81ea\u52a8\u89e3\u6790\u6587\u672c\u7ed3\u6784\u2014\u2014\u4ece\u5c01\u9762\u3001\u76ee\u5f55\u5230\u6b63\u6587\u3001\u53c2\u8003\u6587\u732e\uff0c\u4e00\u952e\u62c6\u5206\u7ae0\u3001\u8282\u3001\u5c0f\u8282\uff0c\u6784\u5efa\u5b8c\u6574\u76ee\u5f55\u6811\u3002</p>
+          </div>
+        </div>
+        <!-- Slide 1 -->
+        <div class="showcase-slide">
+          <div class="showcase-illustration">
+            <svg viewBox="0 0 200 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="15" y="10" width="170" height="110" rx="8" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
+              <circle cx="55" cy="55" r="26" fill="rgba(168,85,247,.08)" stroke="rgba(168,85,247,.2)" stroke-width="1.5"/>
+              <circle cx="55" cy="55" r="14" fill="rgba(168,85,247,.05)" stroke="rgba(168,85,247,.15)" stroke-width="1"/>
+              <circle cx="55" cy="55" r="6" fill="rgba(168,85,247,.25)"/>
+              <line x1="73" y1="73" x2="98" y2="98" stroke="rgba(168,85,247,.3)" stroke-width="2.5" stroke-linecap="round"/>
+              <rect x="110" y="22" width="60" height="9" rx="3" fill="rgba(255,255,255,.06)"/>
+              <rect x="110" y="38" width="48" height="7" rx="3" fill="rgba(255,255,255,.04)"/>
+              <rect x="110" y="50" width="54" height="7" rx="3" fill="rgba(255,255,255,.04)"/>
+              <rect x="110" y="62" width="40" height="7" rx="3" fill="rgba(255,255,255,.04)"/>
+              <circle cx="118" cy="86" r="4" fill="rgba(34,211,238,.4)"/><circle cx="132" cy="86" r="4" fill="rgba(34,211,238,.4)"/><circle cx="146" cy="86" r="4" fill="rgba(34,211,238,.3)"/><circle cx="160" cy="86" r="4" fill="rgba(34,211,238,.2)"/>
+            </svg>
+          </div>
+          <div class="showcase-text">
+            <h3>\u{1F50D} 12 \u6e90\u6587\u732e\u68c0\u7d22</h3>
+            <p>\u57fa\u4e8e\u8bba\u6587\u7ae0\u8282\u5173\u952e\u8bcd\uff0c\u5e76\u53d1\u68c0\u7d22 OpenAlex\u3001Crossref\u3001Semantic Scholar \u7b49 12 \u4e2a\u5b66\u672f\u6570\u636e\u5e93\uff0c\u667a\u80fd\u5206\u914d\u4e2d\u82f1\u6587\u6bd4\u4f8b\u4e0e\u8fd1\u4e94\u5e74\u6587\u732e\u5360\u6bd4\u3002</p>
+          </div>
+        </div>
+        <!-- Slide 2 -->
+        <div class="showcase-slide">
+          <div class="showcase-illustration">
+            <svg viewBox="0 0 200 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="15" y="10" width="170" height="110" rx="8" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
+              <circle cx="55" cy="38" r="16" fill="rgba(59,130,246,.12)" stroke="rgba(59,130,246,.28)" stroke-width="1.5"/>
+              <circle cx="38" cy="80" r="12" fill="rgba(34,211,238,.1)" stroke="rgba(34,211,238,.22)" stroke-width="1"/>
+              <circle cx="78" cy="74" r="12" fill="rgba(168,85,247,.1)" stroke="rgba(168,85,247,.22)" stroke-width="1"/>
+              <circle cx="28" cy="104" r="9" fill="rgba(251,146,60,.1)" stroke="rgba(251,146,60,.22)" stroke-width="1"/>
+              <circle cx="58" cy="108" r="9" fill="rgba(251,146,60,.1)" stroke="rgba(251,146,60,.22)" stroke-width="1"/>
+              <circle cx="88" cy="98" r="9" fill="rgba(251,146,60,.1)" stroke="rgba(251,146,60,.22)" stroke-width="1"/>
+              <line x1="50" y1="52" x2="38" y2="70" stroke="rgba(255,255,255,.06)" stroke-width=".8"/>
+              <line x1="60" y1="52" x2="80" y2="64" stroke="rgba(255,255,255,.06)" stroke-width=".8"/>
+              <line x1="34" y1="90" x2="27" y2="97" stroke="rgba(255,255,255,.05)" stroke-width=".6"/>
+              <line x1="44" y1="90" x2="58" y2="100" stroke="rgba(255,255,255,.05)" stroke-width=".6"/>
+              <line x1="82" y1="84" x2="90" y2="92" stroke="rgba(255,255,255,.05)" stroke-width=".6"/>
+              <rect x="110" y="22" width="60" height="9" rx="3" fill="rgba(255,255,255,.06)"/>
+              <rect x="110" y="38" width="42" height="7" rx="3" fill="rgba(255,255,255,.04)"/>
+              <rect x="110" y="50" width="56" height="7" rx="3" fill="rgba(255,255,255,.04)"/>
+            </svg>
+          </div>
+          <div class="showcase-text">
+            <h3>\u{1F578} \u77e5\u8bc6\u56fe\u8c31\u53ef\u89c6\u5316</h3>
+            <p>\u81ea\u52a8\u63d0\u53d6\u8bba\u6587\u4e3b\u9898\u8bcd\uff0c\u6784\u5efa\u5173\u952e\u8bcd\u5171\u73b0\u7f51\u7edc\u3001\u7ae0\u8282\u5173\u8054\u77e9\u9635\uff0c\u652f\u6301\u8bcd\u4e91\u3001\u529b\u5bfc\u5411\u7f51\u7edc\u56fe\u3001\u6587\u732e\u65f6\u95f4\u7ebf\u4e09\u79cd\u89c6\u56fe\u5207\u6362\u3002</p>
+          </div>
+        </div>
+        <!-- Slide 3 -->
+        <div class="showcase-slide">
+          <div class="showcase-illustration">
+            <svg viewBox="0 0 200 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="15" y="10" width="170" height="110" rx="8" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
+              <circle cx="48" cy="48" r="32" fill="none" stroke="rgba(99,102,241,.08)" stroke-width="22"/>
+              <circle cx="48" cy="48" r="32" fill="none" stroke="rgba(99,102,241,.3)" stroke-width="2" stroke-dasharray="50 150"/>
+              <text x="48" y="51" text-anchor="middle" fill="rgba(255,255,255,.9)" font-size="14" font-weight="700" font-family="monospace">78</text>
+              <text x="48" y="66" text-anchor="middle" fill="rgba(255,255,255,.3)" font-size="6">\u7efc\u5408\u8bc4\u5206</text>
+              <rect x="95" y="20" width="76" height="6" rx="3" fill="rgba(34,211,238,.1)"/>
+              <rect x="95" y="20" width="53" height="6" rx="3" fill="rgba(34,211,238,.25)"/>
+              <rect x="95" y="32" width="76" height="6" rx="3" fill="rgba(59,130,246,.1)"/>
+              <rect x="95" y="32" width="61" height="6" rx="3" fill="rgba(59,130,246,.25)"/>
+              <rect x="95" y="44" width="76" height="6" rx="3" fill="rgba(168,85,247,.1)"/>
+              <rect x="95" y="44" width="45" height="6" rx="3" fill="rgba(168,85,247,.25)"/>
+              <rect x="95" y="56" width="76" height="6" rx="3" fill="rgba(251,146,60,.1)"/>
+              <rect x="95" y="56" width="36" height="6" rx="3" fill="rgba(251,146,60,.25)"/>
+              <rect x="95" y="68" width="76" height="6" rx="3" fill="rgba(239,68,68,.1)"/>
+              <rect x="95" y="68" width="24" height="6" rx="3" fill="rgba(239,68,68,.25)"/>
+              <rect x="95" y="85" width="64" height="8" rx="4" fill="rgba(255,255,255,.06)"/>
+            </svg>
+          </div>
+          <div class="showcase-text">
+            <h3>\u{1F4CA} \u5341\u7ef4\u8bc4\u4f30\u62a5\u544a</h3>
+            <p>\u8986\u76d6\u9009\u9898\u4ef7\u503c\u3001\u6587\u732e\u7efc\u8ff0\u3001\u6846\u67b6\u7ed3\u6784\u3001\u7814\u7a76\u65b9\u6cd5\u7b49 10 \u4e2a\u8bc4\u5ba1\u7ef4\u5ea6\uff0c\u81ea\u52a8\u751f\u6210\u8bc4\u5206\u96f7\u8fbe\u56fe\u3001\u6539\u8fdb\u5efa\u8bae\u548c\u7ae0\u8282\u5b57\u6570\u5206\u6790\u3002</p>
+          </div>
+        </div>
       </div>
-      <div class="login-field">
-        <svg class="login-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        <input type="password" id="loginPassword" placeholder="密码" autocomplete="current-password">
+      <div class="showcase-dots" id="showcaseDots">
+        <span class="showcase-dot active" data-idx="0"></span>
+        <span class="showcase-dot" data-idx="1"></span>
+        <span class="showcase-dot" data-idx="2"></span>
+        <span class="showcase-dot" data-idx="3"></span>
       </div>
-      <div class="login-error" id="loginError"></div>
-      <button class="login-btn" id="loginBtn" onclick="doLogin()">
-        <span>登 录</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-      </button>
     </div>
-    <div class="login-footer">默认账户 admin / admin123</div>
+
+    <!-- Right: Login Card -->
+    <div class="landing-login">
+      <div class="login-card-v2">
+        <h3 class="login-card-title">\u767b\u5f55\u7cfb\u7edf</h3>
+        <div class="login-form">
+          <div class="login-field">
+            <svg class="login-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+            <input type="text" id="loginUsername" placeholder="\u7528\u6237\u540d" autocomplete="username" autofocus>
+          </div>
+          <div class="login-field">
+            <svg class="login-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input type="password" id="loginPassword" placeholder="\u5bc6\u7801" autocomplete="current-password">
+          </div>
+          <div class="login-error" id="loginError"></div>
+          <button class="login-btn" id="loginBtn" onclick="doLogin()">
+            <span>\u767b \u5f55</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+        <div class="login-footer">\u9ed8\u8ba4\u8d26\u6237 admin / admin123</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -415,6 +534,41 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
       document.getElementById('loginPassword').focus();
     }
   };
+
+  // Carousel logic
+  (function(){
+    var slides = document.querySelectorAll('.showcase-slide');
+    var dots = document.querySelectorAll('.showcase-dot');
+    if (!slides.length) return;
+    var current = 0, total = slides.length;
+    var timer = null;
+    var pauseOnHover = document.getElementById('landingShowcase');
+
+    function goTo(idx) {
+      slides[current].classList.remove('active');
+      dots[current].classList.remove('active');
+      current = ((idx % total) + total) % total;
+      slides[current].classList.add('active');
+      dots[current].classList.add('active');
+    }
+
+    function next() { goTo(current + 1); }
+
+    timer = setInterval(next, 4000);
+
+    dots.forEach(function(dot) {
+      dot.addEventListener('click', function() {
+        goTo(parseInt(dot.getAttribute('data-idx')));
+        clearInterval(timer);
+        timer = setInterval(next, 4000);
+      });
+    });
+
+    if (pauseOnHover) {
+      pauseOnHover.addEventListener('mouseenter', function() { clearInterval(timer); });
+      pauseOnHover.addEventListener('mouseleave', function() { timer = setInterval(next, 4000); });
+    }
+  })();
 
   // Enter key submits login
   document.getElementById('loginPassword').addEventListener('keydown', function(e) {
