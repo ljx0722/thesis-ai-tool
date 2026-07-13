@@ -1230,7 +1230,7 @@ function cwConfirmAccept(sname){
     for(var l2=0;l2<els2.length;l2++){
       if(refB2&&(els2[l2].compareDocumentPosition(refB2)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
       var et2=(els2[l2].textContent||'').trim();
-      if(et2===tx2||et2.replace(/\s+/g,' ')===tx2.replace(/\s+/g,' ')||(tx2.length>=10&&et2.length>=10&&et2.replace(/\s+/g,' ').substring(0,20)===tx2.replace(/\s+/g,' ').substring(0,20))){
+      if(window._normText(et2)===window._normText(tx2)||(tx2.length>=10&&et2.length>=10&&window._normText(et2).substring(0,20)===window._normText(tx2).substring(0,20))){
         var dup3=false;
         for(var d3=0;d3<window._cwCheckedEls[_cwPhase].length;d3++){if(window._cwCheckedEls[_cwPhase][d3]===els2[l2]){dup3=true;break;}}
         if(!dup3)window._cwCheckedEls[_cwPhase].push(els2[l2]);
@@ -2198,6 +2198,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
         }
       }
       console.log('[docx] Populated _els for',window._docxStyleGroups.length,'style groups');
+    window._normText=function(s){return(s||'').replace(/[\s\u3000\u00A0\u2000-\u200A]+/g,' ').replace(/ +/g,' ').trim();};
     }
 
     updLoad('构建章节树...','35');
