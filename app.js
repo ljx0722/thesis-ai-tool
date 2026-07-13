@@ -1112,13 +1112,21 @@ function cwShowConfirmPopup(sname){
   var items=[],cached=window._docxStyleGroups&&window._docxStyleGroups.length?window._docxStyleGroups:cwGetStyleGroups();
   for(var ci=0;ci<cached.length;ci++){
     if(cached[ci].name===sname&&cached[ci]._texts&&cached[ci]._texts.length){
-      var txts=cached[ci]._texts,seen2={},eix=0;
+      var txts=cached[ci]._texts,seen2={},normW=function(s){return(s||'').replace(/\s+/g,' ').trim();};
       for(var ti=0;ti<txts.length;ti++){
-        var tx=txts[ti];if(!tx||tx.length<2){eix++;continue;}
-        if(seen2[tx]){eix++;continue;}
+        var tx=txts[ti];if(!tx||tx.length<2)continue;
+        if(seen2[tx])continue;
         seen2[tx]=true;
-        items.push({txt:tx,el:cached[ci]._els?cached[ci]._els[eix]:null,checked:true,idx:items.length});
-        eix++;
+        var matchedEl=null;
+        if(cached[ci]._els&&cached[ci]._els.length){
+          for(var ei=0;ei<cached[ci]._els.length;ei++){
+            var eNorm=normW(cached[ci]._els[ei].textContent||'');
+            if(eNorm===normW(tx)||(tx.length>=10&&eNorm.length>=10&&eNorm.substring(0,20)===tx.substring(0,20))){
+              matchedEl=cached[ci]._els[ei];break;
+            }
+          }
+        }
+        items.push({txt:tx,el:matchedEl,checked:true,idx:items.length});
       }
       break;
     }
@@ -1222,7 +1230,7 @@ function cwConfirmAccept(sname){
     for(var l2=0;l2<els2.length;l2++){
       if(refB2&&(els2[l2].compareDocumentPosition(refB2)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
       var et2=(els2[l2].textContent||'').trim();
-      if(et2===tx2||(tx2.length>=10&&et2.length>=10&&et2.substring(0,20)===tx2.substring(0,20))){
+      if(et2===tx2||et2.replace(/\s+/g,' ')===tx2.replace(/\s+/g,' ')||(tx2.length>=10&&et2.length>=10&&et2.replace(/\s+/g,' ').substring(0,20)===tx2.replace(/\s+/g,' ').substring(0,20))){
         var dup3=false;
         for(var d3=0;d3<window._cwCheckedEls[_cwPhase].length;d3++){if(window._cwCheckedEls[_cwPhase][d3]===els2[l2]){dup3=true;break;}}
         if(!dup3)window._cwCheckedEls[_cwPhase].push(els2[l2]);
@@ -2144,17 +2152,18 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     var tbs=thesisBoxEl.querySelectorAll('table');for(var ti=0;ti<tbs.length;ti++)tbs[ti].style.display='';
     // 为 _docxStyleGroups 补充 _els（DOM 元素引用），确保校准向导能直接获取元素而非文本匹配
     if(window._docxStyleGroups&&window._docxStyleGroups.length){
+      var norm=function(s){return(s||'').replace(/\s+/g,' ').trim();};
       var textToGidx={};
       for(var gi=0;gi<window._docxStyleGroups.length;gi++){
         window._docxStyleGroups[gi]._els=[];
         var txts2=window._docxStyleGroups[gi]._texts||[];
         for(var ti2=0;ti2<txts2.length;ti2++){
-          if(txts2[ti2]&&txts2[ti2].length>=2)textToGidx[txts2[ti2]]=gi;
+          if(txts2[ti2]&&txts2[ti2].length>=2)textToGidx[norm(txts2[ti2])]=gi;
         }
       }
       var allDomEls=thesisBoxEl.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li');
       for(var dei=0;dei<allDomEls.length;dei++){
-        var dt=(allDomEls[dei].textContent||'').trim();if(!dt||dt.length<2)continue;
+        var dt=norm(allDomEls[dei].textContent||'');if(!dt||dt.length<2)continue;
         var gix=textToGidx[dt];
         if(gix!==undefined){window._docxStyleGroups[gix]._els.push(allDomEls[dei]);continue;}
         if(dt.length>=10){
