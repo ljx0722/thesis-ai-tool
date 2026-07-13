@@ -274,8 +274,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 .landing-header{position:relative;z-index:1;text-align:center;padding:28px 20px 4px;flex-shrink:0}
 .landing-brand-wordmark{display:inline-flex;align-items:center;gap:10px;margin-bottom:4px}
 .landing-brand-mark{width:28px;height:28px;color:rgba(165,180,252,.7);flex-shrink:0}
-.landing-brand-title{font-size:1.75rem;font-weight:800;color:#f1f5f9;margin:0;letter-spacing:.02em;text-wrap:balance}
-.landing-brand-sub{font-size:.7rem;color:rgba(255,255,255,.3);margin:2px 0 0;letter-spacing:.12em}
+.landing-brand-title{font-size:2.3rem;font-weight:800;color:#f1f5f9;margin:0;letter-spacing:.03em;text-wrap:balance}
+.landing-brand-sub{font-size:.76rem;color:rgba(255,255,255,.3);margin:6px 0 0;letter-spacing:.08em}
 /* ====== Body Layout ====== */
 .landing-body{position:relative;z-index:1;display:flex;flex:1;width:100%;max-width:1100px;margin:0 auto;padding:8px 24px 28px;gap:32px;align-items:stretch;min-height:0}
 /* ====== Left: Bento Grid Feature Cards ====== */
