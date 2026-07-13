@@ -34,7 +34,6 @@ jobs:
   deploy-to-sealos:
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: ${{ secrets.SEALOS_KUBECONFIG != '' }}
 
     steps:
       - name: Setup kubectl
@@ -45,7 +44,6 @@ jobs:
       - name: Deploy to Sealos Cloud
         run: |
           mkdir -p ~/.kube
-          echo "${{ secrets.SEALOS_KUBECONFIG }}" | base64 -d > ~/.kube/sealos-config
-          export KUBECONFIG=~/.kube/sealos-config
-          kubectl rollout restart deployment/thesis-ai-tool
-          kubectl rollout status deployment/thesis-ai-tool --timeout=120s
+          echo "${{ secrets.SEALOS_KUBECONFIG }}" | base64 -d > ~/.kube/config
+          kubectl rollout restart deployment/thesis-ai-tool -n ns-mzyybqj8
+          kubectl rollout status deployment/thesis-ai-tool -n ns-mzyybqj8 --timeout=120s
