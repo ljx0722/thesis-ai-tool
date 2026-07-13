@@ -30,3 +30,22 @@ jobs:
           tags: ghcr.io/ljx0722/thesis-ai-tool:latest
           labels: |
             org.opencontainers.image.source=https://github.com/ljx0722/thesis-ai-tool
+
+  deploy-to-sealos:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: ${{ secrets.SEALOS_KUBECONFIG != '' }}
+
+    steps:
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+
+      - name: Deploy to Sealos Cloud
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.SEALOS_KUBECONFIG }}" | base64 -d > ~/.kube/sealos-config
+          export KUBECONFIG=~/.kube/sealos-config
+          kubectl rollout restart deployment/thesis-ai-tool
+          kubectl rollout status deployment/thesis-ai-tool --timeout=120s
