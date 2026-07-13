@@ -8,9 +8,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>">
 
-ipt>
+</script>
 <link rel="stylesheet" href="css/style.css"></head><body>
-<div id="fileBlock"><b>⚠️ 请通过 HTTP 访问</b><br><br>本页面需要调用外部API检索文献，无法从 file:// 协议使用。<br><br><button onclick="window.open('http://localhost:5000/','_self')" style="font-size:1rem;padding:10px 30px;background:var(--b);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700">🔗 一键跳转 HTTP</button><br><br><small style="color:var(--m)">或双击运行 <b>启动.bat</b> 后点击上方按钮</small></div>
+<div id="fileBlock"><b>⚠️ 请通过 HTTP 访问</b><br><br>本页面需要调用外部API检索文献，无法从 file:// 协议使用。<br><br><button onclick="window.open('http://localhost:5000/','_self')" style="font-size:1rem;padding:10px 30px;background:#0071e3;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700">🔗 一键跳转 HTTP</button><br><br><small style="color:var(--m)">或双击运行 <b>启动.bat</b> 后点击上方按钮</small></div>
 <script>if(window.location.protocol==='file:'){document.getElementById('fileBlock').style.display='block';document.querySelector('.main')&&(document.querySelector('.main').style.display='none');document.querySelector('.bar')&&(document.querySelector('.bar').style.display='none');fetch('http://localhost:5000/',{mode:'no-cors'}).then(function(r){window.location.href='http://localhost:5000/'}).catch(function(){});}</script>
 
 <!-- ====== 快捷键提示条 ====== -->
