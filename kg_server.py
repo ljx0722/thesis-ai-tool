@@ -1172,7 +1172,13 @@ def usage_module():
     return jsonify({'success': True, 'free': False, 'cost': price, 'credits_after': after})
 
 # 模块扣点定价（从 config 表读取，默认值兜底）
-PRICING_DEFAULTS = {'module': 1, 'upload': 10, 'llm_analysis': 0, 'domain_analysis': 0, 'kg': 0, 'search': 0}
+PRICING_DEFAULTS = {
+    'module': 1, 'upload': 10, 'llm_analysis': 1,
+    'topic-finder': 5, 'proposal': 5, 'review': 3, 'optimization': 3,
+    'expand': 5, 'proofread': 5, 'de-duplicate': 10,
+    'defense-ppt': 5, 'en-abstract': 3,
+    'domain_analysis': 0, 'kg': 0, 'search': 0
+}
 def get_price(key):
     try:
         db = get_db()

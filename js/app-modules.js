@@ -4,14 +4,22 @@
  */
 
 var APP_MODULES = [
-  { id: 'review',          name: '论文审阅',   icon: '🔍', requiresThesis: true },
-  { id: 'optimization',    name: '优化建议',   icon: '💡', requiresThesis: true },
-  { id: 'expand',          name: '论文扩写',   icon: '✍️', requiresThesis: true },
-  { id: 'proposal',        name: '开题大纲',   icon: '📝', requiresThesis: false },
   { id: 'topic-finder',    name: '选题推荐',   icon: '💡', requiresThesis: false },
+  { id: 'proposal',        name: '开题大纲',   icon: '📝', requiresThesis: false },
+  { id: 'references',      name: '参考文献',   icon: '📋', requiresThesis: true },
+  { id: 'expand',          name: '论文扩写',   icon: '✍️', requiresThesis: true },
   { id: 'data-analysis',   name: '数据分析',   icon: '📈', requiresThesis: false },
   { id: 'knowledge-graph', name: '知识图谱',   icon: '🕸️', requiresThesis: true },
-  { id: 'references',      name: '参考文献',   icon: '📋', requiresThesis: true },
+  { id: 'proofread',       name: '论文查错',   icon: '✏️', requiresThesis: false },
+  { id: 'de-duplicate',    name: '查重降重',   icon: '📋', requiresThesis: false },
+  { id: 'format-check',    name: '格式检查',   icon: '✅', requiresThesis: true },
+  { id: 'terminology',     name: '术语分析',   icon: '🔤', requiresThesis: true },
+  { id: 'paragraph',       name: '段落分析',   icon: '📝', requiresThesis: true },
+  { id: 'review',          name: '论文审阅',   icon: '🔍', requiresThesis: true },
+  { id: 'optimization',    name: '优化建议',   icon: '💡', requiresThesis: true },
+  { id: 'defense-ppt',     name: '答辩PPT',    icon: '📊', requiresThesis: false },
+  { id: 'en-abstract',     name: '英文摘要',   icon: '🌐', requiresThesis: false },
+  { id: 'dashboard',       name: '论文看板',   icon: '📊', requiresThesis: true },
 ];
 
 var _activeModule = 'references';
@@ -331,10 +339,18 @@ window.switchModule = function(moduleId) {
       else if (moduleId === 'data-analysis' && typeof runDataAnalysis === 'function') runDataAnalysis(panel);
       else if (moduleId === 'proposal' && typeof runProposalModule === 'function') runProposalModule(panel);
       else if (moduleId === 'topic-finder' && typeof runTopicFinder === 'function') runTopicFinder(panel);
+      else if (moduleId === 'proofread' && typeof runProofread === 'function') runProofread(panel);
+      else if (moduleId === 'de-duplicate' && typeof runDeduplicate === 'function') runDeduplicate(panel);
+      else if (moduleId === 'defense-ppt' && typeof runDefensePPT === 'function') runDefensePPT(panel);
+      else if (moduleId === 'en-abstract' && typeof runEnAbstract === 'function') runEnAbstract(panel);
+      else if (moduleId === 'format-check' && typeof runFormatCheck === 'function') runFormatCheck(panel);
+      else if (moduleId === 'terminology' && typeof runTerminology === 'function') runTerminology(panel);
+      else if (moduleId === 'paragraph' && typeof runParagraphAnalysis === 'function') runParagraphAnalysis(panel);
+      else if (moduleId === 'dashboard' && typeof showDashboard === 'function') showDashboard();
     } catch (e) { panel.innerHTML = '<div style="text-align:center;padding:40px;color:var(--r)">分析出错: ' + e.message + '</div>'; }
     hideLoad();
     // Auto-inject AI analysis button (skip for KG, references, data, topic-finder)
-    var aiSkip = ['knowledge-graph', 'references', 'data-analysis', 'topic-finder'];
+    var aiSkip = ['knowledge-graph', 'references', 'data-analysis', 'topic-finder', 'proofread', 'de-duplicate', 'defense-ppt', 'en-abstract', 'format-check', 'terminology', 'paragraph', 'dashboard'];
     if (aiSkip.indexOf(moduleId) < 0 && typeof addLLMButton === 'function') {
       setTimeout(function() {
         var container = document.querySelector('#moduleOutput .module-panel');

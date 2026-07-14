@@ -107,7 +107,7 @@
         <div class="landing-stat-divider"></div>
         <div class="landing-stat"><span class="stat-value">221</span><span class="stat-label">回归测试</span></div>
         <div class="landing-stat-divider"></div>
-        <div class="landing-stat"><span class="stat-value">8</span><span class="stat-label">功能模块</span></div>
+        <div class="landing-stat"><span class="stat-value">15</span><span class="stat-label">功能模块</span></div>
         <div class="landing-stat-divider"></div>
         <div class="landing-stat"><span class="stat-value">10</span><span class="stat-label">评审维度</span></div>
       </div>
@@ -202,20 +202,39 @@
     </div>
     <div class="nav-modules" id="navModules">
       <div class="nav-group">
-        <div class="nav-group-title" onclick="toggleNavGroup(this)">📝 论文分析 <span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-title" onclick="toggleNavGroup(this)">🎯 选题阶段 <span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
-          <div class="nav-item" data-module="review" onclick="switchModule('review')">🔍 论文审阅</div>
-          <div class="nav-item" data-module="optimization" onclick="switchModule('optimization')">💡 优化建议</div>
-          <div class="nav-item" data-module="expand" onclick="switchModule('expand')">✍️ 论文扩写</div>
           <div class="nav-item" data-module="topic-finder" onclick="switchModule('topic-finder')">💡 选题推荐</div>
           <div class="nav-item" data-module="proposal" onclick="switchModule('proposal')">📝 开题大纲</div>
         </div>
       </div>
       <div class="nav-group">
-        <div class="nav-group-title" onclick="toggleNavGroup(this)">📊 数据工具 <span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-title" onclick="toggleNavGroup(this)">📝 撰写阶段 <span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
+          <div class="nav-item" data-module="references" onclick="switchModule('references')">📋 参考文献</div>
+          <div class="nav-item" data-module="expand" onclick="switchModule('expand')">✍️ 论文扩写</div>
           <div class="nav-item" data-module="data-analysis" onclick="switchModule('data-analysis')">📈 数据分析</div>
           <div class="nav-item" data-module="knowledge-graph" onclick="switchModule('knowledge-graph')">🕸️ 知识图谱</div>
+        </div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-title" onclick="toggleNavGroup(this)">🔍 打磨阶段 <span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-items">
+          <div class="nav-item" data-module="proofread" onclick="switchModule('proofread')">✏️ 论文查错</div>
+          <div class="nav-item" data-module="de-duplicate" onclick="switchModule('de-duplicate')">📋 查重降重</div>
+          <div class="nav-item" data-module="format-check" onclick="switchModule('format-check')">✅ 格式检查</div>
+          <div class="nav-item" data-module="terminology" onclick="switchModule('terminology')">🔤 术语分析</div>
+          <div class="nav-item" data-module="paragraph" onclick="switchModule('paragraph')">📝 段落分析</div>
+        </div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-title" onclick="toggleNavGroup(this)">📊 评审输出 <span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-items">
+          <div class="nav-item" data-module="review" onclick="switchModule('review')">🔍 论文审阅</div>
+          <div class="nav-item" data-module="optimization" onclick="switchModule('optimization')">💡 优化建议</div>
+          <div class="nav-item" data-module="defense-ppt" onclick="switchModule('defense-ppt')">📊 答辩PPT</div>
+          <div class="nav-item" data-module="en-abstract" onclick="switchModule('en-abstract')">🌐 英文摘要</div>
+          <div class="nav-item" data-module="dashboard" onclick="switchModule('dashboard')">📊 论文看板</div>
         </div>
       </div>
     </div>
@@ -406,6 +425,10 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <script src="js/modules/onboarding.js?v=27"></script>
 <script src="js/modules/cat-game.js?v=27"></script>
 <script src="js/modules/topic-finder.js?v=27"></script>
+<script src="js/modules/proofread.js?v=27"></script>
+<script src="js/modules/de-duplicate.js?v=27"></script>
+<script src="js/modules/defense-ppt.js?v=27"></script>
+<script src="js/modules/en-abstract.js?v=27"></script>
 <script src="js/app-modules.js?v=27"></script>
 <script>
 (function(){
