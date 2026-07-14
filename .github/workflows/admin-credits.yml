@@ -7,11 +7,14 @@ jobs:
   add-credits:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: azure/setup-kubectl@v4
         with:
           version: latest
-      - name: Add 500 decipoints to admin
+      - name: Add 500 decipoints (50 points) to admin
         run: |
           mkdir -p ~/.kube
           echo "${{ secrets.SEALOS_KUBECONFIG }}" | base64 -d > ~/.kube/config
-          kubectl exec -n ns-mzyybqj8 deploy/thesis-ai-tool -- sh -c "sqlite3 /app/data/thesis.db \"SELECT 'Before:', credits FROM users WHERE username='admin'; UPDATE users SET credits = credits + 500 WHERE username='admin'; SELECT 'After:', credits FROM users WHERE username='admin';\""
+          POD=$(kubectl get pods -n ns-mzyybqj8 -o jsonpath='{.items[0].metadata.name}')
+          kubectl cp tools/add_credits.py "ns-mzyybqj8/$POD:/tmp/add_credits.py"
+          kubectl exec -n ns-mzyybqj8 "$POD" -- python3 /tmp/add_credits.py
