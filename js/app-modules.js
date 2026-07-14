@@ -8,6 +8,7 @@ var APP_MODULES = [
   { id: 'optimization',    name: '优化建议',   icon: '💡', requiresThesis: true },
   { id: 'expand',          name: '论文扩写',   icon: '✍️', requiresThesis: true },
   { id: 'proposal',        name: '开题大纲',   icon: '📝', requiresThesis: false },
+  { id: 'topic-finder',    name: '选题推荐',   icon: '💡', requiresThesis: false },
   { id: 'data-analysis',   name: '数据分析',   icon: '📈', requiresThesis: false },
   { id: 'knowledge-graph', name: '知识图谱',   icon: '🕸️', requiresThesis: true },
   { id: 'references',      name: '参考文献',   icon: '📋', requiresThesis: true },
@@ -329,6 +330,7 @@ window.switchModule = function(moduleId) {
       else if (moduleId === 'expand' && typeof runExpandModule === 'function') runExpandModule(panel);
       else if (moduleId === 'data-analysis' && typeof runDataAnalysis === 'function') runDataAnalysis(panel);
       else if (moduleId === 'proposal' && typeof runProposalModule === 'function') runProposalModule(panel);
+      else if (moduleId === 'topic-finder' && typeof runTopicFinder === 'function') runTopicFinder(panel);
     } catch (e) { panel.innerHTML = '<div style="text-align:center;padding:40px;color:var(--r)">分析出错: ' + e.message + '</div>'; }
     hideLoad();
   }, 100);

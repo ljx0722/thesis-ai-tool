@@ -207,6 +207,7 @@
           <div class="nav-item" data-module="review" onclick="switchModule('review')">🔍 论文审阅</div>
           <div class="nav-item" data-module="optimization" onclick="switchModule('optimization')">💡 优化建议</div>
           <div class="nav-item" data-module="expand" onclick="switchModule('expand')">✍️ 论文扩写</div>
+          <div class="nav-item" data-module="topic-finder" onclick="switchModule('topic-finder')">💡 选题推荐</div>
           <div class="nav-item" data-module="proposal" onclick="switchModule('proposal')">📝 开题大纲</div>
         </div>
       </div>
@@ -404,6 +405,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <script src="js/modules/proposal.js?v=27"></script>
 <script src="js/modules/onboarding.js?v=27"></script>
 <script src="js/modules/cat-game.js?v=27"></script>
+<script src="js/modules/topic-finder.js?v=27"></script>
 <script src="js/app-modules.js?v=27"></script>
 <script>
 (function(){
@@ -697,7 +699,13 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
       <p style="font-size:.58rem;color:rgba(255,255,255,.2);text-align:center;margin:6px 0 0">支付完成后请等待管理员确认</p>
     </div>
     <h4 style="font-size:.75rem;color:rgba(255,255,255,.5);margin:12px 0 6px">修改密码</h4><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input type="password" id="pwOld" placeholder="原密码" style="flex:1;min-width:80px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:7px 10px;font-size:.7rem;color:#e2e8f0;outline:none"><input type="password" id="pwNew" placeholder="新密码(6位+)" style="flex:1;min-width:80px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:7px 10px;font-size:.7rem;color:#e2e8f0;outline:none"><button onclick="changePassword()" style="padding:7px 14px;border:none;border-radius:8px;background:#6366f1;color:#fff;font-size:.7rem;cursor:pointer;font-weight:600">修改</button></div><div id="pwMsg" style="font-size:.62rem;min-height:14px;margin-top:4px"></div>
-  <h4 style="font-size:.75rem;color:rgba(255,255,255,.5);margin:0 0 6px">充值记录</h4>
+  <h4 style="font-size:.75rem;color:rgba(255,255,255,.5);margin:12px 0 6px">管理员确认</h4>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <input type="text" id="adminSecret" placeholder="管理密钥" style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:6px 10px;font-size:.68rem;color:#e2e8f0;outline:none">
+      <button onclick="loadAdminOrders()" style="padding:6px 14px;border:none;border-radius:8px;background:#6366f1;color:#fff;font-size:.68rem;cursor:pointer;font-weight:600">刷新订单</button>
+    </div>
+    <div id="adminOrdersList" style="max-height:120px;overflow-y:auto;font-size:.65rem;color:rgba(255,255,255,.5)"></div>
+    <h4 style="font-size:.75rem;color:rgba(255,255,255,.5);margin:0 0 6px">充值记录</h4>
     <div id="rechargeHistory" style="max-height:160px;overflow-y:auto;font-size:.7rem;color:rgba(255,255,255,.5)"></div>
   </div>
 </div>
