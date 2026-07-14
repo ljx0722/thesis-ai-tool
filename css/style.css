@@ -60,7 +60,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 .main{display:flex;flex:1;overflow:hidden}
 
 /* ====== Sidebar ====== */
-.nav-sidebar{width:220px;min-width:160px;max-width:300px;flex-shrink:0;background:var(--glass);backdrop-filter:saturate(180%) var(--blur);-webkit-backdrop-filter:saturate(180%) var(--blur);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.nav-sidebar{width:220px;min-width:160px;max-width:300px;flex-shrink:0;background:var(--solid);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
 .nav-sidebar h3{font-size:.64rem;font-weight:var(--fw-semibold);padding:var(--sp-3) var(--sp-4) var(--sp-2);color:var(--t);letter-spacing:.03em;text-transform:uppercase;opacity:.5}
 .nav-tree{flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--sp-1) var(--sp-2)}
 .tree-node{padding:4px 10px;cursor:pointer;font-size:var(--fs-sm);border-radius:var(--r-xs);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.8;transition:all var(--t-fast) ease;position:relative;user-select:none}
@@ -72,7 +72,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 
 /* ====== Thesis Panel ====== */
 .thesis-panel{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
-.thesis-bar{display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) var(--sp-4);border-bottom:1px solid var(--border);background:var(--glass);backdrop-filter:saturate(180%) var(--blur);-webkit-backdrop-filter:saturate(180%) var(--blur);flex-shrink:0}
+.thesis-bar{display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) var(--sp-4);border-bottom:1px solid var(--border);background:var(--solid);flex-shrink:0}
 .thesis-bar h3{font-size:var(--fs-base);font-weight:var(--fw-semibold);color:var(--t)}
 .thesis-bar button{font-size:var(--fs-sm);padding:4px 10px;border-radius:var(--r-xs);border:1px solid var(--borderStrong);cursor:pointer;background:var(--solid);color:var(--t2);transition:all var(--t-fast)}
 .thesis-bar button:hover{background:var(--bg);border-color:rgba(0,0,0,0.15)}
@@ -94,7 +94,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 .ref-sentence:hover{background:rgba(0,122,255,0.14)}
 
 /* ====== Right Panel ====== */
-.ref-panel{width:520px;min-width:340px;max-width:620px;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden;border-left:1px solid var(--border);background:var(--bg)}
+.ref-panel{width:520px;min-width:340px;max-width:620px;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden;border-left:1px solid var(--border);background:var(--solid)}
 .kw-bar{background:var(--glass);backdrop-filter:saturate(180%) var(--blurLight);-webkit-backdrop-filter:saturate(180%) var(--blurLight);padding:var(--sp-3) var(--sp-4);border-bottom:1px solid var(--border);flex-shrink:0}
 .kw-bar h4{font-size:var(--fs-md);font-weight:var(--fw-semibold);color:var(--t);margin-bottom:6px}
 .kw-tags{display:flex;flex-wrap:wrap;gap:5px}
@@ -144,11 +144,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 
 /* ====== Dashboard / Filters ====== */
 .dashboard{display:flex;gap:var(--sp-2);padding:var(--sp-2) var(--sp-3);background:var(--glass);backdrop-filter:var(--blurLight);-webkit-backdrop-filter:var(--blurLight);border-bottom:1px solid var(--border);flex-shrink:0}
-.dash-card{flex:1;min-width:50px;text-align:center;padding:8px 6px;border-radius:var(--r-sm);background:var(--solid);box-shadow:var(--s-xs);border:1px solid var(--border);transition:all var(--t-base)}
+.dash-card{flex:1;min-width:50px;text-align:center;padding:14px 10px;border-radius:var(--r-md);background:linear-gradient(135deg,var(--solid),rgba(99,102,241,.03));box-shadow:var(--s-sm);border:1.5px solid var(--border);transition:all var(--t-base);position:relative;overflow:hidden}.dash-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),#a78bfa)}
 .dash-card:hover{box-shadow:var(--s-sm);transform:translateY(-2px)}
 .dash-card:active{transform:translateY(0)}
-.dash-card .dv{font-size:1.1rem;font-weight:var(--fw-bold);color:var(--t)}
-.dash-card .dl{font-size:.58rem;color:var(--m1);margin-top:3px;font-weight:var(--fw-medium);text-transform:uppercase;letter-spacing:.03em}
+.dash-card .dv{font-size:1.25rem;font-weight:var(--fw-heavy);color:var(--t);position:relative;z-index:1}
+.dash-card .dl{font-size:.58rem;color:var(--m1);margin-top:4px;font-weight:var(--fw-medium);text-transform:uppercase;letter-spacing:.04em;position:relative;z-index:1}
 .filters{background:var(--glass);backdrop-filter:var(--blurLight);-webkit-backdrop-filter:var(--blurLight);padding:var(--sp-2) var(--sp-3);margin:6px 8px;border-radius:var(--r-sm);border:1px solid var(--border);display:flex;gap:4px;align-items:center;font-size:.62rem;flex-shrink:0;flex-wrap:wrap}
 .filters label{font-weight:var(--fw-semibold);color:var(--m1);font-size:.58rem;white-space:nowrap;text-transform:uppercase;letter-spacing:.02em}
 .filters input{font-size:.64rem;padding:4px 5px;border:1px solid var(--borderStrong);border-radius:var(--r-xs);width:44px;text-align:center;background:var(--solid);transition:border var(--t-fast)}
@@ -207,7 +207,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 /* ====== Module Panel ====== */
 .module-panel{padding:var(--sp-4);overflow-y:auto;font-size:var(--fs-md);line-height:1.7;flex:1}
 .module-panel h4{font-size:var(--fs-base);font-weight:var(--fw-semibold);color:var(--t);margin:16px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--border);letter-spacing:-.01em}
-.module-panel .finding{padding:10px 14px;margin:5px 0;border-radius:var(--r-sm);font-size:var(--fs-sm);transition:all var(--t-fast);background:var(--solid);border:1px solid var(--border);line-height:1.6}
+.module-panel .finding{padding:12px 16px;margin:6px 0;border-radius:var(--r-md);font-size:var(--fs-sm);transition:all var(--t-fast);background:var(--solid);border:1.5px solid var(--border);line-height:1.7}.module-panel .finding:hover{box-shadow:var(--s-sm);border-color:rgba(99,102,241,.15)}
 .module-panel .finding:hover{box-shadow:var(--s-sm)}
 .module-panel .finding.warn{border-left-color:var(--warning);background:rgba(255,149,0,0.03)}
 .module-panel .finding.err{border-left-color:var(--danger);background:rgba(255,59,48,0.03)}
