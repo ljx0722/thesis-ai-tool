@@ -710,7 +710,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
       .then(function(r){return r.json();}).then(function(d){
         var el = document.getElementById('consumptionHistory');
         if(!d.success){el.innerHTML='加载失败';return;}
-        var h='<div style="color:rgba(255,255,255,.2);font-size:.58rem;margin-bottom:4px">余额: '+(d.credits/10).toFixed(1)+'点</div>';
+        var h='<div style="color:rgba(255,255,255,.2);font-size:.58rem;margin-bottom:4px">余额: '+(d.credits||0)+'点</div>';
         fetch('/api/payment/orders', { headers: { 'Authorization': 'Bearer ' + token } })
           .then(function(r2){return r2.json();}).then(function(d2){
             if(d2.orders&&d2.orders.length){

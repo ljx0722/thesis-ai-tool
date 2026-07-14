@@ -105,8 +105,8 @@ def init_db():
     ''')
     conn.commit()
     # Default pricing config (单位：分点 = 0.1点)
-    for k,v in [('upload_price','10'),('module_price','1'),('search_price','0'),
-                ('kg_price','0'),('domain_analysis_price','0'),('register_bonus','50'),('invite_bonus','10')]:
+    for k,v in [('upload_price','1'),('module_price','1'),('search_price','0'),
+                ('kg_price','0'),('domain_analysis_price','0'),('register_bonus','5'),('invite_bonus','1')]:
         conn.execute('INSERT OR IGNORE INTO config (key,value) VALUES (?,?)',(k,v))
     # Seed admin
     try:
@@ -114,9 +114,9 @@ def init_db():
         salt = secrets.token_bytes(32)
         key = hashlib.pbkdf2_hmac('sha256', admin_pwd.encode(), salt, 100000)
         pwd_hash = salt.hex() + ':' + key.hex()
-        conn.execute('INSERT OR IGNORE INTO users (username, password_hash, credits, is_admin, created_at) VALUES (?, ?, 50000, 1, datetime(\"now\",\"localtime\"))',
+        conn.execute('INSERT OR IGNORE INTO users (username, password_hash, credits, is_admin, created_at) VALUES (?, ?, 500, 1, datetime(\"now\",\"localtime\"))',
                      ('admin', pwd_hash))
-        conn.execute("UPDATE users SET credits = 50000 WHERE username = 'admin' AND credits < 50000")
+        conn.execute("UPDATE users SET credits = 500 WHERE username = 'admin' AND credits < 5")
         conn.commit()
     except: pass
     # Generate admin invite code
@@ -947,7 +947,7 @@ def auth_register():
         if existing:
             return jsonify({'success': False, 'error': '用户名已存在'}), 409
         pwd_hash = hash_password(password)
-        bonus = int(db.execute("SELECT value FROM config WHERE key='register_bonus'").fetchone()['value'] or 50)
+        bonus = int(db.execute("SELECT value FROM config WHERE key='register_bonus'").fetchone()['value'] or 5)
         # Apply invite code bonus
         inviter_id = None
         if invite:
@@ -1060,7 +1060,7 @@ def payment_submit():
         order = db.execute('SELECT * FROM recharge_orders WHERE id = ? AND user_id = ?', (order_id, request.user_id)).fetchone()
         if not order: return jsonify({'success': False, 'error': '订单不存在'}), 404
         if order['status'] != 'pending': return jsonify({'success': False, 'error': '订单已处理'}), 400
-        pts = int(order['amount_yuan'] * 10)
+        pts = int(order['amount_yuan'])
         db.execute("UPDATE recharge_orders SET status = 'confirmed', confirmed_at = datetime('now','localtime') WHERE id = ?", (order_id,))
         db.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (pts, request.user_id))
         after = db.execute('SELECT credits FROM users WHERE id = ?', (request.user_id,)).fetchone()['credits']
@@ -1096,7 +1096,7 @@ def payment_confirm():
         order = db.execute('SELECT * FROM recharge_orders WHERE id = ?', (order_id,)).fetchone()
         if not order: return jsonify({'success': False, 'error': '订单不存在'}), 404
         if order['status'] == 'confirmed': return jsonify({'success': False, 'error': '已处理'}), 400
-        pts = int(order['amount_yuan'] * 10)
+        pts = int(order['amount_yuan'])
         db.execute("UPDATE recharge_orders SET status = 'confirmed', confirmed_at = datetime('now','localtime') WHERE id = ?", (order_id,))
         db.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (pts, order['user_id']))
         after = db.execute('SELECT credits FROM users WHERE id = ?', (order['user_id'],)).fetchone()['credits']

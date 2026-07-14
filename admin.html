@@ -64,15 +64,15 @@ function loadDashboard(){
     document.getElementById('statCards').innerHTML=
       '<div class="stat"><div class="v">'+s.total_users+'</div><div class="l">总用户</div></div>'+
       '<div class="stat"><div class="v">'+s.today_users+'</div><div class="l">今日新增</div></div>'+
-      '<div class="stat"><div class="v">'+(s.total_credits/10).toFixed(0)+'</div><div class="l">总点数</div></div>'+
+      '<div class="stat"><div class="v">'+s.total_credits+'</div><div class="l">总点数</div></div>'+
       '<div class="stat"><div class="v">¥'+s.total_recharge+'</div><div class="l">充值总额</div></div>'+
       '<div class="stat"><div class="v">'+s.pending_orders+'</div><div class="l">待确认订单</div></div>'+
       '<div class="stat"><div class="v">'+s.llm_today+'</div><div class="l">今日AI调用</div></div>'+
       '<div class="stat"><div class="v">'+s.llm_total+'</div><div class="l">累计AI调用</div></div>'+
-      '<div class="stat"><div class="v">'+(s.total_cost/10).toFixed(0)+'</div><div class="l">AI消耗点数</div></div>';
+      '<div class="stat"><div class="v">'+s.total_cost+'</div><div class="l">AI消耗点数</div></div>';
 
     var uhtml='';
-    s.recent_users.forEach(function(u){uhtml+='<tr><td>'+u.id+'</td><td>'+u.username+'</td><td>'+(u.credits/10).toFixed(1)+'</td><td>'+(u.invite_code||'-')+'</td><td>'+(u.created_at||'').substring(0,16)+'</td></tr>';});
+    s.recent_users.forEach(function(u){uhtml+='<tr><td>'+u.id+'</td><td>'+u.username+'</td><td>'+u.credits+'</td><td>'+(u.invite_code||'-')+'</td><td>'+(u.created_at||'').substring(0,16)+'</td></tr>';});
     document.querySelector('#userTable tbody').innerHTML=uhtml;
 
     var ohtml='';var sm={pending:'待支付',submitted:'已提交',confirmed:'已到账'};
@@ -86,7 +86,7 @@ function adjustCredits(){
   var reason=document.getElementById('creditReason').value||'管理员调整';
   if(!uid||!amt){alert('请输入用户ID和点数');return}
   fetch('/api/admin/credits',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:SECRET,user_id:uid,amount:amt,reason:reason})})
-    .then(r=>r.json()).then(d=>{if(d.success){alert('调整成功，余额:'+(d.credits/10).toFixed(1)+'点');loadDashboard();}else{alert(d.error)}});
+    .then(r=>r.json()).then(d=>{if(d.success){alert('调整成功，余额:'+d.credits+'点');loadDashboard();}else{alert(d.error)}});
 }
 function confirmOrder(oid){
   fetch('/api/payment/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order_id:oid})})

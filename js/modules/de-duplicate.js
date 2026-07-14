@@ -27,7 +27,7 @@ window.runDedupAI = function(mode) {
     body: JSON.stringify({ module: 'de-duplicate', system_prompt: '你是学术论文查重与降重专家。请用中文回答，结构化输出。', user_prompt: prompt, max_tokens: 2500 })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.success) {
-      out.innerHTML = '<div style="padding:16px;background:rgba(255,255,255,.03);border-radius:10px;border:1px solid rgba(255,255,255,.08);font-size:.75rem;color:#e2e8f0;line-height:1.8;white-space:pre-wrap">'+d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div><div style="text-align:right;font-size:.62rem;color:rgba(255,255,255,.25);margin-top:6px">消耗 '+d.usage.cost_credits/10+' 点 · 剩余 '+d.usage.credits_after/10+' 点</div>';
+      out.innerHTML = '<div style="padding:16px;background:rgba(255,255,255,.03);border-radius:10px;border:1px solid rgba(255,255,255,.08);font-size:.75rem;color:#e2e8f0;line-height:1.8;white-space:pre-wrap">'+d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div><div style="text-align:right;font-size:.62rem;color:rgba(255,255,255,.25);margin-top:6px">消耗 '+d.usage.cost_credits+' 点 · 剩余 '+d.usage.credits_after+' 点</div>';
       if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
     } else { out.innerHTML = '<div style="color:#fca5a5">❌ '+d.error+'</div>'; }
   });
