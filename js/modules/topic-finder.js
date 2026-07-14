@@ -5,8 +5,7 @@ function runTopicFinder(container) {
   c.innerHTML = '<div class="module-panel" style="max-width:800px;margin:0 auto">' +
     '<h4>💡 论文选题推荐</h4>' +
     '<div style="padding:12px;background:rgba(99,102,241,.05);border-radius:10px;margin-bottom:16px;font-size:.75rem;color:rgba(255,255,255,.5);line-height:1.7">' +
-    '输入你感兴趣的研究领域，AI 会分析该领域的研究热点与空白，<br>为你推荐 <b>5 个可行论文题目</b>，每个附带大纲方向与参考文献建议。<br>' +
-    '消耗 <b>1 点</b>（调两次 AI：研究趋势分析 + 题目生成）</div>' +
+    '输入你感兴趣的研究领域，AI 会分析该领域的研究热点与空白，<br>为你推荐 <b>5 个可行论文题目</b>，每个附带大纲方向与参考文献建议。</div>' +
     '<div style="display:flex;gap:10px;margin-bottom:12px">' +
       '<input id="topicDomain" placeholder="研究领域（如：人工智能教育、供应链金融风险）" style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 14px;color:#e2e8f0;font-size:.78rem;outline:none">' +
       '<input id="topicKeywords" placeholder="关键词（选填，逗号分隔）" style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 14px;color:#e2e8f0;font-size:.78rem;outline:none">' +
@@ -36,8 +35,7 @@ window.runTopicFinderAI = function() {
     .then(function(d) {
       if (d.success) {
         out.innerHTML = '<div style="padding:16px;background:rgba(255,255,255,.03);border-radius:10px;border:1px solid rgba(255,255,255,.08);font-size:.75rem;color:#e2e8f0;line-height:1.8;white-space:pre-wrap">' +
-          d.content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' +
-          '<div style="text-align:right;font-size:.62rem;color:rgba(255,255,255,.25);margin-top:6px">消耗 ' + d.usage.cost_credits/1000 + ' 点 · 剩余 ' + d.usage.credits_after/1000 + ' 点</div>';
+          d.content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
       } else { out.innerHTML = '<div style="padding:16px;background:rgba(239,68,68,.1);border-radius:10px;color:#fca5a5">❌ ' + d.error + '</div>'; }
     });
 };
