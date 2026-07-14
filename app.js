@@ -2617,7 +2617,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
       // 统计标签分布
       var tagStats={};for(var ti=tocIdx;ti<Math.min(tocIdx+30,allEls.length);ti++){var tn=(allEls[ti].tagName||'').toUpperCase();tagStats[tn]=(tagStats[tn]||0)+1;}
       console.log('[detect] first 30 tags after tocIdx:',JSON.stringify(tagStats));
-      // ===== 第3步：收集标题候选（HTML 标签 + 文本模式）=====
+      // ===== 第3步：收集标题候选（HTML 标签 + 样式数据 + 文本模式）=====
       var allHeadings = [];
       for (var ei = bodyStartIdx; ei < allEls.length; ei++) {
         var el2 = allEls[ei], txt2 = (el2.textContent || '').trim();
@@ -2630,7 +2630,45 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
           allHeadings.push({ el: el2, txt: txt2, level: -1, tagLevel: parseInt(tagName.charAt(1)), bare: false });
         }
       }
-      // 文本模式兜底（始终执行）
+      // ---- 样式数据驱动检测：_docxStyleGroups._els 直接映射到 DOM ----
+      // 策略：利用已解析的 Word 样式名 + 字体属性推断层级，不再纯靠文本正则
+      var styleToLevel={};
+      var headingStylePatterns=[
+        {re:/(一级|1级|章标题|一[级級]|h1|heading\s*1|标题_TJ|第.*章)/i, lv:0},
+        {re:/(二级|2级|节标题|二[级級]|h2|heading\s*2)/i, lv:1},
+        {re:/(三级|3级|小节标题|三[级級]|h3|heading\s*3)/i, lv:2},
+        {re:/(四级|4级|h4|heading\s*4)/i, lv:2},
+      ];
+      (window._docxStyleGroups||[]).forEach(function(g){
+        var nm=g.name||''; if(styleToLevel[nm]!==undefined)return;
+        for(var pi4=0;pi4<headingStylePatterns.length;pi4++){
+          if(headingStylePatterns[pi4].re.test(nm)){styleToLevel[nm]=headingStylePatterns[pi4].lv;return;}
+        }
+        // 字体启发式: 粗体 + 大字号(≥14pt) + 短文本(<60字) → 疑似标题
+        if(g.commonBold&&g.sizes&&g.sizes.length&&g.sizes[g.sizes.length-1]>=14){
+          var avgLen=0;(g.samples||[]).forEach(function(s){avgLen+=s.length;});avgLen/=Math.max(1,g.samples.length);
+          if(avgLen<60)styleToLevel[nm]=1;
+        }
+      });
+      var elToLevel=new Map();
+      (window._docxStyleGroups||[]).forEach(function(g){
+        var lv5=styleToLevel[g.name]; if(lv5===undefined)return;
+        var els5=g._els||[]; for(var ei4=0;ei4<els5.length;ei4++)elToLevel.set(els5[ei4],lv5);
+      });
+      // 样式数据扫描：直接匹配 DOM 元素
+      for(var ei5=bodyStartIdx;ei5<allEls.length;ei5++){
+        var ef5=allEls[ei5],tf5=(ef5.textContent||'').trim();
+        if(!tf5||tf5.length<2)continue;
+        if(refBound&&(ef5.compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))break;
+        var dupH=false;
+        for(var dh=0;dh<allHeadings.length;dh++){if(allHeadings[dh].el===ef5){dupH=true;break;}}
+        if(dupH)continue;
+        var slv5=elToLevel.get(ef5);
+        if(slv5!==undefined){
+          allHeadings.push({el:ef5,txt:tf5,level:slv5,tagLevel:-1,bare:false});
+        }
+      }
+      // 文本模式兜底（对样式未覆盖的元素）
       for (var ei2 = bodyStartIdx; ei2 < allEls.length; ei2++) {
         var ef = allEls[ei2], tf = (ef.textContent || '').trim();
         if (!tf || tf.length < 2) continue;
