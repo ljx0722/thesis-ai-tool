@@ -3,24 +3,83 @@
  * 模块标签顶栏 / 操作按钮顶栏 / 键盘快捷键 / 换论文 / 悬浮上传
  */
 
+// ==================== 模块清单 ====================
+// requiresThesis: 是否需要先上传论文才能使用
+// aiDriven: 是否调用 AI 大模型（消耗点数）
 var APP_MODULES = [
-  { id: 'topic-finder',    name: '选题推荐',   icon: '💡', requiresThesis: false },
-  { id: 'proposal',        name: '开题大纲',   icon: '📝', requiresThesis: false },
-  { id: 'references',      name: '参考文献',   icon: '📋', requiresThesis: true },
-  { id: 'expand',          name: '论文扩写',   icon: '✍️', requiresThesis: true },
-  { id: 'data-analysis',   name: '数据分析',   icon: '📈', requiresThesis: false },
-  { id: 'knowledge-graph', name: '知识图谱',   icon: '🕸️', requiresThesis: true },
-  { id: 'proofread',       name: '论文查错',   icon: '✏️', requiresThesis: false },
-  { id: 'de-duplicate',    name: '查重降重',   icon: '📋', requiresThesis: false },
-  { id: 'format-check',    name: '格式检查',   icon: '✅', requiresThesis: true },
-  { id: 'terminology',     name: '术语分析',   icon: '🔤', requiresThesis: true },
-  { id: 'paragraph',       name: '段落分析',   icon: '📝', requiresThesis: true },
-  { id: 'review',          name: '论文审阅',   icon: '🔍', requiresThesis: true },
-  { id: 'optimization',    name: '优化建议',   icon: '💡', requiresThesis: true },
-  { id: 'defense-ppt',     name: '答辩PPT',    icon: '📊', requiresThesis: false },
-  { id: 'en-abstract',     name: '英文摘要',   icon: '🌐', requiresThesis: false },
-  { id: 'dashboard',       name: '论文看板',   icon: '📊', requiresThesis: true },
+  // 选题阶段 — 无需论文, AI驱动
+  { id: 'topic-finder',    name: '选题推荐',   icon: '💡', requiresThesis: false, aiDriven: true },
+  { id: 'proposal',        name: '开题大纲',   icon: '📝', requiresThesis: false, aiDriven: true },
+  // 撰写阶段
+  { id: 'references',      name: '参考文献',   icon: '📋', requiresThesis: true,  aiDriven: false },
+  { id: 'expand',          name: '论文扩写',   icon: '✍️', requiresThesis: true,  aiDriven: true },
+  { id: 'data-analysis',   name: '数据分析',   icon: '📈', requiresThesis: false, aiDriven: false },
+  { id: 'knowledge-graph', name: '知识图谱',   icon: '🕸️', requiresThesis: true,  aiDriven: false },
+  // 打磨阶段
+  { id: 'proofread',       name: '论文查错',   icon: '✏️', requiresThesis: false, aiDriven: true },
+  { id: 'de-duplicate',    name: '查重降重',   icon: '📋', requiresThesis: false, aiDriven: true },
+  { id: 'format-check',    name: '格式检查',   icon: '✅', requiresThesis: true,  aiDriven: false },
+  { id: 'terminology',     name: '术语分析',   icon: '🔤', requiresThesis: true,  aiDriven: false },
+  { id: 'paragraph',       name: '段落分析',   icon: '📝', requiresThesis: true,  aiDriven: true },
+  // 评审输出
+  { id: 'review',          name: '论文审阅',   icon: '🔍', requiresThesis: true,  aiDriven: true },
+  { id: 'optimization',    name: '优化建议',   icon: '💡', requiresThesis: true,  aiDriven: true },
+  { id: 'defense-ppt',     name: '答辩PPT',    icon: '📊', requiresThesis: false, aiDriven: true },
+  { id: 'en-abstract',     name: '英文摘要',   icon: '🌐', requiresThesis: false, aiDriven: true },
+  { id: 'dashboard',       name: '论文看板',   icon: '📊', requiresThesis: true,  aiDriven: false },
 ];
+
+// 模块 id → 运行函数名映射 (run + PascalCase 或特定命名)
+var MODULE_RUNNERS = {
+  'topic-finder':    'runTopicFinder',
+  'proposal':        'runProposalModule',
+  'expand':          'runExpandModule',
+  'data-analysis':   'runDataAnalysis',
+  'proofread':       'runProofread',
+  'de-duplicate':    'runDeduplicate',
+  'format-check':    'runFormatCheck',
+  'terminology':     'runTerminology',
+  'paragraph':       'runParagraph',
+  'review':          'runReviewModule',
+  'optimization':    'runOptimization',
+  'defense-ppt':     'runDefensePPT',
+  'en-abstract':     'runEnAbstract',
+  'dashboard':       'runDashboard',
+};
+
+// 更新侧边栏项目状态（标记哪些需要论文上传才能用）
+function updateNavStates() {
+  var items = document.querySelectorAll('.nav-item[data-needs-thesis]');
+  for (var i = 0; i < items.length; i++) {
+    var needs = items[i].getAttribute('data-needs-thesis') === '1';
+    if (needs && !_thesisLoaded) {
+      items[i].classList.add('disabled');
+      items[i].title = items[i].title || '需要先上传论文';
+    } else {
+      items[i].classList.remove('disabled');
+    }
+  }
+}
+
+// Block clicks on disabled nav items
+document.addEventListener('click', function(e) {
+  var navItem = e.target.closest('.nav-item.disabled');
+  if (navItem) {
+    e.preventDefault();
+    e.stopPropagation();
+    ttp('📎 请先上传论文');
+  }
+}, true);
+
+// Handle disabled nav items
+document.addEventListener('click', function(e) {
+  var navItem = e.target.closest('.nav-item.disabled');
+  if (navItem) {
+    e.preventDefault();
+    e.stopPropagation();
+    ttp('📎 请先上传论文');
+  }
+}, true);
 
 var _activeModule = 'references';
 var _thesisLoaded = false;
@@ -45,6 +104,7 @@ function changeThesis() {
   renderModuleTabs();
   updateBarActions();
   updateStatusBar2();
+  updateNavStates();
   switchPanel('references');
   document.getElementById('statusBar').textContent = '等待上传论文…';
   document.getElementById('upStatus').innerHTML = '等待上传';
@@ -170,6 +230,10 @@ function switchModule(moduleId) {
   if (typeof searchRunning !== 'undefined' && searchRunning) { ttp('检索进行中，请等待完成'); return; }
   _activeModule = moduleId;
 
+  // Highlight nav items
+  document.querySelectorAll('.nav-item').forEach(function(n) {
+    n.classList.toggle('active', n.getAttribute('data-module') === moduleId);
+  });
   var tabs = document.querySelectorAll('.module-tab');
   for (var i = 0; i < tabs.length; i++) tabs[i].classList.toggle('active', tabs[i].getAttribute('data-module') === moduleId);
 
@@ -203,41 +267,70 @@ function switchPanel(moduleId) {
     if (moduleArea) moduleArea.style.display = 'none';
     if (typeof mergedRefs !== 'undefined' && mergedRefs.length) renderRefs();
     else if (typeof existingRefs !== 'undefined' && existingRefs.length) renderExistingOnly();
-  } else {
-    for (var i = 0; i < refOnlyEls.length; i++) refOnlyEls[i].style.display = 'none';
-    if (!moduleArea) {
-      moduleArea = document.createElement('div');
-      moduleArea.className = 'module-area';
-      moduleArea.style.cssText = 'flex:1;overflow-y:auto;';
-      panel.appendChild(moduleArea);
-    }
-    moduleArea.style.display = '';
-
-    if (moduleId === 'knowledge-graph') {
-      moduleArea.innerHTML = '<div class="module-panel"><div style="text-align:center;padding:50px"><div style="font-size:3rem;margin-bottom:16px">🕸️</div><div style="color:var(--m);margin-bottom:16px">知识图谱弹窗已打开</div><button onclick="showKnowledgeGraph()" style="font-size:.85rem;padding:10px 24px;background:var(--p);color:#fff;border:none;border-radius:18px;cursor:pointer;font-weight:600">重新打开知识图谱</button></div></div>';
-      return;
-    }
-
-    moduleArea.innerHTML = '<div class="module-panel"><div style="text-align:center;padding:40px;color:var(--m)"><div style="font-size:2rem;margin-bottom:12px">⏳</div><div>正在分析...</div></div></div>';
-
-    if (_thesisLoaded) {
-      var name = APP_MODULES.find(function(m) { return m.id === moduleId; });
-      var label = name ? name.name : moduleId;
-      showLoad('正在' + label + '...', 15, '分析论文数据中');
-
-      setTimeout(function() {
-        var mc = moduleArea.querySelector('.module-panel');
-        try {
-          if (moduleId === 'optimization' && typeof runOptimization === 'function') runOptimization(mc);
-          else if (moduleId === 'review' && typeof runReviewModule === 'function') runReviewModule(mc);
-          else if (moduleId === 'expand' && typeof runExpandModule === 'function') runExpandModule(mc);
-          else if (moduleId === 'data-analysis' && typeof runDataAnalysis === 'function') runDataAnalysis(mc);
-          else if (moduleId === 'proposal' && typeof runProposalModule === 'function') runProposalModule(mc);
-        } catch (e) { mc.innerHTML = '<div style="text-align:center;padding:40px;color:var(--r)">分析出错: ' + e.message + '</div>'; }
-        hideLoad();
-      }, 100);
-    }
+    updateStatusBar2();
+    return;
   }
+
+  // Non-reference modules
+  for (var i = 0; i < refOnlyEls.length; i++) refOnlyEls[i].style.display = 'none';
+  if (!moduleArea) {
+    moduleArea = document.createElement('div');
+    moduleArea.className = 'module-area';
+    moduleArea.style.cssText = 'flex:1;overflow-y:auto;';
+    panel.appendChild(moduleArea);
+  }
+  moduleArea.style.display = '';
+
+  if (moduleId === 'knowledge-graph') {
+    if (_thesisLoaded) {
+      moduleArea.innerHTML = '<div class="module-panel"><div style="text-align:center;padding:50px"><div style="font-size:3rem;margin-bottom:16px">🕸️</div><div style="color:var(--m);margin-bottom:16px">知识图谱弹窗已打开</div><button onclick="showKnowledgeGraph()" style="font-size:.85rem;padding:10px 24px;background:var(--p);color:#fff;border:none;border-radius:18px;cursor:pointer;font-weight:600">重新打开知识图谱</button></div></div>';
+    } else {
+      moduleArea.innerHTML = '<div class="module-panel" style="text-align:center;padding:60px 20px"><div style="font-size:3rem;margin-bottom:16px">📎</div><h4 style="margin-bottom:8px">需要先上传论文</h4><p style="color:var(--text-muted);font-size:.8rem;margin-bottom:20px">知识图谱需要从论文中提取主题词才能生成</p><button onclick="triggerUpload()" style="font-size:.85rem;padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:18px;cursor:pointer;font-weight:600">📎 上传论文</button></div>';
+    }
+    updateStatusBar2();
+    return;
+  }
+
+  // Check if module needs thesis
+  var modDef = APP_MODULES.find(function(m) { return m.id === moduleId; });
+  var needsThesis = modDef ? modDef.requiresThesis : true;
+
+  if (needsThesis && !_thesisLoaded) {
+    // File-dependent module without thesis: show upload prompt
+    var label = modDef ? modDef.name : moduleId;
+    moduleArea.innerHTML = '<div class="module-panel" style="text-align:center;padding:60px 20px"><div style="font-size:3rem;margin-bottom:16px">📎</div><h4 style="margin-bottom:8px;color:var(--text-primary)">需要先上传论文</h4><p style="color:var(--text-muted);font-size:.8rem;margin-bottom:20px">"' + label + '"模块需要论文数据才能运行</p><button onclick="triggerUpload()" style="font-size:.85rem;padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:18px;cursor:pointer;font-weight:600">📎 上传论文</button></div>';
+    updateStatusBar2();
+    return;
+  }
+
+  // Load and run the module
+  moduleArea.innerHTML = '<div class="module-panel"><div style="text-align:center;padding:40px;color:var(--text-muted)"><div style="font-size:2rem;margin-bottom:12px">⏳</div><div>正在加载...</div></div></div>';
+
+  var runnerName = MODULE_RUNNERS[moduleId];
+  if (!runnerName) {
+    moduleArea.querySelector('.module-panel').innerHTML = '<div style="text-align:center;padding:40px;color:var(--danger)">未知模块: ' + moduleId + '</div>';
+    updateStatusBar2();
+    return;
+  }
+
+  if (needsThesis) {
+    // File-dependent module with thesis loaded
+    showLoad('正在' + (modDef ? modDef.name : moduleId) + '...', 15, '分析论文数据中');
+  }
+
+  setTimeout(function() {
+    var mc = moduleArea.querySelector('.module-panel');
+    try {
+      var fn = window[runnerName];
+      if (typeof fn === 'function') {
+        fn(mc);
+      } else {
+        mc.innerHTML = '<div style="text-align:center;padding:40px;color:var(--danger)">模块函数 ' + runnerName + ' 未定义，请确认脚本已加载</div>';
+      }
+    } catch (e) { mc.innerHTML = '<div style="text-align:center;padding:40px;color:var(--danger)">加载出错: ' + e.message + '</div>'; }
+    if (needsThesis) hideLoad();
+  }, 100);
+
   updateStatusBar2();
 }
 
@@ -255,11 +348,12 @@ function updateStatusBar2() {
   if (_thesisLoaded && refCount > 0) { var chCount = (typeof sections !== 'undefined' && sections) ? sections.length : 0; sb.textContent = chCount + '章 | ' + refCount + '条文献'; }
   else if (_thesisLoaded) sb.textContent = '';
   else sb.textContent = '等待上传论文…';
+  updateNavStates();
 }
 
 function onThesisLoaded() {
   _thesisLoaded = true; _analysisCache = {}; kgCurrentData = null;
-  updateBarActions(); updateStatusBar2();
+  updateBarActions(); updateStatusBar2(); updateNavStates();
   switchView('references');
 }
 
@@ -303,85 +397,6 @@ function switchView(view) {
 
 function toggleNavGroup(el) {
   el.classList.toggle('collapsed');
-}
-
-// Override switchModule to show content in thesis panel
-var _origSwitchModule = switchModule;
-window.switchModule = function(moduleId) {
-  if (typeof searchRunning !== 'undefined' && searchRunning) { ttp('检索进行中，请等待完成'); return; }
-  _activeModule = moduleId;
-  // Highlight nav item
-  document.querySelectorAll('.nav-item').forEach(function(n) {
-    n.classList.toggle('active', n.getAttribute('data-module') === moduleId);
-  });
-  // Show module in thesis panel
-  var tb = document.getElementById('thesisBox');
-  var ws = document.getElementById('workspaceContent');
-  if (ws) ws.style.display = 'none';
-  // Hide paper content, show module output
-  var children = tb.children;
-  for (var i = 0; i < children.length; i++) {
-    if (children[i] !== ws) children[i].style.display = 'none';
-  }
-  var mc = document.getElementById('moduleOutput');
-  if (!mc) {
-    mc = document.createElement('div');
-    mc.id = 'moduleOutput';
-    mc.style.cssText = 'padding:0;flex:1;overflow-y:auto';
-    tb.appendChild(mc);
-  }
-  mc.style.display = '';
-  mc.innerHTML = '<div class="module-panel"><div style="text-align:center;padding:40px;color:var(--m)"><div style="font-size:2rem;margin-bottom:12px">⏳</div><div>正在分析...</div></div></div>';
-
-  if (moduleId === 'knowledge-graph') { showKnowledgeGraph(); mc.innerHTML = '<div class="module-panel"><div style="text-align:center;padding:50px"><div style="font-size:3rem;margin-bottom:16px">🕸️</div><div style="color:var(--m);margin-bottom:16px">知识图谱弹窗已打开</div><button onclick="showKnowledgeGraph()" style="font-size:.85rem;padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:18px;cursor:pointer;font-weight:600">重新打开知识图谱</button></div></div>'; return; }
-  if (!_thesisLoaded && moduleId !== 'data-analysis' && moduleId !== 'proposal') { mc.innerHTML = '<div class="module-panel"><div style="text-align:center;padding:40px;color:#9ca3af">请先上传论文</div></div>'; return; }
-
-  showLoad('分析中...', 15, '');
-  setTimeout(function() {
-    var panel = mc.querySelector('.module-panel');
-    try {
-      if (moduleId === 'optimization' && typeof runOptimization === 'function') runOptimization(panel);
-      else if (moduleId === 'review' && typeof runReviewModule === 'function') runReviewModule(panel);
-      else if (moduleId === 'expand' && typeof runExpandModule === 'function') runExpandModule(panel);
-      else if (moduleId === 'data-analysis' && typeof runDataAnalysis === 'function') runDataAnalysis(panel);
-      else if (moduleId === 'proposal' && typeof runProposalModule === 'function') runProposalModule(panel);
-      else if (moduleId === 'topic-finder' && typeof runTopicFinder === 'function') runTopicFinder(panel);
-      else if (moduleId === 'proofread' && typeof runProofread === 'function') runProofread(panel);
-      else if (moduleId === 'de-duplicate' && typeof runDeduplicate === 'function') runDeduplicate(panel);
-      else if (moduleId === 'defense-ppt' && typeof runDefensePPT === 'function') runDefensePPT(panel);
-      else if (moduleId === 'en-abstract' && typeof runEnAbstract === 'function') runEnAbstract(panel);
-      else if (moduleId === 'format-check' && typeof runFormatCheck === 'function') runFormatCheck(panel);
-      else if (moduleId === 'terminology' && typeof runTerminology === 'function') runTerminology(panel);
-      else if (moduleId === 'paragraph' && typeof runParagraphAnalysis === 'function') runParagraphAnalysis(panel);
-      else if (moduleId === 'dashboard' && typeof showDashboard === 'function') showDashboard();
-    } catch (e) { panel.innerHTML = '<div style="text-align:center;padding:40px;color:var(--r)">分析出错: ' + e.message + '</div>'; }
-    hideLoad();
-    // Auto-inject AI analysis button (skip for KG, references, data, topic-finder)
-    var aiSkip = ['knowledge-graph', 'references', 'data-analysis', 'topic-finder', 'proofread', 'de-duplicate', 'defense-ppt', 'en-abstract', 'format-check', 'terminology', 'paragraph', 'dashboard'];
-    if (aiSkip.indexOf(moduleId) < 0 && typeof addLLMButton === 'function') {
-      setTimeout(function() {
-        var container = document.querySelector('#moduleOutput .module-panel');
-        if (container) {
-          var btnWrap = document.createElement('div'); btnWrap.id = 'aiBtnWrap';
-          container.appendChild(btnWrap);
-          var name = APP_MODULES.find(function(m) { return m.id === moduleId; });
-          var label = name ? name.name : moduleId;
-          addLLMButton('aiBtnWrap', moduleId, function() {
-            return '请对以下"' + label + '"内容进行深度分析：\n\n' + (typeof manuscriptText !== 'undefined' ? manuscriptText.substring(0, 5000) : '');
-          });
-        }
-      }, 400);
-    }
-  }, 100);
-};
-
-// Keep switchPanel for backwards compat
-function switchPanel(moduleId) {
-  if (moduleId === 'references') {
-    switchView('references');
-  } else {
-    switchModule(moduleId);
-  }
 }
 
 var _origClearAll = typeof clearAll === 'function' ? clearAll : function() {};
@@ -436,7 +451,7 @@ function runExpandModule(container) {
     var suggest=len<500?'建议至少扩写至2000字（当前'+Math.round(len/100)/10+'千字）。可增加：文献综述、理论框架、案例支撑。':
                 (len<2000?'内容偏少，建议补充实证数据、案例分析和图表说明。':
                 (len<5000?'结构合理，可在结论部分增加未来展望和局限讨论。':'内容较充实，检查是否有冗余段落可精简。'));
-    container.innerHTML+='<div style="border-left:3px solid '+(len<500?'#ff3b30':len<2000?'#ff9f0a':len<5000?'#30d158':'#0071e3')+';padding:8px 12px;margin:6px 0;border-radius:6px;background:rgba(0,0,0,.02)">'+
+    container.innerHTML+='<div style="border-left:1px solid '+(len<500?'#ff3b30':len<2000?'#ff9f0a':len<5000?'#30d158':'#0071e3')+';padding:8px 12px;margin:6px 0;border-radius:6px;background:rgba(0,0,0,.02)">'+
       '<div style="font-weight:600;font-size:.76rem">'+cs.name+' <span style="font-size:.62rem;color:var(--m)">('+Math.round(len/100)/10+'k字 | '+Math.round(ratio)+'%)</span> '+status+'</div>'+
       '<div style="font-size:.68rem;color:#666;margin-top:4px">'+suggest+'</div>'+
       '</div>';
@@ -452,31 +467,24 @@ function runExpandModule(container) {
 }
 
 function runDataAnalysis(container) {
-  // Placeholder until user uploads Excel file
   container.innerHTML = '<div class="module-panel">'+
     '<h4>📈 数据分析</h4>'+
-    '<div style="padding:20px;border:2px dashed #ccc;border-radius:12px;text-align:center">'+
+    '<div style="padding:20px;border:2px dashed var(--border);border-radius:var(--radius-lg);text-align:center">'+
     '<div style="font-size:3rem;margin-bottom:8px">📊</div>'+
-    '<div style="font-size:.8rem;font-weight:600;margin-bottom:4px">上传 Excel 数据进行智能分析</div>'+
-    '<div style="font-size:.7rem;color:#999;margin-bottom:12px">支持 .xlsx / .csv，自动识别变量类型与数据规律</div>'+
-    '<input type="file" id="dataFileInput" accept=".xlsx,.csv" style="display:none" onchange="handleDataFile(this)">'+
-    '<button onclick="document.getElementById(\'dataFileInput\').click()" style="background:#0071e3;color:#fff;border:none;border-radius:18px;padding:8px 24px;cursor:pointer;font-weight:600;font-size:.75rem">📁 选择数据文件</button>'+
+    '<div style="font-size:.85rem;font-weight:700;margin-bottom:4px;color:var(--text-primary)">上传数据文件进行智能分析</div>'+
+    '<div style="font-size:.7rem;color:var(--text-muted);margin-bottom:12px">支持 .csv / .tsv，自动识别变量类型、计算统计量并可视化</div>'+
+    '<input type="file" id="dataFileInput" accept=".csv,.tsv,.txt" style="display:none" onchange="handleDataFile(this)">'+
+    '<button onclick="document.getElementById(\'dataFileInput\').click()" style="background:var(--accent);color:#fff;border:none;border-radius:var(--radius-full);padding:10px 28px;cursor:pointer;font-weight:600;font-size:.78rem;font-family:var(--font-sans)">📁 选择数据文件</button>'+
     '</div>'+
-    '<div id="dataAnalysisResult" style="margin-top:12px"></div>'+
+    '<div id="dataAnalysisResult" style="margin-top:16px"></div>'+
     '</div>';
 }
 
 function handleDataFile(input){
   var f=input.files[0];if(!f)return;
   var container=document.getElementById('dataAnalysisResult');if(!container)return;
-  container.innerHTML='<div style="text-align:center;padding:30px;color:var(--m)">⏳ 正在分析数据…</div>';
-  var ext=(f.name||'').toLowerCase().split('.').pop();
-  if(ext==='xlsx'){
-    container.innerHTML='<div style="padding:16px;background:#fff3cd;border-radius:8px;font-size:.72rem;color:#856404">⚠ XLSX 格式需要完整解析库。请将文件另存为 <b>CSV（逗号分隔）</b> 格式后重新上传。<br><br>或者，下面显示的是基础数据信息。</div>';
-    analyzeCSV(f,container);
-  } else {
-    analyzeCSV(f,container);
-  }
+  container.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted)">⏳ 正在解析数据...</div>';
+  analyzeCSV(f,container);
 }
 
 function analyzeCSV(f,container){
@@ -484,32 +492,193 @@ function analyzeCSV(f,container){
   reader.onload=function(e){
     var text=e.target.result;
     var lines=text.split('\n').filter(function(l){return l.trim();});
-    if(lines.length<2){container.innerHTML='<div style="text-align:center;padding:30px;color:var(--m)">文件为空或格式不正确</div>';return;}
-    var headers=lines[0].split(/[,\t]/).map(function(h){return h.replace(/"/g,'').trim();});
-    var rows=lines.slice(1).map(function(l){var vals=l.split(/[,\t]/).map(function(v){return v.replace(/"/g,'').trim();});var obj={};headers.forEach(function(h,i){obj[h]=vals[i]||'';});return obj;});
-    // Basic analysis
-    var h='<h4>📊 数据概览 ('+f.name+')</h4>';
+    if(lines.length<2){container.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted)">文件为空或格式不正确</div>';return;}
+    // Detect delimiter (comma or tab)
+    var sep = lines[0].indexOf('\t') > -1 ? '\t' : ',';
+    var headers=lines[0].split(sep).map(function(h){return h.replace(/"/g,'').trim();});
+    var rows=lines.slice(1).map(function(l){
+      var vals=l.split(sep).map(function(v){return v.replace(/"/g,'').trim();});
+      var obj={}; headers.forEach(function(h,i){obj[h]=vals[i]||'';});
+      return obj;
+    });
+
+    // Summary stats
+    var h='<h4>📊 数据概览 <span style="font-weight:400;font-size:.7rem;color:var(--text-muted)">'+f.name+'</span></h4>';
     h+='<div class="dash-row">';
     h+='<div class="dash-item"><div class="dv">'+headers.length+'</div><div class="dl">变量</div></div>';
     h+='<div class="dash-item"><div class="dv">'+rows.length+'</div><div class="dl">观测值</div></div>';
     h+='</div>';
-    h+='<h4>📋 变量详情</h4>';
+
+    // Per-column analysis with charts
+    h+='<h4>📋 变量分析</h4>';
+    var chartIdx = 0;
     headers.forEach(function(hdr){
       var vals=rows.map(function(r){return r[hdr];}).filter(function(v){return v!=='';});
       var nums=vals.map(function(v){var n=parseFloat(v);return isNaN(n)?null:n;}).filter(function(n){return n!==null;});
       var isNum=nums.length>vals.length*0.7;
+
       if(isNum){
         var sum=nums.reduce(function(a,b){return a+b;},0),avg=sum/nums.length;
         var min=Math.min.apply(null,nums),max=Math.max.apply(null,nums);
-        h+='<div style="padding:6px 8px;margin:2px 0;border-radius:6px;background:rgba(0,0,0,.02);font-size:.7rem"><b>'+hdr+'</b> (数值, '+nums.length+'个有效值) 平均:'+avg.toFixed(2)+' 范围:['+min.toFixed(2)+', '+max.toFixed(2)+']</div>';
+        var sorted=nums.slice().sort(function(a,b){return a-b;});
+        var median=sorted[Math.floor(sorted.length/2)];
+        // Compute std dev
+        var variance=0; nums.forEach(function(n){variance+=Math.pow(n-avg,2);}); variance/=nums.length;
+        var stddev=Math.sqrt(variance);
+        h+='<div style="padding:10px 12px;margin:6px 0;border-radius:var(--radius-md);background:var(--surface-alt);border:1px solid var(--border)">';
+        h+='<div style="font-weight:700;font-size:.78rem;color:var(--text-primary);margin-bottom:6px">'+hdr+' <span style="font-weight:400;font-size:.65rem;color:var(--text-muted)">数值型 · '+nums.length+'个有效值</span></div>';
+        h+='<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:.68rem;color:var(--text-secondary);margin-bottom:8px">';
+        h+='<span>均值 <b style="color:var(--text-primary)">'+avg.toFixed(2)+'</b></span>';
+        h+='<span>中位数 <b style="color:var(--text-primary)">'+median.toFixed(2)+'</b></span>';
+        h+='<span>标准差 <b style="color:var(--text-primary)">'+stddev.toFixed(2)+'</b></span>';
+        h+='<span>最小值 <b style="color:var(--text-primary)">'+min.toFixed(2)+'</b></span>';
+        h+='<span>最大值 <b style="color:var(--text-primary)">'+max.toFixed(2)+'</b></span>';
+        h+='</div>';
+        h+='<canvas id="chartHist'+chartIdx+'" width="600" height="160" style="width:100%;max-width:600px;height:160px;border-radius:6px;background:rgba(255,255,255,0.03)"></canvas>';
+        h+='</div>';
+        chartIdx++;
       } else {
-        var uVals={};vals.forEach(function(v){uVals[v]=(uVals[v]||0)+1;});var topKV=Object.entries(uVals).sort(function(a,b){return b[1]-a[1];}).slice(0,5).map(function(e){return e[0]+'('+e[1]+')';}).join(', ');
-        h+='<div style="padding:6px 8px;margin:2px 0;border-radius:6px;background:rgba(0,0,0,.02);font-size:.7rem"><b>'+hdr+'</b> (分类, '+vals.length+'个有效值) TOP: '+topKV+'</div>';
+        var uVals={}; vals.forEach(function(v){uVals[v]=(uVals[v]||0)+1;});
+        var sorted=Object.entries(uVals).sort(function(a,b){return b[1]-a[1];});
+        var topItems=sorted.slice(0,8);
+        var otherCount=sorted.slice(8).reduce(function(s,e){return s+e[1];},0);
+        h+='<div style="padding:10px 12px;margin:6px 0;border-radius:var(--radius-md);background:var(--surface-alt);border:1px solid var(--border)">';
+        h+='<div style="font-weight:700;font-size:.78rem;color:var(--text-primary);margin-bottom:6px">'+hdr+' <span style="font-weight:400;font-size:.65rem;color:var(--text-muted)">分类型 · '+vals.length+'个值 · '+sorted.length+'个类别</span></div>';
+        h+='<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:.68rem;color:var(--text-secondary);margin-bottom:4px">';
+        sorted.slice(0,5).forEach(function(e){
+          h+='<span>'+e[0]+' <b style="color:var(--text-primary)">'+e[1]+'</b></span>';
+        });
+        if(sorted.length>5) h+='<span style="color:var(--text-muted)">...还有'+(sorted.length-5)+'类</span>';
+        h+='</div>';
+        h+='<canvas id="chartBar'+chartIdx+'" width="600" height="180" style="width:100%;max-width:600px;height:180px;border-radius:6px;background:rgba(255,255,255,0.03)"></canvas>';
+        h+='</div>';
+        chartIdx++;
       }
     });
     container.innerHTML=h;
+
+    // Draw charts after DOM is ready
+    setTimeout(function(){
+      var ci=0;
+      headers.forEach(function(hdr){
+        var vals=rows.map(function(r){return r[hdr];}).filter(function(v){return v!=='';});
+        var nums=vals.map(function(v){var n=parseFloat(v);return isNaN(n)?null:n;}).filter(function(n){return n!==null;});
+        var isNum=nums.length>vals.length*0.7;
+
+        if(isNum){
+          var canvas=document.getElementById('chartHist'+ci);
+          if(canvas) drawHistogram(canvas, nums, hdr);
+          ci++;
+        } else {
+          var uVals={}; vals.forEach(function(v){uVals[v]=(uVals[v]||0)+1;});
+          var sorted=Object.entries(uVals).sort(function(a,b){return b[1]-a[1];});
+          var canvas=document.getElementById('chartBar'+ci);
+          if(canvas) drawBarChart(canvas, sorted.slice(0,8));
+          ci++;
+        }
+      });
+    },50);
   };
   reader.readAsText(f);
+}
+
+// Simple histogram for numeric data
+function drawHistogram(canvas, values, label) {
+  var dpr=window.devicePixelRatio||1;
+  var W=canvas.clientWidth, H=canvas.clientHeight;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  var ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+
+  var min=Math.min.apply(null,values), max=Math.max.apply(null,values);
+  if(min===max){min-=1;max+=1;}
+  var bins=Math.min(20, Math.max(5, Math.ceil(Math.sqrt(values.length))));
+  var binW=(max-min)/bins;
+  var counts=new Array(bins).fill(0);
+  values.forEach(function(v){
+    var idx=Math.min(bins-1, Math.floor((v-min)/binW));
+    counts[idx]++;
+  });
+  var maxCount=Math.max.apply(null,counts);
+  var pad={top:8,right:12,bottom:28,left:50};
+  var pw=W-pad.left-pad.right, ph=H-pad.top-pad.bottom;
+  var barW=pw/bins*0.85, gap=pw/bins*0.15;
+
+  // Background
+  ctx.fillStyle='rgba(255,255,255,0.015)';
+  ctx.fillRect(0,0,W,H);
+
+  // Grid lines
+  ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=0.5;
+  for(var i=0;i<=4;i++){
+    var y=pad.top+ph*i/4;
+    ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(W-pad.right,y); ctx.stroke();
+  }
+
+  // Bars
+  var accent='#6366f1';
+  counts.forEach(function(c,i){
+    var bh=(c/maxCount)*ph;
+    var x=pad.left+i*barW+i*gap;
+    var y=pad.top+ph-bh;
+    ctx.fillStyle=accent; ctx.globalAlpha=0.8;
+    ctx.beginPath();
+    ctx.roundRect(x,y,barW,bh,[2,2,0,0]);
+    ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  // Axes
+  ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(pad.left,pad.top); ctx.lineTo(pad.left,pad.top+ph); ctx.lineTo(W-pad.right,pad.top+ph); ctx.stroke();
+
+  // Labels
+  ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.font='10px -apple-system,sans-serif';
+  ctx.textAlign='center';
+  for(var i=0;i<=4;i++){
+    var val=min+(max-min)*i/4;
+    var y=pad.top+ph-ph*i/4;
+    ctx.fillText(val.toFixed(1),pad.left/2+10,y+4);
+  }
+  ctx.fillText(label, W/2, H-4);
+}
+
+// Horizontal bar chart for categorical data
+function drawBarChart(canvas, items) {
+  var dpr=window.devicePixelRatio||1;
+  var W=canvas.clientWidth, H=canvas.clientHeight;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  var ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+
+  var maxVal=items[0]?items[0][1]:1;
+  var pad={top:4,right:12,bottom:4,left:100};
+  var pw=W-pad.left-pad.right, ph=H-pad.top-pad.bottom;
+  var barH=Math.min(20, ph/items.length-4);
+  var colors=['#6366f1','#818cf8','#a78bfa','#c4b5fd','#22d3ee','#34d399','#f59e0b','#f472b6'];
+
+  ctx.fillStyle='rgba(255,255,255,0.015)';
+  ctx.fillRect(0,0,W,H);
+
+  items.forEach(function(item,i){
+    var y=pad.top+i*(barH+4);
+    var bw=(item[1]/maxVal)*pw;
+    // label
+    ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='10px -apple-system,sans-serif';
+    ctx.textAlign='right';
+    var label=item[0]; if(label.length>12)label=label.substring(0,11)+'…';
+    ctx.fillText(label, pad.left-8, y+barH/2+4);
+    // bar
+    ctx.fillStyle=colors[i%colors.length]; ctx.globalAlpha=0.75;
+    ctx.beginPath();
+    ctx.roundRect(pad.left, y, bw, barH, [0,3,3,0]);
+    ctx.fill();
+    ctx.globalAlpha=1;
+    // count
+    ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.font='9px -apple-system,sans-serif';
+    ctx.textAlign='left';
+    ctx.fillText(item[1], pad.left+bw+6, y+barH/2+4);
+  });
 }
 
 // ==================== 初始化 ====================

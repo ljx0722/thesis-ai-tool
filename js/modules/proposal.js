@@ -13,7 +13,7 @@ function runProposalModule(container) {
     '<b>• 各章核心内容建议</b><br>' +
     '<b>• 研究方法与技术路线</b><br>' +
     '<b>• 参考文献方向建议</b><br>' +
-    '<b>• 数据可视化建议</b>（结合 SciPilot 可视化顾问）</div>' +
+    '<b>• 数据可视化建议</b>（论文配图类型推荐）</div>' +
     '<textarea id="proposalInput" placeholder="在此粘贴你的开题报告全文..." style="width:100%;height:200px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:14px;color:#e2e8f0;font-size:.78rem;font-family:inherit;resize:vertical;line-height:1.7;outline:none;margin-bottom:12px"></textarea>' +
     '<div style="display:flex;gap:8px;margin-bottom:16px">' +
       '<button onclick="runProposalAI()" style="flex:1;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:.8rem;font-weight:700;cursor:pointer">🤖 AI 分析开题报告</button>' +
@@ -37,7 +37,7 @@ window.runProposalAI = function() {
     body: JSON.stringify({
       module: 'proposal',
       system_prompt: '你是一位资深的学术论文导师，擅长帮助研究生从开题报告梳理出完整的论文大纲。请用中文回答，输出结构清晰、有层次。',
-      user_prompt: '请根据以下开题报告内容，完成以下任务：\n\n1. 梳理论文大纲结构（章→节→小节，至少3章）\n2. 每章核心内容建议（各100-200字）\n3. 建议的研究方法与技术路线（含数据可视化方案，参考SciPilot可视化标准）\n4. 参考文献方向建议（至少3个领域）\n5. 潜在创新点与注意事项\n\n开题报告内容：\n' + input.substring(0, 8000),
+      user_prompt: '请根据以下开题报告内容，完成以下任务：\n\n1. 梳理论文大纲结构（章→节→小节，至少3章）\n2. 每章核心内容建议（各100-200字）\n3. 建议的研究方法与技术路线（含数据可视化方案，推荐合适的图表类型）\n4. 参考文献方向建议（至少3个领域）\n5. 潜在创新点与注意事项\n\n开题报告内容：\n' + input.substring(0, 8000),
       max_tokens: 2500
     })
   }).then(function(r) { return r.json(); })

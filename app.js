@@ -211,7 +211,78 @@ function navClick2(el){
 }
 
 function extractTextFromXml(xml){var re=/<w:t[^>]*>([^<]*)<\/w:t>/g,parts=[],m;while((m=re.exec(xml))!==null)parts.push(m[1]);return parts.join('').replace(/\s+/g,' ').trim()}
-async function extractRefsFromRawDocx(buf){var zip=await JSZip.loadAsync(buf),xml=await zip.file('word/document.xml').async('string'),idx=xml.lastIndexOf('参考文献');if(idx<0)return[];var tail=xml.substring(idx),paras=[],pm,pr=/<w:p[ >][\s\S]*?<\/w:p>/g;while((pm=pr.exec(tail))!==null)paras.push(pm[0]);if(paras.length<2)return[];var refs=[],sw=/^(致谢|附录|个人简历|声明|获奖|奖项|认证|荣誉|专利|Abstract|攻读|在读)/;for(var i=0;i<paras.length;i++){var t=extractTextFromXml(paras[i]);if(!t)continue;if(/^(?:HYPERLINK|PAGEREF|_Toc)/.test(t))continue;if(sw.test(t))break;if(t.length<10)continue;refs.push({num:refs.length+1,ci:t})}return refs}
+async function extractRefsFromRawDocx(buf){
+  var zip=await JSZip.loadAsync(buf);
+  var xml=await zip.file('word/document.xml').async('string');
+
+  // Find reference boundary: strip XML tags then search for full text "参考文献"
+  var plainXml=xml.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ');
+  var refIdx=plainXml.lastIndexOf('参考文献');
+  // If not found, try common variants
+  if(refIdx<0){refIdx=plainXml.lastIndexOf('參考文獻');}
+  if(refIdx<0){refIdx=plainXml.lastIndexOf('References');}
+  if(refIdx<0){console.log('[refs] No "参考文献" boundary found in document');return [];}
+
+  // Map the plain-text index back to XML position (approximate)
+  var xmlIdx=0, plainPos=0;
+  var inTag=false;
+  for(var i=0;i<xml.length;i++){
+    if(xml[i]==='<'){inTag=true;continue;}
+    if(xml[i]==='>'){inTag=false;continue;}
+    if(inTag)continue;
+    if(plainPos>=refIdx){xmlIdx=i;break;}
+    plainPos++;
+  }
+  if(!xmlIdx){xmlIdx=Math.floor(xml.length*0.75);} // fallback
+
+  // Extract paragraphs after reference boundary
+  var tail=xml.substring(xmlIdx);
+  var paraBlocks=tail.split('<w:p ');
+  var rawParas=[];
+  for(var pbi=1;pbi<paraBlocks.length;pbi++){
+    var pBlock='<w:p '+paraBlocks[pbi];
+    // Skip tables
+    if(pBlock.indexOf('<w:tbl>')>=0||pBlock.indexOf('<w:tbl ')>=0)continue;
+    var txt=extractTextFromXml(pBlock);
+    if(!txt||txt.length<2)continue;
+    // Skip field codes (TOC entries, hyperlinks, page refs)
+    if(/^(?:HYPERLINK|PAGEREF|_Toc|TOC)/.test(txt))continue;
+    if(/^[\s\d.]*$/.test(txt))continue; // pure numbers/dots
+    rawParas.push(txt);
+  }
+
+  if(rawParas.length<2)return [];
+
+  // Merge consecutive paragraphs into proper reference entries
+  var refs=[];
+  var stopWords=/^(致谢|附录|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读|Abstract|Acknowledg)/;
+  var refStart=/^\[?(\d+)\]?[\s\.、．]+/;  // [1] or 1. or 1、
+
+  for(var ri=0;ri<rawParas.length;ri++){
+    var txt=rawParas[ri];
+    if(stopWords.test(txt))break;
+    if(txt.length<8)continue;
+
+    // Check if this paragraph starts a new reference
+    var startM=txt.match(refStart);
+    if(startM){
+      // New reference — start fresh
+      refs.push(txt);
+    } else if(refs.length>0){
+      // Continuation line — merge with previous reference
+      refs[refs.length-1]+=' '+txt;
+    } else {
+      // First ref might not start with a number (e.g. "参考文献" heading line)
+      if(txt==='参考文献'||txt==='參考文獻'||txt==='References')continue;
+      refs.push(txt);
+    }
+  }
+
+  console.log('[refs] Merged '+rawParas.length+' raw lines → '+refs.length+' references');
+  return refs.map(function(ci,i){
+    return {num:i+1,ci:ci.replace(/\s+/g,' ').trim()};
+  });
+}
 function parseRefMeta(ci){
   if(!ci)return{title:'',journal:'',year:'',doi:''};
   var t2=ci.replace(/\s+/g,' ').trim(),title='',journal='',year='',doi='';
@@ -1424,6 +1495,18 @@ function renderCalibrationModal(){
         titleEl.textContent=sname+(toc?' [目录样式]':'');
         info.appendChild(titleEl);
         if(sample){var ex=document.createElement('div');ex.style.cssText='font-size:.62rem;color:#999;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';ex.textContent='例如：'+sample;info.appendChild(ex);}
+        // Show font info if available
+        if(g.fonts&&g.fonts.length){
+          var fi=document.createElement('div');fi.style.cssText='font-size:.58rem;color:#999;margin-top:1px';
+          var fiParts=[];
+          var totalFonts=0;
+          if(g.fonts.length)fiParts.push('🔤 '+g.fonts.slice(0,3).join('|'));
+          if(g.sizes)fiParts.push('📏 '+g.sizes[0]+'-'+g.sizes[1]+'pt');
+          if(g.commonBold)fiParts.push('B');
+          if(g.commonItalic)fiParts.push('I');
+          fi.textContent=fiParts.join(' · ');
+          info.appendChild(fi);
+        }
         row.appendChild(info);
 
         var bgHex=rowCl==='#ccc'?'rgba(0,0,0,0.05)':(rowCl+'10');
@@ -2131,56 +2214,210 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
 
     // === .docx 格式：本地解析 ===
     if(ext==='docx'){
-    // 预解析：从 DOCX 原始 XML 提取每段 Word 样式名（纯字符串拆分，拒绝正则回溯）
+    // ================================================================
+    // PHASE 1: XML 预解析 — 提取样式名 + 字体属性 + 生成 styleMap
+    // ================================================================
     window._docxParaStyleList=[];
+    window._docxFontInfo=[];  // per-paragraph font data for post-processing
+    var mammothOptions={includeDefaultStyleMap:true,transformDocument:function(doc){return doc;}};
     try{
       var docxZip=await JSZip.loadAsync(buf);
       var stylesXml=await docxZip.file('word/styles.xml').async('string');
       var docXml=await docxZip.file('word/document.xml').async('string');
       if(stylesXml&&docXml){
-        // 步骤A：拆分 stylesXml 为独立 <w:style ...> 块，从中提取 styleId → 中文名
-        var styleNameById={};
+        // ----- 步骤A: 从 styles.xml 提取 styleId → 名称 + 默认字体属性 -----
+        var styleNameById={}, styleTypeById={}, styleRprById={};
         var styleBlocks=stylesXml.split('<w:style ');
         for(var sbi=1;sbi<styleBlocks.length;sbi++){
-          var block='<w:style '+styleBlocks[sbi];
-          var idMatch=block.match(/w:styleId="([^"]*)"/);
-          if(!idMatch)continue;
-          var sid2=idMatch[1];
-          var nmMatch=block.match(/<w:name[^>]*w:val="([^"]*)"/);
-          var nm=sid2; // 兜底：用 ID 本身
-          if(nmMatch){
-            nm=nmMatch[1];
-          }
-          styleNameById[sid2]=nm;
-        }
-        console.log('[docx] Parsed '+Object.keys(styleNameById).length+' style names from styles.xml');
+          var block2='<w:style '+styleBlocks[sbi];
+          var idM=block2.match(/w:styleId="([^"]*)"/);
+          if(!idM)continue;
+          var sid2=idM[1];
+          var nmM=block2.match(/<w:name[^>]*w:val="([^"]*)"/);
+          var tpM=block2.match(/w:type="([^"]*)"/);
+          styleNameById[sid2]=nmM?nmM[1]:sid2;
+          styleTypeById[sid2]=tpM?tpM[1]:'paragraph';
 
-        // 步骤B：拆分 documentXml 为独立 <w:p ...> 块
+          // 提取样式级别的 rPr 默认值（自定义样式如 _TJ 系在此定义字体）
+          var defRpr={};
+          var rprBlockM=block2.match(/<w:rPr>([\s\S]*?)<\/w:rPr>/);
+          if(rprBlockM){
+            var drpr=rprBlockM[1];
+            var drfM=drpr.match(/<w:rFonts[^>]*\/?>/);
+            if(drfM){
+              var daM=drfM[0].match(/w:ascii="([^"]*)"/);
+              var dhM=drfM[0].match(/w:hAnsi="([^"]*)"/);
+              var deM=drfM[0].match(/w:eastAsia="([^"]*)"/);
+              var dcM=drfM[0].match(/w:cs="([^"]*)"/);
+              if(daM)defRpr.ascii=daM[1];
+              if(dhM)defRpr.hAnsi=dhM[1];
+              if(deM)defRpr.eastAsia=deM[1];
+              if(dcM)defRpr.cs=dcM[1];
+            }
+            var dszM=drpr.match(/<w:sz[^>]*w:val="(\d+)"/);
+            if(dszM)defRpr.size=parseInt(dszM[1])/2;
+            var dszCsM=drpr.match(/<w:szCs[^>]*w:val="(\d+)"/);
+            if(dszCsM&&!dszM)defRpr.size=parseInt(dszCsM[1])/2;
+            if(drpr.match(/<w:b\s*\/?>/))defRpr.bold=true;
+            if(drpr.match(/<w:i\s*\/?>/))defRpr.italic=true;
+            var dclrM=drpr.match(/<w:color[^>]*w:val="([^"]*)"/);
+            if(dclrM)defRpr.color='#'+dclrM[1];
+          }
+          // Also check pPr > rPr in paragraph styles
+          if(!rprBlockM){
+            var pprBlockM=block2.match(/<w:pPr>([\s\S]*?)<\/w:pPr>/);
+            if(pprBlockM){
+              var ppr=pprBlockM[1];
+              var rprInPprM=ppr.match(/<w:rPr>([\s\S]*?)<\/w:rPr>/);
+              if(rprInPprM){
+                var drpr2=rprInPprM[1];
+                var drfM2=drpr2.match(/<w:rFonts[^>]*\/?>/);
+                if(drfM2){
+                  var daM2=drfM2[0].match(/w:ascii="([^"]*)"/);
+                  var dhM2=drfM2[0].match(/w:hAnsi="([^"]*)"/);
+                  var deM2=drfM2[0].match(/w:eastAsia="([^"]*)"/);
+                  if(daM2)defRpr.ascii=daM2[1];
+                  if(dhM2)defRpr.hAnsi=dhM2[1];
+                  if(deM2)defRpr.eastAsia=deM2[1];
+                }
+                var dszM2=drpr2.match(/<w:sz[^>]*w:val="(\d+)"/);
+                if(dszM2)defRpr.size=parseInt(dszM2[1])/2;
+                if(drpr2.match(/<w:b\s*\/?>/))defRpr.bold=true;
+                if(drpr2.match(/<w:i\s*\/?>/))defRpr.italic=true;
+              }
+            }
+          }
+          if(Object.keys(defRpr).length>0)styleRprById[sid2]=defRpr;
+        }
+        console.log('[docx] Parsed '+Object.keys(styleNameById).length+' styles, '+Object.keys(styleRprById).length+' with default rPr');
+
+        // ----- 步骤B: 动态构建 mammoth styleMap -----
+        // 中文论文字体样式 → HTML heading level 映射
+        var headingPatterns=[
+          {regex:/^(标题\s*1|Heading\s*1|Title\s*1|1\s*级|h1|chapter|第.+章)$/i, tag:'h1'},
+          {regex:/^(标题\s*2|Heading\s*2|Title\s*2|2\s*级|h2)$/i, tag:'h2'},
+          {regex:/^(标题\s*3|Heading\s*3|Title\s*3|3\s*级|h3)$/i, tag:'h3'},
+          {regex:/^(标题\s*4|Heading\s*4|4\s*级|h4)$/i, tag:'h4'},
+          {regex:/^(标题\s*5|Heading\s*5|5\s*级|h5)$/i, tag:'h5'},
+          {regex:/^(标题\s*6|Heading\s*6|6\s*级|h6)$/i, tag:'h6'},
+        ];
+        var styleMap=[];
+        Object.keys(styleNameById).forEach(function(sid){
+          var nm=styleNameById[sid];
+          var tp=styleTypeById[sid]||'paragraph';
+          if(tp!=='paragraph')return; // 只映射段落样式
+          for(var pi=0;pi<headingPatterns.length;pi++){
+            if(headingPatterns[pi].regex.test(nm)){
+              styleMap.push('p[style-name=\''+nm+'\'] => '+headingPatterns[pi].tag+':fresh');
+              break;
+            }
+          }
+        });
+        // 补充通用映射（覆盖 mammoth 默认可能遗漏的）
+        styleMap.push('p[style-name=\'Heading 1\'] => h1:fresh');
+        styleMap.push('p[style-name=\'Heading 2\'] => h2:fresh');
+        styleMap.push('p[style-name=\'Heading 3\'] => h3:fresh');
+        styleMap.push('p[style-name=\'Heading 4\'] => h4:fresh');
+        styleMap.push('p[style-name=\'标题 1\'] => h1:fresh');
+        styleMap.push('p[style-name=\'标题 2\'] => h2:fresh');
+        styleMap.push('p[style-name=\'标题 3\'] => h3:fresh');
+        styleMap.push('p[style-name=\'标题\'] => h1:fresh');
+        styleMap.push('p[style-name=\'Title\'] => h1:fresh');
+        styleMap.push('p[style-name=\'Subtitle\'] => h2:fresh');
+        styleMap.push('p[style-name=\'副标题\'] => h2:fresh');
+        if(styleMap.length>0){
+          mammothOptions.styleMap=styleMap;
+          console.log('[docx] Dynamic styleMap built: '+styleMap.length+' rules');
+        }
+
+        // ----- 步骤C: 从 document.xml 提取段落样式 + 字体信息 -----
         var paraBlocks=docXml.split('<w:p ');
         for(var pbi=1;pbi<paraBlocks.length;pbi++){
-          var pBlock='<w:p '+paraBlocks[pbi];
-          var sm2=pBlock.match(/<w:pStyle[^>]*w:val="([^"]*)"/);
-          var sid3=sm2?sm2[1]:'Normal';
-          var sname=styleNameById[sid3]||sid3;
-          // 提取文本
-          var txt='';
-          var tParts=pBlock.split('<w:t');
-          for(var ti2=1;ti2<tParts.length;ti2++){
-            var tm2=tParts[ti2].match(/>([^<]*)</);
-            if(tm2)txt+=tm2[1];
+          var pBlock2='<w:p '+paraBlocks[pbi];
+          // 段落样式
+          var smM=pBlock2.match(/<w:pStyle[^>]*w:val="([^"]*)"/);
+          var sname=smM?styleNameById[smM[1]]||smM[1]:'Normal';
+          // 段落文本
+          var paraText='';
+          var tParts2=pBlock2.split('<w:t');
+          for(var ti3=1;ti3<tParts2.length;ti3++){
+            var tmM2=tParts2[ti3].match(/>([^<]*)</);
+            if(tmM2)paraText+=tmM2[1];
           }
-          txt=txt.replace(/\s+/g,' ').trim();
-          if(!txt||txt.length<2)continue;
-          if(/^\d{1,3}$/.test(txt)||/^[ivxlcdm]+$/i.test(txt))continue;
-          if(/[\t\s]+\d{1,3}$/.test(txt)||/\.{3,}\d{1,3}$/.test(txt))continue;
-          window._docxParaStyleList.push({text:txt,styleName:sname});
+          paraText=paraText.replace(/\s+/g,' ').trim();
+          if(!paraText||paraText.length<2)continue;
+          if(/^\d{1,3}$/.test(paraText)||/^[ivxlcdm]+$/i.test(paraText))continue;
+          if(/[\t\s]+\d{1,3}$/.test(paraText)||/\.{3,}\d{1,3}$/.test(paraText))continue;
+          window._docxParaStyleList.push({text:paraText,styleName:sname});
+
+          // ---- 提取 run-level 字体属性 (rPr) ----
+          var fontRuns=[];
+          var styleDefRpr=styleRprById[smM?smM[1]:'']||null;
+          var runBlocks=pBlock2.split('<w:r ');
+          // 第一个 split 片段不含 <w:r> 内容，跳过
+          for(var rbi=1;rbi<runBlocks.length;rbi++){
+            var rBlock='<w:r '+runBlocks[rbi];
+            // 提取文本
+            var rTxt='';
+            var rtParts=rBlock.split('<w:t');
+            for(var rti=1;rti<rtParts.length;rti++){
+              var rtm=rtParts[rti].match(/>([^<]*)</);
+              if(rtm)rTxt+=rtm[1];
+            }
+            if(!rTxt)continue;
+            // 提取字体属性
+            var rFonts={},hasVals=false;
+            var rprM=rBlock.match(/<w:rPr[^>]*>([\s\S]*?)<\/w:rPr>/);
+            if(rprM){
+              var rpr=rprM[1];
+              var rfM=rpr.match(/<w:rFonts[^>]*\/>/);
+              if(rfM){
+                var aM=rfM[0].match(/w:ascii="([^"]*)"/);
+                var hM=rfM[0].match(/w:hAnsi="([^"]*)"/);
+                var eM=rfM[0].match(/w:eastAsia="([^"]*)"/);
+                var cM=rfM[0].match(/w:cs="([^"]*)"/);
+                if(aM){rFonts.ascii=aM[1];hasVals=true;}
+                if(hM){rFonts.hAnsi=hM[1];hasVals=true;}
+                if(eM){rFonts.eastAsia=eM[1];hasVals=true;}
+                if(cM){rFonts.cs=cM[1];hasVals=true;}
+              }
+              var szM=rpr.match(/<w:sz[^>]*w:val="(\d+)"/);
+              if(szM){rFonts.size=parseInt(szM[1])/2;hasVals=true;}
+              var szCsM=rpr.match(/<w:szCs[^>]*w:val="(\d+)"/);
+              if(szCsM&&!szM){rFonts.size=parseInt(szCsM[1])/2;hasVals=true;}
+              var bM=rpr.match(/<w:b\s*\/?>/);
+              if(bM){rFonts.bold=true;hasVals=true;}
+              var iM=rpr.match(/<w:i\s*\/?>/);
+              if(iM){rFonts.italic=true;hasVals=true;}
+              var colorM=rpr.match(/<w:color[^>]*w:val="([^"]*)"/);
+              if(colorM){rFonts.color='#'+colorM[1];hasVals=true;}
+            }
+            // 回退到样式级 rPr: run 无 rPr 或 rPr 中无字体数据
+            if(!hasVals && styleDefRpr){
+              rFonts=Object.assign({}, styleDefRpr);
+            }
+            fontRuns.push({text:rTxt,props:rFonts});
+          }
+          // 如果整段没有任何 run 提取到字体，但样式定义了默认字体，至少记一条
+          if(fontRuns.length===0 && styleDefRpr){
+            fontRuns.push({text:paraText,props:Object.assign({},styleDefRpr)});
+          }
+          if(fontRuns.length>0){
+            window._docxFontInfo.push({text:paraText,styleName:sname,runs:fontRuns});
+          }
         }
-        console.log('[docx] _docxParaStyleList:',window._docxParaStyleList.length,'paragraphs with styles');
+        console.log('[docx] _docxParaStyleList: '+window._docxParaStyleList.length+' paragraphs');
+        console.log('[docx] _docxFontInfo: '+window._docxFontInfo.length+' paragraphs with font data');
       }
-    }catch(e){console.warn('[docx] Style pre-parse failed:',e.message);window._docxParaStyleList=[];}
-    // mammoth 渲染
-    var result=await mammoth.convertToHtml({arrayBuffer:buf},{includeDefaultStyleMap:true,transformDocument:function(doc){return doc;}});
+    }catch(e){console.warn('[docx] XML pre-parse failed:',e.message);window._docxParaStyleList=[];window._docxFontInfo=[];}
+
+    // ----- mammoth 渲染 (with dynamic styleMap) -----
+    updLoad('渲染文档样式...','22');
+    var result=await mammoth.convertToHtml({arrayBuffer:buf},mammothOptions);
     manuscriptHTML=result.value;
+    if(result.messages&&result.messages.length){
+      console.log('[mammoth] '+result.messages.length+' messages:',result.messages.slice(0,10));
+    }
     } // end if docx
     manuscriptHTML=manuscriptHTML
       .replace(/<img /g,'<img loading="lazy" style="max-width:100%;height:auto;display:block;margin:10px auto;border-radius:4px" ')
@@ -2198,54 +2435,69 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     if(window._docxParaStyleList&&window._docxParaStyleList.length){
       var domA=thesisBoxEl.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li');
       var sg2={},xl=window._docxParaStyleList;
-      // 位置对齐：同时遍历 XML 列表和 DOM 元素，中间允许 ±3 行偏差
-      var di=0,xi=0;
-      while(di<domA.length&&xi<xl.length){
-        var dE=domA[di],dt=window._normText(dE.textContent||'');
-        // 跳过空白、页码、TOC 条目
-        if(!dt||dt.length<2||/^\d{1,3}$/.test(dt)||/^[ivxlcdm]+$/i.test(dt)||/[	\s]+\d{1,3}$/.test(dt)||/\.{3,}\d{1,3}$/.test(dt)){
-          di++;continue;
-        }
-        // 在当前 XML 位置前后 3 行内找文本匹配
-        var found=false;
-        for(var off=-3;off<=3;off++){
-          var xpos=xi+off;if(xpos<0||xpos>=xl.length)continue;
-          var xt=window._normText(xl[xpos].text);
-          if(xt===dt||(dt.length>=8&&xt.length>=8&&dt.substring(0,20)===xt.substring(0,20))){
-            var sn2=xl[xpos].styleName||'Normal';
-            if(!sg2[sn2])sg2[sn2]={name:sn2,count:0,samples:[],_texts:[],_els:[]};
-            sg2[sn2].count++;
-            if(sg2[sn2].samples.length<4)sg2[sn2].samples.push(dt.substring(0,80));
-            sg2[sn2]._texts.push(dt);
-            sg2[sn2]._els.push(dE);
-            xi=xpos+1;found=true;break;
-          }
-        }
-        if(!found){
-          // 纯文本段落在 XML 中也可能是 "Normal" 样式
-          // 尝试前进 xi，查看下一行是否匹配
-          if(xi+1<xl.length){
-            var nextXt=window._normText(xl[xi+1].text);
-            if(nextXt===dt||(dt.length>=8&&nextXt.length>=8&&dt.substring(0,20)===nextXt.substring(0,20))){
-              xi++; // 跳过当前不匹配的 XML 行
-              var sn3=xl[xi].styleName||'Normal';
-              if(!sg2[sn3])sg2[sn3]={name:sn3,count:0,samples:[],_texts:[],_els:[]};
-              sg2[sn3].count++;
-              if(sg2[sn3].samples.length<4)sg2[sn3].samples.push(dt.substring(0,80));
-              sg2[sn3]._texts.push(dt);
-              sg2[sn3]._els.push(dE);
-              xi++;found=true;
+      // 策略A: 位置映射 + 宽松文本验证 (窗口=10%)
+      var xlClean=[], domClean=[];
+      for(var xi=0;xi<xl.length;xi++){var xt=window._normText(xl[xi].text);if(xt&&xt.length>=2&&!/^\d{1,3}$/.test(xt)&&!/^[ivxlcdm]+$/i.test(xt)&&!/[\t\s]+\d{1,3}$/.test(xt)&&!/\.{3,}\d{1,3}$/.test(xt))xlClean.push(xi);}
+      for(var di=0;di<domA.length;di++){var dt=window._normText(domA[di].textContent||'');if(dt&&dt.length>=2&&!/^\d{1,3}$/.test(dt)&&!/^[ivxlcdm]+$/i.test(dt)&&!/[\t\s]+\d{1,3}$/.test(dt)&&!/\.{3,}\d{1,3}$/.test(dt))domClean.push(di);}
+      var xmlMatched={};
+      for(var dci=0;dci<domClean.length;dci++){
+        var di2=domClean[dci],dE2=domA[di2],dt2=window._normText(dE2.textContent||''),xlApprox=Math.round(dci*xlClean.length/domClean.length),matchXi=-1;
+        var radius=Math.max(15,Math.floor(domClean.length*0.03));
+        for(var off=-radius;off<=radius;off++){var xp=xlApprox+off;if(xp<0||xp>=xlClean.length)continue;var xi2=xlClean[xp],xt2=window._normText(xl[xi2].text);
+          if(xt2===dt2){matchXi=xi2;break;}if(dt2.length>=10&&xt2.length>=10&&dt2.substring(0,30)===xt2.substring(0,30)){matchXi=xi2;break;}
+          if(dt2.length>=8&&xt2.length>=8){var minL=Math.min(dt2.length,xt2.length),mC=0;for(var mc=0;mc<minL;mc++){if(dt2[mc]===xt2[mc])mC++;}if(mC/minL>=0.85){matchXi=xi2;break;}}}
+        if(matchXi>=0){var sn=xl[matchXi].styleName||'Normal';if(!sg2[sn])sg2[sn]={name:sn,count:0,samples:[],_texts:[],_els:[]};sg2[sn].count++;if(sg2[sn].samples.length<5)sg2[sn].samples.push(dt2.substring(0,80));sg2[sn]._texts.push(dt2);sg2[sn]._els.push(dE2);xmlMatched[matchXi]=true;}
+      }
+      // 策略B: 未被DOM匹配的XML段落也全部纳入（保留所有自定义样式）
+      var unm=0;
+      for(var xi3=0;xi3<xl.length;xi3++){if(xmlMatched[xi3])continue;var xt3=window._normText(xl[xi3].text);if(!xt3||xt3.length<2)continue;if(/^\d{1,3}$/.test(xt3)||/^[ivxlcdm]+$/i.test(xt3))continue;if(/[\t\s]+\d{1,3}$/.test(xt3)||/\.{3,}\d{1,3}$/.test(xt3))continue;var sn4=xl[xi3].styleName||'Normal';if(!sg2[sn4])sg2[sn4]={name:sn4,count:0,samples:[],_texts:[],_els:[]};sg2[sn4].count++;if(sg2[sn4].samples.length<5)sg2[sn4].samples.push(xt3.substring(0,80));sg2[sn4]._texts.push(xt3);unm++;}
+      if(unm>0)console.log('[docx] +'+unm+' unmatched XML paragraphs retained');
+      window._docxStyleGroups=Object.values(sg2).sort(function(a,b){return b.count-a.count;});
+      console.log('[docx] '+window._docxStyleGroups.length+' style groups found. Full list:',window._docxStyleGroups.map(function(g){return g.name+'×'+g.count;}).join(', '));
+      // ----- Attach font info to style groups -----
+      var fontInfo=window._docxFontInfo||[];
+      if(fontInfo.length){
+        var fontByStyle={};
+        fontInfo.forEach(function(fp){
+          var sn=fp.styleName||'Normal';
+          if(!fontByStyle[sn])fontByStyle[sn]=new Set();
+          fp.runs.forEach(function(r){
+            var rp=r.props;
+            if(rp.eastAsia)fontByStyle[sn].add(rp.eastAsia);
+            if(rp.cs)fontByStyle[sn].add(rp.cs);
+            if(rp.ascii)fontByStyle[sn].add(rp.ascii);
+            if(rp.hAnsi)fontByStyle[sn].add(rp.hAnsi);
+          });
+        });
+        window._docxStyleGroups.forEach(function(g){
+          var fonts=fontByStyle[g.name];
+          if(fonts&&fonts.size){
+            g.fonts=Array.from(fonts).slice(0,5);
+            // Also attach example sizes
+            var sizes=[];
+            (fontInfo||[]).forEach(function(fp){
+              if(fp.styleName===g.name&&fp.runs){
+                fp.runs.forEach(function(r){if(r.props.size)sizes.push(r.props.size);});
+              }
+            });
+            if(sizes.length){
+              g.sizes=[Math.min.apply(null,sizes),Math.max.apply(null,sizes)];
+              // Check for bold/italic commonality
+              var boldCount=0, italicCount=0, totalRuns=0;
+              (fontInfo||[]).forEach(function(fp){
+                if(fp.styleName===g.name&&fp.runs){
+                  fp.runs.forEach(function(r){
+                    totalRuns++;
+                    if(r.props.bold)boldCount++;
+                    if(r.props.italic)italicCount++;
+                  });
+                }
+              });
+              if(boldCount>totalRuns*0.5)g.commonBold=true;
+              if(italicCount>totalRuns*0.5)g.commonItalic=true;
             }
           }
-        }
-        di++;
-        // 防止无限循环：每 5 个 DOM 元素前进一次 xi
-        if(!found&&di%5===0)xi++;
-      }
-      window._docxStyleGroups=Object.values(sg2).sort(function(a,b){return b.count-a.count;});
-      console.log('[docx] Built '+window._docxStyleGroups.length+' style groups, matched '+xi+'/'+xl.length+' XML paragraphs with '+di+' DOM elements');
-      if(window._docxStyleGroups.length){
-        console.log('[docx] Groups:',window._docxStyleGroups.map(function(g){return g.name+'×'+g.count;}).join(', '));
+        });
       }
     }
     // 兜底：如果没有任何匹配（极少情况），退化为简单文本模式

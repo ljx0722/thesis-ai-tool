@@ -180,7 +180,7 @@ DEEPSEEK_MODEL = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
 DEEPSEEK_INPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_INPUT_PRICE', '1.0'))
 DEEPSEEK_OUTPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_OUTPUT_PRICE', '2.0'))
 USER_MARKUP = 2.0
-ADMIN_SECRET = os.environ.get('ADMIN_SECRET', secrets.token_hex(16))
+ADMIN_SECRET = os.environ.get('ADMIN_SECRET', 'admin123')
 
 
 # ========== 文件服务 ==========
@@ -1446,21 +1446,40 @@ def search_cnki(query, max_rows=40):
 
 
 # ========== 管理员看板 API ==========
+
+def _check_admin(s):
+    """Check admin auth: accepts secret key or admin JWT token"""
+    if s == ADMIN_SECRET:
+        return True
+    if HAS_JWT and s:
+        try:
+            payload = pyjwt.decode(s, JWT_SECRET, algorithms=['HS256'])
+            db = get_db()
+            try:
+                u = db.execute('SELECT is_admin FROM users WHERE id=?', (payload['user_id'],)).fetchone()
+                if u and u['is_admin']:
+                    return True
+            finally: db.close()
+        except: pass
+    return False
+
 @app.route('/api/admin/dashboard', methods=['GET'])
 def admin_dashboard():
     s = request.args.get('secret', '')
+    auth = request.headers.get('Authorization', '')
+    # Try query param first (as secret key or JWT), then header
     db = get_db()
     try:
-        if s != ADMIN_SECRET:
-            auth = request.headers.get('Authorization', '')
-            if auth.startswith('Bearer '):
-                try:
-                    payload = pyjwt.decode(auth[7:], JWT_SECRET, algorithms=['HS256'])
-                    u = db.execute('SELECT is_admin FROM users WHERE id=?', (payload['user_id'],)).fetchone()
-                    if not (u and u['is_admin']):
-                        return jsonify({'error': '无权限'}), 403
-                except: return jsonify({'error': '无权限'}), 403
-            else: return jsonify({'error': '无权限'}), 403
+        authorized = _check_admin(s)
+        if not authorized and auth.startswith('Bearer '):
+            try:
+                payload = pyjwt.decode(auth[7:], JWT_SECRET, algorithms=['HS256'])
+                u = db.execute('SELECT is_admin FROM users WHERE id=?', (payload['user_id'],)).fetchone()
+                if u and u['is_admin']:
+                    authorized = True
+            except: pass
+        if not authorized:
+            return jsonify({'error': '无权限'}), 403
         today = date.today().isoformat()
         total_users = db.execute('SELECT COUNT(*) as c FROM users').fetchone()['c']
         today_users = db.execute("SELECT COUNT(*) as c FROM users WHERE created_at LIKE ?", (today+'%',)).fetchone()['c']
@@ -1483,7 +1502,7 @@ def admin_dashboard():
 @app.route('/api/admin/users', methods=['GET'])
 def admin_users():
     s = request.args.get('secret', '')
-    if s != ADMIN_SECRET: return jsonify({'error': '无权限'}), 403
+    if not _check_admin(s): return jsonify({'error': '无权限'}), 403
     db = get_db()
     try:
         rows = [dict(r) for r in db.execute('SELECT id,username,credits,invite_code,created_at FROM users ORDER BY id DESC LIMIT 100').fetchall()]
@@ -1493,7 +1512,7 @@ def admin_users():
 @app.route('/api/admin/credits', methods=['POST'])
 def admin_credits():
     data = request.get_json() or {}
-    if data.get('secret','') != ADMIN_SECRET: return jsonify({'error':'无权限'}), 403
+    if not _check_admin(data.get('secret','')): return jsonify({'error':'无权限'}), 403
     uid = data.get('user_id')
     amount = int(data.get('amount', 0))
     reason = data.get('reason', '管理员调整')

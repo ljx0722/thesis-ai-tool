@@ -14,116 +14,73 @@
 <div id="loginOverlay">
   <div class="login-bg">
     <div class="login-bg-grid"></div>
-    <div class="login-bg-accent"></div>
   </div>
 
-  <!-- Brand Header -->
-  <div class="landing-header">
-    <h1 class="landing-brand-title">学术论文AI一站式助手</h1>
-    <p class="landing-brand-sub">上传 · 解析 · 检索 · 评审 — 一站式论文工作台</p>
-  </div>
+  <div class="landing-container">
+    <!-- Left: Hero + Feature Grid -->
+    <div class="landing-hero">
+      <div class="landing-brand">
+        <h1 class="landing-title">学术论文AI<br>一站式助手</h1>
+        <p class="landing-desc">从选题到答辩，覆盖论文写作全流程的智能工作台。<br>上传 DOCX，即刻获得文献检索、格式检查、AI 审阅与知识图谱。</p>
+      </div>
 
-  <!-- Body -->
-  <div class="landing-body">
-        <!-- Left: Feature Bento Grid -->
-    <div class="landing-showcase">
-      <div class="bento-grid">
-        <!-- Hero card: DOCX -->
-        <div class="bento-card">
-          <div class="bento-card-body">
-            <div class="bento-card-icon" style="--card-accent:#818cf8">📄</div>
-            <div class="bento-card-text">
-              <h4>DOCX 智能解析</h4>
-              <p>上传 Word 文档，自动识别章、节、小节层级，构建完整五层目录树</p>
-            </div>
+      <div class="landing-features">
+        <div class="feature-item">
+          <div class="feature-icon" style="--fa:#818cf8">📄</div>
+          <div class="feature-text">
+            <span class="feature-title">DOCX 智能解析</span>
+            <span class="feature-sub">五层目录树 · 样式识别 · 章节结构化</span>
           </div>
         </div>
-
-        <!-- Hero card: 文献检索 -->
-        <div class="bento-card">
-          <div class="bento-card-body">
-            <div class="bento-card-icon" style="--card-accent:#a78bfa">🔍</div>
-            <div class="bento-card-text">
-              <h4>12 源文献检索</h4>
-              <p>并发检索全球 12 个学术数据库，智能平衡中英文比例与时效性</p>
-            </div>
+        <div class="feature-item">
+          <div class="feature-icon" style="--fa:#a78bfa">🔍</div>
+          <div class="feature-text">
+            <span class="feature-title">14 源文献检索</span>
+            <span class="feature-sub">OpenAlex · Crossref · Semantic Scholar · arXiv 等</span>
           </div>
         </div>
-
-        <!-- Medium: 知识图谱 -->
-        <div class="bento-card bento-med">
-          <div class="bento-card-body">
-            <div class="bento-card-icon" style="--card-accent:#22d3ee">🕸️</div>
-            <div class="bento-card-text">
-              <h4>知识图谱</h4>
-              <p>主题词共现网络、词云、文献时间线三种可视化视图</p>
-            </div>
+        <div class="feature-item">
+          <div class="feature-icon" style="--fa:#22d3ee">🕸️</div>
+          <div class="feature-text">
+            <span class="feature-title">知识图谱</span>
+            <span class="feature-sub">词云 · 共现网络 · 文献时间线</span>
           </div>
         </div>
-
-        <!-- Medium: 评估报告 -->
-        <div class="bento-card bento-med">
-          <div class="bento-card-body">
-            <div class="bento-card-icon" style="--card-accent:#f59e0b">📊</div>
-            <div class="bento-card-text">
-              <h4>十维评估报告</h4>
-              <p>10 维度评分 + 雷达图 + 优先改进建议 + 章节分析</p>
-            </div>
+        <div class="feature-item">
+          <div class="feature-icon" style="--fa:#f59e0b">📊</div>
+          <div class="feature-text">
+            <span class="feature-title">十维评估报告</span>
+            <span class="feature-sub">雷达图 · 章节分析 · 优先改进建议</span>
           </div>
         </div>
-
-        <!-- Medium: 论文查错 -->
-        <div class="bento-card bento-med">
-          <div class="bento-card-body">
-            <div class="bento-card-icon" style="--card-accent:#34d399">✏️</div>
-            <div class="bento-card-text">
-              <h4>论文查错</h4>
-              <p>AI逐句扫描语病/标点/重复句</p>
-            </div>
+        <div class="feature-item">
+          <div class="feature-icon" style="--fa:#34d399">✏️</div>
+          <div class="feature-text">
+            <span class="feature-title">AI 论文审阅</span>
+            <span class="feature-sub">查错 · 降重 · 术语分析 · 段落诊断</span>
           </div>
         </div>
-        <!-- Medium: 查重降重 -->
-        <div class="bento-card bento-med">
-          <div class="bento-card-body">
-            <div class="bento-card-icon" style="--card-accent:#22d3ee">📋</div>
-            <div class="bento-card-text">
-              <h4>查重降重</h4>
-              <p>相似度检测 + AI智能改写降重</p>
-            </div>
-          </div>
-        </div>
-        <!-- Medium: 答辩PPT -->
-        <div class="bento-card bento-med">
-          <div class="bento-card-body">
-            <div class="bento-card-icon" style="--card-accent:#f59e0b">📊</div>
-            <div class="bento-card-text">
-              <h4>答辩PPT大纲</h4>
-              <p>从论文自动生成15-20页PPT大纲</p>
-            </div>
-          </div>
-        </div>
-        <!-- Medium: 英文摘要 -->
-        <div class="bento-card bento-med">
-          <div class="bento-card-body">
-            <div class="bento-card-icon" style="--card-accent:#f472b6">🌐</div>
-            <div class="bento-card-text">
-              <h4>英文摘要</h4>
-              <p>中→英翻译或已有英文润色优化</p>
-            </div>
+        <div class="feature-item">
+          <div class="feature-icon" style="--fa:#f472b6">🌐</div>
+          <div class="feature-text">
+            <span class="feature-title">答辩输出</span>
+            <span class="feature-sub">PPT 大纲 · 英文摘要 · 开题报告</span>
           </div>
         </div>
       </div>
 
-      <!-- Stats bar -->
-            <div class="landing-highlights">
-        <div class="landing-hl-item">🎯 选题→答辩<span style="font-size:.55rem;display:block;color:rgba(255,255,255,.2)">全流程覆盖</span></div>
-        <div class="landing-hl-item">🤖 AI驱动<span style="font-size:.55rem;display:block;color:rgba(255,255,255,.2)">16个智能模块</span></div>
-        <div class="landing-hl-item">📚 14源检索<span style="font-size:.55rem;display:block;color:rgba(255,255,255,.2)">全球学术数据库</span></div>
-        <div class="landing-hl-item">✨ 0.3点起<span style="font-size:.55rem;display:block;color:rgba(255,255,255,.2)">每日首次免费</span></div>
+      <div class="landing-metrics">
+        <div class="metric"><span class="metric-num">14</span><span class="metric-label">学术数据源</span></div>
+        <div class="metric-div"></div>
+        <div class="metric"><span class="metric-num">16</span><span class="metric-label">AI 智能模块</span></div>
+        <div class="metric-div"></div>
+        <div class="metric"><span class="metric-num">GB/T 7714</span><span class="metric-label">标准参考文献</span></div>
+        <div class="metric-div"></div>
+        <div class="metric"><span class="metric-num">0.3 点</span><span class="metric-label">每日首次免费</span></div>
       </div>
     </div>
 
-    <!-- Right: Login -->
+    <!-- Right: Login Card -->
     <div class="landing-login">
       <div class="login-card-v2">
         <h3 class="login-card-title" id="loginCardTitle">登录系统</h3>
@@ -146,12 +103,12 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </button>
         </div>
-        <div class="login-switch" style="text-align:center;margin-top:12px;font-size:.68rem;color:rgba(255,255,255,.3)">
+        <div class="login-switch">
           <span id="loginSwitchText">还没有账号？</span>
-          <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06)">
-            <input type="text" id="regInviteCode" placeholder="邀请码(选填)" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px 12px;font-size:.75rem;color:#e2e8f0;width:100%;box-sizing:border-box;outline:none">
+          <div class="login-invite-row">
+            <input type="text" id="regInviteCode" placeholder="邀请码（选填）">
           </div>
-          <a href="javascript:void(0)" id="loginSwitchLink" onclick="toggleRegMode()" style="color:#818cf8;text-decoration:none;font-weight:600">立即注册</a>
+          <a href="javascript:void(0)" id="loginSwitchLink" onclick="toggleRegMode()">立即注册</a>
         </div>
       </div>
     </div>
@@ -219,37 +176,37 @@
       <div class="nav-group">
         <div class="nav-group-title" onclick="toggleNavGroup(this)">🎯 选题阶段 <span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
-          <div class="nav-item" data-module="topic-finder" onclick="switchModule('topic-finder')">💡 选题推荐</div>
-          <div class="nav-item" data-module="proposal" onclick="switchModule('proposal')">📝 开题大纲</div>
+          <div class="nav-item" data-module="topic-finder" data-needs-thesis="0" onclick="switchModule('topic-finder')" title="无需上传论文，直接输入领域获取推荐">💡 选题推荐</div>
+          <div class="nav-item" data-module="proposal" data-needs-thesis="0" onclick="switchModule('proposal')" title="无需上传论文，粘贴开题报告即可">📝 开题大纲</div>
         </div>
       </div>
       <div class="nav-group">
         <div class="nav-group-title" onclick="toggleNavGroup(this)">📝 撰写阶段 <span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
-          <div class="nav-item" data-module="references" onclick="switchModule('references')">📋 参考文献</div>
-          <div class="nav-item" data-module="expand" onclick="switchModule('expand')">✍️ 论文扩写</div>
-          <div class="nav-item" data-module="data-analysis" onclick="switchModule('data-analysis')">📈 数据分析</div>
-          <div class="nav-item" data-module="knowledge-graph" onclick="switchModule('knowledge-graph')">🕸️ 知识图谱</div>
+          <div class="nav-item" data-module="references" data-needs-thesis="1" onclick="switchModule('references')" title="需要上传论文">📋 参考文献</div>
+          <div class="nav-item" data-module="expand" data-needs-thesis="1" onclick="switchModule('expand')" title="需要上传论文">✍️ 论文扩写</div>
+          <div class="nav-item" data-module="data-analysis" data-needs-thesis="0" onclick="switchModule('data-analysis')" title="无需上传论文，上传Excel/CSV即可">📈 数据分析</div>
+          <div class="nav-item" data-module="knowledge-graph" data-needs-thesis="1" onclick="switchModule('knowledge-graph')" title="需要上传论文">🕸️ 知识图谱</div>
         </div>
       </div>
       <div class="nav-group">
         <div class="nav-group-title" onclick="toggleNavGroup(this)">🔍 打磨阶段 <span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
-          <div class="nav-item" data-module="proofread" onclick="switchModule('proofread')">✏️ 论文查错</div>
-          <div class="nav-item" data-module="de-duplicate" onclick="switchModule('de-duplicate')">📋 查重降重</div>
-          <div class="nav-item" data-module="format-check" onclick="switchModule('format-check')">✅ 格式检查</div>
-          <div class="nav-item" data-module="terminology" onclick="switchModule('terminology')">🔤 术语分析</div>
-          <div class="nav-item" data-module="paragraph" onclick="switchModule('paragraph')">📝 段落分析</div>
+          <div class="nav-item" data-module="proofread" data-needs-thesis="0" onclick="switchModule('proofread')" title="无需上传论文，粘贴文本即可检查">✏️ 论文查错</div>
+          <div class="nav-item" data-module="de-duplicate" data-needs-thesis="0" onclick="switchModule('de-duplicate')" title="无需上传论文，粘贴文本即可降重">📋 查重降重</div>
+          <div class="nav-item" data-module="format-check" data-needs-thesis="1" onclick="switchModule('format-check')" title="需要上传论文">✅ 格式检查</div>
+          <div class="nav-item" data-module="terminology" data-needs-thesis="1" onclick="switchModule('terminology')" title="需要上传论文">🔤 术语分析</div>
+          <div class="nav-item" data-module="paragraph" data-needs-thesis="1" onclick="switchModule('paragraph')" title="需要上传论文">📝 段落分析</div>
         </div>
       </div>
       <div class="nav-group">
         <div class="nav-group-title" onclick="toggleNavGroup(this)">📊 评审输出 <span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
-          <div class="nav-item" data-module="review" onclick="switchModule('review')">🔍 论文审阅</div>
-          <div class="nav-item" data-module="optimization" onclick="switchModule('optimization')">💡 优化建议</div>
-          <div class="nav-item" data-module="defense-ppt" onclick="switchModule('defense-ppt')">📊 答辩PPT</div>
-          <div class="nav-item" data-module="en-abstract" onclick="switchModule('en-abstract')">🌐 英文摘要</div>
-          <div class="nav-item" data-module="dashboard" onclick="switchModule('dashboard')">📊 论文看板</div>
+          <div class="nav-item" data-module="review" data-needs-thesis="1" onclick="switchModule('review')" title="需要上传论文">🔍 论文审阅</div>
+          <div class="nav-item" data-module="optimization" data-needs-thesis="1" onclick="switchModule('optimization')" title="需要上传论文">💡 优化建议</div>
+          <div class="nav-item" data-module="defense-ppt" data-needs-thesis="0" onclick="switchModule('defense-ppt')" title="无需上传论文，粘贴摘要即可生成">📊 答辩PPT</div>
+          <div class="nav-item" data-module="en-abstract" data-needs-thesis="0" onclick="switchModule('en-abstract')" title="无需上传论文，粘贴文本即可翻译/润色">🌐 英文摘要</div>
+          <div class="nav-item" data-module="dashboard" data-needs-thesis="1" onclick="switchModule('dashboard')" title="需要上传论文">📊 论文看板</div>
         </div>
       </div>
     </div>
@@ -761,39 +718,43 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 </script>
 
 <!-- ====== 充值弹窗 ====== -->
-<div id="rechargeModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);z-index:100005;align-items:center;justify-content:center" onclick="hideRechargeModal()">
-  <div style="background:#1e1b2e;border-radius:16px;padding:24px;width:440px;max-width:92%;max-height:80vh;overflow-y:auto;border:1px solid rgba(255,255,255,.1);box-shadow:0 20px 60px rgba(0,0,0,.5)" onclick="event.stopPropagation()">
+<div id="rechargeModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg-overlay);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:100005;align-items:center;justify-content:center" onclick="hideRechargeModal()">
+  <div style="background:var(--bg-card);border-radius:var(--radius-xl);padding:24px;width:440px;max-width:92%;max-height:80vh;overflow-y:auto;border:1px solid var(--border);box-shadow:var(--shadow-lg)" onclick="event.stopPropagation()">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <h3 style="font-size:1rem;color:#f1f5f9;margin:0">充值</h3>
-      <button onclick="hideRechargeModal()" style="background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;font-size:1.2rem">&times;</button>
+      <h3 style="font-size:var(--font-size-xl);color:var(--text-primary);margin:0;font-weight:var(--font-weight-bold)">充值</h3>
+      <button onclick="hideRechargeModal()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.2rem;font-family:var(--font-sans)">&times;</button>
     </div>
-    <p style="font-size:.75rem;color:rgba(255,255,255,.5);margin:0 0 12px">点数: <strong id="rechargeBalance" style="color:#f1f5f9">0.00</strong> 元</p>
-    <h4 style="font-size:.78rem;color:rgba(255,255,255,.6);margin:0 0 8px">选择充值金额</h4>
+    <p style="font-size:var(--font-size-md);color:var(--text-muted);margin:0 0 12px">点数: <strong id="rechargeBalance" style="color:var(--text-primary)">0.00</strong> 点</p>
+    <h4 style="font-size:var(--font-size-base);color:var(--text-secondary);margin:0 0 8px;font-weight:var(--font-weight-semibold)">选择充值金额</h4>
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-      <button class="recharge-amt-btn" data-amt="1" onclick="selectRechargeAmount(1)" style="flex:1;min-width:60px;padding:10px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.7);cursor:pointer;font-size:.78rem;font-weight:600">1元<span style="display:block;font-size:.5rem;color:rgba(255,255,255,.2);margin-top:1px">=1.0点</span></button>
-      <button class="recharge-amt-btn" data-amt="5" onclick="selectRechargeAmount(5)" style="flex:1;min-width:60px;padding:10px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.7);cursor:pointer;font-size:.78rem;font-weight:600">5元<span style="display:block;font-size:.5rem;color:rgba(255,255,255,.2);margin-top:1px">=5.0点</span></button>
-      <button class="recharge-amt-btn" data-amt="10" onclick="selectRechargeAmount(10)" style="flex:1;min-width:60px;padding:10px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.7);cursor:pointer;font-size:.78rem;font-weight:600">10元<span style="display:block;font-size:.5rem;color:rgba(255,255,255,.2);margin-top:1px">=10.0点</span></button>
-      <button class="recharge-amt-btn" data-amt="20" onclick="selectRechargeAmount(20)" style="flex:1;min-width:60px;padding:10px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.7);cursor:pointer;font-size:.78rem;font-weight:600">20元<span style="display:block;font-size:.5rem;color:rgba(255,255,255,.2);margin-top:1px">=20.0点</span></button>
-      <button class="recharge-amt-btn" data-amt="50" onclick="selectRechargeAmount(50)" style="flex:1;min-width:60px;padding:10px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.7);cursor:pointer;font-size:.78rem;font-weight:600">50元<span style="display:block;font-size:.5rem;color:rgba(255,255,255,.2);margin-top:1px">=50.0点</span></button>
+      <button class="recharge-amt-btn" data-amt="1" onclick="selectRechargeAmount(1)">1元<span style="display:block;font-size:.5rem;opacity:.4;margin-top:1px">=1.0点</span></button>
+      <button class="recharge-amt-btn" data-amt="5" onclick="selectRechargeAmount(5)">5元<span style="display:block;font-size:.5rem;opacity:.4;margin-top:1px">=5.0点</span></button>
+      <button class="recharge-amt-btn" data-amt="10" onclick="selectRechargeAmount(10)">10元<span style="display:block;font-size:.5rem;opacity:.4;margin-top:1px">=10.0点</span></button>
+      <button class="recharge-amt-btn" data-amt="20" onclick="selectRechargeAmount(20)">20元<span style="display:block;font-size:.5rem;opacity:.4;margin-top:1px">=20.0点</span></button>
+      <button class="recharge-amt-btn" data-amt="50" onclick="selectRechargeAmount(50)">50元<span style="display:block;font-size:.5rem;opacity:.4;margin-top:1px">=50.0点</span></button>
     </div>
-    <div id="rechargePayment" style="display:none;padding:14px;background:rgba(255,255,255,.02);border-radius:12px;border:1px solid rgba(255,255,255,.06);margin-bottom:12px">
-      <h4 style="font-size:.75rem;color:rgba(255,255,255,.5);margin:0 0 8px">扫码支付</h4>
+    <div id="rechargePayment" style="display:none;padding:14px;background:var(--surface-alt);border-radius:var(--radius-lg);border:1px solid var(--border);margin-bottom:12px">
+      <h4 style="font-size:var(--font-size-md);color:var(--text-muted);margin:0 0 8px;font-weight:var(--font-weight-semibold)">扫码支付</h4>
       <div style="display:flex;gap:8px;margin-bottom:10px">
-        <button class="qr-tab-btn active" data-method="alipay" onclick="switchQR('alipay')" style="flex:1;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(99,102,241,.15);color:#c7d2fe;cursor:pointer;font-size:.7rem">支付宝</button>
-        <button class="qr-tab-btn" data-method="wechat" onclick="switchQR('wechat')" style="flex:1;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);color:rgba(255,255,255,.5);cursor:pointer;font-size:.7rem">微信</button>
+        <button class="qr-tab-btn active" data-method="alipay" onclick="switchQR('alipay')">支付宝</button>
+        <button class="qr-tab-btn" data-method="wechat" onclick="switchQR('wechat')">微信</button>
       </div>
       <div style="text-align:center;margin-bottom:8px">
-        <img id="qrImage" src="static/qr-alipay.png" alt="收款码" style="width:180px;height:180px;border-radius:8px;background:rgba(255,255,255,.05);object-fit:contain">
+        <img id="qrImage" src="static/qr-alipay.png" alt="收款码" style="width:180px;height:180px;border-radius:var(--radius-md);background:var(--surface-alt);object-fit:contain">
       </div>
-      <button onclick="submitRecharge()" style="width:100%;padding:10px;border-radius:10px;border:none;background:#6366f1;color:#fff;cursor:pointer;font-weight:700;font-size:.8rem">我已支付，提交申请</button>
-      <p style="font-size:.58rem;color:rgba(255,255,255,.2);text-align:center;margin:6px 0 0">支付完成后请等待管理员确认</p>
+      <button onclick="submitRecharge()" style="width:100%;padding:10px;border-radius:var(--radius-md);border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:var(--font-weight-bold);font-size:var(--font-size-base);font-family:var(--font-sans);transition:all var(--duration-fast)">我已支付，提交申请</button>
+      <p style="font-size:var(--font-size-xs);color:var(--text-muted);text-align:center;margin:6px 0 0">支付完成后请等待管理员确认</p>
     </div>
-    <h4 style="font-size:.75rem;color:rgba(255,255,255,.5);margin:12px 0 6px">修改密码</h4><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input type="password" id="pwOld" placeholder="原密码" style="flex:1;min-width:80px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:7px 10px;font-size:.7rem;color:#e2e8f0;outline:none"><input type="password" id="pwNew" placeholder="新密码(6位+)" style="flex:1;min-width:80px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:7px 10px;font-size:.7rem;color:#e2e8f0;outline:none"><button onclick="changePassword()" style="padding:7px 14px;border:none;border-radius:8px;background:#6366f1;color:#fff;font-size:.7rem;cursor:pointer;font-weight:600">修改</button></div><div id="pwMsg" style="font-size:.62rem;min-height:14px;margin-top:4px"></div>
-  充值记录</h4>
-    <div id="rechargeHistory" style="max-height:160px;overflow-y:auto;font-size:.7rem;color:rgba(255,255,255,.5)"></div>
+    <h4 style="font-size:var(--font-size-md);color:var(--text-secondary);margin:12px 0 6px;font-weight:var(--font-weight-semibold)">修改密码</h4>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <input type="password" id="pwOld" placeholder="原密码" style="flex:1;min-width:80px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;font-size:var(--font-size-sm);color:var(--text-primary);outline:none;font-family:var(--font-sans)">
+      <input type="password" id="pwNew" placeholder="新密码(6位+)" style="flex:1;min-width:80px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;font-size:var(--font-size-sm);color:var(--text-primary);outline:none;font-family:var(--font-sans)">
+      <button onclick="changePassword()" style="padding:7px 14px;border:none;border-radius:var(--radius-sm);background:var(--accent);color:#fff;font-size:var(--font-size-sm);cursor:pointer;font-weight:var(--font-weight-semibold);font-family:var(--font-sans)">修改</button>
+    </div>
+    <div id="pwMsg" style="font-size:var(--font-size-xs);min-height:14px;margin-top:4px"></div>
+    <h4 style="font-size:var(--font-size-md);color:var(--text-secondary);margin:12px 0 6px;font-weight:var(--font-weight-semibold)">充值记录</h4>
+    <div id="rechargeHistory" style="max-height:160px;overflow-y:auto;font-size:var(--font-size-sm);color:var(--text-muted)"></div>
   </div>
 </div>
-
-<style>.recharge-amt-btn.active{border-color:#6366f1!important;background:rgba(99,102,241,.15)!important;color:#c7d2fe!important}.qr-tab-btn.active{background:rgba(99,102,241,.15)!important;color:#c7d2fe!important}</style>
 
 </body></html>
