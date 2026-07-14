@@ -252,7 +252,7 @@ function updateStatusBar2() {
 function onThesisLoaded() {
   _thesisLoaded = true; _analysisCache = {}; kgCurrentData = null;
   updateBarActions(); updateStatusBar2();
-  switchView('refs');
+  switchView('references');
 }
 
 function switchView(view) {
