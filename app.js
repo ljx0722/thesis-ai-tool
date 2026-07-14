@@ -2138,25 +2138,33 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
       var stylesXml=await docxZip.file('word/styles.xml').async('string');
       var docXml=await docxZip.file('word/document.xml').async('string');
       if(stylesXml&&docXml){
-        var styleMap={};
-        var reS=new RegExp('<w:style[^>]*w:styleId="([^"]*)"[^>]*>[^]*?<w:name[^>]*w:val="([^"]*)"[^]*?<\\/w:style>','g');
-        var mS;
-        while((mS=reS.exec(stylesXml))!==null)styleMap[mS[1]]=mS[2];
-        var reP=new RegExp('<w:p[ >][^]*?<\\/w:p>','g');
+        var styleNameById={};
+        var reS, mS;
+
+        // 样式 ID → 样式名
+        reS =/<w:style[^>]*w:styleId="([^"]*)"[\s\S]*?<w:name[^>]*w:val="([^"]*)"[\s\S]*?<\/w:style>/g;
+        while((mS=reS.exec(stylesXml))!==null){styleNameById[mS[1]]=mS[2];}
+        console.log('[docx] Parsed styleNameById:',Object.keys(styleNameById).length,'styles');
+
+        // 每段：提取 <w:pStyle w:val="..."> 的样式 ID，然后查名字
+        var reP =/<w:p[ >][\s\S]*?<\/w:p>/g;
         var mP;
         while((mP=reP.exec(docXml))!==null){
           var p=mP[0];
           var sm=p.match(/<w:pStyle[^>]*w:val="([^"]*)"/);
           var sid=sm?sm[1]:'Normal';
-          var sname=styleMap[sid]||sid;
-          var tx=[],tr=new RegExp('<w:t[^>]*>([^<]*)<\\/w:t>','g'),tm;
-          while((tm=tr.exec(p))!==null)tx.push(tm[1]);
+          var sname=styleNameById[sid]||sid;
+          var tx=[];
+          var tr=/<w:t[^>]*>([^<]*)<\/w:t>/g;
+          var tm;
+          while((tm=tr.exec(p))!==null){tx.push(tm[1]);}
           var txt=tx.join('').replace(/\s+/g,' ').trim();
           if(!txt||txt.length<2)continue;
           if(/^\d{1,3}$/.test(txt)||/^[ivxlcdm]+$/i.test(txt))continue;
           if(/[\t\s]+\d{1,3}$/.test(txt)||/\.{3,}\d{1,3}$/.test(txt))continue;
           window._docxParaStyleList.push({text:txt,styleName:sname});
         }
+        console.log('[docx] _docxParaStyleList:',window._docxParaStyleList.length,'paragraphs with styles');
       }
     }catch(e){console.warn('[docx] Style pre-parse failed:',e.message);window._docxParaStyleList=[];}
     // mammoth 渲染
