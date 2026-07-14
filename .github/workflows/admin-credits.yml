@@ -1,0 +1,27 @@
+name: Admin Credit Adjustment
+
+on:
+  workflow_dispatch:
+
+jobs:
+  add-credits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+      - name: Add 500 credits to admin
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.SEALOS_KUBECONFIG }}" | base64 -d > ~/.kube/config
+          kubectl exec -n ns-mzyybqj8 deployment/thesis-ai-tool -- python3 -c "
+import sqlite3
+conn = sqlite3.connect('/app/data/thesis.db')
+u = conn.execute('SELECT id, credits FROM users WHERE username=\"admin\"').fetchone()
+print(f'Before: {u[\"credits\"]} credits')
+conn.execute('UPDATE users SET credits = credits + 500 WHERE username=\"admin\"')
+conn.commit()
+u2 = conn.execute('SELECT credits FROM users WHERE username=\"admin\"').fetchone()
+print(f'After: {u2[\"credits\"]} credits (added 50.0 points)')
+conn.close()
+"
