@@ -178,7 +178,7 @@
   <div class="bar-right">
     <span id="statusBar" style="font-size:.62rem;color:var(--m)">等待上传...</span>
     <span id="balanceBar" style="font-size:.65rem;color:rgba(255,255,255,.4);cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.06);padding:3px 10px;border-radius:12px;margin-left:6px" onclick="showRechargeModal()" title="点击充值">✨ <strong id="balanceAmount" style="color:#fff;font-weight:700">0.0</strong> 点 <span style="font-size:.5rem;color:rgba(255,255,255,.3)">+</span></span>
-    <button onclick="doLogout()" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:6px">登出</button>
+    <button onclick="window.location.href='/admin.html'" style="background:rgba(99,102,241,.15);color:#c7d2fe;border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:4px;display:none" id="adminPanelBtn" title="管理员看板">⚙️</button><button onclick="doLogout()" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:6px">登出</button>
   </div>
 </div>
 <!-- ====== 更新日志按钮 ====== -->
@@ -546,6 +546,12 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
         if (d.success) {
           sessionStorage.setItem(TOKEN_KEY, d.token);
           sessionStorage.setItem(USER_KEY, JSON.stringify(d.user));
+          if (d.user.is_admin) {
+            // Admin: redirect to admin dashboard
+            sessionStorage.setItem('thesis_ai_admin_secret', d.token);
+            window.location.href = '/admin.html';
+            return;
+          }
           hideLogin();
           updateBalanceDisplay();
         } else { err.textContent = d.error; }
@@ -586,6 +592,13 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 
   // 余额更新
   window.updateBalanceDisplay = function() {
+    // Show admin panel button if admin
+    var userData = null;
+    try { userData = JSON.parse(sessionStorage.getItem('thesis_ai_user')||'{}'); } catch(e) {}
+    if (userData && userData.is_admin) {
+      var adminBtn = document.getElementById('adminPanelBtn');
+      if (adminBtn) adminBtn.style.display = '';
+    }
     var token = sessionStorage.getItem(TOKEN_KEY);
     if (!token) return;
     var balEl = document.getElementById('balanceAmount');
