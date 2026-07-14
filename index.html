@@ -591,15 +591,42 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
   window.submitRecharge = function() {
     if (!window._selectedAmount) { alert('请选择充值金额'); return; }
     var token = sessionStorage.getItem(TOKEN_KEY);
+    // Step 1: Create order + show QR
     fetch('/api/payment/recharge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify({ amount_yuan: window._selectedAmount, payment_method: window._selectedPayment })
     }).then(function(r) { return r.json(); })
       .then(function(d) {
-        if (d.success) { alert(d.message); window.hideRechargeModal(); updateBalanceDisplay(); }
-        else { alert(d.error); }
+        if (d.success) {
+          alert('请扫码支付 ¥'+window._selectedAmount+'，支付完成后回来点击"确认已支付"');
+          // Change button to "确认已支付" mode
+          var btn = document.querySelector('#rechargePayment button');
+          if (btn) { btn.textContent = '✅ 确认已支付，提交审核'; btn.onclick = confirmPaid; }
+        } else { alert(d.error); }
       }).catch(function() { alert('网络错误'); });
+  };
+  window.confirmPaid = function() {
+    // Re-submit recharge to get latest pending order ID, then mark submitted
+    var token = sessionStorage.getItem(TOKEN_KEY);
+    fetch('/api/payment/orders', { headers: { 'Authorization': 'Bearer ' + token } })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.success && d.orders && d.orders.length) {
+          var last = d.orders[0];
+          if (last.status === 'pending') {
+            fetch('/api/payment/submit', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+              body: JSON.stringify({ order_id: last.id })
+            }).then(function(r2) { return r2.json(); })
+              .then(function(d2) {
+                if (d2.success) { alert(d2.message); window.hideRechargeModal(); updateBalanceDisplay(); }
+                else { alert(d2.error); }
+              });
+          }
+        }
+      });
   };
   function updateRechargeBalance() {
     var token = sessionStorage.getItem(TOKEN_KEY);

@@ -1040,15 +1040,29 @@ def payment_recharge():
         return jsonify({'success': False, 'error': '金额必须为: 1, 5, 10, 20, 50'}), 400
     db = get_db()
     try:
-        pts = int(amount_yuan * 10)
-        db.execute("INSERT INTO recharge_orders (user_id, amount_yuan, amount_fen, status, payment_method, created_at, confirmed_at) VALUES (?, ?, ?, 'confirmed', ?, datetime('now','localtime'), datetime('now','localtime'))",
+        db.execute("INSERT INTO recharge_orders (user_id, amount_yuan, amount_fen, status, payment_method, created_at) VALUES (?, ?, ?, 'pending', ?, datetime('now','localtime'))",
                    (request.user_id, amount_yuan, int(amount_yuan * 100), pm))
-        db.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (pts, request.user_id))
-        after = db.execute('SELECT credits FROM users WHERE id = ?', (request.user_id,)).fetchone()[0]
-        db.execute("INSERT INTO transactions (user_id, type, amount_credits, credits_after, description, created_at) VALUES (?,?,?,?,?,datetime('now','localtime'))",
-                   (request.user_id, 'recharge', pts, after, '充值 '+str(pts/10)+'点'))
         db.commit()
-        return jsonify({'success': True, 'message': '充值成功！到账 '+str(pts/10)+' 点 (￥'+str(amount_yuan)+' = '+str(pts/10)+'点)', 'credits': after})
+        return jsonify({'success': True, 'message': '充值申请已提交 (¥'+str(amount_yuan)+')，请扫码支付后点击"我已支付"'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/payment/submit', methods=['POST'])
+@require_auth
+def payment_submit():
+    """用户点击'我已支付'，订单状态改为 submitted"""
+    data = request.get_json() or {}
+    order_id = data.get('order_id')
+    db = get_db()
+    try:
+        order = db.execute('SELECT * FROM recharge_orders WHERE id = ? AND user_id = ?', (order_id, request.user_id)).fetchone()
+        if not order: return jsonify({'success': False, 'error': '订单不存在'}), 404
+        if order['status'] != 'pending': return jsonify({'success': False, 'error': '订单已处理'}), 400
+        db.execute("UPDATE recharge_orders SET status = 'submitted' WHERE id = ?", (order_id,))
+        db.commit()
+        return jsonify({'success': True, 'message': '已提交，等待管理员确认到账'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
@@ -1096,6 +1110,32 @@ def payment_balance():
         u = db.execute('SELECT credits, free_used_date FROM users WHERE id = ?', (request.user_id,)).fetchone()
         today = date.today().isoformat()
         return jsonify({'success': True, 'credits': u['credits'], 'free_available': (u['free_used_date'] != today)})
+    finally:
+        db.close()
+
+@app.route('/api/admin/orders', methods=['GET'])
+def admin_orders():
+    """管理员查看所有 submitted 订单"""
+    data = request.args
+    secret = data.get('secret', '')
+    if secret != ADMIN_SECRET:
+        db3 = get_db()
+        try:
+            # Try JWT
+            auth = request.headers.get('Authorization', '')
+            if auth.startswith('Bearer '):
+                try:
+                    payload = pyjwt.decode(auth[7:], JWT_SECRET, algorithms=['HS256'])
+                    u = db3.execute('SELECT is_admin FROM users WHERE id = ?', (payload['user_id'],)).fetchone()
+                    if not (u and u['is_admin']):
+                        return jsonify({'success': False, 'error': '无权限'}), 403
+                except: return jsonify({'success': False, 'error': '无权限'}), 403
+            else: return jsonify({'success': False, 'error': '无权限'}), 403
+        finally: db3.close()
+    db = get_db()
+    try:
+        rows = db.execute("SELECT o.*, u.username FROM recharge_orders o JOIN users u ON o.user_id = u.id WHERE o.status = 'submitted' ORDER BY o.created_at DESC LIMIT 50").fetchall()
+        return jsonify({'success': True, 'orders': [dict(r) for r in rows]})
     finally:
         db.close()
 
