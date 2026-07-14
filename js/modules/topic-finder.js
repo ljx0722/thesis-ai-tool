@@ -4,12 +4,11 @@ function runTopicFinder(container) {
   if (!c) return;
   c.innerHTML = '<div class="module-panel" style="max-width:800px;margin:0 auto">' +
     '<h4>💡 论文选题推荐</h4>' +
-    '<div style="padding:12px;background:rgba(99,102,241,.05);border-radius:10px;margin-bottom:16px;font-size:.75rem;color:rgba(255,255,255,.5);line-height:1.7">' +
-    '输入你感兴趣的研究领域，AI 会分析该领域的研究热点与空白，<br>为你推荐 <b>5 个可行论文题目</b>，每个附带大纲方向与参考文献建议。</div>' +
-    '<div style="display:flex;gap:10px;margin-bottom:12px">' +
-      '<input id="topicDomain" placeholder="研究领域（如：人工智能教育、供应链金融风险）" style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 14px;color:#e2e8f0;font-size:.78rem;outline:none">' +
-      '<input id="topicKeywords" placeholder="关键词（选填，逗号分隔）" style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 14px;color:#e2e8f0;font-size:.78rem;outline:none">' +
-      '<button onclick="runTopicFinderAI()" style="padding:10px 20px;border:none;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap">🤖 开始推荐</button>' +
+    '<div class="ai-desc">输入你感兴趣的研究领域，AI 会分析该领域的研究热点与空白，<br>为你推荐 <b>5 个可行论文题目</b>，每个附带大纲方向与参考文献建议。</div>' +
+    '<div class="ai-input-row">' +
+      '<input id="topicDomain" class="ai-input" placeholder="研究领域（如：人工智能教育、供应链金融风险）" style="flex:2">' +
+      '<input id="topicKeywords" class="ai-input" placeholder="关键词（选填，逗号分隔）">' +
+      '<button onclick="runTopicFinderAI()" class="ai-btn" style="flex:0 0 auto;padding:11px 24px">🤖 开始推荐</button>' +
     '</div>' +
     '<div id="topicOutput" style="min-height:200px"></div>' +
   '</div>';
@@ -20,7 +19,7 @@ window.runTopicFinderAI = function() {
   var keywords = document.getElementById('topicKeywords').value.trim();
   if (!domain || domain.length < 2) { alert('请输入研究领域'); return; }
   var out = document.getElementById('topicOutput');
-  out.innerHTML = '<div style="text-align:center;padding:40px;color:rgba(255,255,255,.4)">⏳ AI 正在分析"' + domain + '"领域的研究趋势...</div>';
+  out.innerHTML = '<div class="ai-loading">⏳ AI 正在分析"' + domain + '"领域的研究趋势...</div>';
   var token = sessionStorage.getItem('thesis_ai_token');
 
   fetch('/api/llm/analyze', {
@@ -34,8 +33,7 @@ window.runTopicFinderAI = function() {
   }).then(function(r) { return r.json(); })
     .then(function(d) {
       if (d.success) {
-        out.innerHTML = '<div style="padding:16px;background:rgba(255,255,255,.03);border-radius:10px;border:1px solid rgba(255,255,255,.08);font-size:.75rem;color:#e2e8f0;line-height:1.8;white-space:pre-wrap">' +
-          d.content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
-      } else { out.innerHTML = '<div style="padding:16px;background:rgba(239,68,68,.1);border-radius:10px;color:#fca5a5">❌ ' + d.error + '</div>'; }
+        out.innerHTML = '<div class="ai-output">' + d.content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+      } else { out.innerHTML = '<div class="ai-output-error">❌ ' + d.error + '</div>'; }
     });
 };
