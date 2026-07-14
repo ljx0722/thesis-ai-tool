@@ -341,6 +341,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 .workspace-card-icon{font-size:1.8rem;margin-bottom:8px}
 .workspace-card-title{font-weight:700;color:#c7d2fe;font-size:.82rem;margin-bottom:6px}
 .workspace-card-desc{font-size:.65rem;color:rgba(255,255,255,.35);line-height:1.5}
+/* Landing page glow + hover effects */
+.bento-card{transition:transform .25s,box-shadow .25s,border-color .25s,background .25s}
+.bento-card:hover{box-shadow:0 0 30px rgba(99,102,241,.1),0 4px 12px rgba(0,0,0,.2);border-color:rgba(99,102,241,.2);transform:translateY(-2px)}
+.bento-card.bento-hero:hover{box-shadow:0 0 40px rgba(99,102,241,.15),0 6px 20px rgba(0,0,0,.25)}
+.bento-card.bento-med:hover{box-shadow:0 0 25px rgba(99,102,241,.08),0 3px 10px rgba(0,0,0,.15)}
+.login-card-v2:hover{box-shadow:0 0 40px rgba(99,102,241,.12),0 8px 32px rgba(0,0,0,.4);transition:box-shadow .4s}
+.workspace-card:hover{box-shadow:0 0 25px rgba(99,102,241,.15),0 4px 16px rgba(0,0,0,.2);transform:translateY(-3px)}
+.landing-brand-title{text-shadow:0 0 40px rgba(99,102,241,.2)}
+.bento-card-icon{transition:transform .3s}
+.bento-card:hover .bento-card-icon{transform:scale(1.1)}
 .landing-highlights{display:flex;gap:6px;justify-content:center;padding:6px 0 0;flex-shrink:0}.landing-hl-item{flex:1;text-align:center;padding:6px 4px;background:rgba(255,255,255,.02);border-radius:10px;border:1px solid rgba(255,255,255,.04);font-size:.62rem;font-weight:600;color:rgba(255,255,255,.55)}
 /* ============================================================
    DARK MODE — triggered by system preference or .dark class
