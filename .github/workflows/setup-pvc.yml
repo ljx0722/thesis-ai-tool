@@ -1,0 +1,27 @@
+name: Setup PVC and Volume Mount
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup-pvc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+      - name: Create PVC and mount volume
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.SEALOS_KUBECONFIG }}" | base64 -d > ~/.kube/config
+
+          echo "Creating PersistentVolumeClaim..."
+          printf 'apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: thesis-db-pvc\n  namespace: ns-mzyybqj8\nspec:\n  accessModes:\n  - ReadWriteOnce\n  resources:\n    requests:\n      storage: 1Gi\n' | kubectl apply -f -
+
+          echo "Adding volume mount to deployment..."
+          kubectl patch deployment thesis-ai-tool -n ns-mzyybqj8 --type json -p '[{"op":"add","path":"/spec/template/spec/volumes","value":[{"name":"db-storage","persistentVolumeClaim":{"claimName":"thesis-db-pvc"}}]},{"op":"add","path":"/spec/template/spec/containers/0/volumeMounts","value":[{"name":"db-storage","mountPath":"/app/data"}]}]'
+
+          echo "Restarting deployment..."
+          kubectl rollout restart deployment/thesis-ai-tool -n ns-mzyybqj8
+          kubectl rollout status deployment/thesis-ai-tool -n ns-mzyybqj8 --timeout=180s
+          echo "Done!"
