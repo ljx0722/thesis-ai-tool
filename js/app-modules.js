@@ -333,6 +333,22 @@ window.switchModule = function(moduleId) {
       else if (moduleId === 'topic-finder' && typeof runTopicFinder === 'function') runTopicFinder(panel);
     } catch (e) { panel.innerHTML = '<div style="text-align:center;padding:40px;color:var(--r)">分析出错: ' + e.message + '</div>'; }
     hideLoad();
+    // Auto-inject AI analysis button (skip for KG, references, data, topic-finder)
+    var aiSkip = ['knowledge-graph', 'references', 'data-analysis', 'topic-finder'];
+    if (aiSkip.indexOf(moduleId) < 0 && typeof addLLMButton === 'function') {
+      setTimeout(function() {
+        var container = document.querySelector('#moduleOutput .module-panel');
+        if (container) {
+          var btnWrap = document.createElement('div'); btnWrap.id = 'aiBtnWrap';
+          container.appendChild(btnWrap);
+          var name = APP_MODULES.find(function(m) { return m.id === moduleId; });
+          var label = name ? name.name : moduleId;
+          addLLMButton('aiBtnWrap', moduleId, function() {
+            return '请对以下"' + label + '"内容进行深度分析：\n\n' + (typeof manuscriptText !== 'undefined' ? manuscriptText.substring(0, 5000) : '');
+          });
+        }
+      }, 400);
+    }
   }, 100);
 };
 
