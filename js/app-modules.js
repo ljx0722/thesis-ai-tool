@@ -283,6 +283,13 @@ function switchView(view) {
     _activeModule = 'workspace';
   } else if (view === 'references') {
     if (ws) ws.style.display = 'none';
+    // Restore hidden thesis content
+    if (tb) {
+      var kids = tb.children;
+      for (var i = 0; i < kids.length; i++) {
+        if (kids[i] !== ws) kids[i].style.display = '';
+      }
+    }
     if (rp) rp.style.display = '';
     var refOnly = rp ? rp.querySelectorAll('.ref-only') : [];
     for (var i = 0; i < refOnly.length; i++) refOnly[i].style.display = '';
