@@ -41,32 +41,59 @@ jobs:
         with:
           version: latest
 
-      - name: Apply K8s PVC, secrets, volume mount, and restart
+      - name: Deploy to Sealos
+        env:
+          K8S_CONFIG: ${{ secrets.SEALOS_KUBECONFIG }}
+          DS_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
           mkdir -p ~/.kube
-          echo "${{ secrets.SEALOS_KUBECONFIG }}" | base64 -d > ~/.kube/config
+          echo "$K8S_CONFIG" | base64 -d > ~/.kube/config
+
+          # Update secrets
           kubectl create secret generic thesis-ai-secrets \
-            --namespace ns-mzyybqj8 \
-            --from-literal=deepseek-api-key="${{ secrets.DEEPSEEK_API_KEY }}" \
-            --from-literal=jwt-secret="${{ secrets.DEEPSEEK_API_KEY }}" \
+            -n ns-mzyybqj8 \
+            --from-literal=deepseek-api-key="$DS_KEY" \
+            --from-literal=jwt-secret="$DS_KEY" \
             --from-literal=admin-secret="admin123" \
-            --dry-run=client -o yaml | kubectl apply -f -
-          kubectl apply -f - <<'K8S'
-apiVersion: v1
+            --dry-run=client -o yaml | kubectl apply -f - || true
+
+          # Create PVC
+          echo "apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: thesis-db-pvc
   namespace: ns-mzyybqj8
 spec:
   accessModes:
-    - ReadWriteOnce
+  - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi
-K8S
+      storage: 1Gi" | kubectl apply -f -
+
+          # Set env vars
           kubectl set env deployment/thesis-ai-tool -n ns-mzyybqj8 \
-            DEEPSEEK_API_KEY="${{ secrets.DEEPSEEK_API_KEY }}" \
-            DB_PATH=/app/data/thesis.db
-          kubectl patch deployment thesis-ai-tool -n ns-mzyybqj8 --type=json -p='[{"op":"replace","path":"/spec/template/spec/containers/0/volumeMounts","value":[{"name":"db-storage","mountPath":"/app/data"}]},{"op":"replace","path":"/spec/template/spec/volumes","value":[{"name":"db-storage","persistentVolumeClaim":{"claimName":"thesis-db-pvc"}}]}]'
+            DEEPSEEK_API_KEY="$DS_KEY" \
+            DB_PATH=/app/data/thesis.db || true
+
+          # Create patch file for volume mount
+          cat > /tmp/patch.yaml << 'ENDPATCH'
+spec:
+  template:
+    spec:
+      containers:
+      - name: thesis-ai-tool
+        volumeMounts:
+        - name: db-storage
+          mountPath: /app/data
+      volumes:
+      - name: db-storage
+        persistentVolumeClaim:
+          claimName: thesis-db-pvc
+ENDPATCH
+
+          kubectl patch deployment thesis-ai-tool -n ns-mzyybqj8 \
+            --type merge \
+            --patch-file /tmp/patch.yaml || true
+
           kubectl rollout restart deployment/thesis-ai-tool -n ns-mzyybqj8
           kubectl rollout status deployment/thesis-ai-tool -n ns-mzyybqj8 --timeout=180s
