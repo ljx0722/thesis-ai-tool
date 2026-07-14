@@ -341,6 +341,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 .workspace-card-icon{font-size:1.8rem;margin-bottom:8px}
 .workspace-card-title{font-weight:700;color:#c7d2fe;font-size:.82rem;margin-bottom:6px}
 .workspace-card-desc{font-size:.65rem;color:rgba(255,255,255,.35);line-height:1.5}
+.landing-highlights{display:flex;gap:8px;justify-content:center;padding:10px 0 0;flex-shrink:0}.landing-hl-item{flex:1;text-align:center;padding:8px 4px;background:rgba(255,255,255,.02);border-radius:10px;border:1px solid rgba(255,255,255,.04);font-size:.68rem;font-weight:600;color:rgba(255,255,255,.55)}
 /* ============================================================
    DARK MODE — triggered by system preference or .dark class
    ============================================================ */

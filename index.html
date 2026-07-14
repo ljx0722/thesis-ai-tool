@@ -102,14 +102,11 @@
       </div>
 
       <!-- Stats bar -->
-      <div class="landing-stats">
-        <div class="landing-stat"><span class="stat-value">14</span><span class="stat-label">学术数据源</span></div>
-        <div class="landing-stat-divider"></div>
-        <div class="landing-stat"><span class="stat-value">221</span><span class="stat-label">回归测试</span></div>
-        <div class="landing-stat-divider"></div>
-        <div class="landing-stat"><span class="stat-value">15</span><span class="stat-label">功能模块</span></div>
-        <div class="landing-stat-divider"></div>
-        <div class="landing-stat"><span class="stat-value">10</span><span class="stat-label">评审维度</span></div>
+            <div class="landing-highlights">
+        <div class="landing-hl-item">🎯 选题→答辩<span style="font-size:.55rem;display:block;color:rgba(255,255,255,.2)">全流程覆盖</span></div>
+        <div class="landing-hl-item">🤖 AI驱动<span style="font-size:.55rem;display:block;color:rgba(255,255,255,.2)">16个智能模块</span></div>
+        <div class="landing-hl-item">📚 14源检索<span style="font-size:.55rem;display:block;color:rgba(255,255,255,.2)">全球学术数据库</span></div>
+        <div class="landing-hl-item">✨ 0.3点起<span style="font-size:.55rem;display:block;color:rgba(255,255,255,.2)">每日首次免费</span></div>
       </div>
     </div>
 
@@ -188,7 +185,12 @@
     <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-12</b> 15项模块增强 + 215条自动化回归测试</div>
     <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-10</b> 段落分析模块：标题拆分残留检测 + 逻辑连贯性分析</div>
     <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-08</b> 优化建议模块：目录结构对比 + 空章节警告</div>
-    <div style="color:#999">2026-07-05 初版发布：DOCX解析 / 多源文献检索 / 知识图谱</div>
+    <div style="color:#999">2026-07-14 平台架构升级：16个模块覆盖选题→答辩全流程，统一AI定价，自动时间主题
+2026-07-13 支付系统 + 邀请码 + 点数体系 + 充值自动到账 + 4个新AI模块
+2026-07-12 用户注册登录 + JWT认证 + SQLite持久化 + 知识图谱时间线
+2026-07-10 知识图谱三视图 + 文献时间线 + 交互式词云 + 选题推荐
+2026-07-08 DOCX校准向导 + 五层目录树 + Word样式识别 + 前端架构重组
+2026-07-05 初版发布：DOCX解析 / 多源文献检索 / 知识图谱</div>
   </div>
 </div>
 <script>function toggleChangelog(){var p=document.getElementById('changelogPanel');p.style.display=p.style.display==='none'?'block':'none';}</script>
@@ -291,8 +293,8 @@
     <div class="ref-list ref-only" id="refs"><div style="text-align:center;padding:60px;color:#9ca3af;font-size:.82rem">← 请先上传论文</div></div>
   </div>
 </div>
-    <input type="file" id="fileInput" accept=".docx" style="display:none" onchange="if(this.files.length){window._pendingFile=this.files[0];var s=document.getElementById('upStatus');if(s)s.textContent='已选择: '+this.files[0].name;document.getElementById('fileInput').dispatchEvent(new Event('change'));}">
-    <script>window._pendingFile=null;window.triggerUpload=function(){document.getElementById('fileInput').click();};document.getElementById('fileInput').addEventListener('change',function(){if(this.files.length){window._pendingFile=this.files[0];}});</script>
+    <input type="file" id="fileInput" accept=".docx" style="display:none">
+    <script>window._pendingFile=null;window.triggerUpload=function(){document.getElementById('fileInput').click();};</script>
 
 <!-- ====== 知识图谱弹窗 ====== -->
 <div id="kgOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(30,30,32,0.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:99999;align-items:center;justify-content:center">
@@ -689,6 +691,45 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
       }).catch(function(){msg.textContent='网络错误';msg.style.color='#fca5a5';});
   };
   // Auto update balance on login
+  window.loadConsumptionHistory = function() {
+    var token = sessionStorage.getItem('thesis_ai_token');
+    fetch('/api/payment/balance', { headers: { 'Authorization': 'Bearer ' + token } })
+      .then(function(r){return r.json();}).then(function(d){
+        var el = document.getElementById('consumptionHistory');
+        if(!d.success){el.innerHTML='加载失败';return;}
+        var h='<div style="color:rgba(255,255,255,.2);font-size:.58rem;margin-bottom:4px">余额: '+(d.credits/10).toFixed(1)+'点</div>';
+        fetch('/api/payment/orders', { headers: { 'Authorization': 'Bearer ' + token } })
+          .then(function(r2){return r2.json();}).then(function(d2){
+            if(d2.orders&&d2.orders.length){
+              var sm={pending:'待支付',submitted:'已提交',confirmed:'已到账'};
+              d2.orders.slice(0,10).forEach(function(o){
+                h+='<div style="padding:2px 0;font-size:.6rem;display:flex;justify-content:space-between"><span>¥'+o.amount_yuan+'</span><span style="color:rgba(255,255,255,.3)">'+sm[o.status]+'</span><span style="color:rgba(255,255,255,.2)">'+(o.created_at||'').substring(0,10)+'</span></div>';
+              });
+            }
+            el.innerHTML=h;
+          });
+      });
+  };
+  window.copyInviteCode = function() {
+    var code = document.getElementById('myInviteCode').textContent.trim();
+    if(code==='----')return;
+    navigator.clipboard.writeText(code).then(function(){alert('已复制: '+code);});
+  };
+  setTimeout(function(){
+    var token = sessionStorage.getItem('thesis_ai_token');
+    if(!token)return;
+    fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+token}})
+      .then(function(r){return r.json();}).then(function(d){
+        if(d.success&&d.user){
+          var el=document.getElementById('myInviteCode');
+          if(!el)return;
+          if(!d.user.invite_code){
+            fetch('/api/invite/generate',{method:'POST',headers:{'Authorization':'Bearer '+token},body:'{}'})
+              .then(function(r2){return r2.json();}).then(function(d2){if(d2.success)el.textContent=d2.code;});
+          }else{el.textContent=d.user.invite_code;}
+        }
+      });
+  },1000);
   setInterval(updateBalanceDisplay, 300000);
 })();
 </script>

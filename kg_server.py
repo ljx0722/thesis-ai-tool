@@ -1156,18 +1156,22 @@ def usage_module():
         today = date.today().isoformat()
         free_row = db.execute('SELECT used FROM daily_free_usage WHERE user_id = ? AND usage_date = ?',
                               (request.user_id, today)).fetchone()
-        if not (free_row and free_row['used']):
-            # Mark free and don't charge
+        free_count = free_row['used'] if free_row else 0
+        if free_count < 3:  # 3 free ops per day
             db.execute('INSERT OR IGNORE INTO daily_free_usage (user_id, usage_date, used) VALUES (?, ?, 1)',
+                       (request.user_id, today))
+            db.execute('UPDATE daily_free_usage SET used = used + 1 WHERE user_id = ? AND usage_date = ?',
                        (request.user_id, today))
             db.execute("UPDATE users SET free_used_date = ? WHERE id = ?", (today, request.user_id))
             db.commit()
-            return jsonify({'success': True, 'free': True, 'message': '今日首次使用，免费'})
+            new_count = db.execute('SELECT used FROM daily_free_usage WHERE user_id = ? AND usage_date = ?',
+                                   (request.user_id, today)).fetchone()['used']
+            return jsonify({'success': True, 'free': True, 'message': '今日免费(' + str(new_count) + '/3)'})
     finally: db.close()
     # Not free — deduct
     price = get_price('module')
     if price <= 0: return jsonify({'success': True, 'free': False, 'cost': 0})
-    ok, err, after = deduct_credits(request.user_id, price, '模块使用 (' + str(price/10) + '点)')
+    ok, err, after = deduct_credits(request.user_id, price, '模块使用')
     if not ok: return jsonify({'success': False, 'error': err, 'needed': price}), 402
     return jsonify({'success': True, 'free': False, 'cost': price, 'credits_after': after})
 
