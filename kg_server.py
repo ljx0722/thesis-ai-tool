@@ -1158,10 +1158,13 @@ def deduct_credits(user_id, amount, desc):
     finally:
         db.close()
 
-# ========== LLM 分析 API（点数扣费） ==========
+# ========== LLM 分析 API（按实际 token 成本 ×2 扣点） ==========
 @app.route('/api/llm/analyze', methods=['POST'])
 @require_auth
 def llm_analyze():
+    """LLM 分析：先估算费用检查余额 → 调用 DeepSeek → 按实际 token 成本 ×2 扣点
+    计费公式：DeepSeek 实际花费 N 元 → 扣用户 ceil(2N) 点（最低 1 点）
+    DeepSeek 定价：输入 1元/百万token，输出 2元/百万token"""
     if not DEEPSEEK_API_KEY:
         return jsonify({'success': False, 'error': 'LLM服务未配置'}), 503
     data = request.get_json() or {}
@@ -1169,41 +1172,67 @@ def llm_analyze():
     system_prompt = data.get('system_prompt', '')
     user_prompt = data.get('user_prompt', '')
     max_tokens = data.get('max_tokens', 2000)
-    price = get_price(module) if module != 'generic' else get_price('llm_analysis')
-    # Estimate tokens
+
+    # 估算费用（防止余额不够还调 API）
     total_text = system_prompt + user_prompt
     cn = len(re.findall(r'[一-鿿]', total_text))
     est_input = int(cn * 0.6 + (len(total_text) - cn) * 0.25)
-    est_cost = max(1, int((est_input / 1000000 * DEEPSEEK_INPUT_PRICE_PER_1M +
-                            max_tokens / 1000000 * DEEPSEEK_OUTPUT_PRICE_PER_1M) * 100 * USER_MARKUP))
-    # Check points
-    ok, err, after = deduct_credits(request.user_id, price, f'LLM分析 {module} (预估 {est_cost/100:.2f}元)')
-    if not ok: return jsonify({'success': False, 'error': err, 'points_needed': price}), 402
-    # Call DeepSeek
+    est_api_cost = (est_input / 1000000 * DEEPSEEK_INPUT_PRICE_PER_1M +
+                    max_tokens / 1000000 * DEEPSEEK_OUTPUT_PRICE_PER_1M)  # 元
+    est_credits = max(1, int(est_api_cost * USER_MARKUP + 0.999))  # 预估扣点，向上取整
+
+    # 检查余额
+    db = get_db()
+    try:
+        u = db.execute('SELECT credits FROM users WHERE id = ?', (request.user_id,)).fetchone()
+        if not u: return jsonify({'success': False, 'error': '用户不存在'}), 404
+        if u['credits'] < est_credits:
+            return jsonify({'success': False, 'error': f'点数不足。预计需 {est_credits} 点，当前 {u["credits"]} 点',
+                            'credits': u['credits'], 'needed': est_credits}), 402
+    finally: db.close()
+
+    # 调用 DeepSeek
     try:
         resp = requests.post(f'{DEEPSEEK_BASE_URL}/chat/completions',
             headers={'Authorization': f'Bearer {DEEPSEEK_API_KEY}', 'Content-Type': 'application/json'},
-            json={'model': DEEPSEEK_MODEL, 'messages': [{'role': 'system', 'content': system_prompt}, {'role': 'user', 'content': user_prompt}],
-                  'max_tokens': max_tokens, 'temperature': 0.3, 'stream': False}, timeout=120)
+            json={'model': DEEPSEEK_MODEL, 'messages': [
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': user_prompt}
+            ], 'max_tokens': max_tokens, 'temperature': 0.3, 'stream': False}, timeout=120)
         resp.raise_for_status()
         result = resp.json()
     except Exception as e:
-        # Refund on failure
-        db2=get_db();db2.execute("UPDATE users SET credits = credits + ? WHERE id = ?",(price,request.user_id));db2.commit();db2.close()
-        return jsonify({'success': False, 'error': f'LLM调用失败: {str(e)}（{price}点已退回）'}), 502
-    usage = result.get('usage', {})
-    actual_input = usage.get('prompt_tokens', est_input)
-    actual_output = usage.get('completion_tokens', 0)
+        return jsonify({'success': False, 'error': f'LLM调用失败: {str(e)}'}), 502
+
+    # 按实际用量计算费用
+    usage_info = result.get('usage', {})
+    actual_input = usage_info.get('prompt_tokens', est_input)
+    actual_output = usage_info.get('completion_tokens', 0)
+    # DeepSeek 实际花费（元）
+    api_cost = (actual_input / 1000000 * DEEPSEEK_INPUT_PRICE_PER_1M +
+                actual_output / 1000000 * DEEPSEEK_OUTPUT_PRICE_PER_1M)
+    # 用户扣点：实际成本 ×2，向上取整，最低 1 点
+    charge_credits = max(1, int(api_cost * USER_MARKUP + 0.999))
     content = result['choices'][0]['message']['content']
-    db3=get_db()
+
+    # 扣点
+    ok, err, after = deduct_credits(request.user_id, charge_credits,
+        f'LLM分析 {module} (输入{actual_input}+输出{actual_output} tokens, API成本¥{api_cost:.4f}, 扣{charge_credits}点)')
+    if not ok:
+        return jsonify({'success': False, 'error': f'扣费失败: {err}'}), 402
+
+    # 记录
+    db2 = get_db()
     try:
-        db3.execute("INSERT INTO llm_usage (user_id, module, prompt_tokens, completion_tokens, cost_credits, user_charged_credits, model, success, created_at) VALUES (?,?,?,?,?,?,?,1,datetime('now','localtime'))",
-                    (request.user_id, module, actual_input, actual_output, 0, price, DEEPSEEK_MODEL))
-        db3.commit()
-    finally: db3.close()
+        db2.execute("INSERT INTO llm_usage (user_id, module, prompt_tokens, completion_tokens, cost_credits, user_charged_credits, model, success, created_at) VALUES (?,?,?,?,?,?,?,1,datetime('now','localtime'))",
+                    (request.user_id, module, actual_input, actual_output, int(api_cost*100), charge_credits, DEEPSEEK_MODEL))
+        db2.commit()
+    finally: db2.close()
+
     return jsonify({'success': True, 'content': content, 'usage': {
         'input_tokens': actual_input, 'output_tokens': actual_output,
-        'cost_credits': price, 'credits_after': after
+        'api_cost': round(api_cost, 4), 'cost_credits': charge_credits,
+        'credits_after': after
     }})
 
 # ========== 领域分析 API（检索前先由AI分析论文领域） ==========
