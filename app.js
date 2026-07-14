@@ -3402,7 +3402,7 @@ function exportReport(){
     h+='<tr><td>参考文献</td><td>'+refCount+' 条（中文 '+cnCount+'，英文 '+(refCount-cnCount)+'）</td></tr>';
     h+='</table>';
     if(rl.length){h+='<h2>📚 参考文献列表</h2><ol>';rl.forEach(function(r,i){h+='<li>'+formatGB7714(r).replace(/<[^>]+>/g,'')+'</li>';});h+='</ol>';}
-    h+='<p style="color:#94a3b8;font-size:.75rem;margin-top:40px">由 论文AI利器 自动生成</p></body></html>';
+    h+='<p style="color:#94a3b8;font-size:.75rem;margin-top:40px">由 学术论文AI一站式助手 自动生成</p></body></html>';
     var blob=new Blob([h],{type:'text/html;charset=utf-8'});
     var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='论文分析报告.html';a.click();
     updLoad('完成',100);setTimeout(hideLoad,500);

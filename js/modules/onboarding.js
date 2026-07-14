@@ -1,5 +1,5 @@
 /**
- * 论文AI利器 — 交互式操作指南
+ * 学术论文AI一站式助手 — 交互式操作指南
  * 首次访问自动播放，右上角 ? 按钮可随时重新打开
  */
 var _tourSteps = [];
@@ -9,7 +9,7 @@ var _tourRunning = false;
 function buildTourSteps() {
   _tourSteps = [
     {
-      title: '欢迎使用 论文AI利器',
+      title: '欢迎使用 学术论文AI一站式助手',
       body: '一站式论文写作辅助平台。上传你的 .docx 论文后，即可使用全部功能。<br><br><b>本指南将带你快速了解所有核心功能。</b>',
       el: null, pos: 'center', icon: '👋'
     },
