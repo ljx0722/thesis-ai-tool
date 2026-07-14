@@ -2427,6 +2427,10 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
       .replace(/<p>/g,'<p style="line-height:1.9">')
     manuscriptText=manuscriptHTML.replace(/<[^>]+>/g,'\n').replace(/&nbsp;/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/\n{3,}/g,'\n\n')
     var thesisBoxEl=document.getElementById('thesisBox');
+    // 保存原始工作台内容，解析失败时可恢复
+    var _savedWorkspace = null;
+    var wsEl = document.getElementById('workspaceContent');
+    if (wsEl) _savedWorkspace = wsEl.outerHTML;
     thesisBoxEl.innerHTML=manuscriptHTML;
     var tbs=thesisBoxEl.querySelectorAll('table');for(var ti=0;ti<tbs.length;ti++)tbs[ti].style.display='';
     // 构建 _docxStyleGroups：XML 样式名 + DOM 元素按文档序对齐（不靠文本匹配）
@@ -2930,7 +2934,25 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     if(typeof onThesisLoaded==='function')onThesisLoaded();
     // 会话持久化：备份基础数据防刷新丢失
     try{sessionStorage.setItem('thesis_backup_text',manuscriptText.substring(0,500000));sessionStorage.setItem('thesis_backup_html',manuscriptHTML.substring(0,800000));}catch(e2){}
-    }catch(err){console.error('Parse error:',err);hideLoad();if(typeof onThesisLoaded==='function')onThesisLoaded();alert('解析失败: '+err.message+'\n\n建议用Word另存为新的.docx后重试')}
+    }catch(err){
+      console.error('Parse error:',err);
+      hideLoad();
+      // 恢复原始工作台界面（滚轮依赖 workspace-content div）
+      if (_savedWorkspace) {
+        var tb = document.getElementById('thesisBox');
+        if (tb) tb.innerHTML = _savedWorkspace;
+      }
+      // 重置论文状态 — 不要把半成品标记为已加载
+      _thesisLoaded = false;
+      existingRefs = []; mergedRefs = []; manuscriptText = ''; manuscriptHTML = ''; paperTopics = []; sections = [];
+      document.getElementById('navTree').innerHTML = '<i style="color:var(--m);font-size:.7rem;padding:8px;display:block">请先上传论文</i>';
+      document.getElementById('refs').innerHTML = '<div style="text-align:center;padding:60px;color:#9ca3af;font-size:.82rem">← 请先上传论文</div>';
+      document.getElementById('kwBar').style.display = 'none';
+      document.getElementById('upStatus').innerHTML = '等待上传';
+      if (typeof updateDashboard === 'function') updateDashboard([]);
+      if (typeof updateNavStates === 'function') updateNavStates();
+      alert('解析失败: '+err.message+'\n\n建议用Word另存为新的.docx后重试');
+    }
 
     // 结构化面板放在try外面，出错不影响正文展示
     try{structureThesisBox();}catch(e){console.warn('[struct] 跳过结构化:',e.message);}
