@@ -269,8 +269,8 @@ console.log('\n=== Section 4: UI/HTML Elements ===');
 test('HTML has all required id elements', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
   var required = ['thesisBox', 'navTree', 'refPanel', 'refs', 'fileInput',
-    'statusBar', 'loadOv', 'ttp', 'moduleTabs', 'barActions', 'uploadOverlay',
-    'kgOverlay', 'dashboard', 'kwBar', 'kwTags', 'fTotal', 'fCN', 'fEN'];
+    'statusBar', 'loadOv', 'ttp', 'barTabs', 'kgOverlay',
+    'dashboard', 'kwBar', 'kwTags', 'fTotal', 'fCN', 'fEN'];
   required.forEach(function(id) {
     assert(html.indexOf('id="' + id + '"') >= 0, 'Missing HTML element: #' + id);
   });
@@ -286,10 +286,9 @@ test('Help button (?) exists in HTML', function() {
   assert(html.indexOf('help-btn') >= 0, 'Missing help button element');
 });
 
-test('Upload overlay has correct initial state (show class)', function() {
+test('Upload overlay / file input is present', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(html.indexOf('upload-overlay') >= 0, 'Missing upload-overlay element');
-  // show class is set on <div class="upload-overlay" — any div with that class in HTML is fine
+  assert(html.indexOf('id="fileInput"') >= 0, 'Missing file input (upload mechanism changed from overlay to inline)');
 });
 
 // ============================================================
@@ -434,16 +433,15 @@ test('MODULE: dashboard.js integrates review scores', function() {
   assert(src.indexOf('showReviewInDashboard') >= 0, 'Missing review handler');
 });
 
-test('UI: Dashboard button exists in top bar', function() {
+test('UI: Dashboard entry exists', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(html.indexOf('dashboardBtn') >= 0, 'Missing dashboard button');
-  assert(html.indexOf('showDashboard()') >= 0, 'Missing showDashboard call');
+  assert(html.indexOf('showDashboard()') >= 0, 'Missing showDashboard call (moved to bar tab)');
 });
 
 test('UI: Dashboard overlay has review report button', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(html.indexOf('dashboardBtn') >= 0, 'Missing dashboard button');
   assert(html.indexOf('showDashboard') >= 0, 'Missing showDashboard reference');
+  assert(html.indexOf('dbOverlay') >= 0, 'Missing dashboard overlay');
 });
 
 // ============================================================
@@ -1372,12 +1370,12 @@ test('INTEGRITY: mammoth and jszip loaded with defer (not blocking)', function()
   assert(src.substring(Math.max(0,jsZipIdx-20),jsZipIdx+30).indexOf('defer')>=0,'jszip must be deferred');
 });
 
-test('INTEGRITY: Upload overlay shown before external scripts load', function() {
+test('INTEGRITY: Upload input appears before external scripts', function() {
   var src=fs.readFileSync(path.join(projectRoot,'index.html'),'utf8');
-  var overlayIdx=src.indexOf('id="uploadOverlay"');
+  var overlayIdx=src.indexOf('id="fileInput"');
   var firstScript=src.indexOf('<script src=');
   if(firstScript<0)firstScript=src.indexOf('<script defer src=');
-  assert(overlayIdx<firstScript,'Upload overlay HTML must appear before external scripts');
+  assert(overlayIdx<firstScript,'File input must appear before external scripts');
 });
 
 // --- CATEGORY K: DO NOT regress specific known bug patterns ---

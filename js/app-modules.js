@@ -250,9 +250,97 @@ function updateStatusBar2() {
 
 function onThesisLoaded() {
   _thesisLoaded = true; _analysisCache = {}; kgCurrentData = null;
-  hideUploadOverlay();
-  renderModuleTabs(); updateBarActions(); updateStatusBar2();
-  switchPanel('references');
+  updateBarActions(); updateStatusBar2();
+  switchView('refs');
+}
+
+function switchView(view) {
+  // Update bar tabs
+  document.querySelectorAll('.bar-tab').forEach(function(t) {
+    t.classList.toggle('active', t.getAttribute('data-view') === view);
+  });
+  var ws = document.getElementById('workspaceContent');
+  var tb = document.getElementById('thesisBox');
+  var rp = document.getElementById('refPanel');
+
+  if (view === 'workspace') {
+    if (ws) ws.style.display = '';
+    // Hide paper content
+    var children = tb.children;
+    for (var i = 0; i < children.length; i++) {
+      if (children[i] !== ws) children[i].style.display = 'none';
+    }
+    if (rp) rp.style.display = 'none';
+    _activeModule = 'workspace';
+  } else if (view === 'references') {
+    if (ws) ws.style.display = 'none';
+    if (rp) rp.style.display = '';
+    var refOnly = rp ? rp.querySelectorAll('.ref-only') : [];
+    for (var i = 0; i < refOnly.length; i++) refOnly[i].style.display = '';
+    var ma = rp ? rp.querySelector('.module-area') : null;
+    if (ma) ma.style.display = 'none';
+    _activeModule = 'references';
+  } else if (view === 'dashboard') {
+    showDashboard();
+  }
+}
+
+function toggleNavGroup(el) {
+  el.classList.toggle('collapsed');
+}
+
+// Override switchModule to show content in thesis panel
+var _origSwitchModule = switchModule;
+window.switchModule = function(moduleId) {
+  if (typeof searchRunning !== 'undefined' && searchRunning) { ttp('检索进行中，请等待完成'); return; }
+  _activeModule = moduleId;
+  // Highlight nav item
+  document.querySelectorAll('.nav-item').forEach(function(n) {
+    n.classList.toggle('active', n.getAttribute('data-module') === moduleId);
+  });
+  // Show module in thesis panel
+  var tb = document.getElementById('thesisBox');
+  var ws = document.getElementById('workspaceContent');
+  if (ws) ws.style.display = 'none';
+  // Hide paper content, show module output
+  var children = tb.children;
+  for (var i = 0; i < children.length; i++) {
+    if (children[i] !== ws) children[i].style.display = 'none';
+  }
+  var mc = document.getElementById('moduleOutput');
+  if (!mc) {
+    mc = document.createElement('div');
+    mc.id = 'moduleOutput';
+    mc.style.cssText = 'padding:0;flex:1;overflow-y:auto';
+    tb.appendChild(mc);
+  }
+  mc.style.display = '';
+  mc.innerHTML = '<div class="module-panel"><div style="text-align:center;padding:40px;color:var(--m)"><div style="font-size:2rem;margin-bottom:12px">⏳</div><div>正在分析...</div></div></div>';
+
+  if (moduleId === 'knowledge-graph') { showKnowledgeGraph(); mc.innerHTML = '<div class="module-panel"><div style="text-align:center;padding:50px"><div style="font-size:3rem;margin-bottom:16px">🕸️</div><div style="color:var(--m);margin-bottom:16px">知识图谱弹窗已打开</div><button onclick="showKnowledgeGraph()" style="font-size:.85rem;padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:18px;cursor:pointer;font-weight:600">重新打开知识图谱</button></div></div>'; return; }
+  if (!_thesisLoaded && moduleId !== 'data-analysis' && moduleId !== 'proposal') { mc.innerHTML = '<div class="module-panel"><div style="text-align:center;padding:40px;color:#9ca3af">请先上传论文</div></div>'; return; }
+
+  showLoad('分析中...', 15, '');
+  setTimeout(function() {
+    var panel = mc.querySelector('.module-panel');
+    try {
+      if (moduleId === 'optimization' && typeof runOptimization === 'function') runOptimization(panel);
+      else if (moduleId === 'review' && typeof runReviewModule === 'function') runReviewModule(panel);
+      else if (moduleId === 'expand' && typeof runExpandModule === 'function') runExpandModule(panel);
+      else if (moduleId === 'data-analysis' && typeof runDataAnalysis === 'function') runDataAnalysis(panel);
+      else if (moduleId === 'proposal' && typeof runProposalModule === 'function') runProposalModule(panel);
+    } catch (e) { panel.innerHTML = '<div style="text-align:center;padding:40px;color:var(--r)">分析出错: ' + e.message + '</div>'; }
+    hideLoad();
+  }, 100);
+};
+
+// Keep switchPanel for backwards compat
+function switchPanel(moduleId) {
+  if (moduleId === 'references') {
+    switchView('references');
+  } else {
+    switchModule(moduleId);
+  }
 }
 
 var _origClearAll = typeof clearAll === 'function' ? clearAll : function() {};

@@ -159,19 +159,18 @@
 <div class="bar">
   <div class="bar-left">
     <h1>论文AI利器</h1>
-    <span id="statusBar" style="font-size:.62rem;color:var(--m)">等待上传论文…</span>
-    <span id="balanceBar" style="font-size:.65rem;color:rgba(255,255,255,.4);cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.06);padding:3px 10px;border-radius:12px;margin-left:6px" onclick="showRechargeModal()" title="点击充值">✨ <strong id="balanceAmount" style="color:#fff;font-weight:700">0</strong> 点 <span style="font-size:.5rem;color:rgba(255,255,255,.3)">+</span></span>
-	  <button id="dashboardBtn" onclick="showDashboard()" disabled style="background:#0071e3;color:#fff;border:none;border-radius:18px;padding:6px 14px;cursor:pointer;font-weight:700;font-size:.7rem;box-shadow:0 1px 4px rgba(0,0,0,0.2);margin-left:10px">📊 论文看板</button>
   </div>
-  <div class="module-tabs" id="moduleTabs"></div>
-  <div class="bar-actions" id="barActions">
-    <button class="ba-btn ba-search" disabled id="baSearch" onclick="startSearch()">🔍 检索</button>
-    <button class="ba-btn ba-verify" disabled id="baVerify" onclick="batchVerify()">✅ 校验</button>
-    <button class="ba-btn ba-change" onclick="changeThesis()">📎 换论文</button>
-    <button class="ba-btn ba-reset" id="baReset" onclick="resetSearch()">↺ 重…置</button>
+  <div class="bar-tabs" id="barTabs">
+    <button class="bar-tab active" data-view="workspace" onclick="switchView('workspace')">工作台</button>
+    <button class="bar-tab" data-view="refs" onclick="switchView('references')">参考文献</button>
+    <button class="bar-tab" data-view="dashboard" onclick="showDashboard()">论文看板</button>
+  </div>
+  <div class="bar-right">
+    <span id="statusBar" style="font-size:.62rem;color:var(--m)">等待上传...</span>
+    <span id="balanceBar" style="font-size:.65rem;color:rgba(255,255,255,.4);cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.06);padding:3px 10px;border-radius:12px;margin-left:6px" onclick="showRechargeModal()" title="点击充值">✨ <strong id="balanceAmount" style="color:#fff;font-weight:700">0.0</strong> 点 <span style="font-size:.5rem;color:rgba(255,255,255,.3)">+</span></span>
+    <button onclick="doLogout()" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:6px">登出</button>
   </div>
 </div>
-
 <!-- ====== 更新日志按钮 ====== -->
 <div id="changelogBtn" onclick="toggleChangelog()" title="更新日志" style="position:fixed;top:52px;right:12px;z-index:1000;font-size:.62rem;color:#0071e3;cursor:pointer;background:rgba(0,113,227,.08);padding:3px 10px;border-radius:12px;border:1px solid rgba(0,113,227,.2);transition:all .2s;font-weight:600" onmouseenter="this.style.background='rgba(0,113,227,.15)'" onmouseleave="this.style.background='rgba(0,113,227,.08)'">📜 更新日志</div>
 <div id="changelogPanel" style="display:none;position:fixed;top:88px;right:12px;width:340px;max-height:70vh;overflow-y:auto;background:#fff;border-radius:12px;padding:16px;box-shadow:0 8px 40px rgba(0,0,0,.15);z-index:1001;font-size:.68rem;line-height:1.7;color:#333;border:1px solid #e5e7eb">
@@ -197,7 +196,29 @@
 <!-- ====== 三栏布局 ====== -->
 <div class="main">
   <div class="nav-sidebar" id="navSidebar">
-    <h3>📑 目录</h3>
+    <h3>导航</h3>
+    <div class="nav-upload" id="navUpload">
+      <button onclick="triggerUpload()" class="nav-upload-btn">📎 上传论文</button>
+    </div>
+    <div class="nav-modules" id="navModules">
+      <div class="nav-group">
+        <div class="nav-group-title" onclick="toggleNavGroup(this)">📝 论文分析 <span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-items">
+          <div class="nav-item" data-module="review" onclick="switchModule('review')">🔍 论文审阅</div>
+          <div class="nav-item" data-module="optimization" onclick="switchModule('optimization')">💡 优化建议</div>
+          <div class="nav-item" data-module="expand" onclick="switchModule('expand')">✍️ 论文扩写</div>
+          <div class="nav-item" data-module="proposal" onclick="switchModule('proposal')">📝 开题大纲</div>
+        </div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-title" onclick="toggleNavGroup(this)">📊 数据工具 <span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-items">
+          <div class="nav-item" data-module="data-analysis" onclick="switchModule('data-analysis')">📈 数据分析</div>
+          <div class="nav-item" data-module="knowledge-graph" onclick="switchModule('knowledge-graph')">🕸️ 知识图谱</div>
+        </div>
+      </div>
+    </div>
+    <h3 style="margin-top:12px">📑 目录</h3>
     <div class="nav-tree" id="navTree" title="点击章/节/小节跳转到对应位置"><i style="color:var(--m);font-size:.7rem;padding:8px;display:block">请先上传论文</i></div>
   </div>
   <div class="resizer" id="navResizer"></div>
@@ -205,13 +226,42 @@
     <div class="thesis-bar">
       <h3>📄 论文原文 <span id="upStatus" style="font-size:.68rem;color:var(--m);font-weight:400">等待上传</span></h3>
       <div style="display:flex;gap:4px;align-items:center;font-size:.68rem">
+        <button onclick="triggerUpload()" style="font-size:.65rem;padding:3px 8px;border-radius:6px;border:1px solid var(--bd);cursor:pointer;background:var(--cardSolid);color:var(--t);font-weight:500">📎 换论文</button>
         <button onclick="zoomThesis(-0.1)" style="font-size:.68rem;padding:3px 8px;border-radius:6px;border:1px solid var(--bd);cursor:pointer;background:var(--cardSolid);color:var(--t)">-</button>
         <span id="zoomLabel">100%</span>
         <button onclick="zoomThesis(0.1)" style="font-size:.68rem;padding:3px 8px;border-radius:6px;border:1px solid var(--bd);cursor:pointer;background:var(--cardSolid);color:var(--t)">+</button>
         <button onclick="zoomThesis(0,1)" style="font-size:.68rem;padding:3px 8px;border-radius:6px;border:1px solid var(--bd);cursor:pointer;background:var(--cardSolid);color:var(--t)">↺</button>
+        <button class="ba-btn ba-search" disabled id="baSearch" onclick="startSearch()" style="margin-left:4px">🔍 检索</button>
+        <button class="ba-btn ba-verify" disabled id="baVerify" onclick="batchVerify()">✅ 校验</button>
       </div>
     </div>
-    <div class="thesis-box" id="thesisBox"><i style="color:#9ca3af">论文原文将在此显示 — 请点击上方"📎 换论文"上传</i></div><div class="skeleton-full" id="thesisSkeleton" style="display:none"><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-block"></div><div class="skeleton skeleton-line"></div></div>
+    <div class="thesis-box" id="thesisBox">
+      <div id="workspaceContent" class="workspace-content">
+        <div class="workspace-hero">
+          <div class="workspace-icon">📋</div>
+          <h2 class="workspace-title">欢迎使用论文辅助智能助手</h2>
+          <p class="workspace-sub">上传你的论文，开始智能写作辅助之旅</p>
+          <div class="workspace-actions">
+            <div onclick="triggerUpload()" class="workspace-card" onmouseenter="this.style.background='rgba(99,102,241,.14)'" onmouseleave="this.style.background='rgba(99,102,241,.08)'">
+              <div class="workspace-card-icon">📄</div>
+              <div class="workspace-card-title">上传论文</div>
+              <div class="workspace-card-desc">支持 .docx 格式<br>本地解析，数据不上传</div>
+            </div>
+            <div onclick="switchView('references')" class="workspace-card" onmouseenter="this.style.background='rgba(34,211,238,.12)'" onmouseleave="this.style.background='rgba(34,211,238,.06)'">
+              <div class="workspace-card-icon">📋</div>
+              <div class="workspace-card-title">参考文献</div>
+              <div class="workspace-card-desc">检索·筛选·校验·管理</div>
+            </div>
+            <div onclick="showDashboard()" class="workspace-card" onmouseenter="this.style.background='rgba(168,85,247,.12)'" onmouseleave="this.style.background='rgba(168,85,247,.06)'">
+              <div class="workspace-card-icon">📊</div>
+              <div class="workspace-card-title">论文看板</div>
+              <div class="workspace-card-desc">十维评估·雷达图·建议</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="skeleton-full" id="thesisSkeleton" style="display:none"><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-block"></div><div class="skeleton skeleton-line"></div></div>
   </div>
   <div class="resizer" id="refResizer"></div>
   <div class="ref-panel" id="refPanel">
@@ -221,18 +271,8 @@
     <div class="ref-list ref-only" id="refs"><div style="text-align:center;padding:60px;color:#9ca3af;font-size:.82rem">← 请先上传论文</div></div>
   </div>
 </div>
-
-<!-- ====== 悬浮上传遮罩 ====== -->
-<div class="upload-overlay" id="uploadOverlay">
-  <div class="upload-card">
-    <div class="upload-icon">📎</div>
-    <h2>上传论文</h2>
-    <p>上传后即可使用所有功能模块<br>支持 .docx 格式，数据仅在本地处理</p>
-    <div class="upload-drop" id="uploadDrop">点击或拖拽上传论文（仅支持 .docx）<input type="file" id="fileInput" accept=".docx"></div>
-    <div class="upload-footer">💡 文件仅在本机解析，不会上传到任何服务器</div>
-  </div>
-</div>
-<script>document.getElementById("uploadOverlay").classList.add("show");window._pendingFile=null;document.getElementById("fileInput").addEventListener("change",function(e){if(e.target.files.length){window._pendingFile=e.target.files[0];var s=document.getElementById("upStatus");if(s)s.textContent="已选择: "+e.target.files[0].name;}});</script>
+    <input type="file" id="fileInput" accept=".docx" style="display:none" onchange="if(this.files.length){window._pendingFile=this.files[0];var s=document.getElementById('upStatus');if(s)s.textContent='已选择: '+this.files[0].name;document.getElementById('fileInput').dispatchEvent(new Event('change'));}">
+    <script>window._pendingFile=null;window.triggerUpload=function(){document.getElementById('fileInput').click();};document.getElementById('fileInput').addEventListener('change',function(){if(this.files.length){window._pendingFile=this.files[0];}});</script>
 
 <!-- ====== 知识图谱弹窗 ====== -->
 <div id="kgOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(30,30,32,0.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:99999;align-items:center;justify-content:center">
