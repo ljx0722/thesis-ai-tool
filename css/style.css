@@ -244,6 +244,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 
 /* ====== Module area ====== */
 .module-area{flex:1;overflow-y:auto}
+#moduleOutput{overflow-y:auto;flex:1;padding:0}
 /* ============================================================
    LOGIN — committed dark ink-blue + geometric grid + single indigo accent
    Physical scene: graduate library desk lamp at night. Functional dark.
@@ -330,7 +331,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 .nav-item:hover{color:rgba(255,255,255,.7);background:rgba(255,255,255,.04)}
 .nav-item.active{color:#c7d2fe;background:rgba(99,102,241,.08);font-weight:600}
 /* ====== Workspace ====== */
-.workspace-content{display:flex;align-items:center;justify-content:center;height:100%;min-height:300px}
+.workspace-content{display:flex;align-items:center;justify-content:center;min-height:300px;overflow-y:auto}
 .workspace-hero{text-align:center;max-width:600px;padding:20px}
 .workspace-icon{font-size:3rem;margin-bottom:12px}
 .workspace-title{font-size:1.3rem;font-weight:700;color:var(--t);margin:0 0 6px}

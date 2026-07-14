@@ -637,7 +637,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
       }).catch(function(){msg.textContent='网络错误';msg.style.color='#fca5a5';});
   };
   // Auto update balance on login
-  setInterval(updateBalanceDisplay, 30000);
+  setInterval(updateBalanceDisplay, 300000);
 })();
 </script>
 
@@ -651,11 +651,11 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
     <p style="font-size:.75rem;color:rgba(255,255,255,.5);margin:0 0 12px">点数: <strong id="rechargeBalance" style="color:#f1f5f9">0.00</strong> 元</p>
     <h4 style="font-size:.78rem;color:rgba(255,255,255,.6);margin:0 0 8px">选择充值金额</h4>
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-      <button class="recharge-amt-btn" data-amt="1" onclick="selectRechargeAmount(1)" style="flex:1;min-width:60px;padding:10px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.7);cursor:pointer;font-size:.78rem;font-weight:600">1元</button>
-      <button class="recharge-amt-btn" data-amt="5" onclick="selectRechargeAmount(5)" style="flex:1;min-width:60px;padding:10px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.7);cursor:pointer;font-size:.78rem;font-weight:600">5元</button>
-      <button class="recharge-amt-btn" data-amt="10" onclick="selectRechargeAmount(10)" style="flex:1;min-width:60px;padding:10px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.7);cursor:pointer;font-size:.78rem;font-weight:600">10元</button>
-      <button class="recharge-amt-btn" data-amt="20" onclick="selectRechargeAmount(20)" style="flex:1;min-width:60px;padding:10px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.7);cursor:pointer;font-size:.78rem;font-weight:600">20元</button>
-      <button class="recharge-amt-btn" data-amt="50" onclick="selectRechargeAmount(50)" style="flex:1;min-width:60px;padding:10px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.7);cursor:pointer;font-size:.78rem;font-weight:600">50元</button>
+      <button class="recharge-amt-btn" data-amt="1" onclick="selectRechargeAmount(1)" style="flex:1;min-width:60px;padding:10px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.7);cursor:pointer;font-size:.78rem;font-weight:600">1元<span style="display:block;font-size:.5rem;color:rgba(255,255,255,.2);margin-top:1px">=1.0点</span></button>
+      <button class="recharge-amt-btn" data-amt="5" onclick="selectRechargeAmount(5)" style="flex:1;min-width:60px;padding:10px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.7);cursor:pointer;font-size:.78rem;font-weight:600">5元<span style="display:block;font-size:.5rem;color:rgba(255,255,255,.2);margin-top:1px">=5.0点</span></button>
+      <button class="recharge-amt-btn" data-amt="10" onclick="selectRechargeAmount(10)" style="flex:1;min-width:60px;padding:10px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.7);cursor:pointer;font-size:.78rem;font-weight:600">10元<span style="display:block;font-size:.5rem;color:rgba(255,255,255,.2);margin-top:1px">=10.0点</span></button>
+      <button class="recharge-amt-btn" data-amt="20" onclick="selectRechargeAmount(20)" style="flex:1;min-width:60px;padding:10px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.7);cursor:pointer;font-size:.78rem;font-weight:600">20元<span style="display:block;font-size:.5rem;color:rgba(255,255,255,.2);margin-top:1px">=20.0点</span></button>
+      <button class="recharge-amt-btn" data-amt="50" onclick="selectRechargeAmount(50)" style="flex:1;min-width:60px;padding:10px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.7);cursor:pointer;font-size:.78rem;font-weight:600">50元<span style="display:block;font-size:.5rem;color:rgba(255,255,255,.2);margin-top:1px">=50.0点</span></button>
     </div>
     <div id="rechargePayment" style="display:none;padding:14px;background:rgba(255,255,255,.02);border-radius:12px;border:1px solid rgba(255,255,255,.06);margin-bottom:12px">
       <h4 style="font-size:.75rem;color:rgba(255,255,255,.5);margin:0 0 8px">扫码支付</h4>

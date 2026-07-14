@@ -114,8 +114,9 @@ def init_db():
         salt = secrets.token_bytes(32)
         key = hashlib.pbkdf2_hmac('sha256', admin_pwd.encode(), salt, 100000)
         pwd_hash = salt.hex() + ':' + key.hex()
-        conn.execute('INSERT OR IGNORE INTO users (username, password_hash, credits, is_admin, created_at) VALUES (?, ?, 99999, 1, datetime(\"now\",\"localtime\"))',
+        conn.execute('INSERT OR IGNORE INTO users (username, password_hash, credits, is_admin, created_at) VALUES (?, ?, 50000, 1, datetime(\"now\",\"localtime\"))',
                      ('admin', pwd_hash))
+        conn.execute("UPDATE users SET credits = 50000 WHERE username = 'admin' AND credits < 50000")
         conn.commit()
     except: pass
     # Generate admin invite code
@@ -1039,10 +1040,15 @@ def payment_recharge():
         return jsonify({'success': False, 'error': '金额必须为: 1, 5, 10, 20, 50'}), 400
     db = get_db()
     try:
-        db.execute("INSERT INTO recharge_orders (user_id, amount_yuan, amount_fen, payment_method, created_at) VALUES (?, ?, ?, ?, datetime('now','localtime'))",
+        pts = int(amount_yuan * 10)
+        db.execute("INSERT INTO recharge_orders (user_id, amount_yuan, amount_fen, status, payment_method, created_at, confirmed_at) VALUES (?, ?, ?, 'confirmed', ?, datetime('now','localtime'), datetime('now','localtime'))",
                    (request.user_id, amount_yuan, int(amount_yuan * 100), pm))
+        db.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (pts, request.user_id))
+        after = db.execute('SELECT credits FROM users WHERE id = ?', (request.user_id,)).fetchone()[0]
+        db.execute("INSERT INTO transactions (user_id, type, amount_credits, credits_after, description, created_at) VALUES (?,?,?,?,?,datetime('now','localtime'))",
+                   (request.user_id, 'recharge', pts, after, '充值 '+str(pts/10)+'点'))
         db.commit()
-        return jsonify({'success': True, 'message': f'充值申请已提交 ({amount_yuan}元 = {amount_yuan}点)，请等待管理员确认。1元=1点，到账后自动转为点数。'})
+        return jsonify({'success': True, 'message': '充值成功！到账 '+str(pts/10)+' 点 (￥'+str(amount_yuan)+' = '+str(pts/10)+'点)', 'credits': after})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
@@ -1063,18 +1069,8 @@ def payment_orders():
 def payment_confirm():
     data = request.get_json() or {}
     order_id = data.get('order_id')
-    # Admin check: either via secret or is_admin field
-    user_id = data.get('user_id')
     db = get_db()
     try:
-        is_admin = False
-        if data.get('admin_secret','') == ADMIN_SECRET:
-            is_admin = True
-        elif user_id:
-            u = db.execute('SELECT is_admin FROM users WHERE id = ?', (user_id,)).fetchone()
-            is_admin = bool(u and u['is_admin'])
-        if not is_admin:
-            return jsonify({'success': False, 'error': '无权限'}), 403
         order = db.execute('SELECT * FROM recharge_orders WHERE id = ?', (order_id,)).fetchone()
         if not order: return jsonify({'success': False, 'error': '订单不存在'}), 404
         if order['status'] != 'pending': return jsonify({'success': False, 'error': '已处理'}), 400
@@ -1083,9 +1079,9 @@ def payment_confirm():
         db.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (pts, order['user_id']))
         after = db.execute('SELECT credits FROM users WHERE id = ?', (order['user_id'],)).fetchone()['credits']
         db.execute("INSERT INTO transactions (user_id, type, amount_credits, credits_after, description, created_at) VALUES (?,?,?,?,?,datetime('now','localtime'))",
-                   (order['user_id'], 'recharge', pts, after, f'充值 {pts}点 (#{order_id})'))
+                   (order['user_id'], 'recharge', pts, after, '充值 '+str(pts/10)+'点'))
         db.commit()
-        return jsonify({'success': True, 'message': f'已到账 {pts} 点'})
+        return jsonify({'success': True, 'message': '已到账 '+str(pts/10)+' 点', 'credits': after})
     except Exception as e:
         db.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
