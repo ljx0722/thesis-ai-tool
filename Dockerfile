@@ -3,6 +3,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
+RUN mkdir -p /app/data /app/static/qr
 ENV PORT=5000
+ENV DB_PATH=/app/data/thesis.db
+ENV DEEPSEEK_API_KEY=""
+ENV ADMIN_PASSWORD="admin123"
 EXPOSE 5000
-CMD ["gunicorn", "kg_server:app", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120"]
+CMD ["gunicorn", "kg_server:app", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "180"]

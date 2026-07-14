@@ -4,8 +4,16 @@ Flask后端: HTTP文件服务 + 知识图谱API + 多源文献检索API
 数据源: OpenAlex / Crossref / Semantic Scholar / arXiv / CORE / 百度学术
 """
 from flask import Flask, request, jsonify, send_file
-import math, random, json, re, os, html, time, threading, xml.etree.ElementTree as ET
+import math, random, json, re, os, html, time, threading, sqlite3, hashlib, secrets
+import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, date
+
+try:
+    import jwt as pyjwt
+    HAS_JWT = True
+except ImportError:
+    HAS_JWT = False
 
 try:
     import requests
@@ -14,6 +22,138 @@ except ImportError:
     HAS_REQUESTS = False
 
 app = Flask(__name__)
+
+# ========== 数据库 ==========
+DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'thesis.db'))
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    return conn
+
+def init_db():
+    conn = get_db()
+    conn.executescript('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            balance INTEGER NOT NULL DEFAULT 0,
+            is_admin INTEGER NOT NULL DEFAULT 0,
+            free_used_date TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+        );
+        CREATE TABLE IF NOT EXISTS recharge_orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            amount_yuan REAL NOT NULL,
+            amount_fen INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            payment_method TEXT DEFAULT 'alipay',
+            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+            confirmed_at TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+        CREATE TABLE IF NOT EXISTS transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            type TEXT NOT NULL,
+            amount_fen INTEGER NOT NULL,
+            balance_after INTEGER NOT NULL,
+            description TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+        CREATE TABLE IF NOT EXISTS llm_usage (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            module TEXT NOT NULL,
+            prompt_tokens INTEGER NOT NULL DEFAULT 0,
+            completion_tokens INTEGER NOT NULL DEFAULT 0,
+            cost_fen INTEGER NOT NULL DEFAULT 0,
+            user_charged_fen INTEGER NOT NULL DEFAULT 0,
+            model TEXT NOT NULL DEFAULT 'deepseek-chat',
+            success INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+        CREATE TABLE IF NOT EXISTS daily_free_usage (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            usage_date TEXT NOT NULL,
+            used INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(user_id, usage_date),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+    ''')
+    conn.commit()
+    # Seed admin user if not exists
+    try:
+        admin_pwd = os.environ.get('ADMIN_PASSWORD', 'admin123')
+        salt = secrets.token_bytes(32)
+        key = hashlib.pbkdf2_hmac('sha256', admin_pwd.encode(), salt, 100000)
+        pwd_hash = salt.hex() + ':' + key.hex()
+        conn.execute('INSERT OR IGNORE INTO users (username, password_hash, balance, is_admin) VALUES (?, ?, 10000, 1)',
+                     ('admin', pwd_hash))
+        conn.commit()
+    except: pass
+    conn.close()
+    print(f"[DB] SQLite initialized at {DB_PATH}")
+
+init_db()
+
+# ========== 认证工具 ==========
+JWT_SECRET = os.environ.get('JWT_SECRET', secrets.token_hex(32))
+TOKEN_EXPIRE_DAYS = 30
+
+def hash_password(password):
+    salt = secrets.token_bytes(32)
+    key = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
+    return salt.hex() + ':' + key.hex()
+
+def verify_password(password, stored):
+    salt_hex, key_hex = stored.split(':')
+    salt = bytes.fromhex(salt_hex)
+    key = bytes.fromhex(key_hex)
+    new_key = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
+    return secrets.compare_digest(key, new_key)
+
+def require_auth(f):
+    from functools import wraps
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not HAS_JWT:
+            return jsonify({'success': False, 'error': 'JWT库未安装'}), 500
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({'success': False, 'error': '未登录或登录已过期'}), 401
+        token = auth_header[7:]
+        try:
+            payload = pyjwt.decode(token, JWT_SECRET, algorithms=['HS256'])
+            request.user_id = payload['user_id']
+        except pyjwt.ExpiredSignatureError:
+            return jsonify({'success': False, 'error': '登录已过期，请重新登录'}), 401
+        except Exception:
+            return jsonify({'success': False, 'error': '无效的登录凭证'}), 401
+        return f(*args, **kwargs)
+    return wrapper
+
+def generate_token(user_id):
+    return pyjwt.encode({
+        'user_id': user_id,
+        'exp': datetime.utcnow().timestamp() + TOKEN_EXPIRE_DAYS * 86400
+    }, JWT_SECRET, algorithm='HS256') if HAS_JWT else ''
+
+# ========== LLM 配置 ==========
+DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
+DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
+DEEPSEEK_MODEL = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
+DEEPSEEK_INPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_INPUT_PRICE', '1.0'))
+DEEPSEEK_OUTPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_OUTPUT_PRICE', '2.0'))
+USER_MARKUP = 2.0
+ADMIN_SECRET = os.environ.get('ADMIN_SECRET', secrets.token_hex(16))
 
 
 # ========== 文件服务 ==========
@@ -381,7 +521,7 @@ def search_baidu_xueshu(query, max_rows=80):
 # ========== 统一检索 API ==========
 @app.route('/ping', methods=['GET'])
 def ping():
-    return jsonify({'ok': True, 'service': '论文文献AI利器', 'sources': ['OpenAlex','OpenAlex-CN','Crossref','Semantic Scholar','arXiv','CORE','PubMed','INSPIRE-HEP','DataCite','DOAJ','万方','百度学术']})
+    return jsonify({'ok': True, 'service': '论文文献AI利器', 'sources': ['OpenAlex','OpenAlex-CN','Crossref','Semantic Scholar','arXiv','CORE','PubMed','INSPIRE-HEP','DataCite','DOAJ','EuropePMC','CNKI','万方','百度学术']})
 
 def _run_source(fn, *args):
     """Thread-safe wrapper: 在线程池中安全调用搜索函数"""
@@ -401,17 +541,20 @@ def search_api():
             if not q.strip(): continue
             is_cn = bool(re.search(r'[一-鿿]', q))
 
-            # 每个词只查3个最快源
+            # 每个词只查3个最快源 + 新增源
             for source_fn in [
                 lambda: fetch_with_retry(search_openalex, q, min(max_per, 100)),
                 lambda: search_crossref(q, 50),
                 lambda: search_semantic_scholar(q, 50),
+                lambda: search_europepmc(q, 40),
             ]:
                 try: all_results.extend(source_fn() or [])
                 except: pass
 
             if is_cn:
                 try: all_results.extend(search_baidu_xueshu_page(q, 0) or [])
+                except: pass
+                try: all_results.extend(search_cnki(q, 30) or [])
                 except: pass
 
         all_results = dedup_results(all_results)
@@ -758,6 +901,325 @@ def convert_doc():
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ========== 用户认证 API ==========
+@app.route('/api/auth/register', methods=['POST'])
+def auth_register():
+    data = request.get_json() or {}
+    username = (data.get('username') or '').strip()
+    password = (data.get('password') or '')
+    if not username or len(username) < 2 or len(username) > 32:
+        return jsonify({'success': False, 'error': '用户名需2-32个字符'}), 400
+    if not password or len(password) < 6:
+        return jsonify({'success': False, 'error': '密码至少6个字符'}), 400
+    if not re.match(r'^[a-zA-Z0-9_一-鿿]+$', username):
+        return jsonify({'success': False, 'error': '用户名只能包含中英文、数字和下划线'}), 400
+    db = get_db()
+    try:
+        existing = db.execute('SELECT id FROM users WHERE username = ?', (username,)).fetchone()
+        if existing:
+            return jsonify({'success': False, 'error': '用户名已存在'}), 409
+        pwd_hash = hash_password(password)
+        db.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)', (username, pwd_hash))
+        db.commit()
+        return jsonify({'success': True, 'message': '注册成功，请登录'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/auth/login', methods=['POST'])
+def auth_login():
+    data = request.get_json() or {}
+    username = (data.get('username') or '').strip()
+    password = data.get('password') or ''
+    if not username or not password:
+        return jsonify({'success': False, 'error': '请输入用户名和密码'}), 400
+    db = get_db()
+    try:
+        user = db.execute('SELECT id, username, password_hash, balance, is_admin FROM users WHERE username = ?',
+                          (username,)).fetchone()
+        if not user or not verify_password(password, user['password_hash']):
+            return jsonify({'success': False, 'error': '用户名或密码错误'}), 401
+        token = generate_token(user['id'])
+        return jsonify({'success': True, 'token': token, 'user': {
+            'id': user['id'], 'username': user['username'],
+            'balance': user['balance'], 'is_admin': bool(user['is_admin'])
+        }})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/auth/me', methods=['GET'])
+@require_auth
+def auth_me():
+    db = get_db()
+    try:
+        user = db.execute('SELECT id, username, balance, is_admin, free_used_date, created_at FROM users WHERE id = ?',
+                          (request.user_id,)).fetchone()
+        if not user:
+            return jsonify({'success': False, 'error': '用户不存在'}), 404
+        today = date.today().isoformat()
+        free_used_today = (user['free_used_date'] == today)
+        return jsonify({'success': True, 'user': {
+            'id': user['id'], 'username': user['username'],
+            'balance': user['balance'], 'is_admin': bool(user['is_admin']),
+            'free_used_today': free_used_today
+        }})
+    finally:
+        db.close()
+
+# ========== 支付 API ==========
+@app.route('/api/payment/recharge', methods=['POST'])
+@require_auth
+def payment_recharge():
+    data = request.get_json() or {}
+    amount_yuan = data.get('amount_yuan')
+    payment_method = data.get('payment_method', 'alipay')
+    if amount_yuan not in [1, 5, 10, 20, 50]:
+        return jsonify({'success': False, 'error': '充值金额必须为: 1, 5, 10, 20, 50 元'}), 400
+    db = get_db()
+    try:
+        amount_fen = int(amount_yuan * 100)
+        db.execute('INSERT INTO recharge_orders (user_id, amount_yuan, amount_fen, payment_method) VALUES (?, ?, ?, ?)',
+                   (request.user_id, amount_yuan, amount_fen, payment_method))
+        db.commit()
+        return jsonify({'success': True, 'message': f'充值申请已提交 ({amount_yuan}元)，请等待管理员确认'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/payment/orders', methods=['GET'])
+@require_auth
+def payment_orders():
+    db = get_db()
+    try:
+        rows = db.execute(
+            'SELECT id, amount_yuan, amount_fen, status, payment_method, created_at, confirmed_at '
+            'FROM recharge_orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 50',
+            (request.user_id,)).fetchall()
+        return jsonify({'success': True, 'orders': [dict(r) for r in rows]})
+    finally:
+        db.close()
+
+@app.route('/api/payment/confirm', methods=['POST'])
+def payment_confirm():
+    data = request.get_json() or {}
+    order_id = data.get('order_id')
+    secret = data.get('admin_secret', '')
+    if secret != ADMIN_SECRET:
+        db = get_db()
+        try:
+            user = db.execute('SELECT is_admin FROM users WHERE id = ?', (data.get('user_id'),)).fetchone()
+            if not user or not user['is_admin']:
+                return jsonify({'success': False, 'error': '无权限'}), 403
+        finally:
+            db.close()
+    db = get_db()
+    try:
+        order = db.execute('SELECT * FROM recharge_orders WHERE id = ?', (order_id,)).fetchone()
+        if not order:
+            return jsonify({'success': False, 'error': '订单不存在'}), 404
+        if order['status'] != 'pending':
+            return jsonify({'success': False, 'error': '订单已处理'}), 400
+        db.execute("UPDATE recharge_orders SET status = 'confirmed', confirmed_at = datetime('now','localtime') WHERE id = ?",
+                   (order_id,))
+        db.execute("UPDATE users SET balance = balance + ? WHERE id = ?", (order['amount_fen'], order['user_id']))
+        new_balance = db.execute('SELECT balance FROM users WHERE id = ?', (order['user_id'],)).fetchone()['balance']
+        db.execute(
+            'INSERT INTO transactions (user_id, type, amount_fen, balance_after, description) VALUES (?, ?, ?, ?, ?)',
+            (order['user_id'], 'recharge', order['amount_fen'], new_balance,
+             f'充值 {order["amount_yuan"]}元 (#{order_id})'))
+        db.commit()
+        return jsonify({'success': True, 'message': '充值已确认'})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/payment/balance', methods=['GET'])
+@require_auth
+def payment_balance():
+    db = get_db()
+    try:
+        user = db.execute('SELECT balance, free_used_date FROM users WHERE id = ?', (request.user_id,)).fetchone()
+        today = date.today().isoformat()
+        free_available = (user['free_used_date'] != today)
+        return jsonify({'success': True, 'balance': user['balance'], 'free_available': free_available})
+    finally:
+        db.close()
+
+# ========== 使用量 API ==========
+@app.route('/api/usage/check_free', methods=['GET'])
+@require_auth
+def usage_check_free():
+    db = get_db()
+    try:
+        today = date.today().isoformat()
+        row = db.execute('SELECT used FROM daily_free_usage WHERE user_id = ? AND usage_date = ?',
+                         (request.user_id, today)).fetchone()
+        return jsonify({'success': True, 'free_available': not (row and row['used'])})
+    finally:
+        db.close()
+
+@app.route('/api/usage/mark_free', methods=['POST'])
+@require_auth
+def usage_mark_free():
+    db = get_db()
+    try:
+        today = date.today().isoformat()
+        db.execute('INSERT OR IGNORE INTO daily_free_usage (user_id, usage_date, used) VALUES (?, ?, 1)',
+                   (request.user_id, today))
+        db.execute("UPDATE users SET free_used_date = ? WHERE id = ?", (today, request.user_id))
+        db.commit()
+        return jsonify({'success': True})
+    finally:
+        db.close()
+
+@app.route('/api/usage/charge_upload', methods=['POST'])
+@require_auth
+def usage_charge_upload():
+    """上传扣费: 0.5元/万字符"""
+    data = request.get_json() or {}
+    char_count = data.get('char_count', 0)
+    cost_fen = max(1, int(char_count / 10000 * 50))  # 0.5元/万字符, 最低1分
+    db = get_db()
+    try:
+        user = db.execute('SELECT balance FROM users WHERE id = ?', (request.user_id,)).fetchone()
+        if user['balance'] < cost_fen:
+            return jsonify({'success': False, 'error': f'余额不足。需要 {cost_fen/100:.2f} 元，当前余额 {user["balance"]/100:.2f} 元',
+                            'balance': user['balance'], 'cost_fen': cost_fen}), 402
+        new_balance = user['balance'] - cost_fen
+        db.execute('UPDATE users SET balance = ? WHERE id = ?', (new_balance, request.user_id))
+        db.execute('INSERT INTO transactions (user_id, type, amount_fen, balance_after, description) VALUES (?, ?, ?, ?, ?)',
+                   (request.user_id, 'upload_charge', -cost_fen, new_balance,
+                    f'上传解析 {char_count} 字符 ({(cost_fen/100):.2f}元)'))
+        db.commit()
+        return jsonify({'success': True, 'cost_fen': cost_fen, 'balance': new_balance})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+# ========== LLM 分析 API ==========
+@app.route('/api/llm/analyze', methods=['POST'])
+@require_auth
+def llm_analyze():
+    if not DEEPSEEK_API_KEY:
+        return jsonify({'success': False, 'error': 'LLM服务未配置 (DEEPSEEK_API_KEY)'}), 503
+    data = request.get_json() or {}
+    module = data.get('module', 'unknown')
+    system_prompt = data.get('system_prompt', '')
+    user_prompt = data.get('user_prompt', '')
+    max_tokens = data.get('max_tokens', 2000)
+    temperature = data.get('temperature', 0.3)
+    # Estimate cost
+    total_text = system_prompt + user_prompt
+    cn_chars = len(re.findall(r'[一-鿿]', total_text))
+    en_chars = len(total_text) - cn_chars
+    est_input = int(cn_chars * 0.6 + en_chars * 0.25)
+    est_cost_fen = int((est_input / 1000000 * DEEPSEEK_INPUT_PRICE_PER_1M +
+                         max_tokens / 1000000 * DEEPSEEK_OUTPUT_PRICE_PER_1M) * 100)
+    user_charge_fen = max(1, int(est_cost_fen * USER_MARKUP))
+    db = get_db()
+    try:
+        user = db.execute('SELECT balance FROM users WHERE id = ?', (request.user_id,)).fetchone()
+        if user['balance'] < user_charge_fen:
+            return jsonify({'success': False, 'error': f'余额不足。预计 {user_charge_fen/100:.2f} 元，余额 {user["balance"]/100:.2f} 元',
+                            'balance': user['balance'], 'estimated_cost_fen': user_charge_fen}), 402
+        # Call DeepSeek
+        try:
+            resp = requests.post(
+                f'{DEEPSEEK_BASE_URL}/chat/completions',
+                headers={'Authorization': f'Bearer {DEEPSEEK_API_KEY}', 'Content-Type': 'application/json'},
+                json={'model': DEEPSEEK_MODEL,
+                      'messages': [{'role': 'system', 'content': system_prompt}, {'role': 'user', 'content': user_prompt}],
+                      'max_tokens': max_tokens, 'temperature': temperature, 'stream': False},
+                timeout=120)
+            resp.raise_for_status()
+            result = resp.json()
+        except Exception as api_err:
+            db.execute('INSERT INTO llm_usage (user_id, module, prompt_tokens, completion_tokens, cost_fen, user_charged_fen, model, success) VALUES (?,?,?,?,?,?,?,0)',
+                       (request.user_id, module, est_input, 0, 0, 0, DEEPSEEK_MODEL))
+            db.commit()
+            return jsonify({'success': False, 'error': f'LLM调用失败: {str(api_err)}'}), 502
+        usage = result.get('usage', {})
+        actual_input = usage.get('prompt_tokens', est_input)
+        actual_output = usage.get('completion_tokens', 0)
+        actual_cost = int((actual_input / 1000000 * DEEPSEEK_INPUT_PRICE_PER_1M +
+                            actual_output / 1000000 * DEEPSEEK_OUTPUT_PRICE_PER_1M) * 100)
+        actual_charge = max(1, int(actual_cost * USER_MARKUP))
+        new_balance = user['balance'] - actual_charge
+        db.execute('UPDATE users SET balance = ? WHERE id = ?', (new_balance, request.user_id))
+        db.execute('INSERT INTO transactions (user_id, type, amount_fen, balance_after, description) VALUES (?,?,?,?,?)',
+                   (request.user_id, 'llm_usage', -actual_charge, new_balance,
+                    f'LLM分析 {module} ({actual_input}+{actual_output} tokens, ¥{actual_charge/100:.2f})'))
+        db.execute('INSERT INTO llm_usage (user_id, module, prompt_tokens, completion_tokens, cost_fen, user_charged_fen, model, success) VALUES (?,?,?,?,?,?,?,1)',
+                   (request.user_id, module, actual_input, actual_output, actual_cost, actual_charge, DEEPSEEK_MODEL))
+        db.commit()
+        content = result['choices'][0]['message']['content']
+        return jsonify({'success': True, 'content': content, 'usage': {
+            'input_tokens': actual_input, 'output_tokens': actual_output,
+            'cost_fen': actual_charge, 'cost_yuan': round(actual_charge / 100, 2), 'balance_after': new_balance
+        }})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+# ========== 新增文献源 ==========
+def search_europepmc(query, max_rows=60):
+    """Europe PMC: 生命科学/医学文献"""
+    results = []
+    try:
+        from urllib.parse import quote
+        url = f'https://www.ebi.ac.uk/europepmc/webservices/rest/search?query={quote(query)}&format=json&pageSize=100&resultType=lite'
+        data = fetch_json(url, timeout=15)
+        if data and 'resultList' in data:
+            for item in data['resultList'].get('result', [])[:max_rows]:
+                title = (item.get('title') or '').strip()
+                if not title or len(title) < 3: continue
+                journal = (item.get('journalTitle') or '').strip()
+                year = str(item.get('pubYear') or '')
+                authors = (item.get('authorString') or '').strip()
+                doi = (item.get('doi') or '').strip()
+                results.append(make_result(title, journal, year, authors, doi, 'EP'))
+    except: pass
+    return results
+
+def search_cnki(query, max_rows=40):
+    """CNKI 公共搜索"""
+    results = []
+    try:
+        from urllib.parse import quote
+        url = f'https://search.cnki.net/search.aspx?q={quote(query)}&rank=relevant&cluster=all&val=&p=0'
+        html_text = fetch_text(url, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'text/html', 'Accept-Language': 'zh-CN,zh;q=0.9'
+        }, timeout=15)
+        if not html_text: return results
+        titles = re.findall(r'<a[^>]*class="[^"]*(?:title|fz14)[^"]*"[^>]*>(.*?)</a>', html_text)
+        sources = re.findall(r'(?:class="source"[^>]*>|<p[^>]*>)\s*(.*?)\s*(?:</p>|</span>|</div>)', html_text)
+        for i, t in enumerate(titles[:max_rows]):
+            title = html.unescape(re.sub(r'<[^>]+>', '', t)).strip()
+            if not title or len(title) < 3 or len(title) > 300: continue
+            journal, year = '', ''
+            if i < len(sources):
+                src = html.unescape(re.sub(r'<[^>]+>', '', sources[i])).strip()
+                ym = re.search(r'((?:19|20)\d{2})', src)
+                if ym: year = ym.group(1)
+                journal = re.sub(r'\s*\d{4}.*', '', src).strip()
+            results.append(make_result(title, journal, year, '', '', 'CNKI'))
+    except: pass
+    return results
+
+
 
 
 if __name__ == '__main__':
