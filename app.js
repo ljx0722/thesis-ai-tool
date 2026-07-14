@@ -2131,34 +2131,45 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
 
     // === .docx 格式：本地解析 ===
     if(ext==='docx'){
-    // 预解析：从 DOCX 原始 XML 提取每段 Word 样式名
+    // 预解析：从 DOCX 原始 XML 提取每段 Word 样式名（纯字符串拆分，拒绝正则回溯）
     window._docxParaStyleList=[];
     try{
       var docxZip=await JSZip.loadAsync(buf);
       var stylesXml=await docxZip.file('word/styles.xml').async('string');
       var docXml=await docxZip.file('word/document.xml').async('string');
       if(stylesXml&&docXml){
+        // 步骤A：拆分 stylesXml 为独立 <w:style ...> 块，从中提取 styleId → 中文名
         var styleNameById={};
-        var reS, mS;
+        var styleBlocks=stylesXml.split('<w:style ');
+        for(var sbi=1;sbi<styleBlocks.length;sbi++){
+          var block='<w:style '+styleBlocks[sbi];
+          var idMatch=block.match(/w:styleId="([^"]*)"/);
+          if(!idMatch)continue;
+          var sid2=idMatch[1];
+          var nmMatch=block.match(/<w:name[^>]*w:val="([^"]*)"/);
+          var nm=sid2; // 兜底：用 ID 本身
+          if(nmMatch){
+            nm=nmMatch[1];
+          }
+          styleNameById[sid2]=nm;
+        }
+        console.log('[docx] Parsed '+Object.keys(styleNameById).length+' style names from styles.xml');
 
-        // 样式 ID → 样式名
-        reS =/<w:style[^>]*w:styleId="([^"]*)"[\s\S]*?<w:name[^>]*w:val="([^"]*)"[\s\S]*?<\/w:style>/g;
-        while((mS=reS.exec(stylesXml))!==null){styleNameById[mS[1]]=mS[2];}
-        console.log('[docx] Parsed styleNameById:',Object.keys(styleNameById).length,'styles');
-
-        // 每段：提取 <w:pStyle w:val="..."> 的样式 ID，然后查名字
-        var reP =/<w:p[ >][\s\S]*?<\/w:p>/g;
-        var mP;
-        while((mP=reP.exec(docXml))!==null){
-          var p=mP[0];
-          var sm=p.match(/<w:pStyle[^>]*w:val="([^"]*)"/);
-          var sid=sm?sm[1]:'Normal';
-          var sname=styleNameById[sid]||sid;
-          var tx=[];
-          var tr=/<w:t[^>]*>([^<]*)<\/w:t>/g;
-          var tm;
-          while((tm=tr.exec(p))!==null){tx.push(tm[1]);}
-          var txt=tx.join('').replace(/\s+/g,' ').trim();
+        // 步骤B：拆分 documentXml 为独立 <w:p ...> 块
+        var paraBlocks=docXml.split('<w:p ');
+        for(var pbi=1;pbi<paraBlocks.length;pbi++){
+          var pBlock='<w:p '+paraBlocks[pbi];
+          var sm2=pBlock.match(/<w:pStyle[^>]*w:val="([^"]*)"/);
+          var sid3=sm2?sm2[1]:'Normal';
+          var sname=styleNameById[sid3]||sid3;
+          // 提取文本
+          var txt='';
+          var tParts=pBlock.split('<w:t');
+          for(var ti2=1;ti2<tParts.length;ti2++){
+            var tm2=tParts[ti2].match(/>([^<]*)</);
+            if(tm2)txt+=tm2[1];
+          }
+          txt=txt.replace(/\s+/g,' ').trim();
           if(!txt||txt.length<2)continue;
           if(/^\d{1,3}$/.test(txt)||/^[ivxlcdm]+$/i.test(txt))continue;
           if(/[\t\s]+\d{1,3}$/.test(txt)||/\.{3,}\d{1,3}$/.test(txt))continue;
