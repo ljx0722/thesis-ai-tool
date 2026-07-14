@@ -2181,49 +2181,80 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     var thesisBoxEl=document.getElementById('thesisBox');
     thesisBoxEl.innerHTML=manuscriptHTML;
     var tbs=thesisBoxEl.querySelectorAll('table');for(var ti=0;ti<tbs.length;ti++)tbs[ti].style.display='';
-    // 构建 _docxStyleGroups：XML Word 样式名 + DOM 元素按文档序对齐
+    // 构建 _docxStyleGroups：XML 样式名 + DOM 元素按文档序对齐（不靠文本匹配）
     window._docxStyleGroups=[];
     window._normText=function(s){return(s||'').replace(/[\s　  - ]+/g,' ').replace(/ +/g,' ').trim();};
     if(window._docxParaStyleList&&window._docxParaStyleList.length){
       var domA=thesisBoxEl.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li');
-      var sg2={},xl=window._docxParaStyleList,xi=0;
-      for(var di=0;di<domA.length&&xi<xl.length;di++){
+      var sg2={},xl=window._docxParaStyleList;
+      // 位置对齐：同时遍历 XML 列表和 DOM 元素，中间允许 ±3 行偏差
+      var di=0,xi=0;
+      while(di<domA.length&&xi<xl.length){
         var dE=domA[di],dt=window._normText(dE.textContent||'');
-        if(!dt||dt.length<2)continue;
-        if(/^\d{1,3}$/.test(dt)||/^[ivxlcdm]+$/i.test(dt))continue;
-        if(/[\t\s]+\d{1,3}$/.test(dt)||/\.{3,}\d{1,3}$/.test(dt))continue;
+        // 跳过空白、页码、TOC 条目
+        if(!dt||dt.length<2||/^\d{1,3}$/.test(dt)||/^[ivxlcdm]+$/i.test(dt)||/[	\s]+\d{1,3}$/.test(dt)||/\.{3,}\d{1,3}$/.test(dt)){
+          di++;continue;
+        }
+        // 在当前 XML 位置前后 3 行内找文本匹配
         var found=false;
-        for(var fix=xi;fix<Math.min(xi+4,xl.length);fix++){
-          var xt=window._normText(xl[fix].text);
-          if(xt===dt||(dt.length>=10&&xt.length>=10&&dt.substring(0,20)===xt.substring(0,20))){
-            var sn2=xl[fix].styleName||'Normal';
+        for(var off=-3;off<=3;off++){
+          var xpos=xi+off;if(xpos<0||xpos>=xl.length)continue;
+          var xt=window._normText(xl[xpos].text);
+          if(xt===dt||(dt.length>=8&&xt.length>=8&&dt.substring(0,20)===xt.substring(0,20))){
+            var sn2=xl[xpos].styleName||'Normal';
             if(!sg2[sn2])sg2[sn2]={name:sn2,count:0,samples:[],_texts:[],_els:[]};
             sg2[sn2].count++;
-            if(sg2[sn2].samples.length<3)sg2[sn2].samples.push(dt.substring(0,80));
+            if(sg2[sn2].samples.length<4)sg2[sn2].samples.push(dt.substring(0,80));
             sg2[sn2]._texts.push(dt);
             sg2[sn2]._els.push(dE);
-            xi=fix+1;found=true;break;
+            xi=xpos+1;found=true;break;
           }
         }
+        if(!found){
+          // 纯文本段落在 XML 中也可能是 "Normal" 样式
+          // 尝试前进 xi，查看下一行是否匹配
+          if(xi+1<xl.length){
+            var nextXt=window._normText(xl[xi+1].text);
+            if(nextXt===dt||(dt.length>=8&&nextXt.length>=8&&dt.substring(0,20)===nextXt.substring(0,20))){
+              xi++; // 跳过当前不匹配的 XML 行
+              var sn3=xl[xi].styleName||'Normal';
+              if(!sg2[sn3])sg2[sn3]={name:sn3,count:0,samples:[],_texts:[],_els:[]};
+              sg2[sn3].count++;
+              if(sg2[sn3].samples.length<4)sg2[sn3].samples.push(dt.substring(0,80));
+              sg2[sn3]._texts.push(dt);
+              sg2[sn3]._els.push(dE);
+              xi++;found=true;
+            }
+          }
+        }
+        di++;
+        // 防止无限循环：每 5 个 DOM 元素前进一次 xi
+        if(!found&&di%5===0)xi++;
       }
       window._docxStyleGroups=Object.values(sg2).sort(function(a,b){return b.count-a.count;});
-      console.log('[docx] Built '+window._docxStyleGroups.length+' style groups from '+xi+'/'+xl.length+' XML paragraphs');
+      console.log('[docx] Built '+window._docxStyleGroups.length+' style groups, matched '+xi+'/'+xl.length+' XML paragraphs with '+di+' DOM elements');
+      if(window._docxStyleGroups.length){
+        console.log('[docx] Groups:',window._docxStyleGroups.map(function(g){return g.name+'×'+g.count;}).join(', '));
+      }
     }
+    // 兜底：如果没有任何匹配（极少情况），退化为简单文本模式
     if(!window._docxStyleGroups.length){
+      console.warn('[docx] Zero style groups — fallback to text patterns');
       var fb={};var aEl=thesisBoxEl.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li');
       for(var i=0;i<aEl.length;i++){
         var e=aEl[i],t=(e.textContent||'').trim();
-        if(!t||t.length<2)continue;
-        if(/^\d{1,3}$/.test(t)||/^[ivxlcdm]+$/i.test(t))continue;
-        if(/[\t\s]+\d{1,3}$/.test(t)||/\.{3,}\d{1,3}$/.test(t))continue;
+        if(!t||t.length<2||/^\d{1,3}$/.test(t)||/^[ivxlcdm]+$/i.test(t))continue;
+        if(/[	\s]+\d{1,3}$/.test(t)||/\.{3,}\d{1,3}$/.test(t))continue;
         var g='Normal';
+        if(/^第[一-九十百千123456789]+章/.test(t))g='第X章';
+        else if(/^Chapter\s+\d/i.test(t))g='Chapter';
+        else if(/^\d+(?:\.\d+)+[\s、,，]+/.test(t))g='数字编号';
         if(!fb[g])fb[g]={name:g,count:0,samples:[],_texts:[],_els:[]};
-        fb[g].count++;if(fb[g].samples.length<3)fb[g].samples.push(t.substring(0,80));
+        fb[g].count++;if(fb[g].samples.length<4)fb[g].samples.push(t.substring(0,80));
         fb[g]._texts.push(t);fb[g]._els.push(e);
       }
       window._docxStyleGroups=Object.values(fb).sort(function(a,b){return b.count-a.count;});
     }
-
     updLoad('构建章节树...','35');
 
     // ====== 标题层级检测辅助函数 ======
