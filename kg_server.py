@@ -104,9 +104,9 @@ def init_db():
         );
     ''')
     conn.commit()
-    # Default pricing config
-    for k,v in [('upload_price','0'),('search_price','0'),('llm_analysis_price','1'),
-                ('kg_price','0'),('domain_analysis_price','0'),('register_bonus','5'),('invite_bonus','1')]:
+    # Default pricing config (单位：分点 = 0.1点)
+    for k,v in [('upload_price','10'),('module_price','1'),('search_price','0'),
+                ('kg_price','0'),('domain_analysis_price','0'),('register_bonus','50'),('invite_bonus','10')]:
         conn.execute('INSERT OR IGNORE INTO config (key,value) VALUES (?,?)',(k,v))
     # Seed admin
     try:
@@ -775,20 +775,20 @@ def compute_force_layout(entities, links, width=1400, height=800, iterations=80)
     pos = {e['id']: {'x': random.uniform(100, width - 100), 'y': random.uniform(100, height - 100), 'vx': 0, 'vy': 0} for e in entities}
     cx, cy, r = width / 2, height / 2, min(width, height) * 0.3
     for i, e in enumerate([x for x in entities if x['type'] == 'keyword']):
-        a = (i / max(len(entities) or 1, 1)) * 2 * math.pi - math.pi / 2
+        a = (i / max(len(entities) or 10, 1)) * 2 * math.pi - math.pi / 2
         pos[e['id']] = {'x': cx + math.cos(a) * r * 1.1, 'y': cy + math.sin(a) * r * 1.1, 'vx': 0, 'vy': 0}
     for i, e in enumerate([x for x in entities if x['type'] == 'chapter']):
-        a = (i / max(len(entities) or 1, 1)) * 2 * math.pi - math.pi / 2
+        a = (i / max(len(entities) or 10, 1)) * 2 * math.pi - math.pi / 2
         pos[e['id']] = {'x': cx + math.cos(a) * r * 0.7, 'y': cy + math.sin(a) * r * 0.7, 'vx': 0, 'vy': 0}
     for i, e in enumerate([x for x in entities if x['type'] == 'reference']):
-        a = (i / max(len(entities) or 1, 1)) * 2 * math.pi - math.pi / 2
+        a = (i / max(len(entities) or 10, 1)) * 2 * math.pi - math.pi / 2
         pos[e['id']] = {'x': cx + math.cos(a) * r * 0.4, 'y': cy + math.sin(a) * r * 0.4, 'vx': 0, 'vy': 0}
     ids = {e['id'] for e in entities}
     for _ in range(iterations):
         for i in range(len(entities)):
             for j in range(i + 1, len(entities)):
                 p1, p2 = pos[entities[i]['id']], pos[entities[j]['id']]
-                dx, dy = p2['x'] - p1['x'], p2['y'] - p1['y']; d = math.sqrt(dx * dx + dy * dy) or 1; f = 400 / d
+                dx, dy = p2['x'] - p1['x'], p2['y'] - p1['y']; d = math.sqrt(dx * dx + dy * dy) or 10; f = 400 / d
                 p1['vx'] -= dx / d * f; p1['vy'] -= dy / d * f; p2['vx'] += dx / d * f; p2['vy'] += dy / d * f
         for l in links:
             if l['source'] in ids and l['target'] in ids:
@@ -946,14 +946,14 @@ def auth_register():
         if existing:
             return jsonify({'success': False, 'error': '用户名已存在'}), 409
         pwd_hash = hash_password(password)
-        bonus = int(db.execute("SELECT value FROM config WHERE key='register_bonus'").fetchone()['value'] or 5)
+        bonus = int(db.execute("SELECT value FROM config WHERE key='register_bonus'").fetchone()['value'] or 50)
         # Apply invite code bonus
         inviter_id = None
         if invite:
             ic = db.execute("SELECT * FROM invite_codes WHERE code = ? AND used_by IS NULL", (invite,)).fetchone()
             if ic and ic['owner_id']:
                 inviter_id = ic['owner_id']
-                inv_bonus = int(db.execute("SELECT value FROM config WHERE key='invite_bonus'").fetchone()['value'] or 1)
+                inv_bonus = int(db.execute("SELECT value FROM config WHERE key='invite_bonus'").fetchone()['value'] or 10)
                 db.execute("UPDATE invite_codes SET used_by = (SELECT id FROM users WHERE username = ?), used_at = datetime('now','localtime') WHERE code = ?", (username, invite))
                 db.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (inv_bonus, inviter_id))
                 bonus += inv_bonus
@@ -1078,7 +1078,7 @@ def payment_confirm():
         order = db.execute('SELECT * FROM recharge_orders WHERE id = ?', (order_id,)).fetchone()
         if not order: return jsonify({'success': False, 'error': '订单不存在'}), 404
         if order['status'] != 'pending': return jsonify({'success': False, 'error': '已处理'}), 400
-        pts = int(order['amount_yuan'])
+        pts = int(order['amount_yuan'] * 10)
         db.execute("UPDATE recharge_orders SET status = 'confirmed', confirmed_at = datetime('now','localtime') WHERE id = ?", (order_id,))
         db.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (pts, order['user_id']))
         after = db.execute('SELECT credits FROM users WHERE id = ?', (order['user_id'],)).fetchone()['credits']
@@ -1130,8 +1130,33 @@ def usage_mark_free():
     finally:
         db.close()
 
+@app.route('/api/usage/module', methods=['POST'])
+@require_auth
+def usage_module():
+    """模块使用扣点（0.1点/次 = 1分点）"""
+    # 首次使用免费（当天），否则扣 module_price 分点
+    db = get_db()
+    try:
+        today = date.today().isoformat()
+        free_row = db.execute('SELECT used FROM daily_free_usage WHERE user_id = ? AND usage_date = ?',
+                              (request.user_id, today)).fetchone()
+        if not (free_row and free_row['used']):
+            # Mark free and don't charge
+            db.execute('INSERT OR IGNORE INTO daily_free_usage (user_id, usage_date, used) VALUES (?, ?, 1)',
+                       (request.user_id, today))
+            db.execute("UPDATE users SET free_used_date = ? WHERE id = ?", (today, request.user_id))
+            db.commit()
+            return jsonify({'success': True, 'free': True, 'message': '今日首次使用，免费'})
+    finally: db.close()
+    # Not free — deduct
+    price = get_price('module')
+    if price <= 0: return jsonify({'success': True, 'free': False, 'cost': 0})
+    ok, err, after = deduct_credits(request.user_id, price, '模块使用 (' + str(price/10) + '点)')
+    if not ok: return jsonify({'success': False, 'error': err, 'needed': price}), 402
+    return jsonify({'success': True, 'free': False, 'cost': price, 'credits_after': after})
+
 # 模块扣点定价（从 config 表读取，默认值兜底）
-PRICING_DEFAULTS = {'llm_analysis':1, 'domain_analysis':0, 'kg':0, 'search':0, 'upload':0}
+PRICING_DEFAULTS = {'module': 1, 'upload': 10, 'llm_analysis': 0, 'domain_analysis': 0, 'kg': 0, 'search': 0}
 def get_price(key):
     try:
         db = get_db()
@@ -1309,7 +1334,7 @@ def invite_apply():
         ic = db.execute("SELECT * FROM invite_codes WHERE code = ? AND used_by IS NULL AND owner_id != ?",
                         (code, request.user_id)).fetchone()
         if not ic: return jsonify({'success': False, 'error': '邀请码无效或已被使用'}), 404
-        inv_bonus = int(db.execute("SELECT value FROM config WHERE key='invite_bonus'").fetchone()['value'] or 1)
+        inv_bonus = int(db.execute("SELECT value FROM config WHERE key='invite_bonus'").fetchone()['value'] or 10)
         db.execute("UPDATE invite_codes SET used_by = ?, used_at = datetime('now','localtime') WHERE code = ?",
                    (request.user_id, code))
         db.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (inv_bonus, ic['owner_id']))
