@@ -361,6 +361,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <script src="js/modules/paragraph-analysis.js?v=27"></script>
 <script src="js/modules/dashboard.js?v=27"></script>
 <script src="js/modules/thesis-review.js?v=27"></script>
+<script src="js/modules/proposal.js?v=27"></script>
 <script src="js/modules/onboarding.js?v=27"></script>
 <script src="js/modules/cat-game.js?v=27"></script>
 <script src="js/app-modules.js?v=27"></script>
@@ -584,6 +585,17 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
         el.innerHTML = h;
       });
   }
+  window.changePassword = function(){
+    var oldPw=document.getElementById('pwOld').value, newPw=document.getElementById('pwNew').value;
+    var msg=document.getElementById('pwMsg');
+    if(!oldPw||!newPw){msg.textContent='请填写原密码和新密码';msg.style.color='#fca5a5';return;}
+    var token=sessionStorage.getItem('thesis_ai_token');
+    fetch('/api/auth/change_password',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({old_password:oldPw,new_password:newPw})})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.success){msg.textContent=d.message;msg.style.color='#34d399';}
+        else{msg.textContent=d.error;msg.style.color='#fca5a5';}
+      }).catch(function(){msg.textContent='网络错误';msg.style.color='#fca5a5';});
+  };
   // Auto update balance on login
   setInterval(updateBalanceDisplay, 30000);
 })();
@@ -617,7 +629,8 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
       <button onclick="submitRecharge()" style="width:100%;padding:10px;border-radius:10px;border:none;background:#6366f1;color:#fff;cursor:pointer;font-weight:700;font-size:.8rem">我已支付，提交申请</button>
       <p style="font-size:.58rem;color:rgba(255,255,255,.2);text-align:center;margin:6px 0 0">支付完成后请等待管理员确认</p>
     </div>
-    <h4 style="font-size:.75rem;color:rgba(255,255,255,.5);margin:0 0 6px">充值记录</h4>
+    <h4 style="font-size:.75rem;color:rgba(255,255,255,.5);margin:12px 0 6px">修改密码</h4><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input type="password" id="pwOld" placeholder="原密码" style="flex:1;min-width:80px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:7px 10px;font-size:.7rem;color:#e2e8f0;outline:none"><input type="password" id="pwNew" placeholder="新密码(6位+)" style="flex:1;min-width:80px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:7px 10px;font-size:.7rem;color:#e2e8f0;outline:none"><button onclick="changePassword()" style="padding:7px 14px;border:none;border-radius:8px;background:#6366f1;color:#fff;font-size:.7rem;cursor:pointer;font-weight:600">修改</button></div><div id="pwMsg" style="font-size:.62rem;min-height:14px;margin-top:4px"></div>
+  <h4 style="font-size:.75rem;color:rgba(255,255,255,.5);margin:0 0 6px">充值记录</h4>
     <div id="rechargeHistory" style="max-height:160px;overflow-y:auto;font-size:.7rem;color:rgba(255,255,255,.5)"></div>
   </div>
 </div>

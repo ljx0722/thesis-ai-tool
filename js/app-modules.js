@@ -7,6 +7,7 @@ var APP_MODULES = [
   { id: 'review',          name: '论文审阅',   icon: '🔍', requiresThesis: true },
   { id: 'optimization',    name: '优化建议',   icon: '💡', requiresThesis: true },
   { id: 'expand',          name: '论文扩写',   icon: '✍️', requiresThesis: true },
+  { id: 'proposal',        name: '开题大纲',   icon: '📝', requiresThesis: false },
   { id: 'data-analysis',   name: '数据分析',   icon: '📈', requiresThesis: false },
   { id: 'knowledge-graph', name: '知识图谱',   icon: '🕸️', requiresThesis: true },
   { id: 'references',      name: '参考文献',   icon: '📋', requiresThesis: true },
@@ -222,6 +223,7 @@ function switchPanel(moduleId) {
           else if (moduleId === 'review' && typeof runReviewModule === 'function') runReviewModule(mc);
           else if (moduleId === 'expand' && typeof runExpandModule === 'function') runExpandModule(mc);
           else if (moduleId === 'data-analysis' && typeof runDataAnalysis === 'function') runDataAnalysis(mc);
+          else if (moduleId === 'proposal' && typeof runProposalModule === 'function') runProposalModule(mc);
         } catch (e) { mc.innerHTML = '<div style="text-align:center;padding:40px;color:var(--r)">分析出错: ' + e.message + '</div>'; }
         hideLoad();
       }, 100);

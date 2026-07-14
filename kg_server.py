@@ -1006,6 +1006,28 @@ def auth_me():
     finally:
         db.close()
 
+@app.route('/api/auth/change_password', methods=['POST'])
+@require_auth
+def auth_change_password():
+    data = request.get_json() or {}
+    old_pw = data.get('old_password') or ''
+    new_pw = data.get('new_password') or ''
+    if len(new_pw) < 6:
+        return jsonify({'success': False, 'error': '新密码至少6个字符'}), 400
+    db = get_db()
+    try:
+        user = db.execute('SELECT password_hash FROM users WHERE id = ?', (request.user_id,)).fetchone()
+        if not user or not verify_password(old_pw, user['password_hash']):
+            return jsonify({'success': False, 'error': '原密码错误'}), 401
+        new_hash = hash_password(new_pw)
+        db.execute('UPDATE users SET password_hash = ? WHERE id = ?', (new_hash, request.user_id))
+        db.commit()
+        return jsonify({'success': True, 'message': '密码已修改'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
 # ========== 支付 / 点数 API ==========
 @app.route('/api/payment/recharge', methods=['POST'])
 @require_auth
