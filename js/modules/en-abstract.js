@@ -38,7 +38,7 @@ window.runEnAI = function() {
     body: JSON.stringify({ module: 'en-abstract', system_prompt: '你是学术翻译与写作专家，精通中英文学术写作规范。', user_prompt: prompt, max_tokens: 2000 })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.success) {
-      out.innerHTML = '<div style="padding:16px;background:rgba(255,255,255,.03);border-radius:10px;border:1px solid rgba(255,255,255,.08);font-size:.75rem;color:#e2e8f0;line-height:1.8;white-space:pre-wrap">'+d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div><div style="text-align:right;font-size:.62rem;color:rgba(255,255,255,.25);margin-top:6px">消耗 '+(d.usage.cost_credits).toFixed(1)+' 点 · 剩余 '+(d.usage.credits_after).toFixed(1)+' 点</div>';
+      out.innerHTML = '<div style="padding:16px;background:rgba(255,255,255,.03);border-radius:10px;border:1px solid rgba(255,255,255,.08);font-size:.75rem;color:#e2e8f0;line-height:1.8;white-space:pre-wrap">'+d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div><div style="text-align:right;font-size:.62rem;color:rgba(255,255,255,.25);margin-top:6px">消耗 '+(d.usage.cost_credits/1000).toFixed(1)+' 点 · 剩余 '+(d.usage.credits_after/1000).toFixed(1)+' 点</div>';
     } else { out.innerHTML = '<div style="color:#fca5a5">❌ '+d.error+'</div>'; }
   });
 };

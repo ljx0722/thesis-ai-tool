@@ -37,7 +37,7 @@ window.runTopicFinderAI = function() {
       if (d.success) {
         out.innerHTML = '<div style="padding:16px;background:rgba(255,255,255,.03);border-radius:10px;border:1px solid rgba(255,255,255,.08);font-size:.75rem;color:#e2e8f0;line-height:1.8;white-space:pre-wrap">' +
           d.content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' +
-          '<div style="text-align:right;font-size:.62rem;color:rgba(255,255,255,.25);margin-top:6px">消耗 ' + d.usage.cost_credits + ' 点 · 剩余 ' + d.usage.credits_after + ' 点</div>';
+          '<div style="text-align:right;font-size:.62rem;color:rgba(255,255,255,.25);margin-top:6px">消耗 ' + d.usage.cost_credits/1000 + ' 点 · 剩余 ' + d.usage.credits_after/1000 + ' 点</div>';
       } else { out.innerHTML = '<div style="padding:16px;background:rgba(239,68,68,.1);border-radius:10px;color:#fca5a5">❌ ' + d.error + '</div>'; }
     });
 };

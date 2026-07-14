@@ -24,7 +24,7 @@ window.runDefenseAI = function() {
     body: JSON.stringify({ module: 'defense-ppt', system_prompt: '你是答辩PPT设计专家。请根据论文内容生成一份专业的答辩PPT大纲。每页格式：页码 + 标题 + 3-5个要点 + [建议展示方式:图表/文字/流程图]。结构：封面→目录→研究背景→研究目的→文献综述→研究方法→技术路线→实验/数据→结果分析→创新点→结论→不足与展望→致谢。共15-20页。', user_prompt: '请根据以下论文内容生成答辩PPT大纲：\n\n'+input.substring(0,12000), max_tokens: 3000 })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.success) {
-      out.innerHTML = '<div style="padding:16px;background:rgba(255,255,255,.03);border-radius:10px;border:1px solid rgba(255,255,255,.08);font-size:.75rem;color:#e2e8f0;line-height:1.8;white-space:pre-wrap">'+d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div><div style="text-align:right;font-size:.62rem;color:rgba(255,255,255,.25);margin-top:6px">消耗 '+(d.usage.cost_credits).toFixed(1)+' 点 · 剩余 '+(d.usage.credits_after).toFixed(1)+' 点</div>';
+      out.innerHTML = '<div style="padding:16px;background:rgba(255,255,255,.03);border-radius:10px;border:1px solid rgba(255,255,255,.08);font-size:.75rem;color:#e2e8f0;line-height:1.8;white-space:pre-wrap">'+d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div><div style="text-align:right;font-size:.62rem;color:rgba(255,255,255,.25);margin-top:6px">消耗 '+(d.usage.cost_credits/1000).toFixed(1)+' 点 · 剩余 '+(d.usage.credits_after/1000).toFixed(1)+' 点</div>';
       if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
     } else { out.innerHTML = '<div style="color:#fca5a5">❌ '+d.error+'</div>'; }
   });
