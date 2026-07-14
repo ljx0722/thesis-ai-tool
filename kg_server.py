@@ -1445,6 +1445,70 @@ def search_cnki(query, max_rows=40):
     return results
 
 
+# ========== 管理员看板 API ==========
+@app.route('/api/admin/dashboard', methods=['GET'])
+def admin_dashboard():
+    s = request.args.get('secret', '')
+    db = get_db()
+    try:
+        if s != ADMIN_SECRET:
+            auth = request.headers.get('Authorization', '')
+            if auth.startswith('Bearer '):
+                try:
+                    payload = pyjwt.decode(auth[7:], JWT_SECRET, algorithms=['HS256'])
+                    u = db.execute('SELECT is_admin FROM users WHERE id=?', (payload['user_id'],)).fetchone()
+                    if not (u and u['is_admin']):
+                        return jsonify({'error': '无权限'}), 403
+                except: return jsonify({'error': '无权限'}), 403
+            else: return jsonify({'error': '无权限'}), 403
+        today = date.today().isoformat()
+        total_users = db.execute('SELECT COUNT(*) as c FROM users').fetchone()['c']
+        today_users = db.execute("SELECT COUNT(*) as c FROM users WHERE created_at LIKE ?", (today+'%',)).fetchone()['c']
+        total_credits = db.execute('SELECT SUM(credits) as s FROM users').fetchone()['s'] or 0
+        total_recharge = db.execute("SELECT SUM(amount_yuan) as s FROM recharge_orders WHERE status='confirmed'").fetchone()['s'] or 0
+        pending = db.execute("SELECT COUNT(*) as c FROM recharge_orders WHERE status='submitted'").fetchone()['c']
+        llm_today = db.execute("SELECT COUNT(*) as c FROM llm_usage WHERE created_at LIKE ?", (today+'%',)).fetchone()['c']
+        llm_total = db.execute('SELECT COUNT(*) as c FROM llm_usage WHERE success=1').fetchone()['c']
+        total_cost = db.execute('SELECT SUM(user_charged_credits) as s FROM llm_usage WHERE success=1').fetchone()['s'] or 0
+        recent_users = [dict(r) for r in db.execute('SELECT id,username,credits,created_at FROM users ORDER BY id DESC LIMIT 10').fetchall()]
+        recent_orders = [dict(r) for r in db.execute("SELECT o.*,u.username FROM recharge_orders o JOIN users u ON o.user_id=u.id ORDER BY o.id DESC LIMIT 10").fetchall()]
+        return jsonify({'success': True, 'stats': {
+            'total_users': total_users, 'today_users': today_users, 'total_credits': total_credits,
+            'total_recharge': total_recharge, 'pending_orders': pending,
+            'llm_today': llm_today, 'llm_total': llm_total, 'total_cost': total_cost,
+            'recent_users': recent_users, 'recent_orders': recent_orders
+        }})
+    finally: db.close()
+
+@app.route('/api/admin/users', methods=['GET'])
+def admin_users():
+    s = request.args.get('secret', '')
+    if s != ADMIN_SECRET: return jsonify({'error': '无权限'}), 403
+    db = get_db()
+    try:
+        rows = [dict(r) for r in db.execute('SELECT id,username,credits,invite_code,created_at FROM users ORDER BY id DESC LIMIT 100').fetchall()]
+        return jsonify({'success': True, 'users': rows})
+    finally: db.close()
+
+@app.route('/api/admin/credits', methods=['POST'])
+def admin_credits():
+    data = request.get_json() or {}
+    if data.get('secret','') != ADMIN_SECRET: return jsonify({'error':'无权限'}), 403
+    uid = data.get('user_id')
+    amount = int(data.get('amount', 0))
+    reason = data.get('reason', '管理员调整')
+    db = get_db()
+    try:
+        db.execute('UPDATE users SET credits = credits + ? WHERE id = ?', (amount, uid))
+        after = db.execute('SELECT credits FROM users WHERE id = ?', (uid,)).fetchone()['credits']
+        db.execute("INSERT INTO transactions (user_id,type,amount_credits,credits_after,description,created_at) VALUES (?,?,?,?,?,datetime('now','localtime'))",
+                   (uid, 'admin_adjust', amount, after, reason))
+        db.commit()
+        return jsonify({'success': True, 'credits': after})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally: db.close()
 
 
 if __name__ == '__main__':

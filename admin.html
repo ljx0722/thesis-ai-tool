@@ -1,0 +1,95 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>管理员看板 — 学术论文AI一站式助手</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'PingFang SC',sans-serif;background:#0f172a;color:#e2e8f0;padding:20px;min-height:100vh}
+h1{font-size:1.3rem;margin-bottom:4px}
+h2{font-size:1rem;margin:24px 0 12px;color:#94a3b8}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:16px 0}
+.stat{background:#1e293b;border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.06)}
+.stat .v{font-size:1.5rem;font-weight:800;color:#e2e8f0}
+.stat .l{font-size:.68rem;color:#64748b;margin-top:4px}
+table{width:100%;border-collapse:collapse;font-size:.72rem;margin:8px 0}
+th{text-align:left;padding:8px 10px;color:#94a3b8;font-weight:600;border-bottom:1px solid rgba(255,255,255,.08);font-size:.65rem;text-transform:uppercase}
+td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.03)}
+.btn{padding:6px 14px;border:none;border-radius:8px;cursor:pointer;font-size:.7rem;font-weight:600}
+.btn-primary{background:#6366f1;color:#fff}
+.btn-danger{background:#ef4444;color:#fff}
+.btn-green{background:#10b981;color:#fff}
+input,select{background:#1e293b;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 12px;color:#e2e8f0;font-size:.72rem;outline:none}
+input:focus{border-color:#6366f1}
+.login-box{max-width:400px;margin:40px auto;background:#1e293b;border-radius:16px;padding:32px;text-align:center;border:1px solid rgba(255,255,255,.06)}
+.flex{display:flex;gap:8px;align-items:center}
+.gap8{display:flex;gap:8px;flex-wrap:wrap}
+#loading{text-align:center;padding:60px;color:#64748b;font-size:1rem}
+</style></head><body>
+<div id="loginBox" class="login-box">
+  <h1 style="margin-bottom:16px">🔐 管理员登录</h1>
+  <input id="secretInput" type="password" placeholder="管理密钥" style="width:100%;margin-bottom:10px"><br>
+  <button class="btn btn-primary" onclick="login()" style="width:100%">登录</button>
+  <p style="font-size:.65rem;color:#64748b;margin-top:12px">默认密钥: 首次启动自动生成，查看服务器日志</p>
+</div>
+
+<div id="dashboard" style="display:none">
+  <div class="flex" style="justify-content:space-between;margin-bottom:16px">
+    <h1>📊 管理员看板</h1>
+    <button class="btn btn-danger" onclick="logout()">退出</button>
+  </div>
+
+  <div class="stats" id="statCards"></div>
+
+  <h2>👥 用户管理</h2>
+  <div class="gap8" style="margin-bottom:12px">
+    <input id="uidInput" type="number" placeholder="用户ID" style="width:80px">
+    <input id="creditAmount" type="number" placeholder="点数(正=加/负=扣)" style="width:150px">
+    <input id="creditReason" placeholder="原因" style="width:200px">
+    <button class="btn btn-primary" onclick="adjustCredits()">调整点数</button>
+  </div>
+  <table id="userTable"><thead><tr><th>ID</th><th>用户名</th><th>点数</th><th>邀请码</th><th>注册时间</th></tr></thead><tbody></tbody></table>
+
+  <h2>💰 充值订单</h2>
+  <table id="orderTable"><thead><tr><th>ID</th><th>用户</th><th>金额</th><th>状态</th><th>时间</th><th>操作</th></tr></thead><tbody></tbody></table>
+</div>
+
+<script>
+var SECRET = '';
+function login(){SECRET=document.getElementById('secretInput').value;loadDashboard();}
+function logout(){SECRET='';document.getElementById('loginBox').style.display='';document.getElementById('dashboard').style.display='none';}
+function loadDashboard(){
+  if(!SECRET){alert('请输入密钥');return}
+  fetch('/api/admin/dashboard?secret='+encodeURIComponent(SECRET)).then(r=>r.json()).then(d=>{
+    if(!d.success){alert(d.error||'无权限');return}
+    document.getElementById('loginBox').style.display='none';
+    document.getElementById('dashboard').style.display='';
+    var s=d.stats;
+    document.getElementById('statCards').innerHTML=
+      '<div class="stat"><div class="v">'+s.total_users+'</div><div class="l">总用户</div></div>'+
+      '<div class="stat"><div class="v">'+s.today_users+'</div><div class="l">今日新增</div></div>'+
+      '<div class="stat"><div class="v">'+(s.total_credits/10).toFixed(0)+'</div><div class="l">总点数</div></div>'+
+      '<div class="stat"><div class="v">¥'+s.total_recharge+'</div><div class="l">充值总额</div></div>'+
+      '<div class="stat"><div class="v">'+s.pending_orders+'</div><div class="l">待确认订单</div></div>'+
+      '<div class="stat"><div class="v">'+s.llm_today+'</div><div class="l">今日AI调用</div></div>'+
+      '<div class="stat"><div class="v">'+s.llm_total+'</div><div class="l">累计AI调用</div></div>'+
+      '<div class="stat"><div class="v">'+(s.total_cost/10).toFixed(0)+'</div><div class="l">AI消耗点数</div></div>';
+
+    var uhtml='';
+    s.recent_users.forEach(function(u){uhtml+='<tr><td>'+u.id+'</td><td>'+u.username+'</td><td>'+(u.credits/10).toFixed(1)+'</td><td>'+(u.invite_code||'-')+'</td><td>'+(u.created_at||'').substring(0,16)+'</td></tr>';});
+    document.querySelector('#userTable tbody').innerHTML=uhtml;
+
+    var ohtml='';var sm={pending:'待支付',submitted:'已提交',confirmed:'已到账'};
+    s.recent_orders.forEach(function(o){ohtml+='<tr><td>'+o.id+'</td><td>'+o.username+'</td><td>¥'+o.amount_yuan+'</td><td>'+sm[o.status]+'</td><td>'+(o.created_at||'').substring(0,16)+'</td><td>'+(o.status==='submitted'?'<button class=\"btn btn-green\" onclick=\"confirmOrder('+o.id+')\">确认到账</button>':'')+'</td></tr>';});
+    document.querySelector('#orderTable tbody').innerHTML=ohtml;
+  }).catch(function(){alert('网络错误')});
+}
+function adjustCredits(){
+  var uid=parseInt(document.getElementById('uidInput').value);
+  var amt=parseInt(document.getElementById('creditAmount').value);
+  var reason=document.getElementById('creditReason').value||'管理员调整';
+  if(!uid||!amt){alert('请输入用户ID和点数');return}
+  fetch('/api/admin/credits',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:SECRET,user_id:uid,amount:amt,reason:reason})})
+    .then(r=>r.json()).then(d=>{if(d.success){alert('调整成功，余额:'+(d.credits/10).toFixed(1)+'点');loadDashboard();}else{alert(d.error)}});
+}
+function confirmOrder(oid){
+  fetch('/api/payment/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order_id:oid})})
+    .then(r=>r.json()).then(d=>{if(d.success)loadDashboard();else alert(d.error);});
+}
+</script></body></html>

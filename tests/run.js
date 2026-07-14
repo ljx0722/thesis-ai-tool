@@ -1509,6 +1509,71 @@ test('AUDIT: renderExistingOnly uses lookupRefPosition', function() {
   assert(reBlock.indexOf('lookupRefPosition') >= 0, 'renderExistingOnly must use lookupRefPosition');
 });
 
+// ============================================================
+// SECTION 25: New Modules & Admin API
+// ============================================================
+console.log('\n=== Section 25: New Modules & Admin API ===');
+
+test('MODULE: topic-finder.js has runTopicFinder', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/topic-finder.js'), 'utf8');
+  assert(src.indexOf('function runTopicFinder') >= 0, 'runTopicFinder missing');
+});
+test('MODULE: proofread.js exists', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/proofread.js'), 'utf8');
+  assert(src.indexOf('runProofreadAI') >= 0, 'runProofreadAI missing');
+});
+test('MODULE: de-duplicate.js has check+rewrite modes', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/de-duplicate.js'), 'utf8');
+  assert(src.indexOf('check') >= 0 && src.indexOf('rewrite') >= 0, 'Two modes missing');
+});
+test('MODULE: defense-ppt.js and en-abstract.js exist', function() {
+  assert(fs.existsSync(path.join(projectRoot, 'js/modules/defense-ppt.js')), 'defense-ppt.js missing');
+  assert(fs.existsSync(path.join(projectRoot, 'js/modules/en-abstract.js')), 'en-abstract.js missing');
+});
+test('MODULE: APP_MODULES has 16 entries', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/app-modules.js'), 'utf8');
+  assert((src.match(/{ id: '/g)||[]).length >= 16, 'APP_MODULES <16 items');
+});
+test('API: Admin dashboard + users + credits endpoints', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  assert(src.indexOf('/api/admin/dashboard') >= 0, 'admin dashboard missing');
+  assert(src.indexOf('/api/admin/credits') >= 0, 'admin credits missing');
+});
+test('API: Payment submit endpoint exists', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  assert(src.indexOf('/api/payment/submit') >= 0, 'payment submit missing');
+});
+test('ADMIN: admin.html dashboard page exists', function() {
+  assert(fs.existsSync(path.join(projectRoot, 'admin.html')), 'admin.html missing');
+});
+test('UI: Nav sidebar has 4 stage groups', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert((html.match(/nav-group-title/g)||[]).length >= 4, 'Expected >=4 nav groups');
+});
+test('UI: All 16 modules in nav sidebar', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf("switchModule('topic-finder')") >= 0, 'topic-finder nav missing');
+  assert(html.indexOf("switchModule('proofread')") >= 0, 'proofread nav missing');
+  assert(html.indexOf("switchModule('de-duplicate')") >= 0, 'de-duplicate nav missing');
+  assert(html.indexOf("switchModule('defense-ppt')") >= 0, 'defense-ppt nav missing');
+  assert(html.indexOf("switchModule('en-abstract')") >= 0, 'en-abstract nav missing');
+});
+test('UI: Landing highlights + invite + consumption history', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf('landing-highlights') >= 0, 'highlights missing');
+  assert(html.indexOf('myInviteCode') >= 0, 'invite code missing');
+  assert(html.indexOf('consumptionHistory') >= 0, 'consumption history missing');
+});
+test('PRICING: 3/day free limit in usage_module', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  assert(src.indexOf('free_count < 3') >= 0, '3 free/day not found');
+});
+test('SECURITY: Admin dashboard requires auth', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  var dash = src.substring(src.indexOf('/api/admin/dashboard'), src.indexOf('/api/admin/users'));
+  assert(dash.indexOf('ADMIN_SECRET') >= 0, 'admin auth missing');
+});
+
 // Results
 // ============================================================
 console.log('\n=== RESULTS ===');
