@@ -60,7 +60,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 .main{display:flex;flex:1;overflow:hidden}
 
 /* ====== Sidebar ====== */
-.nav-sidebar{width:228px;min-width:180px;max-width:320px;flex-shrink:0;background:var(--glass);backdrop-filter:saturate(180%) var(--blur);-webkit-backdrop-filter:saturate(180%) var(--blur);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.nav-sidebar{width:220px;min-width:160px;max-width:300px;flex-shrink:0;background:var(--glass);backdrop-filter:saturate(180%) var(--blur);-webkit-backdrop-filter:saturate(180%) var(--blur);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
 .nav-sidebar h3{font-size:.64rem;font-weight:var(--fw-semibold);padding:var(--sp-3) var(--sp-4) var(--sp-2);color:var(--t);letter-spacing:.03em;text-transform:uppercase;opacity:.5}
 .nav-tree{flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--sp-1) var(--sp-2)}
 .tree-node{padding:4px 10px;cursor:pointer;font-size:var(--fs-sm);border-radius:var(--r-xs);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.8;transition:all var(--t-fast) ease;position:relative;user-select:none}
@@ -77,7 +77,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 .thesis-bar button{font-size:var(--fs-sm);padding:4px 10px;border-radius:var(--r-xs);border:1px solid var(--borderStrong);cursor:pointer;background:var(--solid);color:var(--t2);transition:all var(--t-fast)}
 .thesis-bar button:hover{background:var(--bg);border-color:rgba(0,0,0,0.15)}
 .thesis-bar button:active{transform:scale(.96)}
-.thesis-box{flex:1;overflow-y:auto;padding:var(--sp-5) var(--sp-6);background:var(--solid);margin:var(--sp-2);border-radius:var(--r-md);box-shadow:var(--s-sm);border:1px solid var(--border)}
+.thesis-box{flex:1;overflow-y:auto;padding:var(--sp-4) var(--sp-5);background:var(--solid);margin:var(--sp-2);border-radius:var(--r-md);box-shadow:var(--s-sm);border:1px solid var(--border)}
 .thesis-box h1{font-size:var(--fs-3xl);margin:8px 0 4px;color:var(--t);letter-spacing:-.01em}
 .thesis-box p{margin:6px 0;text-indent:2em;line-height:1.9;font-size:14px;color:var(--t2)}
 
@@ -94,7 +94,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 .ref-sentence:hover{background:rgba(0,122,255,0.14)}
 
 /* ====== Right Panel ====== */
-.ref-panel{width:520px;min-width:380px;max-width:600px;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden;border-left:1px solid var(--border);background:var(--bg)}
+.ref-panel{width:520px;min-width:340px;max-width:620px;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden;border-left:1px solid var(--border);background:var(--bg)}
 .kw-bar{background:var(--glass);backdrop-filter:saturate(180%) var(--blurLight);-webkit-backdrop-filter:saturate(180%) var(--blurLight);padding:var(--sp-3) var(--sp-4);border-bottom:1px solid var(--border);flex-shrink:0}
 .kw-bar h4{font-size:var(--fs-md);font-weight:var(--fw-semibold);color:var(--t);margin-bottom:6px}
 .kw-tags{display:flex;flex-wrap:wrap;gap:5px}
@@ -144,12 +144,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 
 /* ====== Dashboard / Filters ====== */
 .dashboard{display:flex;gap:var(--sp-2);padding:var(--sp-2) var(--sp-3);background:var(--glass);backdrop-filter:var(--blurLight);-webkit-backdrop-filter:var(--blurLight);border-bottom:1px solid var(--border);flex-shrink:0}
-.dash-card{flex:1;min-width:60px;text-align:center;padding:10px 8px;border-radius:var(--r-sm);background:var(--solid);box-shadow:var(--s-xs);border:1px solid var(--border);transition:all var(--t-base)}
+.dash-card{flex:1;min-width:50px;text-align:center;padding:8px 6px;border-radius:var(--r-sm);background:var(--solid);box-shadow:var(--s-xs);border:1px solid var(--border);transition:all var(--t-base)}
 .dash-card:hover{box-shadow:var(--s-sm);transform:translateY(-2px)}
 .dash-card:active{transform:translateY(0)}
-.dash-card .dv{font-size:1.15rem;font-weight:var(--fw-bold);color:var(--t)}
+.dash-card .dv{font-size:1.1rem;font-weight:var(--fw-bold);color:var(--t)}
 .dash-card .dl{font-size:.58rem;color:var(--m1);margin-top:3px;font-weight:var(--fw-medium);text-transform:uppercase;letter-spacing:.03em}
-.filters{background:var(--glass);backdrop-filter:var(--blurLight);-webkit-backdrop-filter:var(--blurLight);padding:var(--sp-2) var(--sp-3);margin:6px 8px;border-radius:var(--r-sm);border:1px solid var(--border);display:flex;gap:5px;align-items:center;font-size:.64rem;flex-shrink:0;flex-wrap:nowrap;overflow-x:auto}
+.filters{background:var(--glass);backdrop-filter:var(--blurLight);-webkit-backdrop-filter:var(--blurLight);padding:var(--sp-2) var(--sp-3);margin:6px 8px;border-radius:var(--r-sm);border:1px solid var(--border);display:flex;gap:4px;align-items:center;font-size:.62rem;flex-shrink:0;flex-wrap:wrap}
 .filters label{font-weight:var(--fw-semibold);color:var(--m1);font-size:.58rem;white-space:nowrap;text-transform:uppercase;letter-spacing:.02em}
 .filters input{font-size:.64rem;padding:4px 5px;border:1px solid var(--borderStrong);border-radius:var(--r-xs);width:44px;text-align:center;background:var(--solid);transition:border var(--t-fast)}
 .filters input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px rgba(0,122,255,0.1)}
@@ -263,7 +263,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 /* ====== Body Layout ====== */
 .landing-body{position:relative;z-index:1;display:flex;flex:1;width:100%;max-width:1100px;margin:0 auto;padding:4px 24px 16px;gap:24px;align-items:stretch;min-height:0;overflow:hidden}
 /* ====== Left: Bento Grid Feature Cards ====== */
-.landing-showcase{flex:1;display:flex;flex-direction:column;min-width:0;overflow-y:auto}
+.landing-showcase{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
 .bento-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;flex:1;align-content:start}
 .bento-card{border-radius:12px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);transition:border-color .25s,background .25s,transform .25s;overflow:hidden}
 .bento-card:hover{border-color:rgba(255,255,255,.1);background:rgba(255,255,255,.04);transform:translateY(-1px)}
@@ -284,7 +284,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 .landing-stat-divider{width:1px;height:28px;background:rgba(255,255,255,.06);flex-shrink:0}
 
 /* ====== Right: Login Panel ====== */
-.landing-login{width:370px;flex-shrink:0;display:flex;align-items:center}
+.landing-login{width:340px;flex-shrink:0;display:flex;align-items:center}
 .login-card-v2{width:100%;background:rgba(255,255,255,.03);border-radius:16px;padding:22px 28px 20px;border:1px solid rgba(255,255,255,.06);box-shadow:0 4px 24px rgba(0,0,0,.3);animation:loginCardEnter .5s cubic-bezier(.16,1,.3,1)}
 @keyframes loginCardEnter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .login-card-title{font-size:.85rem;font-weight:700;color:#e2e8f0;margin:0 0 12px;text-align:center;letter-spacing:.04em}
@@ -337,7 +337,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 .workspace-title{font-size:1.3rem;font-weight:700;color:var(--t);margin:0 0 6px}
 .workspace-sub{font-size:.78rem;color:var(--m1);margin:0 0 32px;line-height:1.7}
 .workspace-actions{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
-.workspace-card{flex:1;min-width:150px;max-width:220px;padding:22px 16px;background:rgba(99,102,241,.08);border-radius:14px;border:1px solid rgba(99,102,241,.12);cursor:pointer;transition:all .2s;text-align:center}
+.workspace-card{flex:1;min-width:120px;max-width:200px;padding:16px 12px;background:rgba(99,102,241,.08);border-radius:14px;border:1px solid rgba(99,102,241,.12);cursor:pointer;transition:all .2s;text-align:center}
 .workspace-card-icon{font-size:1.8rem;margin-bottom:8px}
 .workspace-card-title{font-weight:700;color:#c7d2fe;font-size:.82rem;margin-bottom:6px}
 .workspace-card-desc{font-size:.65rem;color:rgba(255,255,255,.35);line-height:1.5}
