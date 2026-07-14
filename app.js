@@ -3230,219 +3230,117 @@ function renderRefNetwork(){
   // Current implementation uses the timeline view canvas
 }
 // ====== 交互式时间线（SVG，论文散点+标题悬停） ======
+// ====== 交互式时间线（重新设计：水平行布局，按年份分列，悬停详情） ======
 function renderTimeline(){
   var tc = document.getElementById('kgTimelineCanvas');
   if (!tc || kgCurrentView !== 'timeline') return;
   tc.style.display = 'block';
-
   var parent = tc.parentElement;
   var w = parent.clientWidth - 8, h = parent.clientHeight - 8;
-
-  // Gather refs with year data
   var refs = (typeof mergedRefs !== 'undefined' && mergedRefs.length ? mergedRefs : (typeof existingRefs !== 'undefined' ? existingRefs : []))
     .filter(function(r) { return r.year && parseInt(r.year) >= 1990; })
     .map(function(r) { return { year: parseInt(r.year), title: (r.title || r.ci || '').substring(0, 60),
-      journal: r.journal || '', type: r.subType || 'existing', displayNum: r.displayNum || 0, ch: r.ch || 1 }; });
-
+      journal: r.journal || '', type: r.subType || 'existing', displayNum: r.displayNum || 0,
+      ch: r.ch || 1, conf: r.conf || 0, _full: r }; });
   if (!refs.length) {
-    tc.style.display = 'none';
     var tg = document.getElementById('kgGraphPanel');
-    if (tg) tg.innerHTML = '<div style="text-align:center;padding:60px;color:#86868b"><div style="font-size:3rem;margin-bottom:16px">📅</div><div style="font-size:.9rem;font-weight:600;margin-bottom:6px">暂缺年份数据</div><div style="font-size:.75rem">文献需包含年份信息才能生成时间线。<br>建议在参考文献模块中检索或补全DOI以获取年份。</div></div>';
+    if (tg) tg.innerHTML = '<div style="text-align:center;padding:60px;color:#86868b"><div style="font-size:3rem;margin-bottom:16px">📅</div><div>暂缺年份数据</div></div>';
     return;
   }
-
-  // Create SVG
   var svgNS = 'http://www.w3.org/2000/svg';
   var svg = document.createElementNS(svgNS, 'svg');
   svg.setAttribute('width', w); svg.setAttribute('height', h);
-  svg.setAttribute('class','tl-svg');svg.style.cssText = 'width:100%;height:100%;position:absolute;top:0;left:0;background:#fafafa;border-radius:12px';
-
-  var margin = { top: 50, right: 40, bottom: 70, left: 60 };
-  var pw = w - margin.left - margin.right;
-  var ph = h - margin.top - margin.bottom;
-
-  // Year range
-  var years = {}; refs.forEach(function(r) { years[r.year] = (years[r.year] || 0) + 1; });
-  var yKeys = Object.keys(years).map(Number).sort(function(a, b) { return a - b; });
-  var minY = yKeys[0], maxY = yKeys[yKeys.length - 1];
-  var range = Math.max(1, maxY - minY);
-
-  // Group by year for stacking dots
-  var byYear = {}; refs.forEach(function(r) {
-    if (!byYear[r.year]) byYear[r.year] = [];
-    byYear[r.year].push(r);
-  });
-
-  // Colors
-  var colors = { existing: '#0071e3', displaced: '#af52de', appended: '#30d158', unchanged: '#0071e3' };
+  svg.setAttribute('class','tl-svg');svg.style.cssText = 'width:100%;height:100%;position:absolute;top:0;left:0;background:#1c1c1e;border-radius:12px';
+  var byYear = {}; refs.forEach(function(r) { if (!byYear[r.year]) byYear[r.year] = []; byYear[r.year].push(r); });
+  var yKeys = Object.keys(byYear).map(Number).sort(function(a,b){return a-b;});
+  var minY = yKeys[0], maxY = yKeys[yKeys.length-1], yRange = Math.max(1, maxY-minY);
+  var margin = { top: 45, right: 30, bottom: 40, left: 30 };
+  var pw = w - margin.left - margin.right, ph = h - margin.top - margin.bottom;
+  var colW = Math.max(60, pw / yKeys.length);
+  // Horizontal scroll if many years
+  var totalW = yKeys.length * colW + margin.left + margin.right;
+  if (totalW > w) { w = totalW; svg.setAttribute('width', w); pw = w - margin.left - margin.right; }
 
   // Background
   var bg = document.createElementNS(svgNS, 'rect');
   bg.setAttribute('width', w); bg.setAttribute('height', h);
-  bg.setAttribute('fill', '#fafafa'); bg.setAttribute('rx', '12');
-  svg.appendChild(bg);
+  bg.setAttribute('fill', '#1c1c1e'); svg.appendChild(bg);
 
   // Title
-  var titleEl = document.createElementNS(svgNS, 'text');
-  titleEl.setAttribute('x', margin.left); titleEl.setAttribute('y', 28);
-  titleEl.setAttribute('font-size', '13'); titleEl.setAttribute('font-weight', '700');
-  titleEl.setAttribute('fill', '#1d1d1f'); titleEl.textContent = '📅 文献时间线';
-  svg.appendChild(titleEl);
+  var tEl = document.createElementNS(svgNS, 'text');
+  tEl.setAttribute('x', margin.left); tEl.setAttribute('y', 26);
+  tEl.setAttribute('font-size', '14'); tEl.setAttribute('font-weight', '700');
+  tEl.setAttribute('fill', '#f1f5f9'); tEl.textContent = '📅 文献时间线 ('+refs.length+'篇, '+minY+'-'+maxY+')';
+  svg.appendChild(tEl);
 
-  var subEl = document.createElementNS(svgNS, 'text');
-  subEl.setAttribute('x', margin.left); subEl.setAttribute('y', 44);
-  subEl.setAttribute('font-size', '10'); subEl.setAttribute('fill', '#86868b');
-  subEl.textContent = refs.length + ' 篇文献 · ' + minY + '–' + maxY + ' · 🖱 悬停查看详情';
-  svg.appendChild(subEl);
+  // Year axis line
+  var axisY = margin.top + ph - 30;
+  var axLine = document.createElementNS(svgNS, 'line');
+  axLine.setAttribute('x1', margin.left); axLine.setAttribute('x2', margin.left + pw);
+  axLine.setAttribute('y1', axisY); axLine.setAttribute('y2', axisY);
+  axLine.setAttribute('stroke', 'rgba(255,255,255,.15)'); axLine.setAttribute('stroke-width', '2');
+  svg.appendChild(axLine);
 
-  // Grid lines
-  for (var yr = minY; yr <= maxY; yr++) {
-    var gx = margin.left + (yr - minY) / range * pw;
-    var line = document.createElementNS(svgNS, 'line');
-    line.setAttribute('x1', gx); line.setAttribute('y1', margin.top);
-    line.setAttribute('x2', gx); line.setAttribute('y2', margin.top + ph);
-    line.setAttribute('stroke', yr % 5 === 0 ? '#d1d1d6' : '#e8e8ed');
-    line.setAttribute('stroke-width', yr % 5 === 0 ? '1.5' : '0.5');
-    svg.appendChild(line);
-
-    if (yr % Math.max(1, Math.floor(range / 12)) === 0 || yr === minY || yr === maxY) {
-      var label = document.createElementNS(svgNS, 'text');
-      label.setAttribute('x', gx); label.setAttribute('y', margin.top + ph + 16);
-      label.setAttribute('text-anchor', 'middle'); label.setAttribute('font-size', '11');
-      label.setAttribute('fill', '#86868b'); label.setAttribute('font-weight', '500');
-      label.textContent = yr;
-      svg.appendChild(label);
-    }
-  }
-
-  // Year groups as vertical columns
-  var colW = Math.min(50, pw / Math.max(1, yKeys.length));
-
-  // Draw count bars
+  // Year columns and dots
   yKeys.forEach(function(yr, yi) {
-    var bx = margin.left + (yr - minY) / range * pw - colW / 2;
-    var cnt = years[yr];
-    var bh = Math.max(8, (cnt / Math.max(1, Object.values(years).reduce(function(a,b){return Math.max(a,b);},0))) * ph * 0.7);
-    var bar = document.createElementNS(svgNS, 'rect');
-    bar.setAttribute('x', bx); bar.setAttribute('y', margin.top + ph - bh);
-    bar.setAttribute('width', Math.max(4, colW - 4)); bar.setAttribute('height', bh);
-    bar.setAttribute('fill', '#0071e3'); bar.setAttribute('opacity', '0.18');
-    bar.setAttribute('rx', '4');
-    svg.appendChild(bar);
-
-    var cntLabel = document.createElementNS(svgNS, 'text');
-    cntLabel.setAttribute('x', bx + Math.max(4, colW - 4) / 2);
-    cntLabel.setAttribute('y', margin.top + ph - bh - 6);
-    cntLabel.setAttribute('text-anchor', 'middle'); cntLabel.setAttribute('font-size', '10');
-    cntLabel.setAttribute('fill', '#86868b'); cntLabel.setAttribute('font-weight', '600');
-    if (cnt > 1) cntLabel.textContent = cnt + '篇';
-    svg.appendChild(cntLabel);
+    var cx = margin.left + yi * colW + colW/2;
+    var items = byYear[yr], count = items.length;
+    // Year label
+    var yLabel = document.createElementNS(svgNS, 'text');
+    yLabel.setAttribute('x', cx); yLabel.setAttribute('y', axisY + 18);
+    yLabel.setAttribute('text-anchor', 'middle'); yLabel.setAttribute('font-size', '11');
+    yLabel.setAttribute('fill', yr % 5 === 0 ? 'rgba(255,255,255,.5)' : 'rgba(255,255,255,.25)');
+    yLabel.setAttribute('font-weight', yr % 5 === 0 ? '600' : '400');
+    yLabel.textContent = yr;
+    svg.appendChild(yLabel);
+    // Connector line
+    if (count > 0) {
+      var ln = document.createElementNS(svgNS, 'line');
+      ln.setAttribute('x1', cx); ln.setAttribute('x2', cx);
+      ln.setAttribute('y1', axisY - 4); ln.setAttribute('y2', axisY - Math.min(ph-40, 10 + count * 14));
+      ln.setAttribute('stroke', 'rgba(255,255,255,.06)'); ln.setAttribute('stroke-width', '1');
+      svg.appendChild(ln);
+    }
+    // Dots stacked vertically above axis
+    var colors = { existing: '#3b82f6', unchanged: '#3b82f6', displaced: '#a78bfa', appended: '#34d399', generated: '#f59e0b' };
+    for (var ri = 0; ri < items.length; ri++) {
+      var r = items[ri];
+      var dy = axisY - 12 - ri * 14;
+      if (dy < margin.top + 10) { dy = margin.top + 10 + (ri % 8) * 12; } // wrap if too tall
+      var dot = document.createElementNS(svgNS, 'circle');
+      dot.setAttribute('cx', cx); dot.setAttribute('cy', dy);
+      dot.setAttribute('r', 4 + Math.min(6, (r.conf || 30) / 20));
+      dot.setAttribute('fill', colors[r.type] || '#3b82f6');
+      dot.setAttribute('opacity', '0.85'); dot.setAttribute('stroke', '#1c1c1e');
+      dot.setAttribute('stroke-width', '1.5'); dot.setAttribute('cursor', 'pointer');
+      dot.setAttribute('data-yr', yr); dot.setAttribute('data-idx', ri);
+      (function(r2, cx2, dy2){
+        dot.addEventListener('mouseenter', function(ev) {
+          var tt = document.getElementById('kgTimelineTooltip');
+          if (!tt) { tt = document.createElement('div'); tt.id = 'kgTimelineTooltip'; tt.style.cssText = 'position:absolute;background:rgba(30,27,46,.96);color:#f1f5f9;padding:10px 14px;border-radius:10px;font-size:.7rem;max-width:260px;line-height:1.5;pointer-events:none;z-index:99999;border:1px solid rgba(255,255,255,.1);box-shadow:0 8px 24px rgba(0,0,0,.4)'; document.body.appendChild(tt); }
+          tt.innerHTML = '<div style=\"font-weight:700;margin-bottom:4px\">['+r2.year+'] '+(r2.title||'未知标题')+'</div>'+
+            (r2.journal?'<div style=\"color:rgba(255,255,255,.4)\">'+r2.journal+'</div>':'')+
+            (r2.displayNum?'<div style=\"color:#fbbf24;font-size:.62rem;margin-top:2px\">['+r2.displayNum+']</div>':'');
+          tt.style.display = 'block';
+          tt.style.left = (ev.clientX+14)+'px'; tt.style.top = (ev.clientY-10)+'px';
+        });
+        dot.addEventListener('mouseleave', function() {
+          var tt = document.getElementById('kgTimelineTooltip');
+          if (tt) tt.style.display = 'none';
+        });
+      })(r, cx, dy);
+      svg.appendChild(dot);
+    }
   });
 
-  // Paper dots and hidden detail panels
-  var tooltip = document.createElementNS(svgNS, 'g');
-  tooltip.setAttribute('id', 'kgTimelineTooltip');
-  tooltip.setAttribute('visibility', 'hidden');
-  svg.appendChild(tooltip);
-
-  var ttBg = document.createElementNS(svgNS, 'rect');
-  ttBg.setAttribute('fill', 'rgba(30,30,32,0.95)'); ttBg.setAttribute('rx', '8');
-  tooltip.appendChild(ttBg);
-  var ttTitle = document.createElementNS(svgNS, 'text');
-  ttTitle.setAttribute('fill', '#fff'); ttTitle.setAttribute('font-size', '11'); ttTitle.setAttribute('font-weight', '600');
-  tooltip.appendChild(ttTitle);
-  var ttMeta = document.createElementNS(svgNS, 'text');
-  ttMeta.setAttribute('fill', '#a1a1aa'); ttMeta.setAttribute('font-size', '10');
-  tooltip.appendChild(ttMeta);
-  var ttRef = document.createElementNS(svgNS, 'text');
-  ttRef.setAttribute('fill', '#fbbf24'); ttRef.setAttribute('font-size', '9');
-  tooltip.appendChild(ttRef);
-
-  // Draw each paper
-  refs.forEach(function(r, ri) {
-    var yrCols = byYear[r.year];
-    var idxInYear = yrCols.indexOf(r);
-    var stackH = Math.min(18, ph / Math.max(1, yrCols.length) - 2);
-    var dotR = Math.max(4, Math.min(8, stackH / 2 - 2));
-    var numPerCol = Math.ceil(yrCols.length / Math.max(1, Math.floor(colW / (dotR * 2.5))));
-    var col = Math.floor(idxInYear / Math.max(1, numPerCol));
-    var row = idxInYear % Math.max(1, numPerCol);
-    var dotX = margin.left + (r.year - minY) / range * pw - colW / 2 + col * (dotR * 3) + dotR + 2;
-    var dotY = margin.top + ph - 10 - stackH + row * (dotR * 2.2) + dotR;
-
-    var dot = document.createElementNS(svgNS, 'circle');
-    dot.setAttribute('cx', dotX); dot.setAttribute('cy', dotY);
-    dot.setAttribute('r', dotR);
-    var cl = r.type === 'appended' ? '#30d158' : (r.type === 'displaced' ? '#af52de' : '#0071e3');
-    dot.setAttribute('fill', cl); dot.setAttribute('opacity', '0.8');
-    dot.setAttribute('stroke', '#fff'); dot.setAttribute('stroke-width', '1');
-    dot.setAttribute('cursor', 'pointer');
-    dot.setAttribute('data-idx', ri);
-    dot.setAttribute('class', 'kg-tl-dot');
-
-    dot.addEventListener('mouseenter', function(ev) {
-      var i = parseInt(this.getAttribute('data-idx'));
-      var rr = refs[i];
-      var lines = [];
-      if (rr.title) {
-        var t = rr.title;
-        while (t.length > 30) { lines.push(t.substring(0, 30)); t = t.substring(30); }
-        lines.push(t);
-      }
-      ttTitle.textContent = lines[0] || '';
-      ttMeta.textContent = (rr.journal ? rr.journal + ' · ' : '') + rr.year;
-      ttRef.textContent = rr.displayNum ? '编号 [' + rr.displayNum + ']' : '';
-
-      var tx = dotX + 12, ty = dotY - 10;
-      if (tx + 220 > w) tx = dotX - 220;
-      if (ty < 10) ty = dotY + 20;
-      ttBg.setAttribute('x', tx - 8); ttBg.setAttribute('y', ty - 8);
-      ttBg.setAttribute('width', Math.max(200, (ttTitle.textContent.length * 7 + 40)));
-      ttBg.setAttribute('height', 56);
-      ttTitle.setAttribute('x', tx); ttTitle.setAttribute('y', ty + 6);
-      ttMeta.setAttribute('x', tx); ttMeta.setAttribute('y', ty + 22);
-      ttRef.setAttribute('x', tx); ttRef.setAttribute('y', ty + 38);
-      tooltip.setAttribute('visibility', 'visible');
-      this.setAttribute('r', dotR + 3);
-      this.setAttribute('stroke', '#fbbf24'); this.setAttribute('stroke-width', '2');
-    });
-
-    dot.addEventListener('mouseleave', function() {
-      tooltip.setAttribute('visibility', 'hidden');
-      this.setAttribute('r', dotR);
-      this.setAttribute('stroke', '#fff'); this.setAttribute('stroke-width', '1');
-    });
-
-    svg.appendChild(dot);
-  });
-
-  // Legend
-  var legX = margin.left, legY = h - 26;
-  [{l: '原文文献', c: '#0071e3'}, {l: '顺延文献', c: '#af52de'}, {l: '新增文献', c: '#30d158'}].forEach(function(item, i) {
-    var lx = legX + i * 100;
-    var c2 = document.createElementNS(svgNS, 'circle');
-    c2.setAttribute('cx', lx); c2.setAttribute('cy', legY); c2.setAttribute('r', '5');
-    c2.setAttribute('fill', item.c); svg.appendChild(c2);
-    var lt = document.createElementNS(svgNS, 'text');
-    lt.setAttribute('x', lx + 10); lt.setAttribute('y', legY + 4);
-    lt.setAttribute('font-size', '10'); lt.setAttribute('fill', '#86868b');
-    lt.textContent = item.l; svg.appendChild(lt);
-  });
-
-  // Clear old timeline SVG
+  // Clean up and insert
   var oldTl = document.querySelector('#kgGraphPanel > svg.tl-svg');
   if (oldTl) oldTl.parentElement.removeChild(oldTl);
-  // Hide network SVG and placeholder, show timeline SVG
-  var svEl = document.getElementById('kgSvg');
-  if (svEl) svEl.style.display = 'none';
-  var ph = document.getElementById('kgPlaceholder');
-  if (ph) ph.style.display = 'none';
+  var svEl = document.getElementById('kgSvg'); if (svEl) svEl.style.display = 'none';
+  var ph2 = document.getElementById('kgPlaceholder'); if (ph2) ph2.style.display = 'none';
   tc.style.display = 'none';
-  var tg = document.getElementById('kgGraphPanel');
-  if (tg) tg.appendChild(svg);
+  var tg2 = document.getElementById('kgGraphPanel'); if (tg2) tg2.appendChild(svg);
 }
-
-// ====== 高亮节点（双向联动） ======
 function highlightKGNode(nodeId,on){
   var sv=document.getElementById('kgSvg'),data=kgCurrentData;
   if(!sv||!data)return;

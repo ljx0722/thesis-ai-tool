@@ -40,10 +40,12 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
-            balance INTEGER NOT NULL DEFAULT 0,
+            credits INTEGER NOT NULL DEFAULT 5,
             is_admin INTEGER NOT NULL DEFAULT 0,
+            invite_code TEXT,
+            invited_by TEXT,
             free_used_date TEXT,
-            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            created_at TEXT
         );
         CREATE TABLE IF NOT EXISTS recharge_orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -52,7 +54,7 @@ def init_db():
             amount_fen INTEGER NOT NULL,
             status TEXT NOT NULL DEFAULT 'pending',
             payment_method TEXT DEFAULT 'alipay',
-            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+            created_at TEXT,
             confirmed_at TEXT,
             FOREIGN KEY (user_id) REFERENCES users(id)
         );
@@ -60,10 +62,10 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
             type TEXT NOT NULL,
-            amount_fen INTEGER NOT NULL,
-            balance_after INTEGER NOT NULL,
+            amount_credits INTEGER NOT NULL,
+            credits_after INTEGER NOT NULL,
             description TEXT,
-            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+            created_at TEXT,
             FOREIGN KEY (user_id) REFERENCES users(id)
         );
         CREATE TABLE IF NOT EXISTS llm_usage (
@@ -72,11 +74,11 @@ def init_db():
             module TEXT NOT NULL,
             prompt_tokens INTEGER NOT NULL DEFAULT 0,
             completion_tokens INTEGER NOT NULL DEFAULT 0,
-            cost_fen INTEGER NOT NULL DEFAULT 0,
-            user_charged_fen INTEGER NOT NULL DEFAULT 0,
+            cost_credits INTEGER NOT NULL DEFAULT 0,
+            user_charged_credits INTEGER NOT NULL DEFAULT 0,
             model TEXT NOT NULL DEFAULT 'deepseek-chat',
             success INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+            created_at TEXT,
             FOREIGN KEY (user_id) REFERENCES users(id)
         );
         CREATE TABLE IF NOT EXISTS daily_free_usage (
@@ -87,16 +89,40 @@ def init_db():
             UNIQUE(user_id, usage_date),
             FOREIGN KEY (user_id) REFERENCES users(id)
         );
+        CREATE TABLE IF NOT EXISTS invite_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT UNIQUE NOT NULL,
+            owner_id INTEGER NOT NULL,
+            used_by INTEGER,
+            used_at TEXT,
+            created_at TEXT,
+            FOREIGN KEY (owner_id) REFERENCES users(id)
+        );
+        CREATE TABLE IF NOT EXISTS config (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        );
     ''')
     conn.commit()
-    # Seed admin user if not exists
+    # Default pricing config
+    for k,v in [('upload_price','0'),('search_price','0'),('llm_analysis_price','1'),
+                ('kg_price','0'),('domain_analysis_price','0'),('register_bonus','5'),('invite_bonus','1')]:
+        conn.execute('INSERT OR IGNORE INTO config (key,value) VALUES (?,?)',(k,v))
+    # Seed admin
     try:
         admin_pwd = os.environ.get('ADMIN_PASSWORD', 'admin123')
         salt = secrets.token_bytes(32)
         key = hashlib.pbkdf2_hmac('sha256', admin_pwd.encode(), salt, 100000)
         pwd_hash = salt.hex() + ':' + key.hex()
-        conn.execute('INSERT OR IGNORE INTO users (username, password_hash, balance, is_admin) VALUES (?, ?, 10000, 1)',
+        conn.execute('INSERT OR IGNORE INTO users (username, password_hash, credits, is_admin, created_at) VALUES (?, ?, 99999, 1, datetime(\"now\",\"localtime\"))',
                      ('admin', pwd_hash))
+        conn.commit()
+    except: pass
+    # Generate admin invite code
+    try:
+        code = __import__('uuid').uuid4().hex[:8].upper()
+        conn.execute("INSERT OR IGNORE INTO invite_codes (code, owner_id, created_at) SELECT ?, id, datetime('now','localtime') FROM users WHERE username='admin' LIMIT 1",(code,))
+        conn.execute("UPDATE users SET invite_code = COALESCE(invite_code, ?) WHERE username='admin'",(code,))
         conn.commit()
     except: pass
     conn.close()
@@ -909,21 +935,32 @@ def auth_register():
     data = request.get_json() or {}
     username = (data.get('username') or '').strip()
     password = (data.get('password') or '')
+    invite = (data.get('invite_code') or '').strip().upper()
     if not username or len(username) < 2 or len(username) > 32:
         return jsonify({'success': False, 'error': '用户名需2-32个字符'}), 400
     if not password or len(password) < 6:
         return jsonify({'success': False, 'error': '密码至少6个字符'}), 400
-    if not re.match(r'^[a-zA-Z0-9_一-鿿]+$', username):
-        return jsonify({'success': False, 'error': '用户名只能包含中英文、数字和下划线'}), 400
     db = get_db()
     try:
         existing = db.execute('SELECT id FROM users WHERE username = ?', (username,)).fetchone()
         if existing:
             return jsonify({'success': False, 'error': '用户名已存在'}), 409
         pwd_hash = hash_password(password)
-        db.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)', (username, pwd_hash))
+        bonus = int(db.execute("SELECT value FROM config WHERE key='register_bonus'").fetchone()['value'] or 5)
+        # Apply invite code bonus
+        inviter_id = None
+        if invite:
+            ic = db.execute("SELECT * FROM invite_codes WHERE code = ? AND used_by IS NULL", (invite,)).fetchone()
+            if ic and ic['owner_id']:
+                inviter_id = ic['owner_id']
+                inv_bonus = int(db.execute("SELECT value FROM config WHERE key='invite_bonus'").fetchone()['value'] or 1)
+                db.execute("UPDATE invite_codes SET used_by = (SELECT id FROM users WHERE username = ?), used_at = datetime('now','localtime') WHERE code = ?", (username, invite))
+                db.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (inv_bonus, inviter_id))
+                bonus += inv_bonus
+        db.execute("INSERT INTO users (username, password_hash, credits, invited_by, created_at) VALUES (?, ?, ?, ?, datetime('now','localtime'))",
+                   (username, pwd_hash, bonus, inviter_id))
         db.commit()
-        return jsonify({'success': True, 'message': '注册成功，请登录'})
+        return jsonify({'success': True, 'message': f'注册成功！赠送{bonus}点数。','points': bonus})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
@@ -938,17 +975,16 @@ def auth_login():
         return jsonify({'success': False, 'error': '请输入用户名和密码'}), 400
     db = get_db()
     try:
-        user = db.execute('SELECT id, username, password_hash, balance, is_admin FROM users WHERE username = ?',
+        user = db.execute('SELECT id, username, password_hash, credits, is_admin, invite_code FROM users WHERE username = ?',
                           (username,)).fetchone()
         if not user or not verify_password(password, user['password_hash']):
             return jsonify({'success': False, 'error': '用户名或密码错误'}), 401
         token = generate_token(user['id'])
         return jsonify({'success': True, 'token': token, 'user': {
             'id': user['id'], 'username': user['username'],
-            'balance': user['balance'], 'is_admin': bool(user['is_admin'])
+            'credits': user['credits'], 'is_admin': bool(user['is_admin']),
+            'invite_code': user['invite_code'] or ''
         }})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         db.close()
 
@@ -957,36 +993,34 @@ def auth_login():
 def auth_me():
     db = get_db()
     try:
-        user = db.execute('SELECT id, username, balance, is_admin, free_used_date, created_at FROM users WHERE id = ?',
+        user = db.execute('SELECT id, username, credits, is_admin, invite_code, free_used_date FROM users WHERE id = ?',
                           (request.user_id,)).fetchone()
-        if not user:
-            return jsonify({'success': False, 'error': '用户不存在'}), 404
+        if not user: return jsonify({'success': False, 'error': '用户不存在'}), 404
         today = date.today().isoformat()
-        free_used_today = (user['free_used_date'] == today)
         return jsonify({'success': True, 'user': {
             'id': user['id'], 'username': user['username'],
-            'balance': user['balance'], 'is_admin': bool(user['is_admin']),
-            'free_used_today': free_used_today
+            'credits': user['credits'], 'is_admin': bool(user['is_admin']),
+            'invite_code': user['invite_code'] or '',
+            'free_used_today': (user['free_used_date'] == today)
         }})
     finally:
         db.close()
 
-# ========== 支付 API ==========
+# ========== 支付 / 点数 API ==========
 @app.route('/api/payment/recharge', methods=['POST'])
 @require_auth
 def payment_recharge():
     data = request.get_json() or {}
     amount_yuan = data.get('amount_yuan')
-    payment_method = data.get('payment_method', 'alipay')
+    pm = data.get('payment_method', 'alipay')
     if amount_yuan not in [1, 5, 10, 20, 50]:
-        return jsonify({'success': False, 'error': '充值金额必须为: 1, 5, 10, 20, 50 元'}), 400
+        return jsonify({'success': False, 'error': '金额必须为: 1, 5, 10, 20, 50'}), 400
     db = get_db()
     try:
-        amount_fen = int(amount_yuan * 100)
-        db.execute('INSERT INTO recharge_orders (user_id, amount_yuan, amount_fen, payment_method) VALUES (?, ?, ?, ?)',
-                   (request.user_id, amount_yuan, amount_fen, payment_method))
+        db.execute("INSERT INTO recharge_orders (user_id, amount_yuan, amount_fen, payment_method, created_at) VALUES (?, ?, ?, ?, datetime('now','localtime'))",
+                   (request.user_id, amount_yuan, int(amount_yuan * 100), pm))
         db.commit()
-        return jsonify({'success': True, 'message': f'充值申请已提交 ({amount_yuan}元)，请等待管理员确认'})
+        return jsonify({'success': True, 'message': f'充值申请已提交 ({amount_yuan}元 = {amount_yuan}点)，请等待管理员确认。1元=1点，到账后自动转为点数。'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
@@ -997,10 +1031,8 @@ def payment_recharge():
 def payment_orders():
     db = get_db()
     try:
-        rows = db.execute(
-            'SELECT id, amount_yuan, amount_fen, status, payment_method, created_at, confirmed_at '
-            'FROM recharge_orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 50',
-            (request.user_id,)).fetchall()
+        rows = db.execute("SELECT id, amount_yuan, status, payment_method, created_at, confirmed_at FROM recharge_orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 50",
+                          (request.user_id,)).fetchall()
         return jsonify({'success': True, 'orders': [dict(r) for r in rows]})
     finally:
         db.close()
@@ -1009,32 +1041,29 @@ def payment_orders():
 def payment_confirm():
     data = request.get_json() or {}
     order_id = data.get('order_id')
-    secret = data.get('admin_secret', '')
-    if secret != ADMIN_SECRET:
-        db = get_db()
-        try:
-            user = db.execute('SELECT is_admin FROM users WHERE id = ?', (data.get('user_id'),)).fetchone()
-            if not user or not user['is_admin']:
-                return jsonify({'success': False, 'error': '无权限'}), 403
-        finally:
-            db.close()
+    # Admin check: either via secret or is_admin field
+    user_id = data.get('user_id')
     db = get_db()
     try:
+        is_admin = False
+        if data.get('admin_secret','') == ADMIN_SECRET:
+            is_admin = True
+        elif user_id:
+            u = db.execute('SELECT is_admin FROM users WHERE id = ?', (user_id,)).fetchone()
+            is_admin = bool(u and u['is_admin'])
+        if not is_admin:
+            return jsonify({'success': False, 'error': '无权限'}), 403
         order = db.execute('SELECT * FROM recharge_orders WHERE id = ?', (order_id,)).fetchone()
-        if not order:
-            return jsonify({'success': False, 'error': '订单不存在'}), 404
-        if order['status'] != 'pending':
-            return jsonify({'success': False, 'error': '订单已处理'}), 400
-        db.execute("UPDATE recharge_orders SET status = 'confirmed', confirmed_at = datetime('now','localtime') WHERE id = ?",
-                   (order_id,))
-        db.execute("UPDATE users SET balance = balance + ? WHERE id = ?", (order['amount_fen'], order['user_id']))
-        new_balance = db.execute('SELECT balance FROM users WHERE id = ?', (order['user_id'],)).fetchone()['balance']
-        db.execute(
-            'INSERT INTO transactions (user_id, type, amount_fen, balance_after, description) VALUES (?, ?, ?, ?, ?)',
-            (order['user_id'], 'recharge', order['amount_fen'], new_balance,
-             f'充值 {order["amount_yuan"]}元 (#{order_id})'))
+        if not order: return jsonify({'success': False, 'error': '订单不存在'}), 404
+        if order['status'] != 'pending': return jsonify({'success': False, 'error': '已处理'}), 400
+        pts = int(order['amount_yuan'])
+        db.execute("UPDATE recharge_orders SET status = 'confirmed', confirmed_at = datetime('now','localtime') WHERE id = ?", (order_id,))
+        db.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (pts, order['user_id']))
+        after = db.execute('SELECT credits FROM users WHERE id = ?', (order['user_id'],)).fetchone()['credits']
+        db.execute("INSERT INTO transactions (user_id, type, amount_credits, credits_after, description, created_at) VALUES (?,?,?,?,?,datetime('now','localtime'))",
+                   (order['user_id'], 'recharge', pts, after, f'充值 {pts}点 (#{order_id})'))
         db.commit()
-        return jsonify({'success': True, 'message': '充值已确认'})
+        return jsonify({'success': True, 'message': f'已到账 {pts} 点'})
     except Exception as e:
         db.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1046,14 +1075,13 @@ def payment_confirm():
 def payment_balance():
     db = get_db()
     try:
-        user = db.execute('SELECT balance, free_used_date FROM users WHERE id = ?', (request.user_id,)).fetchone()
+        u = db.execute('SELECT credits, free_used_date FROM users WHERE id = ?', (request.user_id,)).fetchone()
         today = date.today().isoformat()
-        free_available = (user['free_used_date'] != today)
-        return jsonify({'success': True, 'balance': user['balance'], 'free_available': free_available})
+        return jsonify({'success': True, 'credits': u['credits'], 'free_available': (u['free_used_date'] != today)})
     finally:
         db.close()
 
-# ========== 使用量 API ==========
+# ========== 使用量 API（点数系统） ==========
 @app.route('/api/usage/check_free', methods=['GET'])
 @require_auth
 def usage_check_free():
@@ -1080,96 +1108,191 @@ def usage_mark_free():
     finally:
         db.close()
 
-@app.route('/api/usage/charge_upload', methods=['POST'])
-@require_auth
-def usage_charge_upload():
-    """上传扣费: 0.5元/万字符"""
-    data = request.get_json() or {}
-    char_count = data.get('char_count', 0)
-    cost_fen = max(1, int(char_count / 10000 * 50))  # 0.5元/万字符, 最低1分
+# 模块扣点定价（从 config 表读取，默认值兜底）
+PRICING_DEFAULTS = {'llm_analysis':1, 'domain_analysis':0, 'kg':0, 'search':0, 'upload':0}
+def get_price(key):
+    try:
+        db = get_db()
+        v = db.execute("SELECT value FROM config WHERE key = ?", (key+'_price',)).fetchone()
+        db.close()
+        return int(v['value']) if v else PRICING_DEFAULTS.get(key, 0)
+    except: return PRICING_DEFAULTS.get(key, 0)
+
+def deduct_credits(user_id, amount, desc):
     db = get_db()
     try:
-        user = db.execute('SELECT balance FROM users WHERE id = ?', (request.user_id,)).fetchone()
-        if user['balance'] < cost_fen:
-            return jsonify({'success': False, 'error': f'余额不足。需要 {cost_fen/100:.2f} 元，当前余额 {user["balance"]/100:.2f} 元',
-                            'balance': user['balance'], 'cost_fen': cost_fen}), 402
-        new_balance = user['balance'] - cost_fen
-        db.execute('UPDATE users SET balance = ? WHERE id = ?', (new_balance, request.user_id))
-        db.execute('INSERT INTO transactions (user_id, type, amount_fen, balance_after, description) VALUES (?, ?, ?, ?, ?)',
-                   (request.user_id, 'upload_charge', -cost_fen, new_balance,
-                    f'上传解析 {char_count} 字符 ({(cost_fen/100):.2f}元)'))
+        u = db.execute('SELECT credits FROM users WHERE id = ?', (user_id,)).fetchone()
+        if not u: return False, '用户不存在', None
+        if u['credits'] < amount: return False, f'点数不足。需要 {amount} 点，当前 {u["credits"]} 点', u['credits']
+        after = u['credits'] - amount
+        db.execute('UPDATE users SET credits = ? WHERE id = ?', (after, user_id))
+        db.execute("INSERT INTO transactions (user_id, type, amount_credits, credits_after, description, created_at) VALUES (?,?,?,?,?,datetime('now','localtime'))",
+                   (user_id, 'usage', -amount, after, desc))
         db.commit()
-        return jsonify({'success': True, 'cost_fen': cost_fen, 'balance': new_balance})
+        return True, None, after
+    except Exception as e:
+        db.rollback()
+        return False, str(e), None
+    finally:
+        db.close()
+
+# ========== LLM 分析 API（点数扣费） ==========
+@app.route('/api/llm/analyze', methods=['POST'])
+@require_auth
+def llm_analyze():
+    if not DEEPSEEK_API_KEY:
+        return jsonify({'success': False, 'error': 'LLM服务未配置'}), 503
+    data = request.get_json() or {}
+    module = data.get('module', 'generic')
+    system_prompt = data.get('system_prompt', '')
+    user_prompt = data.get('user_prompt', '')
+    max_tokens = data.get('max_tokens', 2000)
+    price = get_price(module) if module != 'generic' else get_price('llm_analysis')
+    # Estimate tokens
+    total_text = system_prompt + user_prompt
+    cn = len(re.findall(r'[一-鿿]', total_text))
+    est_input = int(cn * 0.6 + (len(total_text) - cn) * 0.25)
+    est_cost = max(1, int((est_input / 1000000 * DEEPSEEK_INPUT_PRICE_PER_1M +
+                            max_tokens / 1000000 * DEEPSEEK_OUTPUT_PRICE_PER_1M) * 100 * USER_MARKUP))
+    # Check points
+    ok, err, after = deduct_credits(request.user_id, price, f'LLM分析 {module} (预估 {est_cost/100:.2f}元)')
+    if not ok: return jsonify({'success': False, 'error': err, 'points_needed': price}), 402
+    # Call DeepSeek
+    try:
+        resp = requests.post(f'{DEEPSEEK_BASE_URL}/chat/completions',
+            headers={'Authorization': f'Bearer {DEEPSEEK_API_KEY}', 'Content-Type': 'application/json'},
+            json={'model': DEEPSEEK_MODEL, 'messages': [{'role': 'system', 'content': system_prompt}, {'role': 'user', 'content': user_prompt}],
+                  'max_tokens': max_tokens, 'temperature': 0.3, 'stream': False}, timeout=120)
+        resp.raise_for_status()
+        result = resp.json()
+    except Exception as e:
+        # Refund on failure
+        db2=get_db();db2.execute("UPDATE users SET credits = credits + ? WHERE id = ?",(price,request.user_id));db2.commit();db2.close()
+        return jsonify({'success': False, 'error': f'LLM调用失败: {str(e)}（{price}点已退回）'}), 502
+    usage = result.get('usage', {})
+    actual_input = usage.get('prompt_tokens', est_input)
+    actual_output = usage.get('completion_tokens', 0)
+    content = result['choices'][0]['message']['content']
+    db3=get_db()
+    try:
+        db3.execute("INSERT INTO llm_usage (user_id, module, prompt_tokens, completion_tokens, cost_credits, user_charged_credits, model, success, created_at) VALUES (?,?,?,?,?,?,?,1,datetime('now','localtime'))",
+                    (request.user_id, module, actual_input, actual_output, 0, price, DEEPSEEK_MODEL))
+        db3.commit()
+    finally: db3.close()
+    return jsonify({'success': True, 'content': content, 'usage': {
+        'input_tokens': actual_input, 'output_tokens': actual_output,
+        'cost_credits': price, 'credits_after': after
+    }})
+
+# ========== 领域分析 API（检索前先由AI分析论文领域） ==========
+@app.route('/api/ai/domain_analyze', methods=['POST'])
+@require_auth
+def domain_analyze():
+    """AI分析论文领域和关键词，用于优化文献检索"""
+    data = request.get_json() or {}
+    text = (data.get('text') or '').strip()
+    if not text or len(text) < 100:
+        return jsonify({'success': False, 'error': '论文内容太少，请至少上传论文正文'}), 400
+    snippet = text[:8000]
+    prompt = f"""你是一个学术论文分析专家。请分析以下论文内容，严格按此格式输出：
+1. 研究领域（3-5个，用中英文，逗号分隔）
+2. 核心关键词（5-10个，用逗号分隔，中英文都有）
+3. 建议检索词（5-10个，最适合在学术数据库检索的关键词组合）
+4. 学科分类（1个最主要学科）
+
+论文内容：
+{snippet}"""
+    ok, err, after = deduct_credits(request.user_id, 0, '领域分析（免费）')
+    if not ok: return jsonify({'success': False, 'error': err}), 402
+    try:
+        resp = requests.post(f'{DEEPSEEK_BASE_URL}/chat/completions',
+            headers={'Authorization': f'Bearer {DEEPSEEK_API_KEY}', 'Content-Type': 'application/json'},
+            json={'model': DEEPSEEK_MODEL, 'messages': [{'role': 'user', 'content': prompt}],
+                  'max_tokens': 600, 'temperature': 0.1}, timeout=60)
+        resp.raise_for_status()
+        result = resp.json()
+        content = result['choices'][0]['message']['content']
+        lines = [l.strip() for l in content.split('\n') if l.strip()]
+        fields, keywords, search_terms, discipline = '', '', '', ''
+        for l in lines:
+            low = l.lower()
+            if '研究领域' in low or low.startswith('1.'): fields = l.split('：',1)[-1].split(':',1)[-1].strip()
+            elif '核心关键' in low or '关键词' in low or low.startswith('2.'): keywords = l.split('：',1)[-1].split(':',1)[-1].strip()
+            elif '检索词' in low or '搜索' in low or low.startswith('3.'): search_terms = l.split('：',1)[-1].split(':',1)[-1].strip()
+            elif '学科' in low or low.startswith('4.'): discipline = l.split('：',1)[-1].split(':',1)[-1].strip()
+        return jsonify({'success': True, 'domain': {
+            'fields': fields or '未识别', 'keywords': keywords or '未识别',
+            'search_terms': search_terms or '未识别', 'discipline': discipline or '未识别',
+            'raw': content
+        }})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'AI分析失败: {str(e)}'}), 502
+
+# ========== 邀请码 API ==========
+@app.route('/api/invite/generate', methods=['POST'])
+@require_auth
+def invite_generate():
+    """生成邀请码"""
+    db = get_db()
+    try:
+        code = __import__('uuid').uuid4().hex[:8].upper()
+        db.execute("INSERT INTO invite_codes (code, owner_id, created_at) VALUES (?, ?, datetime('now','localtime'))",
+                   (code, request.user_id))
+        db.execute("UPDATE users SET invite_code = COALESCE(invite_code, ?) WHERE id = ?", (code, request.user_id))
+        db.commit()
+        return jsonify({'success': True, 'code': code})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/invite/apply', methods=['POST'])
+@require_auth
+def invite_apply():
+    """使用邀请码（已注册用户补充填写）"""
+    data = request.get_json() or {}
+    code = (data.get('code') or '').strip().upper()
+    if not code: return jsonify({'success': False, 'error': '请输入邀请码'}), 400
+    db = get_db()
+    try:
+        ic = db.execute("SELECT * FROM invite_codes WHERE code = ? AND used_by IS NULL AND owner_id != ?",
+                        (code, request.user_id)).fetchone()
+        if not ic: return jsonify({'success': False, 'error': '邀请码无效或已被使用'}), 404
+        inv_bonus = int(db.execute("SELECT value FROM config WHERE key='invite_bonus'").fetchone()['value'] or 1)
+        db.execute("UPDATE invite_codes SET used_by = ?, used_at = datetime('now','localtime') WHERE code = ?",
+                   (request.user_id, code))
+        db.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (inv_bonus, ic['owner_id']))
+        db.execute("UPDATE users SET credits = credits + ?, invited_by = ? WHERE id = ?",
+                   (inv_bonus, request.user_id, ic['owner_id']))
+        db.commit()
+        return jsonify({'success': True, 'message': f'邀请码已使用，你和邀请人各获得 {inv_bonus} 点！'})
     except Exception as e:
         db.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         db.close()
 
-# ========== LLM 分析 API ==========
-@app.route('/api/llm/analyze', methods=['POST'])
+@app.route('/api/invite/my_code', methods=['GET'])
 @require_auth
-def llm_analyze():
-    if not DEEPSEEK_API_KEY:
-        return jsonify({'success': False, 'error': 'LLM服务未配置 (DEEPSEEK_API_KEY)'}), 503
-    data = request.get_json() or {}
-    module = data.get('module', 'unknown')
-    system_prompt = data.get('system_prompt', '')
-    user_prompt = data.get('user_prompt', '')
-    max_tokens = data.get('max_tokens', 2000)
-    temperature = data.get('temperature', 0.3)
-    # Estimate cost
-    total_text = system_prompt + user_prompt
-    cn_chars = len(re.findall(r'[一-鿿]', total_text))
-    en_chars = len(total_text) - cn_chars
-    est_input = int(cn_chars * 0.6 + en_chars * 0.25)
-    est_cost_fen = int((est_input / 1000000 * DEEPSEEK_INPUT_PRICE_PER_1M +
-                         max_tokens / 1000000 * DEEPSEEK_OUTPUT_PRICE_PER_1M) * 100)
-    user_charge_fen = max(1, int(est_cost_fen * USER_MARKUP))
+def invite_my_code():
+    """获取当前用户的邀请码"""
     db = get_db()
     try:
-        user = db.execute('SELECT balance FROM users WHERE id = ?', (request.user_id,)).fetchone()
-        if user['balance'] < user_charge_fen:
-            return jsonify({'success': False, 'error': f'余额不足。预计 {user_charge_fen/100:.2f} 元，余额 {user["balance"]/100:.2f} 元',
-                            'balance': user['balance'], 'estimated_cost_fen': user_charge_fen}), 402
-        # Call DeepSeek
-        try:
-            resp = requests.post(
-                f'{DEEPSEEK_BASE_URL}/chat/completions',
-                headers={'Authorization': f'Bearer {DEEPSEEK_API_KEY}', 'Content-Type': 'application/json'},
-                json={'model': DEEPSEEK_MODEL,
-                      'messages': [{'role': 'system', 'content': system_prompt}, {'role': 'user', 'content': user_prompt}],
-                      'max_tokens': max_tokens, 'temperature': temperature, 'stream': False},
-                timeout=120)
-            resp.raise_for_status()
-            result = resp.json()
-        except Exception as api_err:
-            db.execute('INSERT INTO llm_usage (user_id, module, prompt_tokens, completion_tokens, cost_fen, user_charged_fen, model, success) VALUES (?,?,?,?,?,?,?,0)',
-                       (request.user_id, module, est_input, 0, 0, 0, DEEPSEEK_MODEL))
-            db.commit()
-            return jsonify({'success': False, 'error': f'LLM调用失败: {str(api_err)}'}), 502
-        usage = result.get('usage', {})
-        actual_input = usage.get('prompt_tokens', est_input)
-        actual_output = usage.get('completion_tokens', 0)
-        actual_cost = int((actual_input / 1000000 * DEEPSEEK_INPUT_PRICE_PER_1M +
-                            actual_output / 1000000 * DEEPSEEK_OUTPUT_PRICE_PER_1M) * 100)
-        actual_charge = max(1, int(actual_cost * USER_MARKUP))
-        new_balance = user['balance'] - actual_charge
-        db.execute('UPDATE users SET balance = ? WHERE id = ?', (new_balance, request.user_id))
-        db.execute('INSERT INTO transactions (user_id, type, amount_fen, balance_after, description) VALUES (?,?,?,?,?)',
-                   (request.user_id, 'llm_usage', -actual_charge, new_balance,
-                    f'LLM分析 {module} ({actual_input}+{actual_output} tokens, ¥{actual_charge/100:.2f})'))
-        db.execute('INSERT INTO llm_usage (user_id, module, prompt_tokens, completion_tokens, cost_fen, user_charged_fen, model, success) VALUES (?,?,?,?,?,?,?,1)',
-                   (request.user_id, module, actual_input, actual_output, actual_cost, actual_charge, DEEPSEEK_MODEL))
-        db.commit()
-        content = result['choices'][0]['message']['content']
-        return jsonify({'success': True, 'content': content, 'usage': {
-            'input_tokens': actual_input, 'output_tokens': actual_output,
-            'cost_fen': actual_charge, 'cost_yuan': round(actual_charge / 100, 2), 'balance_after': new_balance
-        }})
-    except Exception as e:
-        db.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+        u = db.execute('SELECT invite_code FROM users WHERE id = ?', (request.user_id,)).fetchone()
+        if not u or not u['invite_code']: return jsonify({'success': False, 'error': '暂无邀请码，请先生成'}), 404
+        return jsonify({'success': True, 'code': u['invite_code']})
+    finally:
+        db.close()
+
+@app.route('/api/invite/stats', methods=['GET'])
+@require_auth
+def invite_stats():
+    """获取邀请统计"""
+    db = get_db()
+    try:
+        total = db.execute("SELECT COUNT(*) as c FROM invite_codes WHERE owner_id = ?", (request.user_id,)).fetchone()['c']
+        used = db.execute("SELECT COUNT(*) as c FROM invite_codes WHERE owner_id = ? AND used_by IS NOT NULL", (request.user_id,)).fetchone()['c']
+        return jsonify({'success': True, 'total': total, 'used': used})
     finally:
         db.close()
 
