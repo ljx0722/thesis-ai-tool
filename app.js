@@ -2131,70 +2131,91 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
 
     // === .docx 格式：本地解析 ===
     if(ext==='docx'){
-    window._mammothParaInfo=[];
-    var result=await mammoth.convertToHtml({arrayBuffer:buf},{includeDefaultStyleMap:true,transformDocument:function(doc){
-      function _extractText(node){var t='';function c(n){if(!n||!n.children)return;for(var i=0;i<n.children.length;i++){var ch=n.children[i];if(ch.type==='text')t+=ch.value||'';if(ch.children)c(ch);}}c(node);return t.replace(/\s+/g,' ').trim();}
-      function _walk(node){if(!node||!node.children)return;for(var i=0;i<node.children.length;i++){var ch=node.children[i];if(ch.type==='paragraph'){var txt=_extractText(ch);if(txt&&txt.length>=2)window._mammothParaInfo.push({text:txt,styleName:ch.styleName||ch.styleId||'Normal',styleId:ch.styleId||'Normal'});}if(ch.children)_walk(ch);}}_walk(doc);return doc;
-    }});
+    // 预解析：从 DOCX 原始 XML 提取每段 Word 样式名
+    window._docxParaStyleList=[];
+    try{
+      var docxZip=await JSZip.loadAsync(buf);
+      var stylesXml=await docxZip.file('word/styles.xml').async('string');
+      var docXml=await docxZip.file('word/document.xml').async('string');
+      if(stylesXml&&docXml){
+        var styleMap={};
+        var reS=new RegExp('<w:style[^>]*w:styleId="([^"]*)"[^>]*>[^]*?<w:name[^>]*w:val="([^"]*)"[^]*?<\\/w:style>','g');
+        var mS;
+        while((mS=reS.exec(stylesXml))!==null)styleMap[mS[1]]=mS[2];
+        var reP=new RegExp('<w:p[ >][^]*?<\\/w:p>','g');
+        var mP;
+        while((mP=reP.exec(docXml))!==null){
+          var p=mP[0];
+          var sm=p.match(/<w:pStyle[^>]*w:val="([^"]*)"/);
+          var sid=sm?sm[1]:'Normal';
+          var sname=styleMap[sid]||sid;
+          var tx=[],tr=new RegExp('<w:t[^>]*>([^<]*)<\\/w:t>','g'),tm;
+          while((tm=tr.exec(p))!==null)tx.push(tm[1]);
+          var txt=tx.join('').replace(/\s+/g,' ').trim();
+          if(!txt||txt.length<2)continue;
+          if(/^\d{1,3}$/.test(txt)||/^[ivxlcdm]+$/i.test(txt))continue;
+          if(/[\t\s]+\d{1,3}$/.test(txt)||/\.{3,}\d{1,3}$/.test(txt))continue;
+          window._docxParaStyleList.push({text:txt,styleName:sname});
+        }
+      }
+    }catch(e){console.warn('[docx] Style pre-parse failed:',e.message);window._docxParaStyleList=[];}
+    // mammoth 渲染
+    var result=await mammoth.convertToHtml({arrayBuffer:buf},{includeDefaultStyleMap:true,transformDocument:function(doc){return doc;}});
     manuscriptHTML=result.value;
     } // end if docx
-    // 后处理：图片响应式 + 表格样式 + 公式保留
     manuscriptHTML=manuscriptHTML
       .replace(/<img /g,'<img loading="lazy" style="max-width:100%;height:auto;display:block;margin:10px auto;border-radius:4px" ')
       .replace(/<table>/g,'<table style="border-collapse:collapse;width:100%;margin:12px 0;font-size:.75rem">')
       .replace(/<th>/g,'<th style="border:1px solid rgba(0,0,0,0.12);padding:6px 10px;background:rgba(0,0,0,0.03);font-weight:600;text-align:center">')
       .replace(/<td>/g,'<td style="border:1px solid rgba(0,0,0,0.1);padding:6px 10px;vertical-align:top">')
       .replace(/<p>/g,'<p style="line-height:1.9">')
-    // 表格默认隐藏（仅保留样式）
     manuscriptText=manuscriptHTML.replace(/<[^>]+>/g,'\n').replace(/&nbsp;/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/\n{3,}/g,'\n\n')
-    // 恢复表格显示（之前被 CSS 隐藏了）
     var thesisBoxEl=document.getElementById('thesisBox');
     thesisBoxEl.innerHTML=manuscriptHTML;
     var tbs=thesisBoxEl.querySelectorAll('table');for(var ti=0;ti<tbs.length;ti++)tbs[ti].style.display='';
-        // === 构建 _docxStyleGroups：使用 mammoth 采集的 Word 样式名分组 ===
+    // 构建 _docxStyleGroups：XML Word 样式名 + DOM 元素按文档序对齐
     window._docxStyleGroups=[];
-    window._normText=function(s){return(s||'').replace(/[\s\u3000\u00A0\u2000-\u200A]+/g,' ').replace(/ +/g,' ').trim();};
-    if(window._mammothParaInfo&&window._mammothParaInfo.length){
-      var domAll=thesisBoxEl.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li');
-      var sg={},pi=0;
-      for(var di=0;di<domAll.length&&pi<window._mammothParaInfo.length;di++){
-        var dEl=domAll[di],dt=(dEl.textContent||'').replace(/\s+/g,' ').trim();
+    window._normText=function(s){return(s||'').replace(/[\s　  - ]+/g,' ').replace(/ +/g,' ').trim();};
+    if(window._docxParaStyleList&&window._docxParaStyleList.length){
+      var domA=thesisBoxEl.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li');
+      var sg2={},xl=window._docxParaStyleList,xi=0;
+      for(var di=0;di<domA.length&&xi<xl.length;di++){
+        var dE=domA[di],dt=window._normText(dE.textContent||'');
         if(!dt||dt.length<2)continue;
         if(/^\d{1,3}$/.test(dt)||/^[ivxlcdm]+$/i.test(dt))continue;
         if(/[\t\s]+\d{1,3}$/.test(dt)||/\.{3,}\d{1,3}$/.test(dt))continue;
-        var info=window._mammothParaInfo[pi];
-        var it=(info.text||'').replace(/\s+/g,' ').trim();
-        if(dt===it||(dt.length>=10&&it.length>=10&&dt.substring(0,20)===it.substring(0,20))){
-          var sn=info.styleName||'Normal';
-          if(!sg[sn])sg[sn]={name:sn,count:0,samples:[],_texts:[],_els:[]};
-          sg[sn].count++;
-          if(sg[sn].samples.length<3)sg[sn].samples.push(dt.substring(0,80));
-          sg[sn]._texts.push(dt);
-          sg[sn]._els.push(dEl);
-          pi++;
+        var found=false;
+        for(var fix=xi;fix<Math.min(xi+4,xl.length);fix++){
+          var xt=window._normText(xl[fix].text);
+          if(xt===dt||(dt.length>=10&&xt.length>=10&&dt.substring(0,20)===xt.substring(0,20))){
+            var sn2=xl[fix].styleName||'Normal';
+            if(!sg2[sn2])sg2[sn2]={name:sn2,count:0,samples:[],_texts:[],_els:[]};
+            sg2[sn2].count++;
+            if(sg2[sn2].samples.length<3)sg2[sn2].samples.push(dt.substring(0,80));
+            sg2[sn2]._texts.push(dt);
+            sg2[sn2]._els.push(dE);
+            xi=fix+1;found=true;break;
+          }
         }
       }
-      window._docxStyleGroups=Object.values(sg).sort(function(a,b){return b.count-a.count;});
-      console.log('[docx] Style groups from mammoth Word styles ('+pi+'/'+window._mammothParaInfo.length+' aligned):',window._docxStyleGroups.map(function(g){return g.name+'\u00d7'+g.count;}).join(', '));
+      window._docxStyleGroups=Object.values(sg2).sort(function(a,b){return b.count-a.count;});
+      console.log('[docx] Built '+window._docxStyleGroups.length+' style groups from '+xi+'/'+xl.length+' XML paragraphs');
     }
     if(!window._docxStyleGroups.length){
-      var fbg={};var allE=thesisBoxEl.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li');
-      for(var i=0;i<allE.length;i++){
-        var el=allE[i],t=(el.textContent||'').trim();
+      var fb={};var aEl=thesisBoxEl.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li');
+      for(var i=0;i<aEl.length;i++){
+        var e=aEl[i],t=(e.textContent||'').trim();
         if(!t||t.length<2)continue;
         if(/^\d{1,3}$/.test(t)||/^[ivxlcdm]+$/i.test(t))continue;
         if(/[\t\s]+\d{1,3}$/.test(t)||/\.{3,}\d{1,3}$/.test(t))continue;
-        var g='\u6b63\u6587\u6bb5\u843d';
-        if(/^\u7b2c[\u4e00-\u4e5d\u5341\u767e\u5343123456789]+\u7ae0/.test(t))g='\u7b2cX\u7ae0 \u683c\u5f0f';
-        else if(/^Chapter\s+\d/i.test(t))g='Chapter \u683c\u5f0f';
-        else if(/^\d+(?:\.\d+)+[\s\u3001,。]+/.test(t))g='\u6570\u5b57\u7f16\u53f7\u683c\u5f0f';
-        else if(t.length<80)g='\u77ed\u6587\u672c(\u7591\u4f3c\u6807\u9898)';
-        if(!fbg[g])fbg[g]={name:g,count:0,samples:[],_texts:[],_els:[]};
-        fbg[g].count++;if(fbg[g].samples.length<3)fbg[g].samples.push(t.substring(0,80));
-        fbg[g]._texts.push(t);fbg[g]._els.push(el);
+        var g='Normal';
+        if(!fb[g])fb[g]={name:g,count:0,samples:[],_texts:[],_els:[]};
+        fb[g].count++;if(fb[g].samples.length<3)fb[g].samples.push(t.substring(0,80));
+        fb[g]._texts.push(t);fb[g]._els.push(e);
       }
-      window._docxStyleGroups=Object.values(fbg).sort(function(a,b){return b.count-a.count;});
+      window._docxStyleGroups=Object.values(fb).sort(function(a,b){return b.count-a.count;});
     }
+
     updLoad('构建章节树...','35');
 
     // ====== 标题层级检测辅助函数 ======
