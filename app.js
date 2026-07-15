@@ -176,7 +176,33 @@ function injectNewMarkers(refs){
 }
 function scrollToRef(n){var el=document.getElementById('r'+(n-1))||document.getElementById('er'+(n-1));if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.transition='background .3s';el.style.background='#fef3c7';setTimeout(function(){el.style.background=''},2000)}else ttp('未找到['+n+']')}
 
-function renderNavTree(tree){var c=document.getElementById('navTree');if(!tree||!tree.length){c.innerHTML='<i style="color:var(--m);font-size:.7rem;padding:8px;display:block">未检测到章节</i>';return}var h='',idx=0;function rnr(nodes,level){for(var i=0;i<nodes.length;i++){var n=nodes[i];var cls=level===0?'ch':(level===1?'sec':'sub');var numId=(n.num||'').replace(/[.]/g,'-');var id=level===0?('ch-'+n.ch):((level===1?'sec-':'sub-')+numId);var label=level===0?n.name:((n.num||'')+' '+(n.title||''));var padLeft=level*14+8;if(level>2)padLeft=8+level*12;h+='<div class="tree-node '+cls+'" data-idx="'+(idx++)+'" data-id="'+id+'" onclick="navClick2(this)" style="padding-left:'+padLeft+'px" title="'+label.replace(/"/g,'&quot;')+'">'+label+'</div>';var kids=n.sections||n.subs||[];if(kids.length)rnr(kids,level+1);}}rnr(tree,0);c.innerHTML=h}
+function renderNavTree(tree){
+  var c=document.getElementById('navTree');
+  var meta=document.getElementById('navTreeMeta');
+  if(!tree||!tree.length){
+    c.innerHTML='<i style="color:rgba(255,255,255,.25);font-size:.65rem;padding:8px;display:block">未检测到章节</i>';
+    if(meta)meta.style.display='none';
+    return;
+  }
+  var h='',idx=0;var chCount=0,secCount=0,subCount=0;
+  function rnr(nodes,level){
+    for(var i=0;i<nodes.length;i++){
+      var n=nodes[i];var cls=level===0?'ch':(level===1?'sec':'sub');
+      var numId=(n.num||'').replace(/[.]/g,'-');
+      var id=level===0?('ch-'+n.ch):((level===1?'sec-':'sub-')+numId);
+      var label=level===0?n.name:((n.num||'')+' '+(n.title||''));
+      var padLeft=level>=2?32:(level===1?20:10);
+      if(level===0)chCount++;else if(level===1)secCount++;else subCount++;
+      h+='<div class="tree-node '+cls+'" data-idx="'+(idx++)+'" data-id="'+id+'" onclick="navClick2(this)" style="padding-left:'+padLeft+'px" title="'+label.replace(/"/g,'&quot;')+'">'+label+'</div>';
+      var kids=n.sections||n.subs||[];if(kids.length)rnr(kids,level+1);
+    }
+  }
+  rnr(tree,0);
+  c.innerHTML=h;
+  if(meta){meta.style.display='';meta.textContent=chCount+' 章 · '+secCount+' 节 · '+subCount+' 小节';}
+  // Scroll tree to show top of content
+  c.scrollTop=0;
+}
 
 
 function navClick2(el){
@@ -215,71 +241,74 @@ async function extractRefsFromRawDocx(buf){
   var zip=await JSZip.loadAsync(buf);
   var xml=await zip.file('word/document.xml').async('string');
 
-  // Find reference boundary: strip XML tags then search for full text "参考文献"
-  var plainXml=xml.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ');
-  var refIdx=plainXml.lastIndexOf('参考文献');
-  // If not found, try common variants
-  if(refIdx<0){refIdx=plainXml.lastIndexOf('參考文獻');}
-  if(refIdx<0){refIdx=plainXml.lastIndexOf('References');}
-  if(refIdx<0){console.log('[refs] No "参考文献" boundary found in document');return [];}
-
-  // Map the plain-text index back to XML position (approximate)
-  var xmlIdx=0, plainPos=0;
-  var inTag=false;
-  for(var i=0;i<xml.length;i++){
-    if(xml[i]==='<'){inTag=true;continue;}
-    if(xml[i]==='>'){inTag=false;continue;}
-    if(inTag)continue;
-    if(plainPos>=refIdx){xmlIdx=i;break;}
-    plainPos++;
-  }
-  if(!xmlIdx){xmlIdx=Math.floor(xml.length*0.75);} // fallback
-
-  // Extract paragraphs after reference boundary
-  var tail=xml.substring(xmlIdx);
-  var paraBlocks=tail.split('<w:p ');
-  var rawParas=[];
+  // Split into paragraphs and extract text + style for each
+  var paraBlocks=xml.split('<w:p ');
+  var paras=[];
   for(var pbi=1;pbi<paraBlocks.length;pbi++){
     var pBlock='<w:p '+paraBlocks[pbi];
-    // Skip tables
+    // Skip table content
     if(pBlock.indexOf('<w:tbl>')>=0||pBlock.indexOf('<w:tbl ')>=0)continue;
     var txt=extractTextFromXml(pBlock);
     if(!txt||txt.length<2)continue;
-    // Skip field codes (TOC entries, hyperlinks, page refs)
+    // Inline field codes (TOC/HYPERLINK/PAGEREF) — skip
     if(/^(?:HYPERLINK|PAGEREF|_Toc|TOC)/.test(txt))continue;
-    if(/^[\s\d.]*$/.test(txt))continue; // pure numbers/dots
-    rawParas.push(txt);
+    if(/^[\d\s.]*$/.test(txt))continue;
+    // Style hint: check if this paragraph has a numbered style like "参考文献"
+    var sm=pBlock.match(/<w:pStyle[^>]*w:val="([^"]*)"/);
+    var styleId=sm?sm[1]:'';
+    paras.push({text:txt,styleId:styleId});
   }
 
-  if(rawParas.length<2)return [];
+  // Find the reference section boundary
+  var refStartIdx=-1;
+  var refHeaderPatterns=[/^参考文献\s*$/i,/^參考文獻\s*$/i,/^References\s*$/i];
+  for(var pi=0;pi<paras.length;pi++){
+    var t=paras[pi].text.replace(/\s+/g,'');
+    for(var h=0;h<refHeaderPatterns.length;h++){
+      if(refHeaderPatterns[h].test(t)){refStartIdx=pi;break;}
+    }
+    if(refStartIdx>=0)break;
+  }
+  if(refStartIdx<0){
+    // Fallback: search for paragraph containing 参考文献 anywhere
+    for(var pi2=0;pi2<paras.length;pi2++){
+      if(/参考文献/.test(paras[pi2].text.replace(/\s+/g,''))&&paras[pi2].text.replace(/\s+/g,'').length<30){
+        refStartIdx=pi2;break;
+      }
+    }
+  }
+  if(refStartIdx<0){console.log('[refs] No "参考文献" boundary found');return [];}
+  console.log('[refs] Found reference boundary at paragraph index '+refStartIdx+': "'+paras[refStartIdx].text.substring(0,50)+'"');
 
-  // Merge consecutive paragraphs into proper reference entries
-  var refs=[];
-  var stopWords=/^(致谢|附录|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读|Abstract|Acknowledg)/;
-  var refStart=/^\[?(\d+)\]?[\s\.、．]+/;  // [1] or 1. or 1、
+  // Collect reference entries from paragraphs after the boundary
+  var tailParas=paras.slice(refStartIdx+1);
+  if(!tailParas.length)return [];
 
-  for(var ri=0;ri<rawParas.length;ri++){
-    var txt=rawParas[ri];
-    if(stopWords.test(txt))break;
-    if(txt.length<8)continue;
+  var rawRefs=[];
+  var stopWords=/^(致谢|附录|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读|Abstract|Acknowledg|作者简介|在读期间)/;
+  var refNumStart=/^\[?(\d+)\]?[\s\.、．—\[\]]+/;  // [1], 1., 1、, 1— etc
 
-    // Check if this paragraph starts a new reference
-    var startM=txt.match(refStart);
-    if(startM){
-      // New reference — start fresh
-      refs.push(txt);
-    } else if(refs.length>0){
-      // Continuation line — merge with previous reference
-      refs[refs.length-1]+=' '+txt;
-    } else {
-      // First ref might not start with a number (e.g. "参考文献" heading line)
-      if(txt==='参考文献'||txt==='參考文獻'||txt==='References')continue;
-      refs.push(txt);
+  for(var ri=0;ri<tailParas.length;ri++){
+    var txt=tailParas[ri].text;
+    if(stopWords.test(txt.replace(/\s+/g,'')))break;
+    if(txt.length<6)continue;
+    // Check if starts a new reference
+    var nm=txt.match(refNumStart);
+    if(nm){
+      // Strip the leading number and bracket for cleaner display
+      var clean=txt.replace(/^\[?\d+\]?[\s\.、．—\[\]…]+/,'').replace(/^\s+/,'');
+      rawRefs.push(clean);
+    }else if(rawRefs.length>0){
+      // Continuation of previous reference
+      rawRefs[rawRefs.length-1]+=' '+txt;
+    }else{
+      // First ref might not have a number prefix
+      rawRefs.push(txt.replace(/^\s*参考文献\s*/,'').replace(/^\s+/,''));
     }
   }
 
-  console.log('[refs] Merged '+rawParas.length+' raw lines → '+refs.length+' references');
-  return refs.map(function(ci,i){
+  console.log('[refs] Extracted '+rawRefs.length+' references from '+tailParas.length+' tail paragraphs');
+  return rawRefs.map(function(ci,i){
     return {num:i+1,ci:ci.replace(/\s+/g,' ').trim()};
   });
 }
@@ -2945,7 +2974,8 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
       // 重置论文状态 — 不要把半成品标记为已加载
       _thesisLoaded = false;
       existingRefs = []; mergedRefs = []; manuscriptText = ''; manuscriptHTML = ''; paperTopics = []; sections = [];
-      document.getElementById('navTree').innerHTML = '<i style="color:var(--m);font-size:.7rem;padding:8px;display:block">请先上传论文</i>';
+      document.getElementById('navTree').innerHTML = '<i style="color:rgba(255,255,255,.25);font-size:.65rem;padding:8px;display:block">请先上传论文</i>';
+      var nm=document.getElementById('navTreeMeta');if(nm)nm.style.display='none';
       document.getElementById('refs').innerHTML = '<div style="text-align:center;padding:60px;color:#9ca3af;font-size:.82rem">← 请先上传论文</div>';
       document.getElementById('kwBar').style.display = 'none';
       document.getElementById('upStatus').innerHTML = '等待上传';
@@ -3091,7 +3121,8 @@ function clearAll(){
   if(!confirm('确定要清空所有数据吗？这将重置文献检索结果。'))return;
   existingRefs=[];mergedRefs=[];manuscriptText='';manuscriptHTML='';paperTopics=[];sections=[];_treeIndex={chapters:[],sections:[],subs:[],paragraphs:[],sentences:[]};
   document.getElementById('thesisBox').innerHTML='';
-  document.getElementById('navTree').innerHTML='<i style="color:var(--m);font-size:.7rem;padding:8px;display:block">请先上传论文</i>';
+  document.getElementById('navTree').innerHTML='<i style="color:rgba(255,255,255,.25);font-size:.65rem;padding:8px;display:block">请先上传论文</i>';
+  var nm=document.getElementById('navTreeMeta');if(nm)nm.style.display='none';
   document.getElementById('refs').innerHTML='<div style="text-align:center;padding:60px;color:#9ca3af;font-size:.82rem">← 请先上传论文</div>';
   document.getElementById('kwBar').style.display='none';
   document.getElementById('statusBar').innerHTML='等待上传论文…';document.getElementById('upStatus').innerHTML='等待上传';

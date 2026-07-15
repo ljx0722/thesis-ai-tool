@@ -297,7 +297,7 @@ body {
 .nav-item.disabled:hover { background: transparent; color: rgba(255, 255, 255, 0.2); }
 
 /* Sidebar tree */
-.nav-tree { flex: 1; overflow-y: auto; overflow-x: hidden; padding: var(--space-1) var(--space-2); min-height: 0; }
+.nav-tree { flex: 1; overflow-y: auto; overflow-x: hidden; padding: var(--space-1) var(--space-2); min-height: 64px; max-height: 260px; border-top: 1px solid rgba(255,255,255,.04); }
 .tree-node {
   padding: 4px 10px;
   cursor: pointer;
@@ -306,17 +306,20 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.8;
+  line-height: 1.9;
   transition: all var(--duration-instant) var(--easing-default);
   position: relative;
   user-select: none;
   color: rgba(255, 255, 255, 0.55);
 }
-.tree-node:hover { background: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.85); }
-.tree-node.sel { background: var(--accent); color: #fff; font-weight: var(--font-weight-semibold); box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3); }
-.tree-node.ch { font-weight: var(--font-weight-semibold); color: rgba(255, 255, 255, 0.85); font-size: var(--font-size-md); padding-top: 5px; padding-bottom: 5px; margin-top: 2px; }
-.tree-node.sec { color: rgba(255, 255, 255, 0.6); }
-.tree-node.sub { color: rgba(255, 255, 255, 0.45); font-size: var(--font-size-xs); }
+.tree-node:hover { background: rgba(255, 255, 255, 0.06); color: rgba(255, 255, 255, 0.9); }
+.tree-node.sel { background: var(--accent); color: #fff; font-weight: var(--font-weight-semibold); box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4); }
+.tree-node.ch { font-weight: var(--font-weight-bold); color: rgba(255, 255, 255, 0.9); font-size: var(--font-size-md); padding-top: 6px; padding-bottom: 6px; margin-top: 2px; }
+.tree-node.ch:hover { background: rgba(255,255,255,.1); }
+.tree-node.sec { color: rgba(255, 255, 255, 0.6); padding-left:20px; }
+.tree-node.sec:hover { color: rgba(255,255,255,.85); }
+.tree-node.sub { color: rgba(255, 255, 255, 0.45); font-size: var(--font-size-xs); padding-left:32px; }
+.tree-node.sub:hover { color: rgba(255,255,255,.75); }
 
 /* ====== Thesis Panel ====== */
 .thesis-panel { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-card); }
