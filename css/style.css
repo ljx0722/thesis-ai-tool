@@ -887,6 +887,24 @@ body {
 .template-card-desc{font-size:.68rem;color:var(--text-secondary);line-height:1.5;margin-bottom:6px}
 .template-card-meta{font-size:.6rem;color:var(--text-muted);margin-bottom:8px}
 .template-card .ai-btn-clear{font-size:.62rem;padding:4px 10px}
+/* Version history */
+.version-row{
+  background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px
+}
+.version-top{display:flex;justify-content:space-between;margin-bottom:4px}
+.version-top b{font-size:.68rem;color:var(--text-primary)}
+.version-top span{font-size:.58rem;color:var(--text-muted)}
+.version-preview{font-size:.62rem;color:var(--text-secondary);line-height:1.5;margin-bottom:6px;max-height:40px;overflow:hidden}
+.version-row .ai-btn-clear{font-size:.58rem;padding:2px 8px}
+/* Smart tips */
+.project-smart-tips{
+  background:rgba(99,102,241,.04);border:1px solid rgba(99,102,241,.12);border-radius:14px;padding:12px 14px;margin-bottom:14px
+}
+.smart-tips-head{font-size:.7rem;font-weight:700;color:var(--accent);margin-bottom:8px}
+.smart-tip-item{margin-bottom:8px}
+.smart-tip-item b{display:block;font-size:.68rem;color:var(--text-primary);margin-bottom:2px}
+.smart-tip-item p{margin:0;font-size:.62rem;color:var(--text-muted);line-height:1.5}
+.smart-tip-item:last-child{margin-bottom:0}
 @media (max-width:768px){
   .chapter-card-top{flex-direction:column}
   .chapter-card-preview{white-space:normal}

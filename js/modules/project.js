@@ -158,7 +158,22 @@
     var p = getCurrentProject();
     if (!p) return null;
     var arts = ensureArtifacts(p);
+    // Ensure versions array exists for this chapter
+    if (!arts._versions) arts._versions = {};
+    var verKey = key + '_versions';
+    var versions = arts._versions[verKey] || [];
     var prev = arts.chapters[key] || {};
+    // Archive previous version if it has content
+    if (prev.content && prev.content.trim()) {
+      versions.push({
+        ts: prev.updatedAt || nowISO(),
+        content: prev.content,
+        status: prev.status || 'draft',
+        words: (prev.content || '').replace(/\s+/g, '').length
+      });
+      versions = versions.slice(-10);
+    }
+    arts._versions[verKey] = versions;
     arts.chapters[key] = {
       key: key,
       title: draft.title || prev.title || '',
@@ -171,6 +186,26 @@
     p.updatedAt = nowISO();
     if ((p.stageStatus || {}).writing !== 'done') p.stageStatus.writing = 'active';
     return upsertProject(p);
+  }
+
+  function getVersionHistory(key) {
+    var p = getCurrentProject();
+    if (!p) return [];
+    var arts = ensureArtifacts(p);
+    if (!arts._versions) return [];
+    var verKey = key + '_versions';
+    return (arts._versions[verKey] || []).slice().reverse();
+  }
+
+  function rollbackChapterVersion(key, ts) {
+    var versions = getVersionHistory(key);
+    var found = null;
+    for (var i = 0; i < versions.length; i++) { if (versions[i].ts === ts) { found = versions[i]; break; } }
+    if (!found) return false;
+    var draft = getChapterDraft(key) || {};
+    // Save current as version first, then restore
+    saveChapterDraft(key, { title: draft.title, sections: draft.sections, content: found.content, status: found.status });
+    return true;
   }
 
   function listChapterCards(project) {
@@ -522,6 +557,7 @@
         '<div class="project-cta-row" style="justify-content:flex-end">' +
           '<button class="ai-btn" onclick="exportFullPaper()">📄 导出论文全文</button>' +
         '</div>' +
+        renderSmartTips(project) +
         '<div class="project-stage-grid">' + stagesHtml + '</div>' +
       '</div>';
   }
@@ -821,7 +857,9 @@
     logSkillRun: logSkillRun,
     listChapterCards: listChapterCards,
     saveChapterDraft: saveChapterDraft,
-    getChapterDraft: getChapterDraft
+    getChapterDraft: getChapterDraft,
+    getVersionHistory: getVersionHistory,
+    rollbackChapterVersion: rollbackChapterVersion,
   };
   window.openIdeaWizard = openIdeaWizard;
   window.closeIdeaWizard = closeIdeaWizard;
@@ -880,7 +918,7 @@
       '<div class="project-modal-head"><div><h3>写作：'+escapeHtml(m.title)+'</h3><p>先写骨架，再调用扩写细化。内容保存在当前项目。</p></div><button class="project-close" onclick="closeChapterOverlays()">×</button></div>'+
       '<div class="project-form"><div class="chapter-sec-tags">'+(m.sections.length?m.sections.map(function(s){return'<span class="chapter-sec-tag">'+escapeHtml(s)+'</span>';}).join(''):'')+'</div>'+
       '<label>本章草稿</label><textarea id="chapterContent" class="ai-textarea" style="height:320px;margin:0" placeholder="在这里写内容/提纲/论据要点..."></textarea></div>'+
-      '<div class="project-modal-actions"><button class="ai-btn-clear" onclick="seedChapterFromSections(\''+key+'\',true)">插入小节骨架</button><button class="ai-btn-clear" onclick="insertCiteMarkers(\''+key+'\')">插入文献引用标记</button><button class="ai-btn-clear" onclick="insertRefsIntoDraft(\''+key+'\')">插入参考文献</button><button class="ai-btn-clear" onclick="expandChapterAI(\''+key+'\')">🤖 AI 扩写</button><button class="ai-btn-clear" onclick="closeChapterOverlays()">取消</button><button class="ai-btn" onclick="saveChapterEditor(\''+key+'\')">保存本章</button></div></div>';
+      '<button class="ai-btn-clear" onclick="seedChapterFromSections(\''+key+'\',true)">插入小节骨架</button><button class="ai-btn-clear" onclick="insertCiteMarkers(\''+key+'\')">插入文献引用标记</button><button class="ai-btn-clear" onclick="insertRefsIntoDraft(\''+key+'\')">插入参考文献</button><button class="ai-btn-clear" onclick="expandChapterAI(\''+key+'\')">🤖 AI 扩写</button><button class="ai-btn-clear" onclick="showVersionHistory(\''+key+'\')">📜 版本历史</button><button class="ai-btn-clear" onclick="closeChapterOverlays()">取消</button><button class="ai-btn" onclick="saveChapterEditor(\''+key+'\')">保存本章</button></div></div>';
     ov.onclick=function(){closeChapterOverlays();};
     document.body.appendChild(ov);
     document.getElementById('chapterContent').value=d.content||'';
@@ -987,6 +1025,86 @@
   window.closeTemplateChooser = closeTemplateChooser;
   window.applySchoolTemplate = applySchoolTemplate;
   window.ideaTemplateChanged = ideaTemplateChanged;
+  window.showVersionHistory = showVersionHistory;
+  window.closeVersionHistory = closeVersionHistory;
+  window.rollbackChapterVersion = rollbackChapterVersion;
+
+  // ============ Version History Viewer ============
+  function showVersionHistory(key) {
+    var meta = findChapterMeta(key);
+    if (!meta) return;
+    var versions = getVersionHistory(key);
+    var draft = getChapterDraft(key) || {};
+    var rows = '';
+    if (!versions.length) {
+      rows = '<div class="project-progress-sub" style="text-align:center;padding:16px">暂无历史版本。多次保存章节后，这里会显示变更记录。</div>';
+    } else {
+      rows = versions.map(function (v) {
+        return '<div class="version-row">' +
+          '<div class="version-top"><b>' + formatTime(v.ts) + '</b><span>' + v.words + ' 字 · ' + (v.status === 'ready' ? '较完整' : (v.status === 'draft' ? '草稿' : '空白')) + '</span></div>' +
+          '<div class="version-preview">' + escapeHtml(v.content.substring(0, 100)) + (v.content.length > 100 ? '…' : '') + '</div>' +
+          '<button class="ai-btn-clear" onclick="rollbackChapterVersion(\'' + key + '\',\'' + v.ts + '\')">恢复此版本</button>' +
+        '</div>';
+      }).join('');
+    }
+    var currentWords = (draft.content || '').replace(/\s/g, '').length;
+    var ov = document.createElement('div');
+    ov.id = 'versionHistoryOverlay';
+    ov.className = 'project-overlay';
+    ov.innerHTML =
+      '<div class="project-modal" style="width:min(520px,100%)" onclick="event.stopPropagation()">' +
+        '<div class="project-modal-head"><div><h3>版本历史：' + escapeHtml(meta.title) + '</h3><p>当前：' + currentWords + ' 字</p></div><button class="project-close" onclick="closeVersionHistory()">×</button></div>' +
+        '<div style="max-height:55vh;overflow:auto">' + rows + '</div>' +
+        '<div class="project-modal-actions"><button class="ai-btn-clear" onclick="closeVersionHistory()">关闭</button></div>' +
+      '</div>';
+    ov.onclick = function () { closeVersionHistory(); };
+    document.body.appendChild(ov);
+  }
+
+  function closeVersionHistory() {
+    var ov = document.getElementById('versionHistoryOverlay');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+
+  // ============ Smart Tips ============
+  function stageTips(project) {
+    if (!project) return [];
+    var tips = [];
+    var stats = chapterStats(project);
+    var stage = project.currentStage || 'ideation';
+
+    if (stage === 'ideation') {
+      if (!project.field) tips.push({ title: '先确定学科领域', desc: '在项目设置中填写领域，选题推荐会更精准' });
+      if (!project.keywords) tips.push({ title: '补充关键词', desc: '关键词帮你聚焦研究方向，也用于文献检索' });
+      tips.push({ title: '试试选题推荐', desc: '输入领域后 AI 可推荐 5 个可行题目' });
+    } else if (stage === 'literature') {
+      if (!project.hasManuscript) tips.push({ title: '还没上传论文？', desc: '可以先在大纲编辑器中写骨架，再用论文扩写生成初稿' });
+      tips.push({ title: '文献检索策略', desc: '先用主题词检索，再看每章关联文献密度，补薄弱章节' });
+    } else if (stage === 'writing') {
+      if (stats.total < 3) tips.push({ title: '大纲不完整', desc: '至少 5 章才算标准硕士论文结构' });
+      if (stats.words < 1000) tips.push({ title: '开始写第一段', desc: '先打开分章草稿，从绪论或你最熟的一章开始写' });
+      if (stats.ready < stats.total && stats.words > 500) tips.push({ title: '章节进度：' + stats.ready + '/' + stats.total, desc: '用 AI 扩写提升草稿完成度，每章目标 ≥2000 字' });
+      if (stats.words > 5000) tips.push({ title: '考虑插入文献', desc: '用章节编辑器的「插入文献引用标记」在关键位置标注引用' });
+    } else if (stage === 'polish') {
+      tips.push({ title: '逐章查错', desc: '用论文查错逐章扫描，优先修绪论和结论（导师最关注）' });
+      tips.push({ title: '降重建议', desc: '复制容易重复的段落到查重降重模块，AI 帮你改写' });
+    } else if (stage === 'review') {
+      tips.push({ title: '看十维看板', desc: '论文看板会告诉你哪些维度偏低，优先修高分影响的维度' });
+    } else if (stage === 'defense') {
+      tips.push({ title: '答辩准备', desc: '先跑英文摘要润色，再生成答辩 PPT 大纲，查漏补缺' });
+    }
+    return tips.slice(0, 3);
+  }
+
+  // Update renderProjectOverviewHTML to include tips
+  function renderSmartTips(project) {
+    var tips = stageTips(project);
+    if (!tips.length) return '';
+    return '<div class="project-smart-tips">' +
+      '<div class="smart-tips-head">💬 写作提示</div>' +
+      tips.map(function (t) { return '<div class="smart-tip-item"><b>' + escapeHtml(t.title) + '</b><p>' + escapeHtml(t.desc) + '</p></div>'; }).join('') +
+    '</div>';
+  }
 
   // ============ Smart Citation Marker Insertion ============
   var SCHOOL_TEMPLATES = [
