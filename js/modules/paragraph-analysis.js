@@ -167,9 +167,10 @@ function jumpToParagraph(idx) {
   for (var i = 0; i < filtered.length; i++) {
     if ((filtered[i].textContent||'').trim().length >= 10) {
       if (count === idx) {
-        filtered[i].scrollIntoView({behavior:'smooth',block:'center'});
-        filtered[i].style.transition='background .3s';filtered[i].style.background='#fef3c7';
-        setTimeout(function(){filtered[i].style.background='';},2000);
+        var target = filtered[i];
+        target.scrollIntoView({behavior:'smooth',block:'center'});
+        target.style.transition='background .3s';target.style.background='#fef3c7';
+        setTimeout(function(){target.style.background='';},2000);
         return;
       }
       count++;

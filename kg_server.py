@@ -548,7 +548,7 @@ def search_baidu_xueshu(query, max_rows=80):
 # ========== 统一检索 API ==========
 @app.route('/ping', methods=['GET'])
 def ping():
-    return jsonify({'ok': True, 'service': '论文文献AI利器', 'sources': ['OpenAlex','OpenAlex-CN','Crossref','Semantic Scholar','arXiv','CORE','PubMed','INSPIRE-HEP','DataCite','DOAJ','EuropePMC','CNKI','万方','百度学术']})
+    return jsonify({'ok': True, 'service': '论文文献AI利器', 'sources': ['OpenAlex','Crossref','Semantic Scholar','EuropePMC','百度学术','CNKI']})
 
 def _run_source(fn, *args):
     """Thread-safe wrapper: 在线程池中安全调用搜索函数"""
@@ -582,6 +582,8 @@ def search_api():
                 try: all_results.extend(search_baidu_xueshu_page(q, 0) or [])
                 except: pass
                 try: all_results.extend(search_cnki(q, 30) or [])
+                except: pass
+                try: all_results.extend(search_openalex_cn(q, 50) or [])
                 except: pass
 
         all_results = dedup_results(all_results)

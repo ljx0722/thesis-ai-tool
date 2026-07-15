@@ -7,8 +7,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>">
-
-</scr</script>
 <link rel="stylesheet" href="css/style.css"></head><body>
 <!-- ====== 登录页 ====== -->
 <div id="loginOverlay">
@@ -258,6 +256,20 @@
     <input type="file" id="fileInput" accept=".docx" style="display:none">
     <script>window._pendingFile=null;window.triggerUpload=function(){document.getElementById('fileInput').click();};</script>
 
+<!-- ====== 上传弹窗 ====== -->
+<div class="upload-overlay" id="uploadOverlay">
+  <div class="upload-card">
+    <div class="upload-icon">📄</div>
+    <h2>上传论文</h2>
+    <p>支持 .docx 格式，本地解析，数据不上传服务器</p>
+    <div class="upload-drop" id="uploadDrop" onclick="document.getElementById('uploadFileInput').click()">
+      拖拽文件到此处或点击选择
+      <input type="file" id="uploadFileInput" accept=".docx" onchange="var dt=new DataTransfer();dt.items.add(this.files[0]);document.getElementById('fileInput').files=dt.files;document.getElementById('fileInput').dispatchEvent(new Event('change'));hideUploadOverlay()" style="display:none">
+    </div>
+    <button onclick="hideUploadOverlay()" style="margin-top:16px;padding:8px 20px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface-alt);color:var(--text-muted);cursor:pointer;font-size:var(--font-size-sm);font-family:var(--font-sans)">取消</button>
+  </div>
+</div>
+
 <!-- ====== 知识图谱弹窗 ====== -->
 <div id="kgOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(30,30,32,0.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:99999;align-items:center;justify-content:center">
   <div id="kgModal" style="background:var(--solid);border-radius:var(--r-xl);padding:20px;width:95%;height:90%;max-width:1600px;display:flex;flex-direction:column;box-shadow:0 25px 80px rgba(0,0,0,0.3),0 0 0 1px rgba(255,255,255,0.1);position:relative;border:1px solid rgba(255,255,255,0.08)">
@@ -495,6 +507,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
         if (d.success) {
           sessionStorage.setItem(TOKEN_KEY, d.token);
           sessionStorage.setItem(USER_KEY, JSON.stringify(d.user));
+          sessionStorage.setItem('thesis_ai_login', 'true'); // 启用引导教程
           if (d.user.is_admin) {
             // Admin: redirect to admin dashboard
             sessionStorage.setItem('thesis_ai_admin_secret', d.token);

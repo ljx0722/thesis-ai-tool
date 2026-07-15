@@ -39,12 +39,12 @@ var MODULE_RUNNERS = {
   'de-duplicate':    'runDeduplicate',
   'format-check':    'runFormatCheck',
   'terminology':     'runTerminology',
-  'paragraph':       'runParagraph',
+  'paragraph':       'runParagraphAnalysis',
   'review':          'runReviewModule',
   'optimization':    'runOptimization',
   'defense-ppt':     'runDefensePPT',
   'en-abstract':     'runEnAbstract',
-  'dashboard':       'runDashboard',
+  'dashboard':       'showDashboard',
 };
 
 // 更新侧边栏项目状态（标记哪些需要论文上传才能用）
@@ -172,7 +172,7 @@ function initKeyboard() {
 
 // ==================== 渲染顶栏模块标签 ====================
 function renderModuleTabs() {
-  var container = document.getElementById('moduleTabs');
+  var container = document.getElementById('barTabs');
   if (!container) return;
   _thesisLoaded = !!(typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100);
 
@@ -286,6 +286,17 @@ function switchPanel(moduleId) {
       moduleArea.innerHTML = '<div class="module-panel"><div style="text-align:center;padding:50px"><div style="font-size:3rem;margin-bottom:16px">🕸️</div><div style="color:var(--m);margin-bottom:16px">知识图谱弹窗已打开</div><button onclick="showKnowledgeGraph()" style="font-size:.85rem;padding:10px 24px;background:var(--p);color:#fff;border:none;border-radius:18px;cursor:pointer;font-weight:600">重新打开知识图谱</button></div></div>';
     } else {
       moduleArea.innerHTML = '<div class="module-panel" style="text-align:center;padding:60px 20px"><div style="font-size:3rem;margin-bottom:16px">📎</div><h4 style="margin-bottom:8px">需要先上传论文</h4><p style="color:var(--text-muted);font-size:.8rem;margin-bottom:20px">知识图谱需要从论文中提取主题词才能生成</p><button onclick="triggerUpload()" style="font-size:.85rem;padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:18px;cursor:pointer;font-weight:600">📎 上传论文</button></div>';
+    }
+    updateStatusBar2();
+    return;
+  }
+
+  if (moduleId === 'dashboard') {
+    if (_thesisLoaded) {
+      showDashboard();
+      moduleArea.innerHTML = '<div class="module-panel"><div style="text-align:center;padding:50px"><div style="font-size:3rem;margin-bottom:16px">📊</div><div style="color:var(--m);margin-bottom:16px">论文看板弹窗已打开</div><button onclick="showDashboard()" style="font-size:.85rem;padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:18px;cursor:pointer;font-weight:600">重新打开看板</button></div></div>';
+    } else {
+      moduleArea.innerHTML = '<div class="module-panel" style="text-align:center;padding:60px 20px"><div style="font-size:3rem;margin-bottom:16px">📎</div><h4 style="margin-bottom:8px">需要先上传论文</h4><p style="color:var(--text-muted);font-size:.8rem;margin-bottom:20px">论文看板需要论文数据才能生成</p><button onclick="triggerUpload()" style="font-size:.85rem;padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:18px;cursor:pointer;font-weight:600">📎 上传论文</button></div>';
     }
     updateStatusBar2();
     return;
