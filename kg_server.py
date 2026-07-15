@@ -209,7 +209,8 @@ DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.co
 DEEPSEEK_MODEL = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
 DEEPSEEK_INPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_INPUT_PRICE', '1.0'))
 DEEPSEEK_OUTPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_OUTPUT_PRICE', '2.0'))
-USER_MARKUP = 2.0
+USER_MARKUP = 3.0  # 用户扣点倍率，覆盖 API 成本 + 服务器运维
+QUICK_RECHARGE_AMOUNTS = [1, 5, 10, 20, 50]  # 快充金额（1元=1点）
 ADMIN_SECRET = os.environ.get('ADMIN_SECRET', 'admin123')
 if ADMIN_SECRET == 'admin123' and os.environ.get('FLASK_ENV') == 'production':
     print('[WARN] ADMIN_SECRET 仍为默认 admin123，生产环境请设置环境变量 ADMIN_SECRET')
@@ -1314,8 +1315,8 @@ def llm_analyze():
     # DeepSeek 实际花费（元）
     api_cost = (actual_input / 1000000 * DEEPSEEK_INPUT_PRICE_PER_1M +
                 actual_output / 1000000 * DEEPSEEK_OUTPUT_PRICE_PER_1M)
-    # 用户扣点：实际成本（元）×2，折算到厘（×1000），四舍五入，最低 1 厘
-    charge_credits = max(1, round(api_cost * USER_MARKUP * 1000))
+    # 用户扣点：实际成本（元）×3，折算到厘（×1000），四舍五入，最低 5 厘（≈0.05元/次地板价覆盖运维）
+    charge_credits = max(5, round(api_cost * USER_MARKUP * 1000))
     content = result['choices'][0]['message']['content']
 
     # 扣点

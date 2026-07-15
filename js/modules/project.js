@@ -143,6 +143,68 @@
     return arts.outline || null;
   }
 
+  function chapterKey(title, idx) {
+    return 'ch_' + idx + '_' + String(title || '').replace(/\s+/g, '').slice(0, 24);
+  }
+
+  function getChapterDraft(key) {
+    var p = getCurrentProject();
+    if (!p) return null;
+    var arts = ensureArtifacts(p);
+    return arts.chapters[key] || null;
+  }
+
+  function saveChapterDraft(key, draft) {
+    var p = getCurrentProject();
+    if (!p) return null;
+    var arts = ensureArtifacts(p);
+    var prev = arts.chapters[key] || {};
+    arts.chapters[key] = {
+      key: key,
+      title: draft.title || prev.title || '',
+      sections: draft.sections || prev.sections || [],
+      content: draft.content != null ? draft.content : (prev.content || ''),
+      status: draft.status || prev.status || 'draft',
+      updatedAt: nowISO(),
+      createdAt: prev.createdAt || nowISO()
+    };
+    p.updatedAt = nowISO();
+    if ((p.stageStatus || {}).writing !== 'done') p.stageStatus.writing = 'active';
+    return upsertProject(p);
+  }
+
+  function listChapterCards(project) {
+    var outline = project && project.artifacts && project.artifacts.outline;
+    if (!outline || !outline.chapters || !outline.chapters.length) return [];
+    var arts = ensureArtifacts(project);
+    return outline.chapters.map(function (ch, idx) {
+      var key = chapterKey(ch.title, idx);
+      var d = arts.chapters[key];
+      var content = d && d.content ? d.content : '';
+      var words = content.replace(/\s+/g, '').length;
+      return {
+        key: key,
+        idx: idx,
+        title: ch.title,
+        sections: ch.sections || [],
+        content: content,
+        words: words,
+        status: !content ? 'empty' : (words < 300 ? 'draft' : 'ready'),
+        updatedAt: d && d.updatedAt ? d.updatedAt : null
+      };
+    });
+  }
+
+  function chapterStats(project) {
+    var cards = listChapterCards(project);
+    var ready = 0, words = 0;
+    cards.forEach(function (c) {
+      words += c.words;
+      if (c.status === 'ready') ready++;
+    });
+    return { total: cards.length, ready: ready, words: words, cards: cards };
+  }
+
   function logSkillRun(entry) {
     var p = getCurrentProject();
     if (!p) return null;
@@ -372,11 +434,64 @@
             '<button class="ai-btn" onclick="runProjectAction(\'' + next.primary.action + '\',\'' + (next.primary.stageId || '') + '\',\'' + (next.primary.moduleId || '') + '\')">' + next.primary.label + '</button>' +
             (next.secondary ? '<button class="ai-btn-clear" onclick="runProjectAction(\'' + next.secondary.action + '\')">' + next.secondary.label + '</button>' : '') +
             '<button class="ai-btn-clear" onclick="openOutlineEditor()">🧭 大纲编辑器</button>' +
+            '<button class="ai-btn-clear" onclick="openChapterBoard()">📝 分章草稿</button>' +
             '<button class="ai-btn-clear" onclick="completeCurrentStage()">标记本阶段完成</button>' +
           '</div>' +
         '</div>' +
+        renderChapterBoardInline(project) +
+        renderSkillLogInline(project) +
         '<div class="project-stage-grid">' + stagesHtml + '</div>' +
       '</div>';
+  }
+
+  function renderChapterBoardInline(project) {
+    var stats = chapterStats(project);
+    if (!stats.total) {
+      return '<div class="project-panel-card">' +
+        '<div class="project-panel-head"><strong>📝 分章草稿</strong><span>先保存大纲后，这里会生成章节卡片</span></div>' +
+        '<button class="ai-btn-clear" onclick="openOutlineEditor()">先编辑大纲</button>' +
+      '</div>';
+    }
+    var cards = stats.cards.map(function (c) {
+      var badge = c.status === 'ready' ? '可进入扩写' : (c.status === 'draft' ? '草稿中' : '未开始');
+      var badgeCls = c.status === 'ready' ? 'ok' : (c.status === 'draft' ? 'warn' : 'muted');
+      return '<div class="chapter-card" onclick="openChapterEditor(\'' + c.key + '\')">' +
+        '<div class="chapter-card-top"><b>' + escapeHtml(c.title) + '</b><span class="chapter-badge ' + badgeCls + '">' + badge + '</span></div>' +
+        '<div class="chapter-card-meta">' + c.words + ' 字 · ' + (c.sections.length || 0) + ' 个小节</div>' +
+        '<div class="chapter-card-preview">' + escapeHtml((c.content || c.sections.join(' / ') || '点击开始写这一章').slice(0, 72)) + '</div>' +
+      '</div>';
+    }).join('');
+    return '<div class="project-panel-card">' +
+      '<div class="project-panel-head"><strong>📝 分章草稿</strong><span>' + stats.ready + '/' + stats.total + ' 章较完整 · 共 ' + stats.words + ' 字</span></div>' +
+      '<div class="chapter-card-grid">' + cards + '</div>' +
+      '<div class="project-cta-row" style="margin:12px 0 0">' +
+        '<button class="ai-btn-clear" onclick="openChapterBoard()">打开分章看板</button>' +
+        '<button class="ai-btn-clear" onclick="openOutlineEditor()">调整大纲</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderSkillLogInline(project) {
+    var logs = (project.artifacts && project.artifacts.skillLogs) || [];
+    if (!logs.length) {
+      return '<div class="project-panel-card"><div class="project-panel-head"><strong>🧾 能力运行记录</strong><span>保存大纲、章节后会自动留下轨迹</span></div></div>';
+    }
+    var rows = logs.slice(0, 5).map(function (l) {
+      return '<div class="skill-log-row"><b>' + escapeHtml(l.title || l.moduleId) + '</b><span>' + escapeHtml(l.summary || '') + '</span><i>' + formatTime(l.at) + '</i></div>';
+    }).join('');
+    return '<div class="project-panel-card"><div class="project-panel-head"><strong>🧾 最近能力记录</strong><span>本地保存，便于回溯</span></div>' + rows + '</div>';
+  }
+
+  function formatTime(iso) {
+    if (!iso) return '';
+    try {
+      var d = new Date(iso);
+      var mm = (d.getMonth() + 1);
+      var dd = d.getDate();
+      var hh = String(d.getHours()).padStart(2, '0');
+      var mi = String(d.getMinutes()).padStart(2, '0');
+      return mm + '/' + dd + ' ' + hh + ':' + mi;
+    } catch (e) { return ''; }
   }
 
   function escapeHtml(s) {
@@ -444,6 +559,12 @@
     project.currentStage = stageId;
     upsertProject(project);
     renderProjectChrome();
+    if (stageId === "writing") {
+      var outline = getOutline();
+      if (!outline) openOutlineEditor();
+      else openChapterBoard();
+      return;
+    }
     var mod = stage.modules && stage.modules[0];
     if (stage.primaryAction === 'open-outline') {
       openOutlineEditor();
@@ -614,7 +735,10 @@
     renderWorkspaceHero: renderWorkspaceHero,
     saveOutline: saveOutline,
     getOutline: getOutline,
-    logSkillRun: logSkillRun
+    logSkillRun: logSkillRun,
+    listChapterCards: listChapterCards,
+    saveChapterDraft: saveChapterDraft,
+    getChapterDraft: getChapterDraft
   };
   window.openIdeaWizard = openIdeaWizard;
   window.closeIdeaWizard = closeIdeaWizard;
@@ -627,4 +751,80 @@
   window.closeOutlineEditor = closeOutlineEditor;
   window.fillDefaultOutline = fillDefaultOutline;
   window.saveOutlineEditor = saveOutlineEditor;
+  // Chapter board
+  function openChapterBoard() {
+    var p = getCurrentProject();
+    if (!p) { openIdeaWizard(); return; }
+    var outline = getOutline();
+    if (!outline) { if (confirm("没有大纲，先编辑吗？")) openOutlineEditor(); return; }
+    closeChapterOverlays();
+    var stats = chapterStats(p);
+    var cards = stats.cards.map(function (c) {
+      var b = c.status === "ready" ? "较完整" : (c.status === "draft" ? "草稿" : "空白");
+      var bc = c.status === "ready" ? "ok" : (c.status === "draft" ? "warn" : "muted");
+      return '<div class="chapter-card" onclick="openChapterEditor(\'' + c.key + '\')">' +
+        '<div class="chapter-card-top"><b>' + escapeHtml(c.title) + '</b><span class="chapter-badge ' + bc + '">' + b + '</span></div>' +
+        '<div class="chapter-card-meta">' + c.words + ' 字 · ' + (c.sections.length||0) + ' 小节' + (c.updatedAt ? ' · ' + formatTime(c.updatedAt) : '') + '</div>' +
+        '<div class="chapter-card-preview">' + escapeHtml((c.content||'小节：'+(c.sections.join('、')||'待补充')).slice(0,80)) + '</div>' +
+        '<div class="chapter-card-actions" onclick="event.stopPropagation()"><button class="ai-btn-clear" onclick="openChapterEditor(\''+c.key+'\')">编辑</button><button class="ai-btn-clear" onclick="seedChapterFromSections(\''+c.key+'\')">小节骨架</button></div>' +
+      '</div>';
+    }).join("");
+    var ov = document.createElement('div'); ov.id = 'chapterBoardOverlay'; ov.className = 'project-overlay';
+    ov.innerHTML = '<div class="project-modal chapter-board-modal" onclick="event.stopPropagation()">' +
+      '<div class="project-modal-head"><div><h3>分章草稿看板</h3><p>按大纲拆成章节卡片</p></div><button class="project-close" onclick="closeChapterOverlays()">×</button></div>' +
+      '<div class="project-progress-sub" style="margin-bottom:10px">完整 ' + stats.ready + '/' + stats.total + ' · ' + stats.words + ' 字</div>' +
+      '<div class="chapter-card-grid">' + cards + '</div>' +
+      '<div class="project-modal-actions"><button class="ai-btn-clear" onclick="openOutlineEditor()">调整大纲</button><button class="ai-btn-clear" onclick="closeChapterOverlays()">关闭</button><button class="ai-btn" onclick="closeChapterOverlays();switchModule(\'expand\')">去论文扩写</button></div></div>';
+    ov.onclick = function () { closeChapterOverlays(); };
+    document.body.appendChild(ov);
+  }
+  function closeChapterOverlays() {
+    ['chapterBoardOverlay','chapterEditorOverlay'].forEach(function(id){ var el=document.getElementById(id); if(el&&el.parentNode)el.parentNode.removeChild(el); });
+  }
+  function findChapterMeta(key) {
+    var p = getCurrentProject(); if (!p) return null;
+    var o = getOutline(); if (!o||!o.chapters) return null;
+    for (var i=0;i<o.chapters.length;i++) { var ch=o.chapters[i]; if (chapterKey(ch.title,i)===key) return {key:key,title:ch.title,sections:ch.sections||[],idx:i}; }
+    return null;
+  }
+  function openChapterEditor(key) {
+    var p=getCurrentProject(); if(!p){openIdeaWizard();return;}
+    var m=findChapterMeta(key); if(!m){alert("未找到该章节");return;}
+    closeChapterOverlays();
+    var d=getChapterDraft(key)||{content:"",status:"empty"};
+    var ov=document.createElement('div');ov.id='chapterEditorOverlay';ov.className='project-overlay';
+    ov.innerHTML='<div class="project-modal chapter-editor-modal" onclick="event.stopPropagation()">'+
+      '<div class="project-modal-head"><div><h3>写作：'+escapeHtml(m.title)+'</h3><p>先写骨架，再调用扩写细化。内容保存在当前项目。</p></div><button class="project-close" onclick="closeChapterOverlays()">×</button></div>'+
+      '<div class="project-form"><div class="chapter-sec-tags">'+(m.sections.length?m.sections.map(function(s){return'<span class="chapter-sec-tag">'+escapeHtml(s)+'</span>';}).join(''):'')+'</div>'+
+      '<label>本章草稿</label><textarea id="chapterContent" class="ai-textarea" style="height:320px;margin:0" placeholder="在这里写内容/提纲/论据要点..."></textarea></div>'+
+      '<div class="project-modal-actions"><button class="ai-btn-clear" onclick="seedChapterFromSections(\''+key+'\',true)">插入小节骨架</button><button class="ai-btn-clear" onclick="closeChapterOverlays()">取消</button><button class="ai-btn" onclick="saveChapterEditor(\''+key+'\')">保存本章</button></div></div>';
+    ov.onclick=function(){closeChapterOverlays();};
+    document.body.appendChild(ov);
+    document.getElementById('chapterContent').value=d.content||'';
+  }
+  function seedChapterFromSections(key,inEditor){
+    var m=findChapterMeta(key);if(!m)return;
+    var sk=m.title+'\\n\\n'+(m.sections||[]).map(function(s,i){return (i+1)+'. '+s+'\\n(在此补充论据、文献与分析)\\n';}).join('\\n');
+    if(inEditor){var ta=document.getElementById('chapterContent');if(!ta)return;if(ta.value&&ta.value.trim()){if(!confirm('已有内容，确认开头插入骨架？'))return;ta.value=sk+'\\n'+ta.value;}else ta.value=sk;return;}
+    var prev=getChapterDraft(key);
+    if(prev&&prev.content&&prev.content.trim()){if(!confirm('该章已有草稿，覆盖为骨架？'))return;}
+    saveChapterDraft(key,{title:m.title,sections:m.sections,content:sk,status:'draft'});
+    logSkillRun({moduleId:'chapter-seed',title:'生成章节骨架',summary:m.title});
+    closeChapterOverlays();openChapterBoard();
+    if(typeof ttp==='function')ttp('已生成骨架：'+m.title);
+  }
+  function saveChapterEditor(key){
+    var m=findChapterMeta(key);if(!m)return;
+    var ct=(document.getElementById('chapterContent').value||''),w=ct.replace(/\\s+/g,'').length;
+    saveChapterDraft(key,{title:m.title,sections:m.sections,content:ct,status:w<1?'empty':(w<300?'draft':'ready')});
+    logSkillRun({moduleId:'chapter-editor',title:'保存章节草稿',summary:m.title+' · '+w+' 字'});
+    closeChapterOverlays();renderProjectChrome();
+    if(typeof ttp==='function')ttp('已保存：'+m.title+'('+w+'字)');
+  }
+  window.openChapterBoard = openChapterBoard;
+  window.closeChapterOverlays = closeChapterOverlays;
+  window.openChapterEditor = openChapterEditor;
+  window.seedChapterFromSections = seedChapterFromSections;
+  window.saveChapterEditor = saveChapterEditor;
+
 })();
