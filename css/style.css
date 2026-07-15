@@ -901,7 +901,13 @@ body {
   white-space: nowrap;
 }
 .ai-btn:hover { background: var(--accent-dark); box-shadow: 0 4px 12px var(--accent-glow); }
-.ai-btn:active { transform: scale(0.98); }
+.ai-btn:disabled, .ai-btn-clear:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+.ai-btn:disabled:hover { background: var(--accent); }
 /* Secondary / clear button */
 .ai-btn-clear {
   padding: 12px 16px;
@@ -1282,7 +1288,7 @@ body {
 }
 
 /* ============================================================
-   DARK MODE — full dark theme with StyleKit colors
+   DARK MODE — tokens via body.dark + system preference
    ============================================================ */
 body.dark {
   --bg-app: #0f172a;
@@ -1305,29 +1311,6 @@ body.dark {
   --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
   --bg-topbar: rgba(15, 23, 42, 0.95);
 }
-body.dark .dash-card,
-body.dark .ref,
-body.dark .module-panel .finding { border-color: var(--border); }
-body.dark .thesis-box { background: var(--bg-card); }
-body.dark .thesis-bar { background: var(--bg-card); border-color: var(--border); }
-body.dark .ref-panel { background: var(--bg-card); }
-body.dark .kw-bar { background: var(--bg-card); }
-body.dark .dashboard { background: var(--bg-card); }
-body.dark .filters { background: var(--bg-card); }
-body.dark .filters input,
-body.dark .filters select { background: var(--bg-input); color: var(--text-primary); border-color: var(--border); }
-body.dark .upload-card { background: var(--bg-card); border-color: var(--border); }
-body.dark .upload-drop { background: var(--surface-alt); }
-body.dark .overlay .obox { background: var(--bg-card); border-color: var(--border); }
-body.dark .ch-head { background: var(--text-primary); }
-body.dark .sec-head { background: var(--surface-alt); }
-body.dark .sub-head { background: rgba(255, 255, 255, 0.02); }
-body.dark .ref-detail { background: var(--surface-alt); }
-body.dark .ref-actions { background: var(--surface-alt); }
-body.dark .ref-actions a,
-body.dark .ref-actions button { background: var(--bg-card); }
-body.dark #changelogPanel { background: var(--bg-card); border-color: var(--border); }
-
 @media (prefers-color-scheme: dark) {
   body:not(.light) {
     --bg-app: #0f172a;
@@ -1350,41 +1333,73 @@ body.dark #changelogPanel { background: var(--bg-card); border-color: var(--bord
     --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
     --bg-topbar: rgba(15, 23, 42, 0.95);
   }
-  body:not(.light) .dash-card,
-  body:not(.light) .ref,
-  body:not(.light) .module-panel .finding { border-color: var(--border); }
-  body:not(.light) .thesis-box { background: var(--bg-card); }
-  body:not(.light) .thesis-bar { background: var(--bg-card); border-color: var(--border); }
-  body:not(.light) .ref-panel { background: var(--bg-card); }
-  body:not(.light) .kw-bar { background: var(--bg-card); }
-  body:not(.light) .dashboard { background: var(--bg-card); }
-  body:not(.light) .filters { background: var(--bg-card); }
-  body:not(.light) .filters input,
-  body:not(.light) .filters select { background: var(--bg-input); color: var(--text-primary); border-color: var(--border); }
-  body:not(.light) .upload-card { background: var(--bg-card); border-color: var(--border); }
-  body:not(.light) .upload-drop { background: var(--surface-alt); }
-  body:not(.light) .overlay .obox { background: var(--bg-card); border-color: var(--border); }
-  body:not(.light) .ch-head { background: var(--text-primary); }
-  body:not(.light) .sec-head { background: var(--surface-alt); }
-  body:not(.light) .sub-head { background: rgba(255, 255, 255, 0.02); }
-  body:not(.light) .ref-detail { background: var(--surface-alt); }
-  body:not(.light) .ref-actions { background: var(--surface-alt); }
-  body:not(.light) .ref-actions a,
-  body:not(.light) .ref-actions button { background: var(--bg-card); }
-  body:not(.light) .bar { background: rgba(2, 6, 23, 0.95); }
-  body:not(.light) #changelogPanel { background: var(--bg-card); border-color: var(--border); }
 }
+/* Shared component overrides — tokens already switched above */
+body.dark .dash-card,
+body.dark .ref,
+body.dark .module-panel .finding,
+body:not(.light) .dash-card,
+body:not(.light) .ref,
+body:not(.light) .module-panel .finding { border-color: var(--border); }
+body.dark .thesis-box, body:not(.light) .thesis-box { background: var(--bg-card); }
+body.dark .thesis-bar, body:not(.light) .thesis-bar { background: var(--bg-card); border-color: var(--border); }
+body.dark .ref-panel, body:not(.light) .ref-panel { background: var(--bg-card); }
+body.dark .kw-bar, body:not(.light) .kw-bar { background: var(--bg-card); }
+body.dark .dashboard, body:not(.light) .dashboard { background: var(--bg-card); }
+body.dark .filters, body:not(.light) .filters { background: var(--bg-card); }
+body.dark .filters input, body.dark .filters select,
+body:not(.light) .filters input, body:not(.light) .filters select { background: var(--bg-input); color: var(--text-primary); border-color: var(--border); }
+body.dark .upload-card, body:not(.light) .upload-card { background: var(--bg-card); border-color: var(--border); }
+body.dark .upload-drop, body:not(.light) .upload-drop { background: var(--surface-alt); }
+body.dark .overlay .obox, body:not(.light) .overlay .obox { background: var(--bg-card); border-color: var(--border); }
+body.dark .ch-head, body:not(.light) .ch-head { background: var(--text-primary); }
+body.dark .sec-head, body:not(.light) .sec-head { background: var(--surface-alt); }
+body.dark .sub-head, body:not(.light) .sub-head { background: rgba(255, 255, 255, 0.02); }
+body.dark .ref-detail, body:not(.light) .ref-detail { background: var(--surface-alt); }
+body.dark .ref-actions, body:not(.light) .ref-actions { background: var(--surface-alt); }
+body.dark .ref-actions a, body.dark .ref-actions button,
+body:not(.light) .ref-actions a, body:not(.light) .ref-actions button { background: var(--bg-card); }
+body.dark #changelogPanel, body:not(.light) #changelogPanel { background: var(--bg-card); border-color: var(--border); }
+body.dark .bar, body:not(.light) .bar { background: rgba(2, 6, 23, 0.95); }
 
 /* ============================================================
    RESPONSIVE
    ============================================================ */
+@media (max-width: 1024px) {
+  .ref-panel { width: 380px; min-width: 280px; }
+  .landing-container { gap: 32px; padding: 0 24px; }
+  .landing-title { font-size: 2.2rem; }
+}
 @media (max-width: 768px) {
-  .nav-sidebar { width: 60px; min-width: 60px; }
+  .nav-sidebar { width: 56px; min-width: 56px; }
   .nav-sidebar h3,
   .nav-group-title span:not(.nav-group-arrow),
   .nav-item,
   .nav-upload-btn span { display: none; }
-  .ref-panel { width: 100%; min-width: 0; }
+  .nav-group-title { justify-content: center; padding: 8px 4px; }
+  .nav-group-arrow { display: none; }
+  .ref-panel { display: none; } /* hide right panel on mobile, use full width */
+  .thesis-panel { width: 100%; }
+  .bar-tabs { display: none; }
+  .bar-left h1 { font-size: 0.85rem; }
+  .landing-container { flex-direction: column; padding: 24px 16px; gap: 24px; padding-top: 6vh; }
+  .landing-title { font-size: 1.8rem; }
+  .landing-desc { font-size: 0.8rem; }
+  .landing-login { width: 100%; }
+  .landing-features { gap: 0; }
+  .feature-item { padding: 8px 10px; }
+  .ai-input-row { flex-direction: column; }
+  .ai-actions { flex-direction: column; }
+  .module-panel { padding: 12px; }
+  .dash-row { flex-wrap: wrap; }
+  .dash-item { min-width: 80px; }
+  .help-btn { bottom: 16px; right: 16px; width: 40px; height: 40px; }
+}
+@media (max-width: 480px) {
+  .landing-title { font-size: 1.5rem; }
+  .bar { padding: 0 8px; }
+  .bar-left h1 { font-size: 0.75rem; }
+  .thesis-bar { flex-wrap: wrap; gap: 4px; }
 }
 
 /* ============================================================

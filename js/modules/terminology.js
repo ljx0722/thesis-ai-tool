@@ -43,7 +43,7 @@ function runTerminology(container) {
 
   if(typeof updLoad==='function')updLoad('检测术语演变...',55);
   h+='<h4>🔄 术语演变检测</h4>';
-  var bodyChs3=(sections||[]).filter(function(s){return!/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name)});
+  var bodyChs3=(sections||[]).filter(isBodyChapter);
   var evolveIssues=0;
   var trackPairs=[{a:'机器学习',b:'机械学习'},{a:'深度学习',b:'深层学习'},{a:'特征提取',b:'特征抽取'},{a:'数据预处理',b:'数据预处理'}];
   trackPairs.forEach(function(p){

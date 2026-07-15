@@ -11,7 +11,7 @@ function runOptimization(container) {
   }
   if(typeof updLoad==='function')updLoad('统计字数...',15);
 
-  var bodyChs = secs.filter(function(s) { return !/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name); });
+  var bodyChs = secs.filter(isBodyChapter);
   var totalChars = text.length;
 
   if(typeof updLoad==='function')updLoad('分析结构...',35);
@@ -43,7 +43,7 @@ function runOptimization(container) {
   // Structure
   if(typeof updLoad==='function')updLoad('结构诊断...',50);
   h += "<h4>📋 目录结构对比</h4>";
-  var bodyChs5=(sections||[]).filter(function(s){return!/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name)});
+  var bodyChs5=(sections||[]).filter(isBodyChapter);
   var standardStruct=["绪论/引言","文献综述/理论","研究方法/设计","实证/调研/分析","结论/对策/建议"];
   var matched=0;
   standardStruct.forEach(function(p){

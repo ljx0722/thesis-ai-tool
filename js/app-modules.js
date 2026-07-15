@@ -3,6 +3,11 @@
  * 模块标签顶栏 / 操作按钮顶栏 / 键盘快捷键 / 换论文 / 悬浮上传
  */
 
+// 共享工具：过滤附录/致谢等非正文章节
+function isBodyChapter(s) {
+  return !/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name || '');
+}
+
 // ==================== 模块清单 ====================
 // requiresThesis: 是否需要先上传论文才能使用
 // aiDriven: 是否调用 AI 大模型（消耗点数）
@@ -62,16 +67,6 @@ function updateNavStates() {
 }
 
 // Block clicks on disabled nav items
-document.addEventListener('click', function(e) {
-  var navItem = e.target.closest('.nav-item.disabled');
-  if (navItem) {
-    e.preventDefault();
-    e.stopPropagation();
-    ttp('📎 请先上传论文');
-  }
-}, true);
-
-// Handle disabled nav items
 document.addEventListener('click', function(e) {
   var navItem = e.target.closest('.nav-item.disabled');
   if (navItem) {
@@ -191,12 +186,10 @@ function renderModuleTabs() {
 
 function updateBarActions() {
   _thesisLoaded = !!(typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100);
-  ['baSearch', 'baVerify', 'baCopy', 'baBib', 'baDOI'].forEach(function(id) {
+  ['baSearch', 'baVerify'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) { if (_thesisLoaded) el.removeAttribute('disabled'); else el.setAttribute('disabled', ''); }
   });
-  var dbBtn = document.getElementById('dashboardBtn');
-  if (dbBtn) { if (_thesisLoaded) dbBtn.removeAttribute('disabled'); else dbBtn.setAttribute('disabled', ''); }
 }
 
 function resetSearch() {
@@ -451,7 +444,7 @@ function runExpandModule(container) {
   if (!(typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100)) {
     container.innerHTML = '<div style="text-align:center;padding:40px;color:#9ca3af">请先上传论文</div>';return;
   }
-  var bodyChs=(sections||[]).filter(function(s){return!/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name)});
+  var bodyChs=(sections||[]).filter(isBodyChapter);
   container.innerHTML = '<div class="module-panel">'+
     '<h4>✍️ 论文扩写建议</h4>'+
     '<div style="padding:12px;background:rgba(0,113,227,.05);border-radius:8px;margin-bottom:12px;font-size:.75rem;color:#555">论文扩写模块帮助从大纲逐步填充完整论文。当前状态监测后给出各章节扩写建议。</div>'+
@@ -520,6 +513,44 @@ function analyzeCSV(f,container){
     h+='<div class="dash-item"><div class="dv">'+rows.length+'</div><div class="dl">观测值</div></div>';
     h+='</div>';
 
+    // Identify numeric columns for correlation / scatter
+    var numCols=[];
+    headers.forEach(function(hdr){
+      var vals=rows.map(function(r){return r[hdr];}).filter(function(v){return v!=='';});
+      var nums=vals.map(function(v){var n=parseFloat(v);return isNaN(n)?null:n;}).filter(function(n){return n!==null;});
+      if(nums.length>vals.length*0.7 && nums.length>=3) numCols.push({name:hdr, values:nums});
+    });
+
+    // Correlation matrix for numeric columns (up to 6)
+    if(numCols.length>=2){
+      var nShow=Math.min(6, numCols.length);
+      h+='<h4>🔗 相关性矩阵（Pearson）</h4>';
+      h+='<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:.68rem;min-width:280px">';
+      h+='<tr><th style="padding:4px 8px;border:1px solid var(--border);background:var(--surface-alt)"></th>';
+      for(var ci=0;ci<nShow;ci++) h+='<th style="padding:4px 8px;border:1px solid var(--border);background:var(--surface-alt);max-width:70px;overflow:hidden;text-overflow:ellipsis" title="'+numCols[ci].name+'">'+numCols[ci].name.substring(0,8)+'</th>';
+      h+='</tr>';
+      for(var i=0;i<nShow;i++){
+        h+='<tr><th style="padding:4px 8px;border:1px solid var(--border);background:var(--surface-alt);text-align:left">'+numCols[i].name.substring(0,10)+'</th>';
+        for(var j=0;j<nShow;j++){
+          var r=pearsonCorr(numCols[i].values, numCols[j].values);
+          var bg=corrColor(r);
+          h+='<td style="padding:4px 8px;border:1px solid var(--border);text-align:center;background:'+bg+';font-family:var(--font-mono)">'+(i===j?'1.00':r.toFixed(2))+'</td>';
+        }
+        h+='</tr>';
+      }
+      h+='</table></div>';
+      // Scatter of strongest |r| pair (non-diagonal)
+      var best={abs:0,i:0,j:1};
+      for(var i=0;i<nShow;i++) for(var j=i+1;j<nShow;j++){
+        var rr=Math.abs(pearsonCorr(numCols[i].values,numCols[j].values));
+        if(rr>best.abs) best={abs:rr,i:i,j:j};
+      }
+      if(best.abs>0.05){
+        h+='<h4>📈 散点图（最强相关: '+numCols[best.i].name+' × '+numCols[best.j].name+', r='+pearsonCorr(numCols[best.i].values,numCols[best.j].values).toFixed(2)+'）</h4>';
+        h+='<canvas id="chartScatter0" width="600" height="220" style="width:100%;max-width:600px;height:220px;border-radius:6px;background:rgba(255,255,255,0.03)"></canvas>';
+      }
+    }
+
     // Per-column analysis with charts
     h+='<h4>📋 变量分析</h4>';
     var chartIdx = 0;
@@ -546,6 +577,7 @@ function analyzeCSV(f,container){
         h+='<span>最大值 <b style="color:var(--text-primary)">'+max.toFixed(2)+'</b></span>';
         h+='</div>';
         h+='<canvas id="chartHist'+chartIdx+'" width="600" height="160" style="width:100%;max-width:600px;height:160px;border-radius:6px;background:rgba(255,255,255,0.03)"></canvas>';
+        h+='<canvas id="chartBox'+chartIdx+'" width="600" height="120" style="width:100%;max-width:600px;height:120px;border-radius:6px;background:rgba(255,255,255,0.03);margin-top:6px"></canvas>';
         h+='</div>';
         chartIdx++;
       } else {
@@ -571,6 +603,17 @@ function analyzeCSV(f,container){
     // Draw charts after DOM is ready
     setTimeout(function(){
       var ci=0;
+      // scatter first if present
+      if(numCols.length>=2){
+        var nShow=Math.min(6, numCols.length);
+        var best={abs:0,i:0,j:1};
+        for(var i=0;i<nShow;i++) for(var j=i+1;j<nShow;j++){
+          var rr=Math.abs(pearsonCorr(numCols[i].values,numCols[j].values));
+          if(rr>best.abs) best={abs:rr,i:i,j:j};
+        }
+        var sc=document.getElementById('chartScatter0');
+        if(sc && best.abs>0.05) drawScatter(sc, numCols[best.i].values, numCols[best.j].values, numCols[best.i].name, numCols[best.j].name);
+      }
       headers.forEach(function(hdr){
         var vals=rows.map(function(r){return r[hdr];}).filter(function(v){return v!=='';});
         var nums=vals.map(function(v){var n=parseFloat(v);return isNaN(n)?null:n;}).filter(function(n){return n!==null;});
@@ -579,6 +622,9 @@ function analyzeCSV(f,container){
         if(isNum){
           var canvas=document.getElementById('chartHist'+ci);
           if(canvas) drawHistogram(canvas, nums, hdr);
+          // boxplot for numeric
+          var boxC=document.getElementById('chartBox'+ci);
+          if(boxC) drawBoxPlot(boxC, nums, hdr);
           ci++;
         } else {
           var uVals={}; vals.forEach(function(v){uVals[v]=(uVals[v]||0)+1;});
@@ -591,6 +637,79 @@ function analyzeCSV(f,container){
     },50);
   };
   reader.readAsText(f);
+}
+
+function pearsonCorr(a,b){
+  var n=Math.min(a.length,b.length); if(n<2) return 0;
+  var sa=0,sb=0,sab=0,sa2=0,sb2=0;
+  for(var i=0;i<n;i++){ sa+=a[i]; sb+=b[i]; sab+=a[i]*b[i]; sa2+=a[i]*a[i]; sb2+=b[i]*b[i]; }
+  var den=Math.sqrt((n*sa2-sa*sa)*(n*sb2-sb*sb));
+  if(!den) return 0;
+  return (n*sab-sa*sb)/den;
+}
+function corrColor(r){
+  var a=Math.min(1, Math.abs(r));
+  if(r>=0) return 'rgba(99,102,241,'+(0.08+a*0.45).toFixed(2)+')';
+  return 'rgba(239,68,68,'+(0.08+a*0.45).toFixed(2)+')';
+}
+function drawScatter(canvas, xs, ys, xl, yl){
+  var dpr=window.devicePixelRatio||1;
+  var W=canvas.clientWidth||600, H=canvas.clientHeight||220;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  var ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+  var n=Math.min(xs.length,ys.length);
+  var xmin=Math.min.apply(null,xs), xmax=Math.max.apply(null,xs);
+  var ymin=Math.min.apply(null,ys), ymax=Math.max.apply(null,ys);
+  if(xmin===xmax){xmin-=1;xmax+=1;} if(ymin===ymax){ymin-=1;ymax+=1;}
+  var pad={top:12,right:12,bottom:28,left:44};
+  var pw=W-pad.left-pad.right, ph=H-pad.top-pad.bottom;
+  ctx.fillStyle='rgba(255,255,255,0.015)'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.strokeRect(pad.left,pad.top,pw,ph);
+  ctx.fillStyle='#6366f1';
+  for(var i=0;i<n;i++){
+    var x=pad.left+((xs[i]-xmin)/(xmax-xmin))*pw;
+    var y=pad.top+ph-((ys[i]-ymin)/(ymax-ymin))*ph;
+    ctx.globalAlpha=0.65; ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.font='10px sans-serif'; ctx.textAlign='center';
+  ctx.fillText(xl+' →', pad.left+pw/2, H-6);
+  ctx.save(); ctx.translate(12, pad.top+ph/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText(yl, 0, 0); ctx.restore();
+}
+function drawBoxPlot(canvas, values, label){
+  if(!values||values.length<3) return;
+  var dpr=window.devicePixelRatio||1;
+  var W=canvas.clientWidth||600, H=canvas.clientHeight||120;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  var ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+  var sorted=values.slice().sort(function(a,b){return a-b;});
+  function q(p){ var i=(sorted.length-1)*p; var lo=Math.floor(i), hi=Math.ceil(i); return sorted[lo]+(sorted[hi]-sorted[lo])*(i-lo); }
+  var q1=q(0.25), med=q(0.5), q3=q(0.75), iqr=q3-q1;
+  var lo=Math.max(sorted[0], q1-1.5*iqr), hi=Math.min(sorted[sorted.length-1], q3+1.5*iqr);
+  var min=sorted[0], max=sorted[sorted.length-1];
+  var pad={top:16,right:16,bottom:24,left:50};
+  var pw=W-pad.left-pad.right, ph=H-pad.top-pad.bottom;
+  function xOf(v){ return pad.left+((v-min)/Math.max(1e-9,max-min))*pw; }
+  ctx.fillStyle='rgba(255,255,255,0.015)'; ctx.fillRect(0,0,W,H);
+  var midY=pad.top+ph/2;
+  // whisker
+  ctx.strokeStyle='#818cf8'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(xOf(lo), midY); ctx.lineTo(xOf(hi), midY); ctx.stroke();
+  // box
+  ctx.fillStyle='rgba(99,102,241,0.25)'; ctx.strokeStyle='#6366f1';
+  ctx.fillRect(xOf(q1), midY-16, xOf(q3)-xOf(q1), 32);
+  ctx.strokeRect(xOf(q1), midY-16, xOf(q3)-xOf(q1), 32);
+  // median
+  ctx.beginPath(); ctx.moveTo(xOf(med), midY-16); ctx.lineTo(xOf(med), midY+16); ctx.stroke();
+  // whisker caps
+  ctx.beginPath(); ctx.moveTo(xOf(lo), midY-10); ctx.lineTo(xOf(lo), midY+10);
+  ctx.moveTo(xOf(hi), midY-10); ctx.lineTo(xOf(hi), midY+10); ctx.stroke();
+  // outliers
+  ctx.fillStyle='#f59e0b';
+  sorted.forEach(function(v){ if(v<lo||v>hi){ ctx.beginPath(); ctx.arc(xOf(v), midY, 2.5, 0, Math.PI*2); ctx.fill(); }});
+  ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.font='10px sans-serif'; ctx.textAlign='center';
+  ctx.fillText(label+' 箱线图  Q1='+q1.toFixed(2)+'  M='+med.toFixed(2)+'  Q3='+q3.toFixed(2), pad.left+pw/2, H-6);
 }
 
 // Simple histogram for numeric data

@@ -64,7 +64,7 @@ function runParagraphAnalysis(container) {
   if(typeof updLoad==='function')updLoad('检测过渡词...',65);
 
   // === 可读性评分 ===
-  var bc4=(sections||[]).filter(function(s){return!/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name)});
+  var bc4=(sections||[]).filter(isBodyChapter);
 
   if(typeof updLoad==='function')updLoad('计算可读性...',75);
   h += '<h4>📊 引用密度分布</h4>';

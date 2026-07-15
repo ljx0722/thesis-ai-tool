@@ -41,7 +41,7 @@ function computeAllScores() {
   var dimScores = { struct:60, literature:45, format:70, readable:60, method:55, content:50, innovation:40, terminology:65, conclusion:55, practical:55 };
   var text = manuscriptText || '';
   var secs = sections || [];
-  var bodyChs = secs.filter(function(s) { return !/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name); });
+  var bodyChs = secs.filter(isBodyChapter);
   var rl = (typeof mergedRefs !== 'undefined' && mergedRefs.length) ? mergedRefs : (typeof existingRefs !== 'undefined' ? existingRefs : []);
   var totalChars = text.length;
   var cnRefs = rl.filter(function(r) { return /[一-鿿]/.test((r.title||r.ci||'').substring(0,5)); }).length;
@@ -336,10 +336,111 @@ function drawChapterChart() {
 }
 
 function drawScoreBars() {
-  // No separate canvas needed — bars are already inline in HTML
+  // Bars are already rendered as HTML soccer-stat cards in buildDashboardHTML
 }
 function drawLitPie() {
-  // Placeholder for future pie chart
+  // Inject a simple literature composition chart into the dashboard stats area
+  var s = window._dbScores;
+  if (!s || !s.totalRefs) return;
+  var host = document.getElementById('dbContent');
+  if (!host || document.getElementById('dbLitPie')) return;
+  var wrap = document.createElement('div');
+  wrap.id = 'dbLitPie';
+  wrap.style.cssText = 'background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.04);padding:14px;margin-top:12px';
+  wrap.innerHTML = '<div style="font-size:.7rem;font-weight:600;color:#1d1d1f;margin-bottom:8px">📚 文献构成</div>' +
+    '<canvas id="dbLitPieCanvas" width="260" height="160" style="width:100%;max-width:280px;height:160px"></canvas>' +
+    '<div style="display:flex;gap:12px;font-size:.62rem;color:#86868b;margin-top:6px;flex-wrap:wrap">' +
+    '<span><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#6366f1;margin-right:4px"></i>中文 '+s.cnRefs+'</span>' +
+    '<span><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#22d3ee;margin-right:4px"></i>英文 '+s.enRefs+'</span>' +
+    '<span><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#34d399;margin-right:4px"></i>近5年 '+s.recentRate+'%</span>' +
+    '</div>';
+  // Prefer left column if present
+  var leftCol = host.querySelector('div[style*="width:290px"]');
+  if (leftCol) leftCol.appendChild(wrap); else host.appendChild(wrap);
+  var canvas = document.getElementById('dbLitPieCanvas');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  var cx = 80, cy = H/2, r = 55;
+  var total = Math.max(1, s.totalRefs);
+  var slices = [
+    {v:s.cnRefs, c:'#6366f1'},
+    {v:s.enRefs, c:'#22d3ee'}
+  ];
+  var start = -Math.PI/2;
+  slices.forEach(function(sl){
+    var ang = (sl.v/total)*Math.PI*2;
+    ctx.beginPath(); ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,r,start,start+ang); ctx.closePath();
+    ctx.fillStyle = sl.c; ctx.fill();
+    start += ang;
+  });
+  // hole
+  ctx.beginPath(); ctx.arc(cx,cy,r*0.55,0,Math.PI*2);
+  ctx.fillStyle = '#fff'; ctx.fill();
+  ctx.fillStyle = '#1d1d1f'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(s.totalRefs+'', cx, cy+2);
+  ctx.font = '10px sans-serif'; ctx.fillStyle = '#86868b';
+  ctx.fillText('总文献', cx, cy+16);
+}
+
+function exportDashboardReport() {
+  var s = window._dbScores || (typeof computeAllScores === 'function' ? computeAllScores() : null);
+  if (!s) { alert('请先打开论文看板生成评估数据'); return; }
+  var dims = [
+    ['选题价值', s.dimScores.innovation+5||45],
+    ['文献综述', s.dimScores.literature],
+    ['框架结构', s.dimScores.struct],
+    ['研究方法', s.dimScores.method],
+    ['内容论证', s.dimScores.content],
+    ['结论展望', s.dimScores.conclusion||55],
+    ['创新性', s.dimScores.innovation],
+    ['学术写作', s.dimScores.readable],
+    ['格式规范', s.dimScores.format],
+    ['实践价值', s.dimScores.practical||55]
+  ];
+  var lines = [];
+  lines.push('学术论文AI一站式助手 — 论文评估报告');
+  lines.push('生成时间: ' + new Date().toLocaleString());
+  lines.push('');
+  lines.push('=== 综合评分 ===');
+  lines.push('总分: ' + s.composite + ' / 100');
+  lines.push('等级: ' + s.grade);
+  lines.push('');
+  lines.push('=== 十维得分 ===');
+  dims.forEach(function(d){ lines.push(d[0] + ': ' + d[1]); });
+  lines.push('');
+  lines.push('=== 基础统计 ===');
+  lines.push('总字数: ' + Math.round(s.totalChars/1000) + 'k');
+  lines.push('正文章节: ' + s.chapters);
+  lines.push('小节数: ' + s.sections);
+  lines.push('参考文献: ' + s.totalRefs + ' (中文 ' + s.cnRefs + ' / 英文 ' + s.enRefs + ')');
+  lines.push('近五年文献占比: ' + s.recentRate + '%');
+  lines.push('DOI覆盖率: ' + s.doiRate + '%');
+  lines.push('图表数量: ' + s.figCount);
+  lines.push('平均句长: ' + s.avgSentLen);
+  lines.push('被动语态密度: ' + s.passiveDens + '/千字');
+  lines.push('研究方法: ' + (s.methods.length ? s.methods.join('、') : '未检测到'));
+  lines.push('');
+  lines.push('=== 优先改进建议 ===');
+  var suggestions = [];
+  if (s.totalRefs < 15) suggestions.push('参考文献仅 ' + s.totalRefs + ' 条，建议补充至 30-50 条');
+  if (s.enRate < 25) suggestions.push('英文文献占比 ' + s.enRate + '%，建议提升至 ≥30%');
+  if (s.structCompleteness < 4) suggestions.push('标准结构完整度 ' + s.structCompleteness + '/5，建议补齐缺失章节');
+  if (s.figCount < 3 && s.totalChars > 20000) suggestions.push('图表偏少，建议增加数据可视化');
+  if (s.avgSentLen > 50) suggestions.push('平均句长偏高，建议控制在 25-35 字');
+  if (!suggestions.length) suggestions.push('整体质量良好，建议继续在各模块中精修细节');
+  suggestions.forEach(function(t,i){ lines.push((i+1) + '. ' + t); });
+  lines.push('');
+  lines.push('（本报告由本地分析模块自动生成，仅供写作参考）');
+
+  var blob = new Blob([lines.join('\n')], {type:'text/plain;charset=utf-8'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '论文评估报告_' + new Date().toISOString().slice(0,10) + '.txt';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+  if (typeof ttp === 'function') ttp('评估报告已导出');
 }
 
 function showReviewInDashboard() {

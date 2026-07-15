@@ -13,7 +13,7 @@ function runFormatCheck(container) {
   }
   if(typeof updLoad==='function')updLoad('数据统计...',15);
 
-  var bodyChs = secs.filter(function(s) { return !/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name); });
+  var bodyChs = secs.filter(isBodyChapter);
   var issues = { errors: [], warnings: [], ok: [] };
   var stats = {};
 
@@ -190,7 +190,7 @@ function runFormatCheck(container) {
 
   // 结论与展望检查
   h += '<h4>\ud83c\udfc1 结论与展望</h4>';
-  var bodyChs2 = secs.filter(function(s) { return !/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name); });
+  var bodyChs2 = secs.filter(isBodyChapter);
   var lastCh2=bodyChs2[bodyChs2.length-1];
   if(lastCh2&&/结论|结语|总结|展望|对策|建议/.test(lastCh2.name)){
     var lct=(lastCh2.text||'').length;

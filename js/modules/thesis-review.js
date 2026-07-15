@@ -8,7 +8,7 @@ var thesisReview = null;
 function computeThesisReview() {
   var text = manuscriptText || '';
   var secs = sections || [];
-  var bodyChs = secs.filter(function(s) { return !/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name); });
+  var bodyChs = secs.filter(isBodyChapter);
   var rl = (typeof mergedRefs !== 'undefined' && mergedRefs.length) ? mergedRefs : (typeof existingRefs !== 'undefined' ? existingRefs : []);
   var totalChars = text.length;
   var cnRefs = rl.filter(function(r) { return /[一-鿿]/.test((r.title || r.ci || '').substring(0, 5)); }).length;

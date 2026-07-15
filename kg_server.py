@@ -132,8 +132,38 @@ def init_db():
 init_db()
 
 # ========== 认证工具 ==========
-JWT_SECRET = os.environ.get('JWT_SECRET', secrets.token_hex(32))
+# JWT_SECRET 持久化到磁盘，避免重启后所有用户掉线
+_JWT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', '.jwt_secret')
+def _load_jwt_secret():
+    env = os.environ.get('JWT_SECRET')
+    if env: return env
+    try:
+        if os.path.exists(_JWT_FILE):
+            with open(_JWT_FILE, 'r') as f:
+                s = f.read().strip()
+                if s: return s
+    except: pass
+    s = secrets.token_hex(32)
+    try:
+        os.makedirs(os.path.dirname(_JWT_FILE), exist_ok=True)
+        with open(_JWT_FILE, 'w') as f: f.write(s)
+    except: pass
+    return s
+JWT_SECRET = _load_jwt_secret()
 TOKEN_EXPIRE_DAYS = 30
+
+# 简单内存速率限制（IP → [timestamps]）
+_rate_buckets = {}
+def _check_rate(key, max_calls=30, window_sec=60):
+    """Return True if under limit, False if rate-limited"""
+    now = time.time()
+    bucket = _rate_buckets.setdefault(key, [])
+    # purge old
+    _rate_buckets[key] = [t for t in bucket if now - t < window_sec]
+    if len(_rate_buckets[key]) >= max_calls:
+        return False
+    _rate_buckets[key].append(now)
+    return True
 
 def hash_password(password):
     salt = secrets.token_bytes(32)
@@ -181,6 +211,10 @@ DEEPSEEK_INPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_INPUT_PRICE', '1.0'
 DEEPSEEK_OUTPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_OUTPUT_PRICE', '2.0'))
 USER_MARKUP = 2.0
 ADMIN_SECRET = os.environ.get('ADMIN_SECRET', 'admin123')
+if ADMIN_SECRET == 'admin123' and os.environ.get('FLASK_ENV') == 'production':
+    print('[WARN] ADMIN_SECRET 仍为默认 admin123，生产环境请设置环境变量 ADMIN_SECRET')
+if not os.environ.get('ADMIN_SECRET'):
+    print('[INFO] ADMIN_SECRET 使用默认值 admin123（开发模式）。生产请设置环境变量。')
 
 
 # ========== 文件服务 ==========
@@ -548,7 +582,7 @@ def search_baidu_xueshu(query, max_rows=80):
 # ========== 统一检索 API ==========
 @app.route('/ping', methods=['GET'])
 def ping():
-    return jsonify({'ok': True, 'service': '论文文献AI利器', 'sources': ['OpenAlex','Crossref','Semantic Scholar','EuropePMC','百度学术','CNKI']})
+    return jsonify({'ok': True, 'service': '论文文献AI利器', 'sources': ['OpenAlex','OpenAlex-CN','Crossref','Semantic Scholar','arXiv','PubMed','CORE','DOAJ','EuropePMC','CNKI','百度学术']})
 
 def _run_source(fn, *args):
     """Thread-safe wrapper: 在线程池中安全调用搜索函数"""
@@ -568,12 +602,14 @@ def search_api():
             if not q.strip(): continue
             is_cn = bool(re.search(r'[一-鿿]', q))
 
-            # 每个词只查3个最快源 + 新增源
+            # 每个词只查核心源 + 学术源
             for source_fn in [
                 lambda: fetch_with_retry(search_openalex, q, min(max_per, 100)),
                 lambda: search_crossref(q, 50),
                 lambda: search_semantic_scholar(q, 50),
                 lambda: search_europepmc(q, 40),
+                lambda: search_arxiv(q, 30),
+                lambda: search_pubmed(q, 30),
             ]:
                 try: all_results.extend(source_fn() or [])
                 except: pass
@@ -584,6 +620,12 @@ def search_api():
                 try: all_results.extend(search_cnki(q, 30) or [])
                 except: pass
                 try: all_results.extend(search_openalex_cn(q, 50) or [])
+                except: pass
+            else:
+                # 英文额外源
+                try: all_results.extend(search_core(q, 30) or [])
+                except: pass
+                try: all_results.extend(search_doaj(q, 20) or [])
                 except: pass
 
         all_results = dedup_results(all_results)
@@ -971,6 +1013,10 @@ def auth_register():
 
 @app.route('/api/auth/login', methods=['POST'])
 def auth_login():
+    # 速率限制：每 IP 每分钟最多 10 次登录尝试
+    ip = request.remote_addr or 'unknown'
+    if not _check_rate('login:'+ip, max_calls=10, window_sec=60):
+        return jsonify({'success': False, 'error': '登录尝试过于频繁，请稍后再试'}), 429
     data = request.get_json() or {}
     username = (data.get('username') or '').strip()
     password = data.get('password') or ''
@@ -1218,6 +1264,10 @@ def llm_analyze():
     """LLM 分析：先估算费用检查余额 → 调用 DeepSeek → 按实际 token 成本 ×2 扣点
     计费公式：DeepSeek 实际花费 N 元 → 扣用户 ceil(2N) 点（最低 1 点）
     DeepSeek 定价：输入 1元/百万token，输出 2元/百万token"""
+    # 速率限制：每用户每分钟最多 20 次 LLM 调用
+    uid = getattr(request, 'user_id', None) or request.remote_addr or 'unknown'
+    if not _check_rate('llm:'+str(uid), max_calls=20, window_sec=60):
+        return jsonify({'success': False, 'error': 'AI 调用过于频繁，请稍后再试'}), 429
     if not DEEPSEEK_API_KEY:
         return jsonify({'success': False, 'error': 'LLM服务未配置'}), 503
     data = request.get_json() or {}
