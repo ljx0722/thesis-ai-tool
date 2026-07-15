@@ -41,3 +41,9 @@
 - Backend: Flask + Gunicorn (kg_server.py)
 - Visualization: 原生 SVG + Canvas (无D3/ECharts)
 - Project state: localStorage (`thesis_ai_projects_v1`)
+
+
+## Roadmap Status
+- Phase 1: project model / idea wizard / stages
+- Phase 2: outline + chapter drafts + export + templates + versions + tips
+- Next: chapter compare UI, evidence-linked writing, DOCX export with styles

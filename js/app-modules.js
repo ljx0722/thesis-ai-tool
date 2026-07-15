@@ -449,6 +449,23 @@ function runReviewModule(container) {
 }
 
 function runExpandModule(container) {
+  // Project-aware chapter draft summary
+  try{
+    if(window.ThesisProject && typeof ThesisProject.listChapterCards==='function'){
+      var p=ThesisProject.getCurrentProject && ThesisProject.getCurrentProject();
+      if(p){
+        var cards=ThesisProject.listChapterCards(p)||[];
+        if(cards.length){
+          var sum=cards.map(function(c){return c.title+'('+c.words+'字)';}).join(' · ');
+          var banner=document.createElement('div');
+          banner.className='ai-desc';
+          banner.innerHTML='当前项目分章草稿：'+sum+' <button class="ai-btn-clear" style="margin-left:8px" onclick="openChapterBoard()">打开分章看板</button>';
+          // prepend later after container filled by original function body via timeout
+          setTimeout(function(){ if(container && container.firstChild) container.insertBefore(banner, container.firstChild); else if(container) container.appendChild(banner); },0);
+        }
+      }
+    }
+  }catch(e){}
   if (!(typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100)) {
     container.innerHTML = '<div style="text-align:center;padding:40px;color:#9ca3af">请先上传论文</div>';return;
   }

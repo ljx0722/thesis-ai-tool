@@ -179,29 +179,31 @@ function scrollToRef(n){var el=document.getElementById('r'+(n-1))||document.getE
 function renderNavTree(tree){
   var c=document.getElementById('navTree');
   var meta=document.getElementById('navTreeMeta');
+  if(!c)return;
   if(!tree||!tree.length){
-    c.innerHTML='<i style="color:rgba(255,255,255,.25);font-size:.65rem;padding:8px;display:block">未检测到章节</i>';
-    if(meta)meta.style.display='none';
+    c.innerHTML='<i style="color:rgba(255,255,255,.25);font-size:.65rem;padding:8px;display:block">未检测到章节，可在标题校准中指定</i>';
+    if(meta){meta.style.display='none';}
     return;
   }
-  var h='',idx=0;var chCount=0,secCount=0,subCount=0;
+  var h='',idx=0,chN=0,secN=0,subN=0;
   function rnr(nodes,level){
     for(var i=0;i<nodes.length;i++){
-      var n=nodes[i];var cls=level===0?'ch':(level===1?'sec':'sub');
-      var numId=(n.num||'').replace(/[.]/g,'-');
+      var n=nodes[i];
+      var cls=level===0?'ch':(level===1?'sec':'sub');
+      if(level===0)chN++; else if(level===1)secN++; else subN++;
+      var numId=(n.num||'').toString().replace(/[.]/g,'-');
       var id=level===0?('ch-'+n.ch):((level===1?'sec-':'sub-')+numId);
-      var label=level===0?n.name:((n.num||'')+' '+(n.title||''));
-      var padLeft=level>=2?32:(level===1?20:10);
-      if(level===0)chCount++;else if(level===1)secCount++;else subCount++;
-      h+='<div class="tree-node '+cls+'" data-idx="'+(idx++)+'" data-id="'+id+'" onclick="navClick2(this)" style="padding-left:'+padLeft+'px" title="'+label.replace(/"/g,'&quot;')+'">'+label+'</div>';
-      var kids=n.sections||n.subs||[];if(kids.length)rnr(kids,level+1);
+      var label=level===0?(n.name||('第'+n.ch+'章')):(((n.num||'')+' '+(n.title||'')).trim());
+      var padLeft=level===0?8:(level===1?18:30);
+      h+='<div class="tree-node '+cls+'" data-idx="'+(idx++)+'" data-id="'+id+'" onclick="navClick2(this)" style="padding-left:'+padLeft+'px" title="'+String(label).replace(/"/g,'&quot;')+'">'+label+'</div>';
+      var kids=n.sections||n.subs||[];
+      if(kids.length)rnr(kids,level+1);
     }
   }
   rnr(tree,0);
   c.innerHTML=h;
-  if(meta){meta.style.display='';meta.textContent=chCount+' 章 · '+secCount+' 节 · '+subCount+' 小节';}
-  // Scroll tree to show top of content
   c.scrollTop=0;
+  if(meta){meta.style.display='block';meta.textContent=chN+' 章 · '+secN+' 节 · '+subN+' 小节';}
 }
 
 

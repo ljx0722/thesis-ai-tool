@@ -15,6 +15,66 @@
     { id: 'defense', name: '答辩输出', icon: '🎤', desc: '英文摘要与答辩材料', modules: ['en-abstract', 'defense-ppt'] }
   ];
 
+  var SCHOOL_TEMPLATES = [
+    { id: 'sjtu', name: '上海交通大学', degree: '硕士', minChapters: 5, minWords: 30000,
+      styleNotes: 'GB/T 7714 参考文献 · 黑体章标题 · 宋体正文 · 公式居中编号',
+      headingMap: { 'h1': '黑体 三号', 'h2': '黑体 小三', 'h3': '宋体 四号 加粗' },
+      outline: [
+        { title: '第1章 绪论', sections: ['研究背景', '研究意义', '国内外研究现状', '研究内容与方法', '论文结构安排'] },
+        { title: '第2章 相关理论与技术', sections: ['核心概念界定', '理论基础', '技术路线'] },
+        { title: '第3章 研究设计与方法', sections: ['研究框架', '数据来源与处理', '模型构建'] },
+        { title: '第4章 实证分析与结果', sections: ['描述性统计', '模型检验', '结果讨论'] },
+        { title: '第5章 结论与展望', sections: ['主要结论', '创新点', '研究局限与展望'] }
+      ]
+    },
+    { id: 'tongji', name: '同济大学', degree: '硕士', minChapters: 5, minWords: 30000,
+      styleNotes: 'GB/T 7714 参考文献 · 宋体正文 · 图表编号连续 · 页面页脚规范',
+      headingMap: { 'h1': '黑体 三号', 'h2': '黑体 小三', 'h3': '仿宋 四号 加粗' },
+      outline: [
+        { title: '第1章 绪论', sections: ['研究背景与问题', '研究目的与意义', '国内外文献综述', '研究内容与技术路线', '论文结构'] },
+        { title: '第2章 理论基础与文献综述', sections: ['相关理论', '国内外研究进展', '研究评述与切入点'] },
+        { title: '第3章 研究方法', sections: ['研究设计', '数据采集', '分析方法'] },
+        { title: '第4章 结果与分析', sections: ['数据结果', '分析与讨论', '对比验证'] },
+        { title: '第5章 结论与建议', sections: ['研究结论', '实践建议', '不足与展望'] }
+      ]
+    },
+    { id: 'zju', name: '浙江大学', degree: '硕士', minChapters: 6, minWords: 35000,
+      styleNotes: 'GB/T 7714 参考文献 · 章另起页 · 图表索引 · 英文摘要规范',
+      headingMap: { 'h1': '黑体 二号', 'h2': '黑体 三号', 'h3': '黑体 小三' },
+      outline: [
+        { title: '第1章 绪论', sections: ['研究背景', '问题提出', '研究意义', '研究方法', '论文框架'] },
+        { title: '第2章 文献综述', sections: ['国内研究', '国外研究', '研究述评'] },
+        { title: '第3章 理论分析与研究假设', sections: ['理论基础', '分析框架', '研究假设'] },
+        { title: '第4章 研究设计', sections: ['样本与数据', '变量定义', '模型设定'] },
+        { title: '第5章 实证检验与结果', sections: ['描述性统计', '回归分析', '稳健性检验'] },
+        { title: '第6章 研究结论与讨论', sections: ['主要结论', '理论贡献', '实践启示', '局限与展望'] }
+      ]
+    },
+    { id: 'fudan', name: '复旦大学', degree: '硕士', minChapters: 5, minWords: 30000,
+      styleNotes: 'GB/T 7714 参考文献 · 英文摘要必需 · 学术诚信声明 · 致谢页',
+      headingMap: { 'h1': '黑体 三号', 'h2': '黑体 小三', 'h3': '宋体 四号 加粗' },
+      outline: [
+        { title: '第1章 引言', sections: ['研究背景', '研究问题', '研究意义', '研究框架'] },
+        { title: '第2章 文献回顾', sections: ['相关理论', '实证研究回顾', '研究缺口'] },
+        { title: '第3章 研究设计与方法', sections: ['研究模型', '数据说明', '方法论'] },
+        { title: '第4章 实证分析', sections: ['初步分析', '主要发现', '进一步讨论'] },
+        { title: '第5章 结论', sections: ['研究总结', '理论贡献', '实践意义', '研究局限'] }
+      ]
+    },
+    { id: 'generic', name: '通用模板', degree: '硕士', minChapters: 5, minWords: 25000,
+      styleNotes: 'GB/T 7714 参考文献 · 建议使用 Word 标题样式套用 · 正文格式见学校规范',
+      headingMap: { 'h1': '各校不同', 'h2': '各校不同', 'h3': '各校不同' },
+      outline: [
+        { title: '第1章 绪论', sections: ['研究背景', '研究意义', '研究内容与方法'] },
+        { title: '第2章 文献综述', sections: ['国内外研究现状', '研究评述'] },
+        { title: '第3章 研究方法', sections: ['研究设计', '数据来源', '分析方法'] },
+        { title: '第4章 实证分析', sections: ['数据结果', '讨论'] },
+        { title: '第5章 结论与展望', sections: ['主要结论', '局限与展望'] }
+      ]
+    }
+  ];
+
+
   function uid() {
     return 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   }
@@ -409,7 +469,7 @@
           '<textarea id="ideaText" class="ai-textarea" style="height:96px;margin:0" placeholder="例如：用机器学习做智慧工地安全风险动态分级评价"></textarea>' +
           '<div class="project-grid-2">' +
             '<div><label>学科/领域</label><input id="ideaField" class="ai-input" placeholder="如：工程管理 / 人工智能"></div>' +
-            '<div><label>学校模板</label><select id="ideaTemplate" class="ai-input" onchange="ideaTemplateChanged(this.value)"><option value="">通用模板</option>' +
+            '<div><label>学位类型</label><select id="ideaDegree" class="ai-input"><option>硕士</option><option>本科</option><option>博士</option></select></div></div><div class="project-grid-2"><div><label>学校模板</label><select id="ideaTemplate" class="ai-input" onchange="ideaTemplateChanged(this.value)"><option value="">通用模板</option>' +
               SCHOOL_TEMPLATES.map(function(t){return '<option value="'+t.id+'">'+t.name+'</option>';}).join('') +
             '</select></div>' +
           '</div>' +
@@ -1107,64 +1167,6 @@
   }
 
   // ============ Smart Citation Marker Insertion ============
-  var SCHOOL_TEMPLATES = [
-    { id: 'sjtu', name: '上海交通大学', degree: '硕士', minChapters: 5, minWords: 30000,
-      styleNotes: 'GB/T 7714 参考文献 · 黑体章标题 · 宋体正文 · 公式居中编号',
-      headingMap: { 'h1': '黑体 三号', 'h2': '黑体 小三', 'h3': '宋体 四号 加粗' },
-      outline: [
-        { title: '第1章 绪论', sections: ['研究背景', '研究意义', '国内外研究现状', '研究内容与方法', '论文结构安排'] },
-        { title: '第2章 相关理论与技术', sections: ['核心概念界定', '理论基础', '技术路线'] },
-        { title: '第3章 研究设计与方法', sections: ['研究框架', '数据来源与处理', '模型构建'] },
-        { title: '第4章 实证分析与结果', sections: ['描述性统计', '模型检验', '结果讨论'] },
-        { title: '第5章 结论与展望', sections: ['主要结论', '创新点', '研究局限与展望'] }
-      ]
-    },
-    { id: 'tongji', name: '同济大学', degree: '硕士', minChapters: 5, minWords: 30000,
-      styleNotes: 'GB/T 7714 参考文献 · 宋体正文 · 图表编号连续 · 页面页脚规范',
-      headingMap: { 'h1': '黑体 三号', 'h2': '黑体 小三', 'h3': '仿宋 四号 加粗' },
-      outline: [
-        { title: '第1章 绪论', sections: ['研究背景与问题', '研究目的与意义', '国内外文献综述', '研究内容与技术路线', '论文结构'] },
-        { title: '第2章 理论基础与文献综述', sections: ['相关理论', '国内外研究进展', '研究评述与切入点'] },
-        { title: '第3章 研究方法', sections: ['研究设计', '数据采集', '分析方法'] },
-        { title: '第4章 结果与分析', sections: ['数据结果', '分析与讨论', '对比验证'] },
-        { title: '第5章 结论与建议', sections: ['研究结论', '实践建议', '不足与展望'] }
-      ]
-    },
-    { id: 'zju', name: '浙江大学', degree: '硕士', minChapters: 6, minWords: 35000,
-      styleNotes: 'GB/T 7714 参考文献 · 章另起页 · 图表索引 · 英文摘要规范',
-      headingMap: { 'h1': '黑体 二号', 'h2': '黑体 三号', 'h3': '黑体 小三' },
-      outline: [
-        { title: '第1章 绪论', sections: ['研究背景', '问题提出', '研究意义', '研究方法', '论文框架'] },
-        { title: '第2章 文献综述', sections: ['国内研究', '国外研究', '研究述评'] },
-        { title: '第3章 理论分析与研究假设', sections: ['理论基础', '分析框架', '研究假设'] },
-        { title: '第4章 研究设计', sections: ['样本与数据', '变量定义', '模型设定'] },
-        { title: '第5章 实证检验与结果', sections: ['描述性统计', '回归分析', '稳健性检验'] },
-        { title: '第6章 研究结论与讨论', sections: ['主要结论', '理论贡献', '实践启示', '局限与展望'] }
-      ]
-    },
-    { id: 'fudan', name: '复旦大学', degree: '硕士', minChapters: 5, minWords: 30000,
-      styleNotes: 'GB/T 7714 参考文献 · 英文摘要必需 · 学术诚信声明 · 致谢页',
-      headingMap: { 'h1': '黑体 三号', 'h2': '黑体 小三', 'h3': '宋体 四号 加粗' },
-      outline: [
-        { title: '第1章 引言', sections: ['研究背景', '研究问题', '研究意义', '研究框架'] },
-        { title: '第2章 文献回顾', sections: ['相关理论', '实证研究回顾', '研究缺口'] },
-        { title: '第3章 研究设计与方法', sections: ['研究模型', '数据说明', '方法论'] },
-        { title: '第4章 实证分析', sections: ['初步分析', '主要发现', '进一步讨论'] },
-        { title: '第5章 结论', sections: ['研究总结', '理论贡献', '实践意义', '研究局限'] }
-      ]
-    },
-    { id: 'generic', name: '通用模板', degree: '硕士', minChapters: 5, minWords: 25000,
-      styleNotes: 'GB/T 7714 参考文献 · 建议使用 Word 标题样式套用 · 正文格式见学校规范',
-      headingMap: { 'h1': '各校不同', 'h2': '各校不同', 'h3': '各校不同' },
-      outline: [
-        { title: '第1章 绪论', sections: ['研究背景', '研究意义', '研究内容与方法'] },
-        { title: '第2章 文献综述', sections: ['国内外研究现状', '研究评述'] },
-        { title: '第3章 研究方法', sections: ['研究设计', '数据来源', '分析方法'] },
-        { title: '第4章 实证分析', sections: ['数据结果', '讨论'] },
-        { title: '第5章 结论与展望', sections: ['主要结论', '局限与展望'] }
-      ]
-    }
-  ];
 
   function openTemplateChooser() {
     closeTemplateChooser();
@@ -1230,7 +1232,7 @@
     var result = parts.map(function (part, i) {
       if (i === parts.length - 1) return part;
       // Don't insert after every sentence - sample ~1 per 3 sentences or key positions
-      if (Math.random() < 0.35 && refIdx <= refs.length) {
+      if ((i % 3 === 1) && refIdx <= refs.length) {
         var marker = ' [' + refIdx + ']';
         refIdx++;
         return part + marker;
@@ -1257,6 +1259,7 @@
       logSkillRun({ moduleId: 'cite-markers', title: '自动插入引用标记', summary: meta.title + ' · ' + (refIdx - 1) + ' 处' });
     }
   }
+
 
   // ============ Export Full Paper ============
   function exportFullPaper() {
