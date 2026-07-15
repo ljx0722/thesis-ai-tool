@@ -870,6 +870,10 @@ body {
 .project-switch-row b{display:block;color:var(--text-primary);font-size:.78rem}
 .project-switch-row span{color:var(--text-muted);font-size:.62rem}
 .project-switch-actions{display:flex;gap:4px}
+/* Project settings specific overrides */
+#projectSettingsOverlay select.ai-input{appearance:auto}
+/* Export button in project overview */
+.project-cta-row[style*="justify-content:flex-end"]{border-top:1px solid var(--border-light);padding-top:12px}
 @media (max-width:768px){
   .chapter-card-top{flex-direction:column}
   .chapter-card-preview{white-space:normal}

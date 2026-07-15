@@ -492,11 +492,15 @@
             (next.secondary ? '<button class="ai-btn-clear" onclick="runProjectAction(\'' + next.secondary.action + '\')">' + next.secondary.label + '</button>' : '') +
             '<button class="ai-btn-clear" onclick="openOutlineEditor()">🧭 大纲编辑器</button>' +
             '<button class="ai-btn-clear" onclick="openChapterBoard()">📝 分章草稿</button>' +
+            '<button class="ai-btn-clear" onclick="openProjectSettings()">⚙️ 设置</button>' +
             '<button class="ai-btn-clear" onclick="completeCurrentStage()">标记本阶段完成</button>' +
           '</div>' +
         '</div>' +
         renderChapterBoardInline(project) +
         renderSkillLogInline(project) +
+        '<div class="project-cta-row" style="justify-content:flex-end">' +
+          '<button class="ai-btn" onclick="exportFullPaper()">📄 导出论文全文</button>' +
+        '</div>' +
         '<div class="project-stage-grid">' + stagesHtml + '</div>' +
       '</div>';
   }
@@ -953,5 +957,115 @@
   window.closeProjectSwitcher = closeProjectSwitcher;
   window.switchToProject = switchToProject;
   window.deleteProject = deleteProject;
+  window.exportFullPaper = exportFullPaper;
+  window.openProjectSettings = openProjectSettings;
+  window.closeProjectSettings = closeProjectSettings;
+  window.saveProjectSettings = saveProjectSettings;
 
-})();
+  // ============ Export Full Paper ============
+  function exportFullPaper() {
+    var p = getCurrentProject();
+    if (!p) { alert('请先创建项目'); return; }
+    var outline = getOutline();
+    if (!outline) { alert('请先编辑论文大纲，再导出'); return; }
+    var lines = [];
+    lines.push(outline.title || p.title);
+    lines.push('');
+    lines.push(p.field ? '领域：' + p.field : '');
+    lines.push(p.degree ? '学位：' + p.degree : '');
+    lines.push('');
+    var stats = chapterStats(p);
+    outline.chapters.forEach(function (ch, idx) {
+      var key = chapterKey(ch.title, idx);
+      var draft = getChapterDraft(key);
+      var content = draft && draft.content ? draft.content.trim() : '';
+      lines.push(ch.title);
+      lines.push('');
+      if (content) {
+        lines.push(content);
+      } else {
+        lines.push('（本章暂无草稿）');
+        if (ch.sections && ch.sections.length) {
+          ch.sections.forEach(function (s) { lines.push('- ' + s); });
+        }
+      }
+      lines.push('');
+    });
+    lines.push('---');
+    lines.push('导出时间：' + new Date().toLocaleString());
+    lines.push('总字数（章节草稿合计）：' + stats.words + ' 字');
+    lines.push('');
+    var refs = (typeof mergedRefs !== 'undefined' && mergedRefs.length) ? mergedRefs : (typeof existingRefs !== 'undefined' ? existingRefs : []);
+    if (refs.length) {
+      lines.push('=== 参考文献 ===');
+      refs.forEach(function (r, i) {
+        var t = r.ci || (r.title || '').replace(/<[^>]+>/g, '');
+        lines.push('[' + (i + 1) + '] ' + t.substring(0, 300));
+      });
+    }
+    var blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (outline.title || '论文草稿').replace(/[\\/:\s]+/g, '_') + '_' + new Date().toISOString().slice(0, 10) + '.txt';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    logSkillRun({ moduleId: 'export', title: '导出论文全文', summary: stats.words + ' 字 · ' + outline.chapters.length + ' 章' });
+    if (typeof ttp === 'function') ttp('已导出论文草稿（' + stats.words + ' 字）');
+  }
+
+  // ============ Project Settings ============
+  function openProjectSettings() {
+    var p = getCurrentProject();
+    if (!p) { openIdeaWizard(); return; }
+    closeProjectSettings();
+    var ov = document.createElement('div');
+    ov.id = 'projectSettingsOverlay';
+    ov.className = 'project-overlay';
+    ov.innerHTML =
+      '<div class="project-modal" style="width:min(520px,100%)" onclick="event.stopPropagation()">' +
+        '<div class="project-modal-head">' +
+          '<div><h3>项目设置</h3><p>调整基本信息与写作目标</p></div>' +
+          '<button class="project-close" onclick="closeProjectSettings()">×</button>' +
+        '</div>' +
+        '<div class="project-form">' +
+          '<label>论文题目</label><input id="setTitle" class="ai-input" value="' + escapeHtml(p.title) + '">' +
+          '<div class="project-grid-2">' +
+            '<div><label>学科/领域</label><input id="setField" class="ai-input" value="' + escapeHtml(p.field || '') + '"></div>' +
+            '<div><label>学位类型</label><select id="setDegree" class="ai-input"><option ' + (p.degree === '硕士' ? 'selected' : '') + '>硕士</option><option ' + (p.degree === '本科' ? 'selected' : '') + '>本科</option><option ' + (p.degree === '博士' ? 'selected' : '') + '>博士</option></select></div>' +
+          '</div>' +
+          '<div class="project-grid-2">' +
+            '<div><label>目标字数</label><input id="setGoalWords" class="ai-input" type="number" value="' + (p.goalWords || 30000) + '" min="5000" max="200000"></div>' +
+            '<div><label>关键词</label><input id="setKeywords" class="ai-input" value="' + escapeHtml(p.keywords || '') + '"></div>' +
+          '</div>' +
+          '<label>研究想法 / 摘要</label><textarea id="setIdea" class="ai-textarea" style="height:80px;margin:0">' + escapeHtml(p.idea || '') + '</textarea>' +
+        '</div>' +
+        '<div class="project-modal-actions">' +
+          '<button class="ai-btn-clear" onclick="closeProjectSettings()">取消</button>' +
+          '<button class="ai-btn" onclick="saveProjectSettings()">保存设置</button>' +
+        '</div>' +
+      '</div>';
+    ov.onclick = function () { closeProjectSettings(); };
+    document.body.appendChild(ov);
+  }
+
+  function closeProjectSettings() {
+    var ov = document.getElementById('projectSettingsOverlay');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+
+  function saveProjectSettings() {
+    var p = getCurrentProject();
+    if (!p) return;
+    var title = (document.getElementById('setTitle').value || '').trim() || p.title;
+    var field = (document.getElementById('setField').value || '').trim();
+    var degree = document.getElementById('setDegree').value || p.degree;
+    var goal = parseInt(document.getElementById('setGoalWords').value) || p.goalWords || 30000;
+    var keywords = (document.getElementById('setKeywords').value || '').trim();
+    var idea = (document.getElementById('setIdea').value || '').trim();
+    updateCurrent({ title: title, field: field, degree: degree, goalWords: goal, keywords: keywords, idea: idea });
+    closeProjectSettings();
+    renderProjectChrome();
+    if (typeof ttp === 'function') ttp('项目设置已保存');
+  }
+
+}).call(this);
