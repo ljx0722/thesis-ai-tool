@@ -860,6 +860,16 @@ body {
 .project-panel-card > .ai-btn-clear{width:100%;margin-top:8px}
 .chapter-board-modal,.chapter-editor-modal{width:min(720px,100%)}
 .chapter-card-grid{max-height:44vh;overflow-y:auto}
+.project-switch-row{
+  display:flex;justify-content:space-between;align-items:center;padding:10px 14px;margin:4px 0;
+  border-radius:10px;border:1px solid var(--border);cursor:pointer;
+  transition:border-color .15s, background .15s
+}
+.project-switch-row:hover{border-color:rgba(99,102,241,.3)}
+.project-switch-row.is-current{border-color:rgba(99,102,241,.4);background:rgba(99,102,241,.05)}
+.project-switch-row b{display:block;color:var(--text-primary);font-size:.78rem}
+.project-switch-row span{color:var(--text-muted);font-size:.62rem}
+.project-switch-actions{display:flex;gap:4px}
 @media (max-width:768px){
   .chapter-card-top{flex-direction:column}
   .chapter-card-preview{white-space:normal}

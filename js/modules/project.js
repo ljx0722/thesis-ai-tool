@@ -300,6 +300,63 @@
     return null;
   }
 
+  function switchToProject(projectId) {
+    if (!projectId) return;
+    setCurrentId(projectId);
+    renderProjectChrome();
+    if (typeof switchView === 'function') switchView('workspace');
+    if (typeof ttp === 'function') ttp('已切换项目');
+  }
+
+  function deleteProject(projectId) {
+    var list = loadAll().filter(function (p) { return p.id !== projectId; });
+    saveAll(list);
+    if (getCurrentId() === projectId) {
+      setCurrentId(list.length ? list[0].id : '');
+    }
+    renderProjectChrome();
+    if (typeof switchView === 'function') switchView('workspace');
+    if (typeof ttp === 'function') ttp('已删除项目');
+  }
+
+  function openProjectSwitcher() {
+    closeProjectSwitcher();
+    var projects = loadAll();
+    var current = getCurrentProject();
+    var rows = projects.map(function (p) {
+      var prog = calcProgress(p);
+      var isCur = current && p.id === current.id;
+      return '<div class="project-switch-row' + (isCur ? ' is-current' : '') + '" onclick="switchToProject(\'' + p.id + '\')">' +
+        '<div><b>' + escapeHtml(p.title) + '</b><span>' + prog.percent + '% · ' + escapeHtml(p.field || p.idea || '') + '</span></div>' +
+        '<div class="project-switch-actions" onclick="event.stopPropagation()">' +
+          '<button class="ai-btn-clear" onclick="switchToProject(\'' + p.id + '\')">打开</button>' +
+          '<button class="ai-btn-clear" onclick="deleteProject(\'' + p.id + '\')">删除</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+    if (!rows) rows = '<div class="project-progress-sub" style="text-align:center;padding:20px">还没有项目，先创建一个吧</div>';
+
+    var ov = document.createElement('div');
+    ov.id = 'projectSwitcherOverlay';
+    ov.className = 'project-overlay';
+    ov.innerHTML =
+      '<div class="project-modal" style="width:min(520px,100%)" onclick="event.stopPropagation()">' +
+        '<div class="project-modal-head"><div><h3>我的项目</h3><p>共 ' + projects.length + ' 个项目</p></div><button class="project-close" onclick="closeProjectSwitcher()">×</button></div>' +
+        '<div style="max-height:50vh;overflow:auto">' + rows + '</div>' +
+        '<div class="project-modal-actions">' +
+          '<button class="ai-btn-clear" onclick="closeProjectSwitcher()">关闭</button>' +
+          '<button class="ai-btn" onclick="closeProjectSwitcher();openIdeaWizard()">新建项目</button>' +
+        '</div>' +
+      '</div>';
+    ov.onclick = function () { closeProjectSwitcher(); };
+    document.body.appendChild(ov);
+  }
+
+  function closeProjectSwitcher() {
+    var ov = document.getElementById('projectSwitcherOverlay');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+
   // ---------- UI: Idea Wizard ----------
   function openIdeaWizard() {
     closeIdeaWizard();
@@ -516,7 +573,8 @@
     var progEl = document.getElementById('projectProgressChip');
     if (titleEl) {
       titleEl.textContent = project ? project.title : '未创建项目';
-      titleEl.title = project ? (project.idea || project.title) : '点击从想法创建项目';
+      titleEl.title = project ? (project.idea || project.title) : '点击查看项目列表';
+      titleEl.onclick = function () { openProjectSwitcher(); };
     }
     if (progEl) {
       var prog = calcProgress(project);
@@ -797,15 +855,15 @@
       '<div class="project-modal-head"><div><h3>写作：'+escapeHtml(m.title)+'</h3><p>先写骨架，再调用扩写细化。内容保存在当前项目。</p></div><button class="project-close" onclick="closeChapterOverlays()">×</button></div>'+
       '<div class="project-form"><div class="chapter-sec-tags">'+(m.sections.length?m.sections.map(function(s){return'<span class="chapter-sec-tag">'+escapeHtml(s)+'</span>';}).join(''):'')+'</div>'+
       '<label>本章草稿</label><textarea id="chapterContent" class="ai-textarea" style="height:320px;margin:0" placeholder="在这里写内容/提纲/论据要点..."></textarea></div>'+
-      '<div class="project-modal-actions"><button class="ai-btn-clear" onclick="seedChapterFromSections(\''+key+'\',true)">插入小节骨架</button><button class="ai-btn-clear" onclick="closeChapterOverlays()">取消</button><button class="ai-btn" onclick="saveChapterEditor(\''+key+'\')">保存本章</button></div></div>';
+      '<div class="project-modal-actions"><button class="ai-btn-clear" onclick="seedChapterFromSections(\''+key+'\',true)">插入小节骨架</button><button class="ai-btn-clear" onclick="insertRefsIntoDraft(\''+key+'\')">插入参考文献</button><button class="ai-btn-clear" onclick="expandChapterAI(\''+key+'\')">🤖 AI 扩写</button><button class="ai-btn-clear" onclick="closeChapterOverlays()">取消</button><button class="ai-btn" onclick="saveChapterEditor(\''+key+'\')">保存本章</button></div></div>';
     ov.onclick=function(){closeChapterOverlays();};
     document.body.appendChild(ov);
     document.getElementById('chapterContent').value=d.content||'';
   }
   function seedChapterFromSections(key,inEditor){
     var m=findChapterMeta(key);if(!m)return;
-    var sk=m.title+'\\n\\n'+(m.sections||[]).map(function(s,i){return (i+1)+'. '+s+'\\n(在此补充论据、文献与分析)\\n';}).join('\\n');
-    if(inEditor){var ta=document.getElementById('chapterContent');if(!ta)return;if(ta.value&&ta.value.trim()){if(!confirm('已有内容，确认开头插入骨架？'))return;ta.value=sk+'\\n'+ta.value;}else ta.value=sk;return;}
+    var sk=m.title+'\n\n'+(m.sections||[]).map(function(s,i){return (i+1)+'. '+s+'\n(在此补充论据、文献与分析)\n';}).join('\n');
+    if(inEditor){var ta=document.getElementById('chapterContent');if(!ta)return;if(ta.value&&ta.value.trim()){if(!confirm('已有内容，确认开头插入骨架？'))return;ta.value=sk+'\n'+ta.value;}else ta.value=sk;return;}
     var prev=getChapterDraft(key);
     if(prev&&prev.content&&prev.content.trim()){if(!confirm('该章已有草稿，覆盖为骨架？'))return;}
     saveChapterDraft(key,{title:m.title,sections:m.sections,content:sk,status:'draft'});
@@ -815,16 +873,85 @@
   }
   function saveChapterEditor(key){
     var m=findChapterMeta(key);if(!m)return;
-    var ct=(document.getElementById('chapterContent').value||''),w=ct.replace(/\\s+/g,'').length;
+    var ct=(document.getElementById('chapterContent').value||''),w=ct.replace(/\s+/g,'').length;
     saveChapterDraft(key,{title:m.title,sections:m.sections,content:ct,status:w<1?'empty':(w<300?'draft':'ready')});
     logSkillRun({moduleId:'chapter-editor',title:'保存章节草稿',summary:m.title+' · '+w+' 字'});
     closeChapterOverlays();renderProjectChrome();
     if(typeof ttp==='function')ttp('已保存：'+m.title+'('+w+'字)');
   }
+
+  function expandChapterAI(key) {
+    var meta=findChapterMeta(key); if(!meta) return;
+    var draft=getChapterDraft(key)||{content:''};
+    if(!draft.content||draft.content.trim().length<20){alert('请先在草稿中写一些内容（至少20字），再调用 AI 扩写');return;}
+    if(!confirm('将使用 AI 对本章进行扩写与充实。确定继续？')) return;
+    var token=sessionStorage.getItem('thesis_ai_token'); if(!token){alert('请先登录');return;}
+    closeChapterOverlays();
+    if(typeof showLoad==='function') showLoad('AI 扩写中...',10,meta.title);
+    var sp='你是学术论文导师，擅长充实论文章节。请基于提供的章节草稿进行扩写，保持学术语气，补充论据和解释，不变更核心论点与结构。用中文输出完整扩写后内容。';
+    var up='章节标题：'+meta.title+'\n小节：'+(meta.sections||[]).join('、')+'\n\n当前草稿：\n'+draft.content.substring(0,6000)+'\n\n请扩写充实，补充论据与学术引用。';
+    fetch('/api/llm/analyze',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({module:'chapter-expand',system_prompt:sp,user_prompt:up,max_tokens:3000})})
+    .then(function(r){return r.json()}).then(function(d){
+      if(typeof hideLoad==='function') hideLoad();
+      if(d.success){
+        var ex=d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        saveChapterDraft(key,{title:meta.title,sections:meta.sections,content:ex,status:'ready'});
+        logSkillRun({moduleId:'chapter-expand-ai',title:'AI扩写章节',summary:meta.title});
+        renderProjectChrome();
+        if(typeof ttp==='function')ttp('AI扩写完成：'+meta.title);
+      }else{alert('AI扩写出错: '+(d.error||'未知错误'));}
+    }).catch(function(){if(typeof hideLoad==='function')hideLoad();alert('网络错误，请重试');});
+  }
+
+  function insertRefsIntoDraft(key){
+    var meta=findChapterMeta(key); if(!meta) return;
+    var draft=getChapterDraft(key)||{content:''};
+    var refs=(typeof mergedRefs!=='undefined'&&mergedRefs.length)?mergedRefs:(typeof existingRefs!=='undefined'?existingRefs:[]);
+    if(!refs.length){alert('还没有检索文献。请先检索参考文献。');return;}
+    closeChapterOverlays();
+    var pool=refs.filter(function(r){return(r.ch===(meta.idx+1)||r._chName===('第'+(meta.idx+1)+'章'));});
+    if(pool.length<2) pool=refs;
+    var sample=pool.slice(0,6).map(function(r,i){return '['+(i+1)+'] '+(r.ci||r.title||'').substring(0,120);}).join('\n');
+    var ov=document.createElement('div');ov.id='refsPickerOverlay';ov.className='project-overlay';
+    ov.innerHTML='<div class="project-modal" style="width:min(560px,100%)" onclick="event.stopPropagation()">'+
+      '<div class="project-modal-head"><div><h3>插入参考文献</h3><p>优先本章关联，备选全库前6条</p></div><button class="project-close" onclick="closeRefsPicker()">×</button></div>'+
+      '<div style="max-height:36vh;overflow:auto;font-size:.7rem;line-height:1.8;padding:4px">'+sample.replace(/\n/g,'<br>')+'</div>'+
+      '<div class="project-form" style="margin-top:12px"><label>插入到章节开头（可编辑后保存）</label>'+
+      '<textarea id="refsInsertText" class="ai-textarea" style="height:120px;margin:0">'+escapeHtml(sample)+'</textarea></div>'+
+      '<div class="project-modal-actions"><button class="ai-btn-clear" onclick="closeRefsPicker()">取消</button>'+
+      '<button class="ai-btn" onclick="confirmRefsInsert(\''+key+'\')">插入到草稿</button></div></div>';
+    ov.onclick=function(){closeRefsPicker();};
+    document.body.appendChild(ov);
+    logSkillRun({moduleId:'refs-insert',title:'打开参考文献选择',summary:meta.title});
+  }
+  function closeRefsPicker(){
+    var ov=document.getElementById('refsPickerOverlay');
+    if(ov&&ov.parentNode)ov.parentNode.removeChild(ov);
+  }
+  function confirmRefsInsert(key){
+    var refText=(document.getElementById('refsInsertText').value||'').trim();
+    if(!refText)return;
+    var draft=getChapterDraft(key)||{content:''};
+    var meta=findChapterMeta(key);
+    saveChapterDraft(key,{title:meta?meta.title:'',sections:meta?meta.sections:[],content:refText+'\n\n'+(draft.content||''),status:'draft'});
+    logSkillRun({moduleId:'refs-insert',title:'插入参考文献',summary:meta?meta.title:''});
+    closeRefsPicker();openChapterEditor(key);
+    if(typeof ttp==='function')ttp('已插入到草稿，可继续编辑保存');
+  }
+
   window.openChapterBoard = openChapterBoard;
   window.closeChapterOverlays = closeChapterOverlays;
   window.openChapterEditor = openChapterEditor;
   window.seedChapterFromSections = seedChapterFromSections;
   window.saveChapterEditor = saveChapterEditor;
+  window.expandChapterAI = expandChapterAI;
+  window.insertRefsIntoDraft = insertRefsIntoDraft;
+  window.closeRefsPicker = closeRefsPicker;
+  window.confirmRefsInsert = confirmRefsInsert;
+  window.openProjectSwitcher = openProjectSwitcher;
+  window.closeProjectSwitcher = closeProjectSwitcher;
+  window.switchToProject = switchToProject;
+  window.deleteProject = deleteProject;
 
 })();
