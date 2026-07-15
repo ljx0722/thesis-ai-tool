@@ -374,8 +374,11 @@
           '<textarea id="ideaText" class="ai-textarea" style="height:96px;margin:0" placeholder="例如：用机器学习做智慧工地安全风险动态分级评价"></textarea>' +
           '<div class="project-grid-2">' +
             '<div><label>学科/领域</label><input id="ideaField" class="ai-input" placeholder="如：工程管理 / 人工智能"></div>' +
-            '<div><label>学位类型</label><select id="ideaDegree" class="ai-input"><option>硕士</option><option>本科</option><option>博士</option></select></div>' +
+            '<div><label>学校模板</label><select id="ideaTemplate" class="ai-input" onchange="ideaTemplateChanged(this.value)"><option value="">通用模板</option>' +
+              SCHOOL_TEMPLATES.map(function(t){return '<option value="'+t.id+'">'+t.name+'</option>';}).join('') +
+            '</select></div>' +
           '</div>' +
+          '<div class="template-hint" id="templateHint" style="display:none"></div>' +
           '<label>关键词（选填，逗号分隔）</label>' +
           '<input id="ideaKeywords" class="ai-input" placeholder="智慧工地, 风险评价, 机器学习">' +
           '<label>暂定题目（选填）</label>' +
@@ -399,11 +402,23 @@
     if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
   }
 
+  function ideaTemplateChanged(templateId) {
+    var hint = document.getElementById('templateHint');
+    if (!hint) return;
+    if (!templateId) { hint.style.display = 'none'; return; }
+    var t = null;
+    for (var i = 0; i < SCHOOL_TEMPLATES.length; i++) { if (SCHOOL_TEMPLATES[i].id === templateId) { t = SCHOOL_TEMPLATES[i]; break; } }
+    if (!t) return;
+    hint.style.display = '';
+    hint.innerHTML = t.styleNotes.replace(/\n/g, '<br>') + '<br><b>要求：</b>≥' + t.outline.length + '章 · ≥' + (t.minWords / 1000) + 'k字 · ' + t.degree;
+  }
+
   function submitIdeaWizard() {
     var idea = (document.getElementById('ideaText').value || '').trim();
     if (idea.length < 8) { alert('请至少用一句话描述你的研究想法（不少于 8 字）'); return; }
     var field = (document.getElementById('ideaField').value || '').trim();
     var degree = document.getElementById('ideaDegree').value || '硕士';
+    var templateId = (document.getElementById('ideaTemplate').value || '').trim();
     var keywords = (document.getElementById('ideaKeywords').value || '').trim();
     var title = (document.getElementById('ideaTitle').value || '').trim();
     if (!title) title = idea.length > 24 ? idea.substring(0, 24) + '…' : idea;
@@ -418,6 +433,11 @@
       currentStage: 'ideation',
       hasManuscript: !!(typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100)
     });
+    upsertProject(project);
+    // Apply school template if selected
+    if (templateId) {
+      applySchoolTemplate(templateId);
+    }
     closeIdeaWizard();
     renderProjectChrome();
     if (typeof switchModule === 'function') switchModule('topic-finder');
@@ -492,6 +512,7 @@
             (next.secondary ? '<button class="ai-btn-clear" onclick="runProjectAction(\'' + next.secondary.action + '\')">' + next.secondary.label + '</button>' : '') +
             '<button class="ai-btn-clear" onclick="openOutlineEditor()">🧭 大纲编辑器</button>' +
             '<button class="ai-btn-clear" onclick="openChapterBoard()">📝 分章草稿</button>' +
+            '<button class="ai-btn-clear" onclick="openTemplateChooser()">🏫 学校模板</button>' +
             '<button class="ai-btn-clear" onclick="openProjectSettings()">⚙️ 设置</button>' +
             '<button class="ai-btn-clear" onclick="completeCurrentStage()">标记本阶段完成</button>' +
           '</div>' +
@@ -859,7 +880,7 @@
       '<div class="project-modal-head"><div><h3>写作：'+escapeHtml(m.title)+'</h3><p>先写骨架，再调用扩写细化。内容保存在当前项目。</p></div><button class="project-close" onclick="closeChapterOverlays()">×</button></div>'+
       '<div class="project-form"><div class="chapter-sec-tags">'+(m.sections.length?m.sections.map(function(s){return'<span class="chapter-sec-tag">'+escapeHtml(s)+'</span>';}).join(''):'')+'</div>'+
       '<label>本章草稿</label><textarea id="chapterContent" class="ai-textarea" style="height:320px;margin:0" placeholder="在这里写内容/提纲/论据要点..."></textarea></div>'+
-      '<div class="project-modal-actions"><button class="ai-btn-clear" onclick="seedChapterFromSections(\''+key+'\',true)">插入小节骨架</button><button class="ai-btn-clear" onclick="insertRefsIntoDraft(\''+key+'\')">插入参考文献</button><button class="ai-btn-clear" onclick="expandChapterAI(\''+key+'\')">🤖 AI 扩写</button><button class="ai-btn-clear" onclick="closeChapterOverlays()">取消</button><button class="ai-btn" onclick="saveChapterEditor(\''+key+'\')">保存本章</button></div></div>';
+      '<div class="project-modal-actions"><button class="ai-btn-clear" onclick="seedChapterFromSections(\''+key+'\',true)">插入小节骨架</button><button class="ai-btn-clear" onclick="insertCiteMarkers(\''+key+'\')">插入文献引用标记</button><button class="ai-btn-clear" onclick="insertRefsIntoDraft(\''+key+'\')">插入参考文献</button><button class="ai-btn-clear" onclick="expandChapterAI(\''+key+'\')">🤖 AI 扩写</button><button class="ai-btn-clear" onclick="closeChapterOverlays()">取消</button><button class="ai-btn" onclick="saveChapterEditor(\''+key+'\')">保存本章</button></div></div>';
     ov.onclick=function(){closeChapterOverlays();};
     document.body.appendChild(ov);
     document.getElementById('chapterContent').value=d.content||'';
@@ -961,6 +982,163 @@
   window.openProjectSettings = openProjectSettings;
   window.closeProjectSettings = closeProjectSettings;
   window.saveProjectSettings = saveProjectSettings;
+  window.insertCiteMarkers = insertCiteMarkers;
+  window.openTemplateChooser = openTemplateChooser;
+  window.closeTemplateChooser = closeTemplateChooser;
+  window.applySchoolTemplate = applySchoolTemplate;
+  window.ideaTemplateChanged = ideaTemplateChanged;
+
+  // ============ Smart Citation Marker Insertion ============
+  var SCHOOL_TEMPLATES = [
+    { id: 'sjtu', name: '上海交通大学', degree: '硕士', minChapters: 5, minWords: 30000,
+      styleNotes: 'GB/T 7714 参考文献 · 黑体章标题 · 宋体正文 · 公式居中编号',
+      headingMap: { 'h1': '黑体 三号', 'h2': '黑体 小三', 'h3': '宋体 四号 加粗' },
+      outline: [
+        { title: '第1章 绪论', sections: ['研究背景', '研究意义', '国内外研究现状', '研究内容与方法', '论文结构安排'] },
+        { title: '第2章 相关理论与技术', sections: ['核心概念界定', '理论基础', '技术路线'] },
+        { title: '第3章 研究设计与方法', sections: ['研究框架', '数据来源与处理', '模型构建'] },
+        { title: '第4章 实证分析与结果', sections: ['描述性统计', '模型检验', '结果讨论'] },
+        { title: '第5章 结论与展望', sections: ['主要结论', '创新点', '研究局限与展望'] }
+      ]
+    },
+    { id: 'tongji', name: '同济大学', degree: '硕士', minChapters: 5, minWords: 30000,
+      styleNotes: 'GB/T 7714 参考文献 · 宋体正文 · 图表编号连续 · 页面页脚规范',
+      headingMap: { 'h1': '黑体 三号', 'h2': '黑体 小三', 'h3': '仿宋 四号 加粗' },
+      outline: [
+        { title: '第1章 绪论', sections: ['研究背景与问题', '研究目的与意义', '国内外文献综述', '研究内容与技术路线', '论文结构'] },
+        { title: '第2章 理论基础与文献综述', sections: ['相关理论', '国内外研究进展', '研究评述与切入点'] },
+        { title: '第3章 研究方法', sections: ['研究设计', '数据采集', '分析方法'] },
+        { title: '第4章 结果与分析', sections: ['数据结果', '分析与讨论', '对比验证'] },
+        { title: '第5章 结论与建议', sections: ['研究结论', '实践建议', '不足与展望'] }
+      ]
+    },
+    { id: 'zju', name: '浙江大学', degree: '硕士', minChapters: 6, minWords: 35000,
+      styleNotes: 'GB/T 7714 参考文献 · 章另起页 · 图表索引 · 英文摘要规范',
+      headingMap: { 'h1': '黑体 二号', 'h2': '黑体 三号', 'h3': '黑体 小三' },
+      outline: [
+        { title: '第1章 绪论', sections: ['研究背景', '问题提出', '研究意义', '研究方法', '论文框架'] },
+        { title: '第2章 文献综述', sections: ['国内研究', '国外研究', '研究述评'] },
+        { title: '第3章 理论分析与研究假设', sections: ['理论基础', '分析框架', '研究假设'] },
+        { title: '第4章 研究设计', sections: ['样本与数据', '变量定义', '模型设定'] },
+        { title: '第5章 实证检验与结果', sections: ['描述性统计', '回归分析', '稳健性检验'] },
+        { title: '第6章 研究结论与讨论', sections: ['主要结论', '理论贡献', '实践启示', '局限与展望'] }
+      ]
+    },
+    { id: 'fudan', name: '复旦大学', degree: '硕士', minChapters: 5, minWords: 30000,
+      styleNotes: 'GB/T 7714 参考文献 · 英文摘要必需 · 学术诚信声明 · 致谢页',
+      headingMap: { 'h1': '黑体 三号', 'h2': '黑体 小三', 'h3': '宋体 四号 加粗' },
+      outline: [
+        { title: '第1章 引言', sections: ['研究背景', '研究问题', '研究意义', '研究框架'] },
+        { title: '第2章 文献回顾', sections: ['相关理论', '实证研究回顾', '研究缺口'] },
+        { title: '第3章 研究设计与方法', sections: ['研究模型', '数据说明', '方法论'] },
+        { title: '第4章 实证分析', sections: ['初步分析', '主要发现', '进一步讨论'] },
+        { title: '第5章 结论', sections: ['研究总结', '理论贡献', '实践意义', '研究局限'] }
+      ]
+    },
+    { id: 'generic', name: '通用模板', degree: '硕士', minChapters: 5, minWords: 25000,
+      styleNotes: 'GB/T 7714 参考文献 · 建议使用 Word 标题样式套用 · 正文格式见学校规范',
+      headingMap: { 'h1': '各校不同', 'h2': '各校不同', 'h3': '各校不同' },
+      outline: [
+        { title: '第1章 绪论', sections: ['研究背景', '研究意义', '研究内容与方法'] },
+        { title: '第2章 文献综述', sections: ['国内外研究现状', '研究评述'] },
+        { title: '第3章 研究方法', sections: ['研究设计', '数据来源', '分析方法'] },
+        { title: '第4章 实证分析', sections: ['数据结果', '讨论'] },
+        { title: '第5章 结论与展望', sections: ['主要结论', '局限与展望'] }
+      ]
+    }
+  ];
+
+  function openTemplateChooser() {
+    closeTemplateChooser();
+    var p = getCurrentProject();
+    var rows = SCHOOL_TEMPLATES.map(function (t) {
+      return '<div class="template-card" onclick="applySchoolTemplate(\'' + t.id + '\')">' +
+        '<div class="template-card-head"><b>' + escapeHtml(t.name) + '</b><span>' + escapeHtml(t.degree) + ' · ≥' + t.minWords / 1000 + 'k字</span></div>' +
+        '<div class="template-card-desc">' + escapeHtml(t.styleNotes) + '</div>' +
+        '<div class="template-card-meta">' + t.outline.length + '章大纲 · ' + Object.values(t.headingMap).join(' | ') + '</div>' +
+        '<button class="ai-btn-clear" onclick="event.stopPropagation();applySchoolTemplate(\'' + t.id + '\')">应用此模板</button>' +
+      '</div>';
+    }).join('');
+    var ov = document.createElement('div');
+    ov.id = 'templateChooserOverlay';
+    ov.className = 'project-overlay';
+    ov.innerHTML =
+      '<div class="project-modal" style="width:min(640px,100%)" onclick="event.stopPropagation()">' +
+        '<div class="project-modal-head"><div><h3>选择学校模板</h3><p>模板会提供预设大纲、标题格式和参考文献规范。应用后可在编辑器中调整。</p></div><button class="project-close" onclick="closeTemplateChooser()">×</button></div>' +
+        '<div style="max-height:55vh;overflow:auto">' + rows + '</div>' +
+        '<div class="project-modal-actions"><button class="ai-btn-clear" onclick="closeTemplateChooser()">关闭</button></div>' +
+      '</div>';
+    ov.onclick = function () { closeTemplateChooser(); };
+    document.body.appendChild(ov);
+  }
+
+  function closeTemplateChooser() {
+    var ov = document.getElementById('templateChooserOverlay');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+
+  function applySchoolTemplate(templateId) {
+    var t = null;
+    for (var i = 0; i < SCHOOL_TEMPLATES.length; i++) { if (SCHOOL_TEMPLATES[i].id === templateId) { t = SCHOOL_TEMPLATES[i]; break; } }
+    if (!t) return;
+    var p = getCurrentProject();
+    if (!p) { openIdeaWizard(); return; }
+    if (p.artifacts && p.artifacts.outline && p.artifacts.outline.chapters && p.artifacts.outline.chapters.length >= t.outline.length) {
+      if (!confirm('当前已有完整大纲。应用模板将覆盖现有大纲，各章节草稿会保留。确定应用？')) return;
+    }
+    saveOutline({ title: p.title, chapters: t.outline.map(function (ch) { return { title: ch.title, sections: ch.sections.slice() }; }) });
+    updateCurrent({ degree: t.degree, goalWords: t.minWords, schoolTemplate: templateId });
+    logSkillRun({ moduleId: 'template', title: '应用学校模板', summary: t.name + ' · ' + t.outline.length + '章' });
+    closeTemplateChooser();
+    renderProjectChrome();
+    if (typeof ttp === 'function') ttp('已应用模板：' + t.name);
+  }
+
+  function insertCiteMarkers(key) {
+    var meta = findChapterMeta(key);
+    if (!meta) return;
+    var draft = getChapterDraft(key) || { content: '' };
+    if (!draft.content || draft.content.trim().length < 30) { alert('请先写一些内容（至少 30 字），再插入引用标记'); return; }
+    var refs = (typeof mergedRefs !== 'undefined' && mergedRefs.length) ? mergedRefs : (typeof existingRefs !== 'undefined' ? existingRefs : []);
+    if (!refs.length) { alert('还没有检索文献。请先在参考文献模块中检索。'); return; }
+    // Find good insertion points: end of sentences (。, .!?) that don't already have [N] after them
+    var text = draft.content;
+    var parts = text.split(/(?<=[。！？\.\!\?]\s*)(?!\s*\[)/);
+    if (parts.length < 2) {
+      // No clear sentence boundaries – just append at end of each paragraph
+      parts = text.split(/\n{2,}/);
+    }
+    var refIdx = 1;
+    var result = parts.map(function (part, i) {
+      if (i === parts.length - 1) return part;
+      // Don't insert after every sentence - sample ~1 per 3 sentences or key positions
+      if (Math.random() < 0.35 && refIdx <= refs.length) {
+        var marker = ' [' + refIdx + ']';
+        refIdx++;
+        return part + marker;
+      }
+      return part;
+    }).join('');
+
+    // Also ensure at least 3 citation markers exist
+    var existingCount = (result.match(/\[\d+\]/g) || []).length;
+    if (existingCount < 3) {
+      result = text.replace(/([。！？\.\!\?])\s*/g, function (match, p1) {
+        if (refIdx <= Math.min(refs.length, 5)) {
+          return p1 + ' [' + (refIdx++) + '] ';
+        }
+        return match;
+      });
+    }
+
+    var ta = document.getElementById('chapterContent');
+    if (!ta) return;
+    if (ta.value && ta.value !== text && ta.value.trim().length > 30) {
+      ta.value = result;
+      if (typeof ttp === 'function') ttp('已插入 ' + (refIdx - 1) + ' 处引用标记 [N]，可手动调整');
+      logSkillRun({ moduleId: 'cite-markers', title: '自动插入引用标记', summary: meta.title + ' · ' + (refIdx - 1) + ' 处' });
+    }
+  }
 
   // ============ Export Full Paper ============
   function exportFullPaper() {
