@@ -358,6 +358,9 @@ function updateStatusBar2() {
 function onThesisLoaded() {
   _thesisLoaded = true; _analysisCache = {}; kgCurrentData = null;
   updateBarActions(); updateStatusBar2(); updateNavStates();
+  if (window.ThesisProject && typeof ThesisProject.onManuscriptReady === 'function') {
+    ThesisProject.onManuscriptReady();
+  }
   switchView('references');
 }
 
@@ -371,7 +374,11 @@ function switchView(view) {
   var rp = document.getElementById('refPanel');
 
   if (view === 'workspace') {
-    if (ws) ws.style.display = '';
+    if (ws) {
+      ws.style.display = '';
+      if (typeof renderWorkspaceHero === 'function') renderWorkspaceHero();
+      else if (window.ThesisProject && typeof ThesisProject.renderWorkspaceHero === 'function') ThesisProject.renderWorkspaceHero();
+    }
     // Hide paper content
     var children = tb.children;
     for (var i = 0; i < children.length; i++) {
@@ -852,11 +859,17 @@ function drawBarChart(canvas, items) {
   // 页面刷新时已有论文数据就不弹上传遮罩
   var hasData = (typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100)
     || (typeof sections !== 'undefined' && sections && sections.length > 0);
+  // Thesis OS: 默认进入项目工作台，而不是强弹上传
   if (!hasData) {
-    showUploadOverlay();
+    // 不再自动 showUploadOverlay，改为项目总览引导
+    if (typeof switchView === 'function') switchView('workspace');
   }
   renderModuleTabs(); updateBarActions(); updateStatusBar2();
   initKeyboard();
+  if (window.ThesisProject && typeof ThesisProject.renderProjectChrome === 'function') {
+    ThesisProject.renderProjectChrome();
+  }
+  if (typeof renderWorkspaceHero === 'function') renderWorkspaceHero();
 
   var pollCount = 0;
   var pollTimer = setInterval(function() {

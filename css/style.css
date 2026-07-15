@@ -744,6 +744,91 @@ body {
 .dash-item .dv { font-size: 1.15rem; font-weight: var(--font-weight-bold); color: var(--text-primary); font-family: var(--font-mono); }
 .dash-item .dl { font-size: 0.58rem; color: var(--text-muted); margin-top: 3px; font-weight: var(--font-weight-medium); text-transform: uppercase; letter-spacing: 0.03em; }
 
+/* ====== Thesis OS / Project System ====== */
+.project-chip{
+  max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  margin-left:8px;padding:4px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.12);
+  background:rgba(99,102,241,.16);color:#c7d2fe;font-size:.62rem;font-weight:600;cursor:pointer;
+  font-family:var(--font-sans);
+}
+.project-progress-chip{
+  margin-left:6px;font-size:.58rem;color:rgba(255,255,255,.45);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.stage-nav{padding:2px 8px 8px;display:flex;flex-direction:column;gap:4px;max-height:220px;overflow:auto}
+.stage-nav-item{
+  display:flex;gap:8px;align-items:flex-start;padding:8px;border-radius:10px;cursor:pointer;
+  border:1px solid transparent;color:rgba(255,255,255,.55);transition:all .15s;
+}
+.stage-nav-item:hover{background:rgba(255,255,255,.05);color:rgba(255,255,255,.85)}
+.stage-nav-item.active{background:rgba(99,102,241,.16);border-color:rgba(99,102,241,.25);color:#e0e7ff}
+.stage-nav-item.is-done .stage-nav-idx{background:rgba(16,185,129,.2);color:#6ee7b7}
+.stage-nav-idx{
+  width:20px;height:20px;border-radius:6px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;
+  font-size:.62rem;font-weight:700;flex-shrink:0;margin-top:1px
+}
+.stage-nav-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.stage-nav-text b{font-size:.68rem;font-weight:700}
+.stage-nav-text i{font-style:normal;font-size:.58rem;opacity:.65;line-height:1.35}
+.project-overview{width:100%;max-width:920px;padding:12px 8px 28px;text-align:left}
+.project-overview-head{margin-bottom:16px}
+.project-badge{
+  display:inline-block;padding:3px 10px;border-radius:999px;background:rgba(99,102,241,.1);color:var(--accent);
+  font-size:.62rem;font-weight:700;margin-bottom:8px
+}
+.project-overview-head h2{margin:0 0 8px;font-size:1.35rem;color:var(--text-primary);letter-spacing:-.02em}
+.project-overview-head p{margin:0;color:var(--text-muted);font-size:.8rem;line-height:1.7}
+.project-cta-row{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0 18px}
+.project-progress-wrap{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:14px
+}
+.project-progress-meta{display:flex;justify-content:space-between;align-items:center;font-size:.72rem;color:var(--text-secondary);margin-bottom:8px}
+.project-progress-bar{height:8px;border-radius:999px;background:rgba(99,102,241,.1);overflow:hidden}
+.project-progress-bar i{display:block;height:100%;background:linear-gradient(90deg,#6366f1,#818cf8);border-radius:999px}
+.project-progress-sub{margin-top:8px;font-size:.62rem;color:var(--text-muted)}
+.project-next-card{
+  display:flex;flex-direction:column;gap:12px;padding:14px 16px;border-radius:14px;
+  border:1px solid rgba(99,102,241,.18);background:rgba(99,102,241,.05);margin-bottom:16px
+}
+.project-next-card strong{display:block;color:var(--text-primary);font-size:.85rem;margin-bottom:4px}
+.project-next-card p{margin:0;color:var(--text-muted);font-size:.72rem;line-height:1.6}
+.project-stage-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.project-stage-card{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:12px;cursor:pointer;
+  transition:border-color .15s, transform .15s, box-shadow .15s;min-height:108px
+}
+.project-stage-card:hover{border-color:rgba(99,102,241,.3);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.project-stage-card.is-current{border-color:rgba(99,102,241,.4);box-shadow:0 0 0 1px rgba(99,102,241,.12)}
+.project-stage-card.is-done{background:rgba(16,185,129,.05)}
+.project-stage-idx,.project-stage-status{font-size:.58rem;font-weight:700;color:var(--accent);margin-bottom:8px}
+.project-stage-status{color:var(--text-muted)}
+.project-stage-card.is-done .project-stage-status{color:#059669}
+.project-stage-card.is-current .project-stage-status{color:var(--accent)}
+.project-stage-name{font-size:.78rem;font-weight:700;color:var(--text-primary);margin-bottom:6px}
+.project-stage-desc{font-size:.65rem;color:var(--text-muted);line-height:1.5}
+.project-overlay{
+  position:fixed;inset:0;z-index:100010;background:rgba(15,23,42,.55);backdrop-filter:blur(8px);
+  display:flex;align-items:center;justify-content:center;padding:20px
+}
+.project-modal{
+  width:min(560px,100%);background:var(--bg-card);border:1px solid var(--border);border-radius:16px;
+  box-shadow:var(--shadow-lg);padding:20px 20px 16px;color:var(--text-primary)
+}
+.project-modal-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:14px}
+.project-modal-head h3{margin:0 0 4px;font-size:1rem}
+.project-modal-head p{margin:0;font-size:.72rem;color:var(--text-muted);line-height:1.6}
+.project-close{border:none;background:transparent;color:var(--text-muted);font-size:1rem;cursor:pointer}
+.project-form{display:flex;flex-direction:column;gap:10px}
+.project-form label{font-size:.68rem;font-weight:600;color:var(--text-secondary)}
+.project-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.project-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+@media (max-width:768px){
+  .project-stage-grid{grid-template-columns:1fr}
+  .project-grid-2{grid-template-columns:1fr}
+  .project-progress-chip{display:none}
+  .project-chip{max-width:120px}
+  .stage-nav-text i{display:none}
+}
+
 /* ====== Help Button ====== */
 .help-btn {
   position: fixed;

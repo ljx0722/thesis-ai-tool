@@ -19,54 +19,52 @@
     <div class="landing-hero">
       <div class="landing-brand">
         <h1 class="landing-title">学术论文AI<br>一站式助手</h1>
-        <p class="landing-desc">从选题到答辩，覆盖论文写作全流程的智能工作台。<br>上传 DOCX，即刻获得文献检索、格式检查、AI 审阅与知识图谱。</p>
+        <p class="landing-desc">从一句话想法开始，到大纲、文献、分章写作、打磨与答辩。<br>既是论文生产流水线，也能导入 DOCX 做专业打磨。</p>
       </div>
 
       <div class="landing-features">
         <div class="feature-item">
-          <div class="feature-icon" style="--fa:#818cf8">📄</div>
+          <div class="feature-icon" style="--fa:#818cf8">💡</div>
           <div class="feature-text">
-            <span class="feature-title">DOCX 智能解析</span>
-            <span class="feature-sub">五层目录树 · 样式识别 · 章节结构化</span>
+            <span class="feature-title">从想法立项</span>
+            <span class="feature-sub">选题 · 研究问题 · 开题大纲</span>
           </div>
         </div>
         <div class="feature-item">
-          <div class="feature-icon" style="--fa:#a78bfa">🔍</div>
+          <div class="feature-icon" style="--fa:#a78bfa">📚</div>
           <div class="feature-text">
-            <span class="feature-title">14 源文献检索</span>
-            <span class="feature-sub">OpenAlex · Crossref · Semantic Scholar · arXiv 等</span>
+            <span class="feature-title">文献与证据</span>
+            <span class="feature-sub">多源检索 · 知识图谱 · 引用管理</span>
           </div>
         </div>
         <div class="feature-item">
-          <div class="feature-icon" style="--fa:#22d3ee">🕸️</div>
+          <div class="feature-icon" style="--fa:#22d3ee">✍️</div>
           <div class="feature-text">
-            <span class="feature-title">知识图谱</span>
-            <span class="feature-sub">词云 · 共现网络 · 文献时间线</span>
+            <span class="feature-title">分阶段写作</span>
+            <span class="feature-sub">扩写 · 数据 · 论证补强</span>
           </div>
         </div>
         <div class="feature-item">
           <div class="feature-icon" style="--fa:#f59e0b">📊</div>
           <div class="feature-text">
-            <span class="feature-title">十维评估报告</span>
-            <span class="feature-sub">雷达图 · 章节分析 · 优先改进建议</span>
+            <span class="feature-title">评审与答辩</span>
+            <span class="feature-sub">十维看板 · 查错降重 · PPT 大纲</span>
           </div>
         </div>
         <div class="feature-item">
-          <div class="feature-icon" style="--fa:#34d399">✏️</div>
+          <div class="feature-icon" style="--fa:#34d399">📄</div>
           <div class="feature-text">
-            <span class="feature-title">AI 论文审阅</span>
-            <span class="feature-sub">查错 · 降重 · 术语分析 · 段落诊断</span>
+            <span class="feature-title">DOCX 智能解析</span>
+            <span class="feature-sub">样式识别 · 目录树 · 本地解析</span>
           </div>
         </div>
         <div class="feature-item">
-          <div class="feature-icon" style="--fa:#f472b6">🌐</div>
+          <div class="feature-icon" style="--fa:#f472b6">🛠️</div>
           <div class="feature-text">
-            <span class="feature-title">答辩输出</span>
-            <span class="feature-sub">PPT 大纲 · 英文摘要 · 开题报告</span>
+            <span class="feature-title">学术能力编排</span>
+            <span class="feature-sub">按写作阶段调用专业能力</span>
           </div>
         </div>
-      </div>
-
       </div>
     </div>
 
@@ -116,6 +114,8 @@
 <div class="bar">
   <div class="bar-left">
     <h1>学术论文AI一站式助手</h1>
+    <button id="projectTitleChip" class="project-chip" onclick="openIdeaWizard()" title="创建或查看项目">未创建项目</button>
+    <span id="projectProgressChip" class="project-progress-chip">创建项目后显示进度</span>
   </div>
   <div class="bar-tabs" id="barTabs">
     <button class="bar-tab active" data-view="workspace" onclick="switchView('workspace')">工作台</button>
@@ -158,29 +158,38 @@
 <!-- ====== 三栏布局 ====== -->
 <div class="main">
   <div class="nav-sidebar" id="navSidebar">
-    <h3>导航</h3>
+    <h3>项目</h3>
     <div class="nav-upload" id="navUpload">
+      <button onclick="openIdeaWizard()" class="nav-upload-btn" style="margin-bottom:6px">💡 从想法开始</button>
       <button onclick="triggerUpload()" class="nav-upload-btn">📎 上传论文</button>
     </div>
+    <h3>写作阶段</h3>
+    <div id="stageNav" class="stage-nav"></div>
+    <h3 style="margin-top:10px">能力</h3>
     <div class="nav-modules" id="navModules">
       <div class="nav-group">
-        <div class="nav-group-title" onclick="toggleNavGroup(this)">🎯 选题阶段 <span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-title" onclick="toggleNavGroup(this)">🎯 选题立项 <span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
           <div class="nav-item" data-module="topic-finder" data-needs-thesis="0" onclick="switchModule('topic-finder')" title="无需上传论文，直接输入领域获取推荐">💡 选题推荐</div>
           <div class="nav-item" data-module="proposal" data-needs-thesis="0" onclick="switchModule('proposal')" title="无需上传论文，粘贴开题报告即可">📝 开题大纲</div>
         </div>
       </div>
       <div class="nav-group">
-        <div class="nav-group-title" onclick="toggleNavGroup(this)">📝 撰写阶段 <span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-title" onclick="toggleNavGroup(this)">📚 文献地图 <span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
-          <div class="nav-item" data-module="references" data-needs-thesis="1" onclick="switchModule('references')" title="需要上传论文">📋 参考文献</div>
-          <div class="nav-item" data-module="expand" data-needs-thesis="1" onclick="switchModule('expand')" title="需要上传论文">✍️ 论文扩写</div>
-          <div class="nav-item" data-module="data-analysis" data-needs-thesis="0" onclick="switchModule('data-analysis')" title="无需上传论文，上传Excel/CSV即可">📈 数据分析</div>
+          <div class="nav-item" data-module="references" data-needs-thesis="1" onclick="switchModule('references')" title="需要上传论文或已有正文结构">📋 参考文献</div>
           <div class="nav-item" data-module="knowledge-graph" data-needs-thesis="1" onclick="switchModule('knowledge-graph')" title="需要上传论文">🕸️ 知识图谱</div>
         </div>
       </div>
       <div class="nav-group">
-        <div class="nav-group-title" onclick="toggleNavGroup(this)">🔍 打磨阶段 <span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-title" onclick="toggleNavGroup(this)">✍️ 分章写作 <span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-items">
+          <div class="nav-item" data-module="expand" data-needs-thesis="1" onclick="switchModule('expand')" title="需要上传论文">✍️ 论文扩写</div>
+          <div class="nav-item" data-module="data-analysis" data-needs-thesis="0" onclick="switchModule('data-analysis')" title="无需上传论文，上传Excel/CSV即可">📈 数据分析</div>
+        </div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-title" onclick="toggleNavGroup(this)">🔍 打磨审校 <span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
           <div class="nav-item" data-module="proofread" data-needs-thesis="0" onclick="switchModule('proofread')" title="无需上传论文，粘贴文本即可检查">✏️ 论文查错</div>
           <div class="nav-item" data-module="de-duplicate" data-needs-thesis="0" onclick="switchModule('de-duplicate')" title="无需上传论文，粘贴文本即可降重">📋 查重降重</div>
@@ -190,13 +199,13 @@
         </div>
       </div>
       <div class="nav-group">
-        <div class="nav-group-title" onclick="toggleNavGroup(this)">📊 评审输出 <span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-title" onclick="toggleNavGroup(this)">📊 评审答辩 <span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
           <div class="nav-item" data-module="review" data-needs-thesis="1" onclick="switchModule('review')" title="需要上传论文">🔍 论文审阅</div>
           <div class="nav-item" data-module="optimization" data-needs-thesis="1" onclick="switchModule('optimization')" title="需要上传论文">💡 优化建议</div>
+          <div class="nav-item" data-module="dashboard" data-needs-thesis="1" onclick="switchModule('dashboard')" title="需要上传论文">📊 论文看板</div>
           <div class="nav-item" data-module="defense-ppt" data-needs-thesis="0" onclick="switchModule('defense-ppt')" title="无需上传论文，粘贴摘要即可生成">📊 答辩PPT</div>
           <div class="nav-item" data-module="en-abstract" data-needs-thesis="0" onclick="switchModule('en-abstract')" title="无需上传论文，粘贴文本即可翻译/润色">🌐 英文摘要</div>
-          <div class="nav-item" data-module="dashboard" data-needs-thesis="1" onclick="switchModule('dashboard')" title="需要上传论文">📊 论文看板</div>
         </div>
       </div>
     </div>
@@ -219,28 +228,7 @@
     </div>
     <div class="thesis-box" id="thesisBox">
       <div id="workspaceContent" class="workspace-content">
-        <div class="workspace-hero">
-          <div class="workspace-icon">📋</div>
-          <h2 class="workspace-title">欢迎使用学术论文AI一站式助手</h2>
-          <p class="workspace-sub">上传你的论文，开始智能写作辅助之旅</p>
-          <div class="workspace-actions">
-            <div onclick="triggerUpload()" class="workspace-card" onmouseenter="this.style.background='rgba(99,102,241,.14)'" onmouseleave="this.style.background='rgba(99,102,241,.08)'">
-              <div class="workspace-card-icon">📄</div>
-              <div class="workspace-card-title">上传论文</div>
-              <div class="workspace-card-desc">支持 .docx 格式<br>本地解析，数据不上传</div>
-            </div>
-            <div onclick="switchView('references')" class="workspace-card" onmouseenter="this.style.background='rgba(34,211,238,.12)'" onmouseleave="this.style.background='rgba(34,211,238,.06)'">
-              <div class="workspace-card-icon">📋</div>
-              <div class="workspace-card-title">参考文献</div>
-              <div class="workspace-card-desc">检索·筛选·校验·管理</div>
-            </div>
-            <div onclick="showDashboard()" class="workspace-card" onmouseenter="this.style.background='rgba(168,85,247,.12)'" onmouseleave="this.style.background='rgba(168,85,247,.06)'">
-              <div class="workspace-card-icon">📊</div>
-              <div class="workspace-card-title">论文看板</div>
-              <div class="workspace-card-desc">十维评估·雷达图·建议</div>
-            </div>
-          </div>
-        </div>
+        <!-- filled by project.js -->
       </div>
     </div>
     <div class="skeleton-full" id="thesisSkeleton" style="display:none"><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-block"></div><div class="skeleton skeleton-line"></div></div>
@@ -391,22 +379,23 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
 <script defer src="mammoth.browser.min.js"></script>
 <script defer src="jszip.min.js"></script>
-<script src="app.js?v=27"></script>
-<script src="js/modules/optimization.js?v=27"></script>
-<script src="js/modules/format-check.js?v=27"></script>
-<script src="js/modules/terminology.js?v=27"></script>
-<script src="js/modules/paragraph-analysis.js?v=27"></script>
-<script src="js/modules/dashboard.js?v=27"></script>
-<script src="js/modules/thesis-review.js?v=27"></script>
-<script src="js/modules/proposal.js?v=27"></script>
-<script src="js/modules/onboarding.js?v=27"></script>
-<script src="js/modules/cat-game.js?v=27"></script>
-<script src="js/modules/topic-finder.js?v=27"></script>
-<script src="js/modules/proofread.js?v=27"></script>
-<script src="js/modules/de-duplicate.js?v=27"></script>
-<script src="js/modules/defense-ppt.js?v=27"></script>
-<script src="js/modules/en-abstract.js?v=27"></script>
-<script src="js/app-modules.js?v=27"></script>
+<script src="app.js?v=28"></script>
+<script src="js/modules/optimization.js?v=28"></script>
+<script src="js/modules/format-check.js?v=28"></script>
+<script src="js/modules/terminology.js?v=28"></script>
+<script src="js/modules/paragraph-analysis.js?v=28"></script>
+<script src="js/modules/dashboard.js?v=28"></script>
+<script src="js/modules/thesis-review.js?v=28"></script>
+<script src="js/modules/proposal.js?v=28"></script>
+<script src="js/modules/onboarding.js?v=28"></script>
+<script src="js/modules/cat-game.js?v=28"></script>
+<script src="js/modules/topic-finder.js?v=28"></script>
+<script src="js/modules/proofread.js?v=28"></script>
+<script src="js/modules/de-duplicate.js?v=28"></script>
+<script src="js/modules/defense-ppt.js?v=28"></script>
+<script src="js/modules/en-abstract.js?v=28"></script>
+<script src="js/modules/project.js?v=28"></script>
+<script src="js/app-modules.js?v=28"></script>
 <script>
 (function(){
   var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');
