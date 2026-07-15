@@ -166,22 +166,23 @@ function initKeyboard() {
 }
 
 // ==================== 渲染顶栏模块标签 ====================
+// 顶栏只保留视图切换（工作台 / 参考文献 / 论文看板）
+// 能力入口统一放在左侧「阶段 + 能力」导航，避免顶栏被 16 个模块挤爆
 function renderModuleTabs() {
   var container = document.getElementById('barTabs');
   if (!container) return;
   _thesisLoaded = !!(typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100);
-
-  var h = '';
-  APP_MODULES.forEach(function(m, idx) {
-    var disabled = m.requiresThesis && !_thesisLoaded;
-    var active = _activeModule === m.id ? ' active' : '';
-    var cls = 'module-tab' + active + (disabled ? ' disabled' : '');
-    var onclick = disabled ? '' : ' onclick="switchModule(\'' + m.id + '\')"';
-    h += '<div class="' + cls + '" data-module="' + m.id + '"' + onclick + ' title="' + (disabled ? '请先上传论文' : m.name + ' (Ctrl+' + (idx + 1) + ')') + '">';
-    h += '<span class="tab-icon">' + m.icon + '</span>' + m.name;
-    h += '</div>';
-  });
-  container.innerHTML = h;
+  var activeView = 'workspace';
+  if (_activeModule === 'references') activeView = 'refs';
+  else if (_activeModule === 'dashboard') activeView = 'dashboard';
+  else if (_activeModule && _activeModule !== 'workspace') {
+    // 在能力模块中时，高亮工作台（中间编辑区）
+    activeView = 'workspace';
+  }
+  container.innerHTML =
+    '<button class="bar-tab' + (activeView === 'workspace' ? ' active' : '') + '" data-view="workspace" onclick="switchView(\'workspace\')">工作台</button>' +
+    '<button class="bar-tab' + (activeView === 'refs' ? ' active' : '') + '" data-view="refs" onclick="switchView(\'references\')">参考文献</button>' +
+    '<button class="bar-tab' + (activeView === 'dashboard' ? ' active' : '') + '" data-view="dashboard" onclick="showDashboard()">论文看板</button>';
 }
 
 function updateBarActions() {

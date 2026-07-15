@@ -820,7 +820,9 @@ body {
 .project-form{display:flex;flex-direction:column;gap:10px}
 .project-form label{font-size:.68rem;font-weight:600;color:var(--text-secondary)}
 .project-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.project-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.project-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap}
+.outline-modal{width:min(680px,100%)}
+.outline-modal .ai-textarea{font-family:var(--font-mono);font-size:.74rem;line-height:1.55}
 @media (max-width:768px){
   .project-stage-grid{grid-template-columns:1fr}
   .project-grid-2{grid-template-columns:1fr}

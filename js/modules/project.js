@@ -9,7 +9,7 @@
   var STAGES = [
     { id: 'ideation', name: '选题立项', icon: '🎯', desc: '从想法到题目与研究问题', modules: ['topic-finder', 'proposal'] },
     { id: 'literature', name: '文献地图', icon: '📚', desc: '检索、筛选、图谱化文献', modules: ['references', 'knowledge-graph'] },
-    { id: 'writing', name: '分章写作', icon: '✍️', desc: '大纲落地、章节扩写与数据', modules: ['expand', 'data-analysis'] },
+    { id: 'writing', name: '分章写作', icon: '✍️', desc: '大纲落地、章节扩写与数据', modules: ['expand', 'data-analysis'], primaryAction: 'open-outline' },
     { id: 'polish', name: '打磨审校', icon: '🔍', desc: '查错、降重、格式与术语', modules: ['proofread', 'de-duplicate', 'format-check', 'terminology', 'paragraph'] },
     { id: 'review', name: '综合评审', icon: '📊', desc: '审阅、优化与十维看板', modules: ['review', 'optimization', 'dashboard'] },
     { id: 'defense', name: '答辩输出', icon: '🎤', desc: '英文摘要与答辩材料', modules: ['en-abstract', 'defense-ppt'] }
@@ -90,6 +90,7 @@
       hasManuscript: !!opts.hasManuscript,
       stageStatus: {},
       notes: opts.notes || '',
+      artifacts: opts.artifacts || { outline: null, chapters: {}, skillLogs: [] },
       createdAt: nowISO(),
       updatedAt: nowISO()
     };
@@ -103,6 +104,57 @@
     var p = getCurrentProject();
     if (!p) return null;
     Object.keys(patch || {}).forEach(function (k) { p[k] = patch[k]; });
+    if (!p.artifacts) p.artifacts = { outline: null, chapters: {}, skillLogs: [] };
+    p.updatedAt = nowISO();
+    return upsertProject(p);
+  }
+
+  function ensureArtifacts(p) {
+    if (!p.artifacts) p.artifacts = { outline: null, chapters: {}, skillLogs: [] };
+    if (!p.artifacts.chapters) p.artifacts.chapters = {};
+    if (!p.artifacts.skillLogs) p.artifacts.skillLogs = [];
+    return p.artifacts;
+  }
+
+  function saveOutline(outline) {
+    var p = getCurrentProject();
+    if (!p) return null;
+    var arts = ensureArtifacts(p);
+    arts.outline = {
+      title: outline.title || p.title,
+      chapters: outline.chapters || [],
+      updatedAt: nowISO()
+    };
+    p.updatedAt = nowISO();
+    // 有大纲后，推进写作阶段
+    if ((p.stageStatus || {}).writing !== 'done') {
+      p.stageStatus.writing = 'active';
+      if (p.currentStage === 'ideation' || p.currentStage === 'literature') {
+        // 不强制跳阶段，只标记写作可开始
+      }
+    }
+    return upsertProject(p);
+  }
+
+  function getOutline() {
+    var p = getCurrentProject();
+    if (!p) return null;
+    var arts = ensureArtifacts(p);
+    return arts.outline || null;
+  }
+
+  function logSkillRun(entry) {
+    var p = getCurrentProject();
+    if (!p) return null;
+    var arts = ensureArtifacts(p);
+    arts.skillLogs.unshift({
+      id: uid(),
+      moduleId: entry.moduleId || '',
+      title: entry.title || '',
+      summary: entry.summary || '',
+      at: nowISO()
+    });
+    arts.skillLogs = arts.skillLogs.slice(0, 50);
     p.updatedAt = nowISO();
     return upsertProject(p);
   }
@@ -319,6 +371,7 @@
           '<div class="project-cta-row" style="margin:0">' +
             '<button class="ai-btn" onclick="runProjectAction(\'' + next.primary.action + '\',\'' + (next.primary.stageId || '') + '\',\'' + (next.primary.moduleId || '') + '\')">' + next.primary.label + '</button>' +
             (next.secondary ? '<button class="ai-btn-clear" onclick="runProjectAction(\'' + next.secondary.action + '\')">' + next.secondary.label + '</button>' : '') +
+            '<button class="ai-btn-clear" onclick="openOutlineEditor()">🧭 大纲编辑器</button>' +
             '<button class="ai-btn-clear" onclick="completeCurrentStage()">标记本阶段完成</button>' +
           '</div>' +
         '</div>' +
@@ -392,6 +445,10 @@
     upsertProject(project);
     renderProjectChrome();
     var mod = stage.modules && stage.modules[0];
+    if (stage.primaryAction === 'open-outline') {
+      openOutlineEditor();
+      return;
+    }
     if (mod && typeof switchModule === 'function') switchModule(mod);
   }
 
@@ -407,7 +464,118 @@
     if (action === 'open-idea-wizard') return openIdeaWizard();
     if (action === 'upload') return typeof triggerUpload === 'function' ? triggerUpload() : null;
     if (action === 'open-stage') return openProjectStage(stageId || 'ideation');
+    if (action === 'open-outline') return openOutlineEditor();
     if (moduleId && typeof switchModule === 'function') return switchModule(moduleId);
+  }
+
+  // ---------- Outline Editor ----------
+  function defaultOutlineFromProject(p) {
+    var title = (p && p.title) || '论文题目';
+    return {
+      title: title,
+      chapters: [
+        { title: '第1章 绪论', sections: ['研究背景', '研究意义', '研究内容与方法'] },
+        { title: '第2章 文献综述', sections: ['国内外研究现状', '研究评述与缺口'] },
+        { title: '第3章 研究设计与方法', sections: ['研究框架', '数据来源', '分析方法'] },
+        { title: '第4章 实证分析 / 案例研究', sections: ['描述性统计', '模型结果', '结果讨论'] },
+        { title: '第5章 结论与展望', sections: ['主要结论', '研究局限', '未来展望'] }
+      ]
+    };
+  }
+
+  function openOutlineEditor() {
+    var p = getCurrentProject();
+    if (!p) { openIdeaWizard(); return; }
+    closeOutlineEditor();
+    var existing = getOutline() || defaultOutlineFromProject(p);
+    var ov = document.createElement('div');
+    ov.id = 'outlineEditorOverlay';
+    ov.className = 'project-overlay';
+    ov.innerHTML =
+      '<div class="project-modal outline-modal" onclick="event.stopPropagation()">' +
+        '<div class="project-modal-head">' +
+          '<div><h3>🧭 论文大纲编辑器</h3><p>先把结构定下来，再进入分章写作。大纲会保存到当前项目。</p></div>' +
+          '<button class="project-close" onclick="closeOutlineEditor()">✕</button>' +
+        '</div>' +
+        '<div class="project-form">' +
+          '<label>论文题目</label>' +
+          '<input id="outlineTitle" class="ai-input" value="' + escapeHtml(existing.title || p.title) + '">' +
+          '<label>章节结构（每行一章；用「- 小节」表示下属小节）</label>' +
+          '<textarea id="outlineText" class="ai-textarea" style="height:280px;margin:0" placeholder="第1章 绪论\n- 研究背景\n- 研究意义"></textarea>' +
+          '<div class="project-progress-sub">提示：可先点「生成默认大纲」，再按你的题目改。</div>' +
+        '</div>' +
+        '<div class="project-modal-actions">' +
+          '<button class="ai-btn-clear" onclick="fillDefaultOutline()">生成默认大纲</button>' +
+          '<button class="ai-btn-clear" onclick="closeOutlineEditor()">取消</button>' +
+          '<button class="ai-btn" onclick="saveOutlineEditor()">保存大纲</button>' +
+        '</div>' +
+      '</div>';
+    ov.onclick = function () { closeOutlineEditor(); };
+    document.body.appendChild(ov);
+    document.getElementById('outlineText').value = serializeOutline(existing);
+  }
+
+  function closeOutlineEditor() {
+    var ov = document.getElementById('outlineEditorOverlay');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+
+  function serializeOutline(outline) {
+    var lines = [];
+    (outline.chapters || []).forEach(function (ch) {
+      lines.push(ch.title || '未命名章节');
+      (ch.sections || []).forEach(function (sec) {
+        lines.push('- ' + sec);
+      });
+    });
+    return lines.join('\n');
+  }
+
+  function parseOutlineText(text) {
+    var lines = String(text || '').split(/\r?\n/);
+    var chapters = [];
+    var cur = null;
+    lines.forEach(function (raw) {
+      var line = raw.replace(/\s+$/, '');
+      if (!line.trim()) return;
+      if (/^\s*[-•]/.test(line) || /^\s+/.test(line)) {
+        var sec = line.replace(/^\s*[-•]\s*/, '').trim();
+        if (sec) {
+          if (!cur) {
+            cur = { title: '第1章', sections: [] };
+            chapters.push(cur);
+          }
+          cur.sections.push(sec);
+        }
+      } else {
+        cur = { title: line.trim(), sections: [] };
+        chapters.push(cur);
+      }
+    });
+    return chapters;
+  }
+
+  function fillDefaultOutline() {
+    var p = getCurrentProject();
+    var d = defaultOutlineFromProject(p || {});
+    var titleEl = document.getElementById('outlineTitle');
+    var textEl = document.getElementById('outlineText');
+    if (titleEl) titleEl.value = d.title;
+    if (textEl) textEl.value = serializeOutline(d);
+  }
+
+  function saveOutlineEditor() {
+    var p = getCurrentProject();
+    if (!p) { alert('请先创建项目'); return; }
+    var title = (document.getElementById('outlineTitle').value || '').trim() || p.title;
+    var chapters = parseOutlineText(document.getElementById('outlineText').value || '');
+    if (!chapters.length) { alert('请至少写一章大纲'); return; }
+    saveOutline({ title: title, chapters: chapters });
+    if (title && title !== p.title) updateCurrent({ title: title });
+    logSkillRun({ moduleId: 'outline-editor', title: '保存论文大纲', summary: '共 ' + chapters.length + ' 章' });
+    closeOutlineEditor();
+    renderProjectChrome();
+    if (typeof ttp === 'function') ttp('大纲已保存（' + chapters.length + ' 章）');
   }
 
   function onManuscriptReady() {
@@ -443,7 +611,10 @@
     ensureDefaultProject: ensureDefaultProject,
     onManuscriptReady: onManuscriptReady,
     renderProjectChrome: renderProjectChrome,
-    renderWorkspaceHero: renderWorkspaceHero
+    renderWorkspaceHero: renderWorkspaceHero,
+    saveOutline: saveOutline,
+    getOutline: getOutline,
+    logSkillRun: logSkillRun
   };
   window.openIdeaWizard = openIdeaWizard;
   window.closeIdeaWizard = closeIdeaWizard;
@@ -452,4 +623,8 @@
   window.completeCurrentStage = completeCurrentStage;
   window.runProjectAction = runProjectAction;
   window.renderWorkspaceHero = renderWorkspaceHero;
+  window.openOutlineEditor = openOutlineEditor;
+  window.closeOutlineEditor = closeOutlineEditor;
+  window.fillDefaultOutline = fillDefaultOutline;
+  window.saveOutlineEditor = saveOutlineEditor;
 })();
