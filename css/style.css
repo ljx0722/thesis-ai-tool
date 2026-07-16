@@ -1666,3 +1666,38 @@ body.dark .bar, body:not(.light) .bar { background: rgba(2, 6, 23, 0.95); }
 .merged-chapter p{font-size:.86rem;line-height:1.85;margin:0 0 10px;text-indent:2em}
 .merged-refs p{text-indent:0;font-size:.8rem;line-height:1.7;margin:0 0 8px}
 #mergedPaperRoot{min-height:100%;background:var(--bg-card)}
+
+
+/* ===== Unified sidebar: stages + prominent TOC ===== */
+.nav-brand-mini{
+  font-size:.72rem;font-weight:700;color:rgba(255,255,255,.85);
+  padding:10px 12px 6px;letter-spacing:.02em
+}
+.nav-section-label{
+  font-size:.58rem;color:rgba(255,255,255,.35);padding:10px 12px 6px;
+  text-transform:uppercase;letter-spacing:.06em
+}
+.nav-section-label.toc-label{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.nav-section-label #navTreeMeta{font-size:.52rem;color:rgba(255,255,255,.28);text-transform:none;letter-spacing:0}
+.nav-upload{display:flex;flex-direction:column;gap:6px;padding:0 10px 8px}
+.nav-upload-btn.primary{background:rgba(99,102,241,.22);border:1px solid rgba(99,102,241,.35);color:#e0e7ff}
+.nav-tree-wrap{
+  flex:1 1 auto;min-height:180px;max-height:none;display:flex;flex-direction:column;
+  margin:0 8px 8px;border:1px solid rgba(255,255,255,.08);border-radius:12px;
+  background:rgba(255,255,255,.03);overflow:hidden
+}
+.nav-tree-wrap .nav-tree{flex:1;max-height:none;min-height:160px;padding:6px}
+.nav-tools-details{margin:0 8px 12px;border-top:1px solid rgba(255,255,255,.06);padding-top:8px}
+.nav-tools-details > summary{
+  cursor:pointer;color:rgba(255,255,255,.45);font-size:.68rem;padding:6px 8px;list-style:none
+}
+.nav-tools-details > summary::-webkit-details-marker{display:none}
+.nav-tools-details[open] > summary{color:rgba(255,255,255,.75);margin-bottom:4px}
+.nav-tools-details .nav-modules{max-height:220px;overflow:auto;padding:0 0 8px}
+.nav-tools-details .nav-item{
+  display:block;padding:7px 10px;margin:2px 4px;border-radius:8px;font-size:.68rem;
+  color:rgba(255,255,255,.55);cursor:pointer
+}
+.nav-tools-details .nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav-tools-details .nav-item.active{background:rgba(99,102,241,.2);color:#c7d2fe}
+.stage-nav{padding:0 8px 8px;max-height:260px;overflow:auto}

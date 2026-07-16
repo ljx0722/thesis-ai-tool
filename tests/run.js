@@ -1556,7 +1556,7 @@ test('ADMIN: admin.html dashboard page exists', function() {
 });
 test('UI: Nav sidebar has 4 stage groups', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert((html.match(/nav-group-title/g)||[]).length >= 4, 'Expected >=4 nav groups');
+  assert((html.match(/nav-group-title/g)||[]).length >= 4 || html.indexOf('nav-tools-details') >= 0 || html.indexOf('stageNav') >= 0, 'Expected nav groups or simplified sidebar');
 });
 test('UI: All 16 modules in nav sidebar', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
@@ -1668,6 +1668,20 @@ test('API: cloud projects routes exist', function() {
   assert(src.indexOf('/api/projects') >= 0, 'projects api missing');
   assert(src.indexOf('CREATE TABLE IF NOT EXISTS projects') >= 0, 'projects table missing');
   assert(src.indexOf('project_artifacts') >= 0, 'project artifacts missing');
+});
+test('PROJECT: pipeline/defense/refnorm exist', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');
+  assert(src.indexOf('function applySchoolTemplate') >= 0, 'applySchoolTemplate missing');
+  assert(src.indexOf('function runOneClickPipeline') >= 0, 'pipeline missing');
+  assert(src.indexOf('function openDefensePack') >= 0, 'defense pack missing');
+  assert(src.indexOf('function normalizeRefsGBT7714') >= 0, 'ref normalize missing');
+  assert(src.indexOf('function submitIdeaWizard') >= 0, 'idea wizard missing');
+});
+test('UI: simplified sidebar has TOC wrap', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf('nav-tree-wrap') >= 0, 'toc wrap missing');
+  assert(html.indexOf('nav-tools-details') >= 0, 'tools details missing');
+  assert(html.indexOf('同一条主线') >= 0, 'mainline label missing');
 });
 test('PROJECT: merge/preview/cloud helpers exist', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');

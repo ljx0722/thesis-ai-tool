@@ -581,41 +581,47 @@
   }
 
   function submitIdeaWizard() {
-    var idea = (document.getElementById('ideaText').value || '').trim();
-    if (idea.length < 8) { alert('请至少用一句话描述你的研究想法（不少于 8 字）'); return; }
-    var field = (document.getElementById('ideaField').value || '').trim();
-    var degree = document.getElementById('ideaDegree').value || '硕士';
-    var templateId = (document.getElementById('ideaTemplate').value || '').trim();
-    var keywords = (document.getElementById('ideaKeywords').value || '').trim();
-    var title = (document.getElementById('ideaTitle').value || '').trim();
-    if (!title) title = idea.length > 24 ? idea.substring(0, 24) + '…' : idea;
+    try {
+      var ideaEl = document.getElementById('ideaText');
+      var idea = (ideaEl && ideaEl.value || '').trim();
+      if (idea.length < 8) { alert('请至少用一句话描述你的研究想法（不少于 8 字）'); return; }
+      var field = ((document.getElementById('ideaField') || {}).value || '').trim();
+      var degree = ((document.getElementById('ideaDegree') || {}).value || '硕士');
+      var templateId = ((document.getElementById('ideaTemplate') || {}).value || '').trim() || 'generic';
+      var keywords = ((document.getElementById('ideaKeywords') || {}).value || '').trim();
+      var title = ((document.getElementById('ideaTitle') || {}).value || '').trim();
+      if (!title) title = idea.length > 24 ? idea.substring(0, 24) + '…' : idea;
 
-    var project = createProject({
-      title: title,
-      idea: idea,
-      field: field,
-      keywords: keywords,
-      degree: degree,
-      mode: 'create',
-      currentStage: 'ideation',
-      hasManuscript: !!(typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100)
-    });
-    upsertProject(project);
-    // Apply school template if selected
-    if (templateId) {
-      applySchoolTemplate(templateId);
+      var project = createProject({
+        title: title,
+        idea: idea,
+        field: field,
+        keywords: keywords,
+        degree: degree,
+        mode: 'create',
+        currentStage: 'ideation',
+        schoolTemplate: templateId,
+        hasManuscript: !!(typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100)
+      });
+      // Always apply template outline (generic if empty)
+      try { applySchoolTemplate(templateId || 'generic'); } catch (e) { console.warn('template apply failed', e); }
+      // ensure project still current
+      project = getCurrentProject() || project;
+      closeIdeaWizard();
+      renderProjectChrome();
+      if (typeof switchView === 'function') switchView('workspace');
+      if (typeof ttp === 'function') ttp('项目已创建：' + project.title + '。可点「一键流水线」自动推进。');
+      // prefill topic finder fields if module later opens
+      setTimeout(function () {
+        var domain = document.getElementById('topicDomain');
+        var kws = document.getElementById('topicKeywords');
+        if (domain) domain.value = field || idea;
+        if (kws) kws.value = keywords;
+      }, 200);
+    } catch (err) {
+      console.error(err);
+      alert('创建项目失败：' + (err.message || err) + '。请打开控制台查看详情。');
     }
-    closeIdeaWizard();
-    renderProjectChrome();
-    if (typeof switchView === 'function') switchView('workspace');
-    if (typeof ttp === 'function') ttp('项目已创建：' + project.title + '。先看工作台建议，再点左侧阶段。');
-    // 预填选题推荐输入
-    setTimeout(function () {
-      var domain = document.getElementById('topicDomain');
-      var kws = document.getElementById('topicKeywords');
-      if (domain) domain.value = field || idea;
-      if (kws) kws.value = keywords;
-    }, 200);
   }
 
   // ---------- UI: Project overview in workspace ----------
@@ -652,14 +658,14 @@
           '<div class="project-overview-head">' +
             '<div class="project-badge">开始使用</div>' +
             '<h2>你想先做什么？</h2>' +
-            '<p>不用一次看完所有功能。选一个入口，系统会引导你完成下一步。</p>' +
+            '<p>只有一条主线：立项/导入 → 大纲与分章 → 文献 → 打磨 → 评审答辩。先选入口。</p>' +
           '</div>' +
           '<div class="home-choice-grid">' +
             '<button class="home-choice primary" onclick="openIdeaWizard()">' +
               '<div class="home-choice-kicker">路径 A · 推荐新手</div>' +
               '<div class="home-choice-title">💡 从想法开始</div>' +
               '<div class="home-choice-desc">还没有完整论文。先立项，再写大纲、分章草稿、检索文献。</div>' +
-              '<div class="home-choice-next">下一步：创建项目 → 选题推荐</div>' +
+              '<div class="home-choice-next">下一步：创建项目 → 一键流水线/大纲写作</div>' +
             '</button>' +
             '<button class="home-choice" onclick="triggerUpload()">' +
               '<div class="home-choice-kicker">路径 B · 已有草稿</div>' +
@@ -668,7 +674,7 @@
               '<div class="home-choice-next">下一步：上传 .docx → 查看目录树</div>' +
             '</button>' +
           '</div>' +
-          '<div class="home-help-note">左侧「写作阶段」是主导航；下方「能力」是工具箱。先选路径，再按阶段推进。登录后项目会自动云同步。</div>' +
+          '<div class="home-help-note">左侧上方是主线阶段，中间大区域是目录树，底部“全部工具”按需展开。登录后项目自动云同步。</div>' +
         '</div>';
     }
 
@@ -707,6 +713,9 @@
         '</div>' +
         renderSmartTips(project) +
         '<details class="project-more-tools"><summary>更多工具</summary><div class="project-tools-row">' +
+          '<button class="ai-btn-clear" onclick="runOneClickPipeline()">一键流水线</button>' +
+          '<button class="ai-btn-clear" onclick="openDefensePack()">答辩材料包</button>' +
+          '<button class="ai-btn-clear" onclick="normalizeRefsGBT7714()">文献规范化</button>' +
           '<button class="ai-btn-clear" onclick="openOutlineEditor()">大纲</button>' +
           '<button class="ai-btn-clear" onclick="openChapterBoard()">分章草稿</button>' +
           '<button class="ai-btn-clear" onclick="openFullPaperPreview()">完整预览</button>' +
@@ -975,6 +984,23 @@
     if (typeof ttp === 'function') ttp('大纲已保存（' + chapters.length + ' 章）');
   }
 
+  
+  function ensureUnifiedProjectState() {
+    // One model for both paths: project + outline + chapters + optional manuscript
+    var p = getCurrentProject();
+    if (!p) return null;
+    var arts = ensureArtifacts(p);
+    if (!arts.outline || !arts.outline.chapters || !arts.outline.chapters.length) {
+      // if manuscript sections exist, sync; else generic template
+      if (typeof sections !== 'undefined' && sections && sections.length) {
+        try { syncSectionsToChapterDrafts(false); } catch (e) {}
+      } else {
+        try { applySchoolTemplate(p.schoolTemplate || 'generic'); } catch (e) {}
+      }
+    }
+    return getCurrentProject();
+  }
+
   function onManuscriptReady() {
     var p = getCurrentProject();
     if (!p) {
@@ -995,7 +1021,8 @@
     try { syncSectionsToChapterDrafts(false); } catch (e) { console.warn('[import-sync]', e); }
     renderProjectChrome();
     if (typeof switchView === 'function') switchView('workspace');
-    if (typeof ttp === 'function') ttp('论文已导入：目录与分章草稿已同步，请按「导入后3步」继续');
+    try { ensureUnifiedProjectState(); } catch (e) {}
+    if (typeof ttp === 'function') ttp('论文已导入：已并入同一项目主线，请按清单继续');
   }
 
   // exports
@@ -1056,7 +1083,7 @@
       '<div class="project-modal-head"><div><h3>分章草稿看板</h3><p>按大纲拆成章节卡片</p></div><button class="project-close" onclick="closeChapterOverlays()">×</button></div>' +
       '<div class="project-progress-sub" style="margin-bottom:10px">完整 ' + stats.ready + '/' + stats.total + ' · ' + stats.words + ' 字</div>' +
       '<div class="chapter-card-grid">' + cards + '</div>' +
-      '<div class="project-modal-actions"><button class="ai-btn-clear" onclick="openOutlineEditor()">调整大纲</button><button class="ai-btn-clear" onclick="closeChapterOverlays()">关闭</button><button class="ai-btn" onclick="closeChapterOverlays();switchModule(\'expand\')">去论文扩写</button></div></div>';
+      '<div class="project-modal-actions"><button class="ai-btn-clear" onclick="openOutlineEditor()">调整大纲</button><button class="ai-btn-clear" onclick="closeChapterOverlays()">关闭</button><button class="ai-btn" onclick="closeChapterOverlays();switchModule("expand")">去论文扩写</button></div></div>';
     ov.onclick = function () { closeChapterOverlays(); };
     document.body.appendChild(ov);
   }
@@ -1365,6 +1392,82 @@
   window.insertCiteMarkers = insertCiteMarkers;
   window.openTemplateChooser = openTemplateChooser;
   window.closeTemplateChooser = closeTemplateChooser;
+  
+  function openTemplateChooser() {
+    // simplified: no complex template export; only apply outline structure
+    var p = getCurrentProject();
+    if (!p) { openIdeaWizard(); return; }
+    var html = '<div style="display:flex;flex-direction:column;gap:8px">';
+    SCHOOL_TEMPLATES.forEach(function(tpl) {
+      html += '<button class="ai-btn-clear" style="text-align:left;padding:10px 12px" onclick="applySchoolTemplate(\'' + tpl.id + '\');closeTemplateChooser();">' +
+        '<b>' + escapeHtml(tpl.name) + '</b><br><span style="font-size:.65rem;color:var(--text-muted)">' + escapeHtml(tpl.styleNotes) + '</span></button>';
+    });
+    html += '</div>';
+    var ov = document.createElement('div');
+    ov.id = 'templateChooserOverlay';
+    ov.className = 'project-overlay';
+    ov.innerHTML = '<div class="project-modal" style="width:min(520px,94vw)" onclick="event.stopPropagation()">' +
+      '<div class="project-modal-head"><div><h3>选择学校大纲模板</h3><p>仅套用章节结构与字数目标，不改变导出样式</p></div>' +
+      '<button class="project-close" onclick="closeTemplateChooser()">×</button></div>' + html +
+      '<div class="project-modal-actions"><button class="ai-btn-clear" onclick="closeTemplateChooser()">关闭</button></div></div>';
+    ov.onclick = function(){ closeTemplateChooser(); };
+    document.body.appendChild(ov);
+  }
+  function closeTemplateChooser() {
+    var ov = document.getElementById('templateChooserOverlay');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+  function applySchoolTemplate(templateId) {
+    var tpl = null;
+    for (var i = 0; i < SCHOOL_TEMPLATES.length; i++) {
+      if (SCHOOL_TEMPLATES[i].id === templateId) { tpl = SCHOOL_TEMPLATES[i]; break; }
+    }
+    if (!tpl) {
+      // generic fallback
+      tpl = SCHOOL_TEMPLATES[SCHOOL_TEMPLATES.length - 1];
+    }
+    var p = getCurrentProject();
+    if (!p) return null;
+    var outline = {
+      title: p.title,
+      chapters: (tpl.outline || []).map(function(ch) {
+        return { title: ch.title, sections: (ch.sections || []).slice() };
+      }),
+      updatedAt: nowISO(),
+      source: 'template:' + tpl.id
+    };
+    saveOutline(outline);
+    // seed empty chapter drafts for each outline chapter
+    var arts = ensureArtifacts(p);
+    outline.chapters.forEach(function(ch, idx) {
+      var key = chapterKey(ch.title, idx);
+      if (!arts.chapters[key] || !(arts.chapters[key].content || '').trim()) {
+        var skeleton = ch.title + '\n\n' + (ch.sections || []).map(function(s, i) {
+          return (i + 1) + '. ' + s + '\n（待完善）\n';
+        }).join('\n');
+        arts.chapters[key] = {
+          key: key, title: ch.title, sections: ch.sections || [], content: skeleton,
+          status: 'draft', updatedAt: nowISO(), createdAt: nowISO(), source: 'template'
+        };
+      }
+    });
+    updateCurrent({
+      schoolTemplate: tpl.id,
+      degree: p.degree || tpl.degree || '硕士',
+      goalWords: p.goalWords || tpl.minWords || 30000
+    });
+    // re-get and persist artifacts
+    p = getCurrentProject();
+    if (p) {
+      p.artifacts = arts;
+      upsertProject(p);
+    }
+    logSkillRun({ moduleId: 'school-template', title: '应用学校大纲模板', summary: tpl.name });
+    renderProjectChrome();
+    if (typeof ttp === 'function') ttp('已应用模板：' + tpl.name);
+    return p;
+  }
+
   window.applySchoolTemplate = applySchoolTemplate;
   window.ideaTemplateChanged = ideaTemplateChanged;
   window.showVersionHistory = showVersionHistory;
@@ -1796,4 +1899,187 @@
   window.closeFullPaperPreview = closeFullPaperPreview;
   window.pullCloudProjects = pullCloudProjects;
   window.syncProjectToCloud = syncProjectToCloud;
+
+  // ===== 一键流水线：想法/导入 -> 大纲 -> 章节骨架 ->（可选）选题建议 =====
+  function runOneClickPipeline() {
+    var p = ensureUnifiedProjectState() || getCurrentProject();
+    if (!p) { openIdeaWizard(); return; }
+    if (!confirm('一键流水线将：\\n1) 确认/生成大纲\\n2) 为每章生成骨架草稿\\n3) 进入写作阶段\\n\\n不会自动调用收费 LLM（可随后手动点 AI 扩写）。继续？')) return;
+
+    // 1 outline
+    var outline = getOutline();
+    if (!outline || !outline.chapters || !outline.chapters.length) {
+      applySchoolTemplate(p.schoolTemplate || 'generic');
+      outline = getOutline();
+    }
+    // 2 seed chapter skeletons
+    var arts = ensureArtifacts(getCurrentProject());
+    var n = 0;
+    (outline.chapters || []).forEach(function(ch, idx) {
+      var key = chapterKey(ch.title, idx);
+      var prev = arts.chapters[key];
+      if (prev && prev.content && prev.content.replace(/\\s+/g,'').length > 80 && prev.source !== 'template') return;
+      var skeleton = ch.title + '\\n\\n' + (ch.sections || []).map(function(s, i) {
+        return (i + 1) + '. ' + s + '\\n（请补充论据、数据与文献引用）\\n';
+      }).join('\\n');
+      // keep imported content if longer
+      if (prev && prev.content && prev.content.length > skeleton.length) return;
+      arts.chapters[key] = {
+        key: key, title: ch.title, sections: ch.sections || [], content: skeleton,
+        status: 'draft', updatedAt: nowISO(), createdAt: (prev && prev.createdAt) || nowISO(), source: 'pipeline'
+      };
+      n++;
+    });
+    var cur = getCurrentProject();
+    cur.artifacts = arts;
+    cur.currentStage = 'writing';
+    cur.stageStatus = cur.stageStatus || {};
+    cur.stageStatus.ideation = 'done';
+    cur.stageStatus.writing = 'active';
+    if (cur.hasManuscript) cur.stageStatus.literature = cur.stageStatus.literature || 'active';
+    upsertProject(cur);
+    logSkillRun({ moduleId: 'pipeline', title: '一键流水线', summary: '生成/更新 ' + n + ' 章骨架' });
+    renderProjectChrome();
+    openChapterBoard();
+    if (typeof ttp === 'function') ttp('流水线完成：已进入分章写作。可再点「合并到正文 / 完整预览 / 导出」');
+  }
+
+  // ===== 答辩材料包 =====
+  function buildDefensePackText(p) {
+    var outline = getOutline() || { chapters: [] };
+    var stats = chapterStats(p);
+    var lines = [];
+    lines.push('# 答辩材料包');
+    lines.push('题目：' + (p.title || ''));
+    lines.push('领域：' + (p.field || '') + '  学位：' + (p.degree || ''));
+    lines.push('想法/摘要：' + (p.idea || ''));
+    lines.push('');
+    lines.push('## 1. 答辩 PPT 结构建议（15-18页）');
+    lines.push('1. 封面与选题');
+    lines.push('2. 研究背景与问题提出');
+    lines.push('3. 研究目的与意义');
+    lines.push('4. 文献综述与研究缺口');
+    lines.push('5. 研究内容与技术路线');
+    lines.push('6. 研究方法与数据');
+    lines.push('7-10. 主要结果（按章节拆分）');
+    lines.push('11. 创新点');
+    lines.push('12. 不足与展望');
+    lines.push('13. 结论');
+    lines.push('14. 致谢/Q&A');
+    lines.push('');
+    lines.push('## 2. 3分钟讲稿提纲');
+    lines.push('开场：问题是什么、为何重要（30秒）');
+    lines.push('方法：用了什么数据/模型/路线（40秒）');
+    lines.push('结果：最关键的 2-3 个发现（60秒）');
+    lines.push('贡献：理论/实践价值（30秒）');
+    lines.push('收尾：不足与下一步（20秒）');
+    lines.push('');
+    lines.push('## 3. 可能提问与回答要点');
+    lines.push('Q1 创新点是什么？ -> 对照现有研究缺口回答');
+    lines.push('Q2 数据来源与可靠性？ -> 说明样本、清洗、验证');
+    lines.push('Q3 方法为何这样选？ -> 对比备选方法');
+    lines.push('Q4 结果是否稳健？ -> 交叉验证/对比实验');
+    lines.push('Q5 局限与未来工作？ -> 数据/场景/方法边界');
+    lines.push('');
+    lines.push('## 4. 当前章节完成度');
+    lines.push('总章数：' + stats.total + '，较完整：' + stats.ready + '，总字数：' + stats.words);
+    (outline.chapters || []).forEach(function(ch, idx) {
+      var d = getChapterDraft(chapterKey(ch.title, idx)) || {};
+      var w = (d.content || '').replace(/\\s+/g, '').length;
+      lines.push('- ' + ch.title + '：' + w + ' 字');
+    });
+    lines.push('');
+    lines.push('## 5. 英文摘要草稿提示');
+    lines.push('Background / Methods / Results / Conclusion 四段式，约 200-300 words。');
+    return lines.join('\\n');
+  }
+
+  function openDefensePack() {
+    var p = getCurrentProject();
+    if (!p) { openIdeaWizard(); return; }
+    var text = buildDefensePackText(p);
+    var ov = document.createElement('div');
+    ov.id = 'defensePackOverlay';
+    ov.className = 'project-overlay';
+    ov.innerHTML = '<div class="project-modal" style="width:min(760px,96vw);max-height:88vh" onclick="event.stopPropagation()">' +
+      '<div class="project-modal-head"><div><h3>答辩材料包</h3><p>PPT结构 / 讲稿 / 问答 / 完成度</p></div>' +
+      '<button class="project-close" onclick="closeDefensePack()">×</button></div>' +
+      '<textarea id="defensePackText" class="ai-textarea" style="height:52vh;margin:0">' + escapeHtml(text) + '</textarea>' +
+      '<div class="project-modal-actions">' +
+      '<button class="ai-btn-clear" onclick="closeDefensePack()">关闭</button>' +
+      '<button class="ai-btn-clear" onclick="downloadDefensePack()">下载TXT</button>' +
+      '<button class="ai-btn" onclick="window._openDefensePpt&&window._openDefensePpt();">打开答辩PPT模块</button>' +
+      '</div></div>';
+    ov.onclick = function(){ closeDefensePack(); };
+    document.body.appendChild(ov);
+    logSkillRun({ moduleId: 'defense-pack', title: '生成答辩材料包', summary: p.title });
+  }
+  function closeDefensePack(){
+    var ov=document.getElementById('defensePackOverlay');
+    if(ov&&ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+  function downloadDefensePack(){
+    var text=(document.getElementById('defensePackText')||{}).value || '';
+    var blob=new Blob([text],{type:'text/plain;charset=utf-8;'});
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='defense_pack.txt';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+
+  // ===== 参考文献 GB/T 7714 自动规范化 =====
+  function normalizeRefsGBT7714() {
+    var refs = (typeof mergedRefs !== 'undefined' && mergedRefs && mergedRefs.length) ? mergedRefs
+      : ((typeof existingRefs !== 'undefined' && existingRefs) ? existingRefs : []);
+    if (!refs.length) {
+      alert('当前没有参考文献。请先导入论文或检索文献。');
+      if (typeof switchView === 'function') switchView('references');
+      return;
+    }
+    var report = { total: refs.length, changed: 0, items: [] };
+    refs.forEach(function(r, idx) {
+      var raw = (r.ci || r.title || '').replace(/\s+/g, ' ').trim();
+      if (!raw) return;
+      var n = parseInt(r.displayNum || r.num || (idx + 1), 10) || (idx + 1);
+      var fixed = raw;
+      // strip leading [n]
+      fixed = fixed.replace(/^\[\d+\]\s*/, '');
+      // unify punctuation spaces
+      fixed = fixed.replace(/\s*,\s*/g, ', ').replace(/\s*\.\s*/g, '. ').replace(/\s+/g, ' ').trim();
+      // ensure ends with .
+      if (!/[.。]$/.test(fixed)) fixed += '.';
+      // Chinese journal-ish: if contains 《》 keep; ensure year 4 digits space normalized
+      fixed = fixed.replace(/(20\d{2}|19\d{2})\s*年/g, '$1');
+      // wrap as [n] text
+      var norm = '[' + n + '] ' + fixed;
+      var before = r.ci || '';
+      r.ci = norm;
+      r.displayNum = n;
+      r.num = n;
+      if (before !== norm) report.changed++;
+      report.items.push(norm);
+    });
+    // re-render refs panel if possible
+    try {
+      if (typeof renderRefs === 'function' && typeof mergedRefs !== 'undefined' && mergedRefs && mergedRefs.length) renderRefs();
+      else if (typeof renderExistingOnly === 'function') renderExistingOnly();
+    } catch (e) {}
+    // show report modal
+    var ov=document.createElement('div'); ov.id='refNormOverlay'; ov.className='project-overlay';
+    ov.innerHTML='<div class="project-modal" style="width:min(720px,96vw);max-height:86vh" onclick="event.stopPropagation()">'+
+      '<div class="project-modal-head"><div><h3>参考文献规范化（GB/T 7714 风格）</h3><p>共 '+report.total+' 条，更新 '+report.changed+' 条</p></div>'+
+      '<button class="project-close" onclick="var el=document.getElementById(\'refNormOverlay\');if(el)el.remove()">×</button></div>'+
+      '<div style="max-height:55vh;overflow:auto;font-size:.72rem;line-height:1.7;border:1px solid var(--border);border-radius:10px;padding:10px;background:var(--surface-alt)">'+
+      report.items.map(function(x){return '<div style="margin:0 0 8px">'+escapeHtml(x)+'</div>';}).join('')+
+      '</div>'+
+      '<div class="project-modal-actions"><button class="ai-btn" onclick="var el=document.getElementById(\'refNormOverlay\');if(el)el.remove();if(typeof switchView===\'function\')switchView(\'references\');">查看参考文献面板</button></div></div>';
+    ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+    document.body.appendChild(ov);
+    logSkillRun({ moduleId: 'ref-normalize', title: '参考文献规范化', summary: report.changed + '/' + report.total });
+    if (typeof ttp === 'function') ttp('已规范化 ' + report.changed + ' 条参考文献');
+  }
+
+  window.runOneClickPipeline = runOneClickPipeline;
+  window.openDefensePack = openDefensePack;
+  window.closeDefensePack = closeDefensePack;
+  window.normalizeRefsGBT7714 = normalizeRefsGBT7714;
+  window.ensureUnifiedProjectState = ensureUnifiedProjectState;
 }).call(this);
