@@ -82,6 +82,7 @@
       <a onclick="document.getElementById('userSection').scrollIntoView({behavior:'smooth'})">用户管理</a>
       <a onclick="document.getElementById('orderSection').scrollIntoView({behavior:'smooth'})">充值订单</a>
       <a onclick="document.getElementById('pricingSection').scrollIntoView({behavior:'smooth'});loadPricing();">计费配置</a>
+      <a onclick="document.getElementById('llmEcoSection').scrollIntoView({behavior:'smooth'});loadLlmEconomics();">AI成本看板</a>
       <div class="nav-divider"></div>
       <a href="/" style="font-size:0.65rem;color:rgba(255,255,255,0.25)">← 返回主页</a>
     </div>
@@ -107,6 +108,11 @@
       <div id="orderSection">
         <h2 class="admin-section-title">充值订单</h2>
         <table class="admin-table" id="orderTable"><thead><tr><th>ID</th><th>用户</th><th>金额</th><th>状态</th><th>时间</th><th>操作</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div id="llmEcoSection">
+        <h2 class="admin-section-title">AI 成本看板</h2>
+        <div class="admin-stats" id="llmEcoCards"></div>
+        <table class="admin-table" id="llmEcoTable"><thead><tr><th>模块</th><th>调用次数</th><th>输入Token</th><th>输出Token</th><th>API成本(元)</th><th>用户扣费(点)</th><th>毛利(点-元)</th></tr></thead><tbody></tbody></table>
       </div>
       <div id="pricingSection">
         <h2 class="admin-section-title">计费配置</h2>
@@ -157,7 +163,7 @@ function loadDashboard(){
     s.recent_orders.forEach(function(o){ohtml+='<tr><td>'+o.id+'</td><td>'+o.username+'</td><td>&yen;'+o.amount_yuan+'</td><td>'+(sm[o.status]||o.status)+'</td><td>'+(o.created_at||'').substring(0,16)+'</td><td>'+(o.status==='submitted'?'<button class="admin-btn admin-btn-success" onclick="confirmOrder('+o.id+')">确认到账</button>':'')+'</td></tr>';});
     document.querySelector('#orderTable tbody').innerHTML=ohtml;
     // preload pricing silently
-    try{loadPricing();}catch(e){}
+    try{loadPricing();loadLlmEconomics();}catch(e){}
   }).catch(function(){alert('网络错误')});
 }
 function adjustCredits(){
@@ -168,6 +174,27 @@ function adjustCredits(){
   fetch('/api/admin/credits',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SECRET},body:JSON.stringify({secret:SECRET,user_id:uid,amount:amt,reason:reason})}).then(r=>r.json()).then(d=>{if(d.success){alert('调整成功');loadDashboard();}else{alert(d.error)}}).catch(function(){alert('网络错误')});
 }
 var _pricingCache=null;
+function loadLlmEconomics(){
+  if(!SECRET){alert('请先登录');return;}
+  fetch('/api/admin/llm_economics?secret='+encodeURIComponent(SECRET),{headers:{'Authorization':'Bearer '+SECRET}})
+    .then(r=>r.json()).then(d=>{
+      if(!d.success){alert(d.error||'无权限');return;}
+      var s=d.summary||{};
+      document.getElementById('llmEcoCards').innerHTML=
+        '<div class="admin-stat"><div class="stat-value">'+ (s.today_calls||0) +'</div><div class="stat-label">今日AI调用</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">'+ (s.total_calls||0) +'</div><div class="stat-label">累计AI调用</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">&yen;'+ (s.api_cost_yuan_today||0) +'</div><div class="stat-label">今日API成本</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">'+ (s.charged_points_today||0) +'</div><div class="stat-label">今日用户扣费(点)</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">&yen;'+ (s.api_cost_yuan_total||0) +'</div><div class="stat-label">累计API成本</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">'+ (s.charged_points_total||0) +'</div><div class="stat-label">累计用户扣费(点)</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">'+ (s.margin_points_total||0) +'</div><div class="stat-label">累计毛利(点-元)</div></div>';
+      var h='';
+      (d.by_module||[]).forEach(function(r){
+        h+='<tr><td>'+r.module+'</td><td>'+r.calls+'</td><td>'+(r.tin||0)+'</td><td>'+(r.tout||0)+'</td><td>'+r.api_cost_yuan+'</td><td>'+r.charged_points+'</td><td>'+r.margin_points+'</td></tr>';
+      });
+      document.querySelector('#llmEcoTable tbody').innerHTML=h||'<tr><td colspan="7">暂无数据</td></tr>';
+    }).catch(function(){alert('网络错误')});
+}
 function loadPricing(){
   if(!SECRET){alert('请先登录');return;}
   fetch('/api/admin/pricing?secret='+encodeURIComponent(SECRET),{headers:{'Authorization':'Bearer '+SECRET}})

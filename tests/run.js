@@ -1633,6 +1633,13 @@ test('API: usage history + admin pricing exist', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
   assert(src.indexOf('/api/usage/history') >= 0, 'usage history missing');
   assert(src.indexOf('/api/admin/pricing') >= 0, 'admin pricing missing');
+  assert(src.indexOf('/api/admin/llm_economics') >= 0, 'llm economics missing');
+});
+test('UI: history filter/export exists', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf('exportConsumptionHistory') >= 0, 'history export missing');
+  assert(html.indexOf('filterConsumptionHistory') >= 0, 'history filter missing');
+  assert(html.indexOf('1 元 = 1 点') >= 0 || html.indexOf('1元=1点') >= 0, 'recharge unit text missing');
 });
 
 test('UI: consumption history entry exists', function() {

@@ -1600,10 +1600,18 @@ def admin_dashboard():
         total_cost = db.execute('SELECT SUM(user_charged_credits) as s FROM llm_usage WHERE success=1').fetchone()['s'] or 0
         recent_users = [dict(r) for r in db.execute('SELECT id,username,credits,created_at FROM users ORDER BY id DESC LIMIT 10').fetchall()]
         recent_orders = [dict(r) for r in db.execute("SELECT o.*,u.username FROM recharge_orders o JOIN users u ON o.user_id=u.id ORDER BY o.id DESC LIMIT 10").fetchall()]
+        # LLM economics
+        try:
+            llm_api_cost_total = db.execute('SELECT SUM(cost_credits) as s FROM llm_usage').fetchone()['s'] or 0  # stored as fen-ish (api_cost*100)
+            llm_charged_total = db.execute('SELECT SUM(user_charged_credits) as s FROM llm_usage').fetchone()['s'] or 0  # milli-credits
+            llm_api_cost_today = db.execute("SELECT SUM(cost_credits) as s FROM llm_usage WHERE created_at LIKE ?", (today+'%',)).fetchone()['s'] or 0
+            llm_charged_today = db.execute("SELECT SUM(user_charged_credits) as s FROM llm_usage WHERE created_at LIKE ?", (today+'%',)).fetchone()['s'] or 0
+        except Exception:
+            llm_api_cost_total = llm_charged_total = llm_api_cost_today = llm_charged_today = 0
         return jsonify({'success': True, 'stats': {
             'total_users': total_users, 'today_users': today_users, 'total_credits': total_credits,
             'total_recharge': total_recharge, 'pending_orders': pending,
-            'llm_today': llm_today, 'llm_total': llm_total, 'total_cost': total_cost,
+            'llm_today': llm_today, 'llm_total': llm_total, 'total_cost': total_cost, 'llm_api_cost_yuan_total': round((llm_api_cost_total or 0)/100.0, 4), 'llm_charged_points_total': round((llm_charged_total or 0)/1000.0, 3), 'llm_api_cost_yuan_today': round((llm_api_cost_today or 0)/100.0, 4), 'llm_charged_points_today': round((llm_charged_today or 0)/1000.0, 3), 'llm_margin_points_total': round(((llm_charged_total or 0)/1000.0) - ((llm_api_cost_total or 0)/100.0), 3),
             'recent_users': recent_users, 'recent_orders': recent_orders
         }})
     finally: db.close()
@@ -2151,6 +2159,52 @@ def admin_pricing():
     except Exception as e:
         db.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+
+
+@app.route('/api/admin/llm_economics', methods=['GET'])
+def admin_llm_economics():
+    s = request.args.get('secret', '')
+    auth = request.headers.get('Authorization', '')
+    if not s and auth.startswith('Bearer '):
+        s = auth[7:]
+    if not _check_admin(s):
+        return jsonify({'success': False, 'error': '无权限'}), 403
+    db = get_db()
+    try:
+        today = date.today().isoformat()
+        total_calls = db.execute('SELECT COUNT(*) as c FROM llm_usage').fetchone()['c']
+        today_calls = db.execute("SELECT COUNT(*) as c FROM llm_usage WHERE created_at LIKE ?", (today+'%',)).fetchone()['c']
+        api_cost_fen_total = db.execute('SELECT SUM(cost_credits) as s FROM llm_usage').fetchone()['s'] or 0
+        charged_milli_total = db.execute('SELECT SUM(user_charged_credits) as s FROM llm_usage').fetchone()['s'] or 0
+        api_cost_fen_today = db.execute("SELECT SUM(cost_credits) as s FROM llm_usage WHERE created_at LIKE ?", (today+'%',)).fetchone()['s'] or 0
+        charged_milli_today = db.execute("SELECT SUM(user_charged_credits) as s FROM llm_usage WHERE created_at LIKE ?", (today+'%',)).fetchone()['s'] or 0
+        by_module = [dict(r) for r in db.execute(
+            "SELECT module, COUNT(*) as calls, SUM(prompt_tokens) as tin, SUM(completion_tokens) as tout, "
+            "SUM(cost_credits) as api_cost_fen, SUM(user_charged_credits) as charged_milli "
+            "FROM llm_usage GROUP BY module ORDER BY calls DESC LIMIT 30"
+        ).fetchall()]
+        for r in by_module:
+            r['api_cost_yuan'] = round((r.get('api_cost_fen') or 0)/100.0, 4)
+            r['charged_points'] = round((r.get('charged_milli') or 0)/1000.0, 3)
+            r['margin_points'] = round(r['charged_points'] - r['api_cost_yuan'], 3)
+        return jsonify({
+            'success': True,
+            'summary': {
+                'total_calls': total_calls,
+                'today_calls': today_calls,
+                'api_cost_yuan_total': round(api_cost_fen_total/100.0, 4),
+                'charged_points_total': round(charged_milli_total/1000.0, 3),
+                'margin_points_total': round((charged_milli_total/1000.0) - (api_cost_fen_total/100.0), 3),
+                'api_cost_yuan_today': round(api_cost_fen_today/100.0, 4),
+                'charged_points_today': round(charged_milli_today/1000.0, 3),
+                'margin_points_today': round((charged_milli_today/1000.0) - (api_cost_fen_today/100.0), 3),
+            },
+            'by_module': by_module
+        })
     finally:
         db.close()
 
