@@ -535,8 +535,8 @@
     }
     closeIdeaWizard();
     renderProjectChrome();
-    if (typeof switchModule === 'function') switchModule('topic-finder');
-    if (typeof ttp === 'function') ttp('项目已创建：' + project.title);
+    if (typeof switchView === 'function') switchView('workspace');
+    if (typeof ttp === 'function') ttp('项目已创建：' + project.title + '。先看工作台建议，再点左侧阶段。');
     // 预填选题推荐输入
     setTimeout(function () {
       var domain = document.getElementById('topicDomain');
@@ -552,26 +552,27 @@
     var next = nextAction(project);
     if (!project) {
       return '' +
-        '<div class="project-overview">' +
+        '<div class="project-overview home-simple">' +
           '<div class="project-overview-head">' +
-            '<div class="project-badge">Thesis OS</div>' +
-            '<h2>从想法到答辩，一步步做成论文</h2>' +
-            '<p>本平台既是论文打磨器，也是写作流水线。你可以先立项，再逐步生成大纲、文献、章节与答辩材料。</p>' +
+            '<div class="project-badge">开始使用</div>' +
+            '<h2>你想先做什么？</h2>' +
+            '<p>不用一次看完所有功能。选一个入口，系统会引导你完成下一步。</p>' +
           '</div>' +
-          '<div class="project-cta-row">' +
-            '<button class="ai-btn" onclick="openIdeaWizard()">💡 从想法开始</button>' +
-            '<button class="ai-btn-clear" onclick="triggerUpload()">📄 上传已有论文</button>' +
-            '<button class="ai-btn-clear" onclick="switchModule(\'topic-finder\')">先试用选题推荐</button>' +
+          '<div class="home-choice-grid">' +
+            '<button class="home-choice primary" onclick="openIdeaWizard()">' +
+              '<div class="home-choice-kicker">路径 A · 推荐新手</div>' +
+              '<div class="home-choice-title">💡 从想法开始</div>' +
+              '<div class="home-choice-desc">还没有完整论文。先立项，再写大纲、分章草稿、检索文献。</div>' +
+              '<div class="home-choice-next">下一步：创建项目 → 选题推荐</div>' +
+            '</button>' +
+            '<button class="home-choice" onclick="triggerUpload()">' +
+              '<div class="home-choice-kicker">路径 B · 已有草稿</div>' +
+              '<div class="home-choice-title">📄 上传论文打磨</div>' +
+              '<div class="home-choice-desc">已有 DOCX。导入后自动解析目录树、参考文献，再做评审与优化。</div>' +
+              '<div class="home-choice-next">下一步：上传 .docx → 查看目录树</div>' +
+            '</button>' +
           '</div>' +
-          '<div class="project-stage-grid">' +
-            STAGES.map(function (s, idx) {
-              return '<div class="project-stage-card">' +
-                '<div class="project-stage-idx">' + (idx + 1) + '</div>' +
-                '<div class="project-stage-name">' + s.icon + ' ' + s.name + '</div>' +
-                '<div class="project-stage-desc">' + s.desc + '</div>' +
-              '</div>';
-            }).join('') +
-          '</div>' +
+          '<div class="home-help-note">左侧「写作阶段」是主导航；下方「能力」是工具箱。先选路径，再按阶段推进。</div>' +
         '</div>';
     }
 
@@ -601,23 +602,21 @@
           '</div>' +
         '</div>' +
         '<div class="project-next-card">' +
-          '<div><strong>' + escapeHtml(next.title) + '</strong><p>' + escapeHtml(next.desc) + '</p></div>' +
+          '<div><div class="next-kicker">当前建议</div><strong>' + escapeHtml(next.title) + '</strong><p>' + escapeHtml(next.desc) + '</p></div>' +
           '<div class="project-cta-row" style="margin:0">' +
             '<button class="ai-btn" onclick="runProjectAction(\'' + next.primary.action + '\',\'' + (next.primary.stageId || '') + '\',\'' + (next.primary.moduleId || '') + '\')">' + next.primary.label + '</button>' +
             (next.secondary ? '<button class="ai-btn-clear" onclick="runProjectAction(\'' + next.secondary.action + '\')">' + next.secondary.label + '</button>' : '') +
-            '<button class="ai-btn-clear" onclick="openOutlineEditor()">🧭 大纲编辑器</button>' +
-            '<button class="ai-btn-clear" onclick="openChapterBoard()">📝 分章草稿</button>' +
-            '<button class="ai-btn-clear" onclick="openTemplateChooser()">🏫 学校模板</button>' +
-            '<button class="ai-btn-clear" onclick="openProjectSettings()">⚙️ 设置</button>' +
-            '<button class="ai-btn-clear" onclick="completeCurrentStage()">标记本阶段完成</button>' +
+            '<button class="ai-btn-clear" onclick="completeCurrentStage()">完成本阶段</button>' +
           '</div>' +
         '</div>' +
-        renderSmartTips(project) + renderChapterBoardInline(project) +
-        renderSkillLogInline(project) +
-        '<div class="project-cta-row" style="justify-content:flex-end">' +
-          '<button class="ai-btn" onclick="exportFullPaper()">📄 导出论文全文</button>' +
-        '</div>' +
         renderSmartTips(project) +
+        '<div class="project-tools-row">' +
+          '<button class="ai-btn-clear" onclick="openOutlineEditor()">大纲</button>' +
+          '<button class="ai-btn-clear" onclick="openChapterBoard()">分章草稿</button>' +
+          '<button class="ai-btn-clear" onclick="openTemplateChooser()">学校模板</button>' +
+          '<button class="ai-btn-clear" onclick="openProjectSettings()">设置</button>' +
+          '<button class="ai-btn-clear" onclick="exportFullPaper()">导出全文</button>' +
+        '</div>' +
         '<div class="project-stage-grid">' + stagesHtml + '</div>' +
       '</div>';
   }

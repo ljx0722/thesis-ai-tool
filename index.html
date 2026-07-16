@@ -108,7 +108,7 @@
 <script>if(window.location.protocol==='file:'){document.getElementById('fileBlock').style.display='block';document.querySelector('.main')&&(document.querySelector('.main').style.display='none');document.querySelector('.bar')&&(document.querySelector('.bar').style.display='none');fetch('http://localhost:5000/',{mode:'no-cors'}).then(function(r){window.location.href='http://localhost:5000/'}).catch(function(){});}</script>
 
 <!-- ====== 快捷键提示条 ====== -->
-<div class="kb-hint" id="kbHint">⌨ Ctrl+1~6 切换模块 | Ctrl+Enter 检索 | Ctrl+O 换论文 | Esc 关闭弹窗</div>
+<div class="kb-hint" id="kbHint" style="display:none">⌨ Ctrl+1~6 切换模块 | Ctrl+Enter 检索 | Ctrl+O 换论文 | Esc 关闭弹窗</div>
 
 <!-- ====== 顶栏 ====== -->
 <div class="bar">
@@ -163,33 +163,34 @@
       <button onclick="openIdeaWizard()" class="nav-upload-btn" style="margin-bottom:6px">💡 从想法开始</button>
       <button onclick="triggerUpload()" class="nav-upload-btn">📎 上传论文</button>
     </div>
-    <h3>写作阶段</h3>
+    <h3>主流程</h3>
+    <div class="nav-flow-hint">按 1→6 推进，先做当前高亮阶段</div>
     <div id="stageNav" class="stage-nav"></div>
-    <h3 style="margin-top:10px">能力</h3>
+    <h3 style="margin-top:10px" title="按需使用的工具，不是必须从头点一遍">工具箱</h3>
     <div class="nav-modules" id="navModules">
       <div class="nav-group">
-        <div class="nav-group-title" onclick="toggleNavGroup(this)">🎯 选题立项 <span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-title collapsed" onclick="toggleNavGroup(this)">🎯 选题立项 <span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
           <div class="nav-item" data-module="topic-finder" data-needs-thesis="0" onclick="switchModule('topic-finder')" title="无需上传论文，直接输入领域获取推荐">💡 选题推荐</div>
           <div class="nav-item" data-module="proposal" data-needs-thesis="0" onclick="switchModule('proposal')" title="无需上传论文，粘贴开题报告即可">📝 开题大纲</div>
         </div>
       </div>
       <div class="nav-group">
-        <div class="nav-group-title" onclick="toggleNavGroup(this)">📚 文献地图 <span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-title collapsed" onclick="toggleNavGroup(this)">📚 文献地图 <span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
           <div class="nav-item" data-module="references" data-needs-thesis="1" onclick="switchModule('references')" title="需要上传论文或已有正文结构">📋 参考文献</div>
           <div class="nav-item" data-module="knowledge-graph" data-needs-thesis="1" onclick="switchModule('knowledge-graph')" title="需要上传论文">🕸️ 知识图谱</div>
         </div>
       </div>
       <div class="nav-group">
-        <div class="nav-group-title" onclick="toggleNavGroup(this)">✍️ 分章写作 <span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-title collapsed" onclick="toggleNavGroup(this)">✍️ 分章写作 <span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
           <div class="nav-item" data-module="expand" data-needs-thesis="1" onclick="switchModule('expand')" title="需要上传论文">✍️ 论文扩写</div>
           <div class="nav-item" data-module="data-analysis" data-needs-thesis="0" onclick="switchModule('data-analysis')" title="无需上传论文，上传Excel/CSV即可">📈 数据分析</div>
         </div>
       </div>
       <div class="nav-group">
-        <div class="nav-group-title" onclick="toggleNavGroup(this)">🔍 打磨审校 <span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-title collapsed" onclick="toggleNavGroup(this)">🔍 打磨审校 <span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
           <div class="nav-item" data-module="proofread" data-needs-thesis="0" onclick="switchModule('proofread')" title="无需上传论文，粘贴文本即可检查">✏️ 论文查错</div>
           <div class="nav-item" data-module="de-duplicate" data-needs-thesis="0" onclick="switchModule('de-duplicate')" title="无需上传论文，粘贴文本即可降重">📋 查重降重</div>
@@ -199,7 +200,7 @@
         </div>
       </div>
       <div class="nav-group">
-        <div class="nav-group-title" onclick="toggleNavGroup(this)">📊 评审答辩 <span class="nav-group-arrow">▾</span></div>
+        <div class="nav-group-title collapsed" onclick="toggleNavGroup(this)">📊 评审答辩 <span class="nav-group-arrow">▾</span></div>
         <div class="nav-group-items">
           <div class="nav-item" data-module="review" data-needs-thesis="1" onclick="switchModule('review')" title="需要上传论文">🔍 论文审阅</div>
           <div class="nav-item" data-module="optimization" data-needs-thesis="1" onclick="switchModule('optimization')" title="需要上传论文">💡 优化建议</div>
@@ -216,7 +217,7 @@
   <div class="resizer" id="navResizer"></div>
   <div class="thesis-panel">
     <div class="thesis-bar">
-      <h3>📄 论文原文 <span id="upStatus" style="font-size:.68rem;color:var(--m);font-weight:400">等待上传</span></h3>
+      <h3>📄 工作区 <span id="upStatus" style="font-size:.68rem;color:var(--m);font-weight:400">未导入论文</span></h3>
       <div style="display:flex;gap:4px;align-items:center;font-size:.68rem">
         <button onclick="triggerUpload()" style="font-size:.65rem;padding:3px 8px;border-radius:6px;border:1px solid var(--bd);cursor:pointer;background:var(--cardSolid);color:var(--t);font-weight:500">📎 换论文</button>
         <button onclick="zoomThesis(-0.1)" style="font-size:.68rem;padding:3px 8px;border-radius:6px;border:1px solid var(--bd);cursor:pointer;background:var(--cardSolid);color:var(--t)">-</button>
@@ -380,23 +381,23 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
 <script defer src="mammoth.browser.min.js"></script>
 <script defer src="jszip.min.js"></script>
-<script src="app.js?v=32"></script>
-<script src="js/modules/optimization.js?v=32"></script>
-<script src="js/modules/format-check.js?v=32"></script>
-<script src="js/modules/terminology.js?v=32"></script>
-<script src="js/modules/paragraph-analysis.js?v=32"></script>
-<script src="js/modules/dashboard.js?v=32"></script>
-<script src="js/modules/thesis-review.js?v=32"></script>
-<script src="js/modules/proposal.js?v=32"></script>
-<script src="js/modules/onboarding.js?v=32"></script>
-<script src="js/modules/cat-game.js?v=32"></script>
-<script src="js/modules/topic-finder.js?v=32"></script>
-<script src="js/modules/proofread.js?v=32"></script>
-<script src="js/modules/de-duplicate.js?v=32"></script>
-<script src="js/modules/defense-ppt.js?v=32"></script>
-<script src="js/modules/en-abstract.js?v=32"></script>
-<script src="js/modules/project.js?v=32"></script>
-<script src="js/app-modules.js?v=32"></script>
+<script src="app.js?v=33"></script>
+<script src="js/modules/optimization.js?v=33"></script>
+<script src="js/modules/format-check.js?v=33"></script>
+<script src="js/modules/terminology.js?v=33"></script>
+<script src="js/modules/paragraph-analysis.js?v=33"></script>
+<script src="js/modules/dashboard.js?v=33"></script>
+<script src="js/modules/thesis-review.js?v=33"></script>
+<script src="js/modules/proposal.js?v=33"></script>
+<script src="js/modules/onboarding.js?v=33"></script>
+<script src="js/modules/cat-game.js?v=33"></script>
+<script src="js/modules/topic-finder.js?v=33"></script>
+<script src="js/modules/proofread.js?v=33"></script>
+<script src="js/modules/de-duplicate.js?v=33"></script>
+<script src="js/modules/defense-ppt.js?v=33"></script>
+<script src="js/modules/en-abstract.js?v=33"></script>
+<script src="js/modules/project.js?v=33"></script>
+<script src="js/app-modules.js?v=33"></script>
 <script>
 (function(){
   var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');

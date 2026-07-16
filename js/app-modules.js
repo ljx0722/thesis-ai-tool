@@ -112,11 +112,14 @@ function initKeyboard() {
   // 显示快捷键提示
   var hintTimer = null;
   function showHint() {
+    if(!kbHint) return;
+    kbHint.style.display='';
     kbHint.classList.add('show');
     clearTimeout(hintTimer);
-    hintTimer = setTimeout(function() { kbHint.classList.remove('show'); }, 4000);
+    hintTimer = setTimeout(function() { kbHint.classList.remove('show'); kbHint.style.display='none'; }, 3500);
   }
-  showHint();
+  // 不默认弹出，避免干扰新用户；Ctrl 首次按下时再提示
+  document.addEventListener('keydown', function onceKb(e){ if(e.ctrlKey||e.metaKey){ showHint(); document.removeEventListener('keydown', onceKb); } }, true);
 
   document.addEventListener('keydown', function(e) {
     var mod = e.ctrlKey || e.metaKey;
