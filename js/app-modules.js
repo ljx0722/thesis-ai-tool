@@ -496,23 +496,36 @@ function runExpandModule(container) {
 }
 
 function runDataAnalysis(container) {
+  try{
+    if(window.ThesisProject && typeof ThesisProject.listChapterCards==='function'){
+      var p=ThesisProject.getCurrentProject && ThesisProject.getCurrentProject();
+      if(p){
+        var cards=ThesisProject.listChapterCards(p)||[];
+        if(cards.length){
+          var sum=cards.map(function(c){return c.title+'('+c.words+'字)';}).join(' · ');
+          setTimeout(function(){
+            var banner=document.createElement('div');
+            banner.className='ai-desc';
+            banner.innerHTML='当前项目分章草稿：'+sum+' <button class="ai-btn-clear" style="margin-left:8px" onclick="openChapterBoard()">打开分章看板</button>';
+            if(container && container.firstChild) container.insertBefore(banner, container.firstChild);
+          },0);
+        }
+      }
+    }
+  }catch(e){}
   container.innerHTML = '<div class="module-panel">'+
     '<h4>数据分析</h4>'+
-    '<div class="ai-desc" style="padding:10px 14px;font-size:.72rem">上传 CSV/TSV 数据，自动识别变量类型并生成统计摘要与可视化图表。<br>'+
-    '<b>支持：</b>描述性统计 · 频次分布 · 相关性矩阵 · 散点图 · 箱线图 · 直方图 · 条形图<br>'+
-    '<b>进阶：</b>可用「论文扩写」模块将分析结果生成论文段落 · 导出数据后搭配专业可视化工具出图</div>'+
+    '<div class="ai-desc" style="padding:10px 14px;font-size:.72rem">参考无代码分析工具流程：导入 → 自动预处理 → 统计检验 → 可视化 → AI 论文表述。<br>'+
+    '<b>本地计算：</b>变量概览 · 缺失率 · 描述统计 · Pearson相关 · t检验 · 直方图/箱线图/散点图<br>'+
+    '<b>AI 辅助：</b>一键生成「结果描述 + 论文段落建议」（按实际 token 扣点）</div>'+
     '<div style="padding:20px;border:2px dashed var(--border);border-radius:var(--radius-lg);text-align:center">'+
-    '<div style="font-size:3rem;margin-bottom:8px"></div>'+
-    '<div style="font-size:.85rem;font-weight:700;margin-bottom:4px;color:var(--text-primary)">上传数据文件进行智能分析</div>'+
-    '<div style="font-size:.7rem;color:var(--text-muted);margin-bottom:12px">支持 .csv / .tsv，自动识别变量类型、计算统计量并可视化</div>'+
+    '<div style="font-size:2.2rem;margin-bottom:8px">📊</div>'+
+    '<div style="font-size:.85rem;font-weight:700;margin-bottom:4px;color:var(--text-primary)">1. 导入数据，自动进行数据预处理</div>'+
+    '<div style="font-size:.7rem;color:var(--text-muted);margin-bottom:12px">支持 .csv / .tsv · 自动识别数值/分类 · 缺失统计 · 无需写代码</div>'+
     '<input type="file" id="dataFileInput" accept=".csv,.tsv,.txt" style="display:none" onchange="handleDataFile(this)">'+
-    '<button onclick="document.getElementById(\'dataFileInput\').click()" style="background:var(--accent);color:#fff;border:none;border-radius:var(--radius-full);padding:10px 28px;cursor:pointer;font-weight:600;font-size:.78rem;font-family:var(--font-sans)"> 选择数据文件</button>'+
+    '<button class="ai-btn" style="max-width:240px;margin:0 auto" onclick="document.getElementById(\'dataFileInput\').click()">📁 选择数据文件</button>'+
     '</div>'+
     '<div id="dataAnalysisResult" style="margin-top:16px"></div>'+
-    '<div style="margin-top:16px;padding:10px 14px;border-radius:var(--radius-md);background:var(--surface-alt);border:1px solid var(--border)">'+
-    '<b style="font-size:.72rem">进阶分析</b><br>'+
-    '<span style="font-size:.65rem;color:var(--text-muted)">分析结果可直接复制到论文草稿中。如需专业图表（Nature/Science 级配图），建议用 Python matplotlib+seaborn+SciencePlots 出图。如需统计检验（t-test/ANOVA/回归），可用 Python statsmodels。</span>'+
-    '</div>'+
     '</div>';
 }
 
@@ -630,6 +643,70 @@ function analyzeCSV(f,container){
         chartIdx++;
       }
     });
+    // ===== 变量概览表（类似无代码工具“数据预览/变量概览”）=====
+    h+='<h4>🧾 变量概览（自动预处理）</h4>';
+    h+='<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:.66rem;min-width:100%">';
+    h+='<tr style="background:var(--surface-alt)"><th style="padding:6px 8px;border:1px solid var(--border);text-align:left">列名</th><th style="padding:6px 8px;border:1px solid var(--border)">类型</th><th style="padding:6px 8px;border:1px solid var(--border)">有效数</th><th style="padding:6px 8px;border:1px solid var(--border)">缺失%</th><th style="padding:6px 8px;border:1px solid var(--border)">示例</th></tr>';
+    var typeMap={};
+    headers.forEach(function(hdr){
+      var vals=rows.map(function(r){return r[hdr];});
+      var nonEmpty=vals.filter(function(v){return v!=='';});
+      var nums=nonEmpty.map(function(v){var n=parseFloat(v);return isNaN(n)?null:n;}).filter(function(n){return n!==null;});
+      var isNum=nums.length>nonEmpty.length*0.7;
+      var miss=rows.length?((rows.length-nonEmpty.length)/rows.length*100):0;
+      typeMap[hdr]=isNum?'numeric':'categorical';
+      h+='<tr><td style="padding:5px 8px;border:1px solid var(--border)">'+hdr+'</td><td style="padding:5px 8px;border:1px solid var(--border);text-align:center">'+(isNum?'数值':'分类')+'</td><td style="padding:5px 8px;border:1px solid var(--border);text-align:center">'+nonEmpty.length+'</td><td style="padding:5px 8px;border:1px solid var(--border);text-align:center">'+miss.toFixed(1)+'%</td><td style="padding:5px 8px;border:1px solid var(--border);color:var(--text-muted)">'+(nonEmpty.slice(0,3).join(' | ').substring(0,40))+'</td></tr>';
+    });
+    h+='</table></div>';
+
+    // ===== 一键显著性检验（无代码）=====
+    var sigRows=[];
+    for(var i=0;i<Math.min(numCols.length,8);i++){
+      for(var j=i+1;j<Math.min(numCols.length,8);j++){
+        var a=numCols[i].values,b=numCols[j].values,n=Math.min(a.length,b.length);
+        if(n<5) continue;
+        var r=pearsonCorr(a,b);
+        var rr=Math.max(-0.999,Math.min(0.999,r));
+        var z=0.5*Math.log((1+rr)/(1-rr))*Math.sqrt(n-3);
+        var p=2*(1-normalCdf(Math.abs(z)));
+        sigRows.push({a:numCols[i].name,b:numCols[j].name,method:'Pearson相关',stat:r,p:p});
+      }
+    }
+    headers.forEach(function(hdr){
+      if(typeMap[hdr]!=='categorical') return;
+      var levels={}; rows.forEach(function(r){var v=r[hdr]; if(v) levels[v]=(levels[v]||0)+1;});
+      var lv=Object.keys(levels); if(lv.length!==2) return;
+      numCols.slice(0,8).forEach(function(nc){
+        var g1=[],g2=[];
+        rows.forEach(function(r){
+          var n=parseFloat(r[nc.name]); if(isNaN(n)) return;
+          if(r[hdr]===lv[0]) g1.push(n); else if(r[hdr]===lv[1]) g2.push(n);
+        });
+        var tt=welchTTest(g1,g2); if(!tt) return;
+        sigRows.push({a:nc.name,b:hdr+'('+lv[0]+' vs '+lv[1]+')',method:'Welch t检验',stat:tt.t,p:tt.p});
+      });
+    });
+    sigRows.sort(function(x,y){return x.p-y.p;});
+    var sigTop=sigRows.slice(0,20);
+    if(sigTop.length){
+      h+='<h4>2. 一键显著性检验（无需代码）</h4>';
+      h+='<div style="font-size:.65rem;color:var(--text-muted);margin-bottom:6px">显著性水平 α=0.05 · 展示 p 值最小的前 20 组</div>';
+      h+='<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:.66rem;min-width:100%">';
+      h+='<tr style="background:var(--surface-alt)"><th style="padding:6px 8px;border:1px solid var(--border)">变量A</th><th style="padding:6px 8px;border:1px solid var(--border)">变量B</th><th style="padding:6px 8px;border:1px solid var(--border)">方法</th><th style="padding:6px 8px;border:1px solid var(--border)">统计量</th><th style="padding:6px 8px;border:1px solid var(--border)">P值</th><th style="padding:6px 8px;border:1px solid var(--border)">显著性</th></tr>';
+      sigTop.forEach(function(s){
+        var sig=s.p<0.05;
+        h+='<tr'+(sig?' style="background:rgba(16,185,129,.06)"':'')+'><td style="padding:5px 8px;border:1px solid var(--border)">'+s.a+'</td><td style="padding:5px 8px;border:1px solid var(--border)">'+s.b+'</td><td style="padding:5px 8px;border:1px solid var(--border);text-align:center">'+s.method+'</td><td style="padding:5px 8px;border:1px solid var(--border);text-align:center;font-family:var(--font-mono)">'+s.stat.toFixed(4)+'</td><td style="padding:5px 8px;border:1px solid var(--border);text-align:center;font-family:var(--font-mono)">'+(s.p<0.0001?'<0.0001':s.p.toFixed(4))+'</td><td style="padding:5px 8px;border:1px solid var(--border);text-align:center;font-weight:700;color:'+(sig?'#059669':'var(--text-muted)')+'">'+(sig?'显著':'不显著')+'</td></tr>';
+      });
+      h+='</table></div>';
+    }
+
+    window._dataAnalysisCache={fileName:f.name,nVar:headers.length,nObs:rows.length,summary:{numCols:numCols.map(function(c){return {name:c.name,n:c.values.length,mean:c.values.reduce(function(s,v){return s+v;},0)/c.values.length};}),headers:headers.slice(0,30)},sigTop:sigTop.map(function(s){return {a:s.a,b:s.b,method:s.method,stat:+s.stat.toFixed(4),p:+s.p.toFixed(6)};})};
+    h+='<div style="margin:16px 0;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-alt)">';
+    h+='<div style="font-weight:700;font-size:.78rem;margin-bottom:6px">🤖 AI 结果表述（论文写作辅助）</div>';
+    h+='<div style="font-size:.65rem;color:var(--text-muted);margin-bottom:8px">把统计表转成可放入论文的“结果分析”段落。前端不显示固定点数，按实际 token 消耗计费。</div>';
+    h+='<button class="ai-btn" style="max-width:220px" onclick="runDataAISummary()">生成论文结果段落</button>';
+    h+='<div id="dataAIOutput" style="margin-top:10px"></div></div>';
+
     container.innerHTML=h;
 
     // Draw charts after DOM is ready
@@ -670,6 +747,50 @@ function analyzeCSV(f,container){
   };
   reader.readAsText(f);
 }
+
+
+function erfcApprox(x){
+  var z=Math.abs(x);
+  var t=1/(1+0.5*z);
+  var ans=t*Math.exp(-z*z-1.26551223+t*(1.00002368+t*(0.37409196+t*(0.09678418+t*(-0.18628806+t*(0.27886807+t*(-1.13520398+t*(1.48851587+t*(-0.82215223+t*0.17087277)))))))));
+  return x>=0?ans:2-ans;
+}
+function normalCdf(x){ return 1-0.5*erfcApprox(x/Math.SQRT2); }
+function studentTCdfApprox(t, df){
+  if(df<=0) return 0.5;
+  var x=t*Math.sqrt(df/(df+t*t));
+  return normalCdf(x);
+}
+function welchTTest(a,b){
+  if(!a||!b||a.length<2||b.length<2) return null;
+  var n1=a.length,n2=b.length;
+  var m1=a.reduce(function(s,v){return s+v;},0)/n1;
+  var m2=b.reduce(function(s,v){return s+v;},0)/n2;
+  var v1=0,v2=0; a.forEach(function(v){v1+=Math.pow(v-m1,2);}); b.forEach(function(v){v2+=Math.pow(v-m2,2);});
+  v1/=(n1-1); v2/=(n2-1);
+  var se=Math.sqrt(v1/n1+v2/n2); if(!se) return {t:0,p:1,df:n1+n2-2};
+  var tstat=(m1-m2)/se;
+  var df=Math.pow(v1/n1+v2/n2,2)/(Math.pow(v1/n1,2)/(n1-1)+Math.pow(v2/n2,2)/(n2-1));
+  var p=2*(1-studentTCdfApprox(Math.abs(tstat), Math.max(1,Math.round(df))));
+  return {t:tstat,p:p,df:df,mean1:m1,mean2:m2};
+}
+window._dataAnalysisCache=null;
+window.runDataAISummary=function(){
+  var cache=window._dataAnalysisCache; if(!cache){alert('请先上传并完成数据分析');return;}
+  var token=sessionStorage.getItem('thesis_ai_token'); if(!token){alert('请先登录');return;}
+  var out=document.getElementById('dataAIOutput'); if(!out)return;
+  out.innerHTML='<div class="ai-loading">⏳ AI 正在根据统计结果撰写论文表述...</div>';
+  var summary=JSON.stringify(cache.summary).substring(0,3500);
+  var sig=JSON.stringify(cache.sigTop||[]).substring(0,2000);
+  fetch('/api/llm/analyze',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+    body:JSON.stringify({module:'data-analysis',system_prompt:'你是学术论文数据分析写作助手。请用中文、规范学术语气，根据统计摘要撰写：1)结果描述 2)可放入论文的段落 3)图表标题建议。不要编造未给出的数据。',
+      user_prompt:'文件：'+cache.fileName+'\n变量数：'+cache.nVar+' 观测：'+cache.nObs+'\n统计摘要：'+summary+'\n显著性结果(Top)：'+sig+'\n请输出结构化中文结果。',max_tokens:1800})})
+  .then(function(r){return r.json();}).then(function(d){
+    if(d.success){ out.innerHTML='<div class="ai-output">'+d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>'; if(typeof updateBalanceDisplay==='function')updateBalanceDisplay(); }
+    else out.innerHTML='<div class="ai-output-error">❌ '+(d.error||'失败')+'</div>';
+  }).catch(function(){out.innerHTML='<div class="ai-output-error">网络错误</div>';});
+};
+
 
 function pearsonCorr(a,b){
   var n=Math.min(a.length,b.length); if(n<2) return 0;
