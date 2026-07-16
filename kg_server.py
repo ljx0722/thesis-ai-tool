@@ -102,6 +102,35 @@ def init_db():
             key TEXT PRIMARY KEY,
             value TEXT
         );
+        CREATE TABLE IF NOT EXISTS projects (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            idea TEXT,
+            field TEXT,
+            keywords TEXT,
+            degree TEXT,
+            goal_words INTEGER DEFAULT 30000,
+            current_stage TEXT,
+            mode TEXT,
+            has_manuscript INTEGER DEFAULT 0,
+            stage_status TEXT,
+            school_template TEXT,
+            notes TEXT,
+            created_at TEXT,
+            updated_at TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+        CREATE TABLE IF NOT EXISTS project_artifacts (
+            project_id TEXT PRIMARY KEY,
+            outline_json TEXT,
+            chapters_json TEXT,
+            versions_json TEXT,
+            skill_logs_json TEXT,
+            manuscript_meta_json TEXT,
+            updated_at TEXT,
+            FOREIGN KEY (project_id) REFERENCES projects(id)
+        );
     ''')
     conn.commit()
     # Default pricing config (单位：分点 = 0.1点)
@@ -2205,6 +2234,181 @@ def admin_llm_economics():
             },
             'by_module': by_module
         })
+    finally:
+        db.close()
+
+
+
+
+# ========== 云端项目库 ==========
+def _project_row_to_dict(row, artifacts=None):
+    import json as _json
+    d = dict(row)
+    # normalize
+    out = {
+        'id': d.get('id'),
+        'title': d.get('title') or '未命名论文项目',
+        'idea': d.get('idea') or '',
+        'field': d.get('field') or '',
+        'keywords': d.get('keywords') or '',
+        'degree': d.get('degree') or '硕士',
+        'goalWords': d.get('goal_words') or 30000,
+        'currentStage': d.get('current_stage') or 'ideation',
+        'mode': d.get('mode') or 'create',
+        'hasManuscript': bool(d.get('has_manuscript') or 0),
+        'schoolTemplate': d.get('school_template') or '',
+        'notes': d.get('notes') or '',
+        'createdAt': d.get('created_at'),
+        'updatedAt': d.get('updated_at'),
+        'stageStatus': {},
+        'artifacts': {'outline': None, 'chapters': {}, 'skillLogs': [], '_versions': {}}
+    }
+    try:
+        out['stageStatus'] = _json.loads(d.get('stage_status') or '{}') or {}
+    except Exception:
+        out['stageStatus'] = {}
+    if artifacts:
+        a = dict(artifacts)
+        try: out['artifacts']['outline'] = _json.loads(a.get('outline_json') or 'null')
+        except Exception: out['artifacts']['outline'] = None
+        try: out['artifacts']['chapters'] = _json.loads(a.get('chapters_json') or '{}') or {}
+        except Exception: out['artifacts']['chapters'] = {}
+        try: out['artifacts']['_versions'] = _json.loads(a.get('versions_json') or '{}') or {}
+        except Exception: out['artifacts']['_versions'] = {}
+        try: out['artifacts']['skillLogs'] = _json.loads(a.get('skill_logs_json') or '[]') or []
+        except Exception: out['artifacts']['skillLogs'] = []
+        try: out['artifacts']['manuscriptMeta'] = _json.loads(a.get('manuscript_meta_json') or 'null')
+        except Exception: out['artifacts']['manuscriptMeta'] = None
+    return out
+
+
+@app.route('/api/projects', methods=['GET'])
+@require_auth
+def projects_list():
+    db = get_db()
+    try:
+        rows = db.execute(
+            'SELECT * FROM projects WHERE user_id=? ORDER BY updated_at DESC, created_at DESC LIMIT 100',
+            (request.user_id,)
+        ).fetchall()
+        items = []
+        for r in rows:
+            art = db.execute('SELECT * FROM project_artifacts WHERE project_id=?', (r['id'],)).fetchone()
+            items.append(_project_row_to_dict(r, art))
+        return jsonify({'success': True, 'projects': items})
+    finally:
+        db.close()
+
+
+@app.route('/api/projects/<project_id>', methods=['GET'])
+@require_auth
+def projects_get(project_id):
+    db = get_db()
+    try:
+        r = db.execute('SELECT * FROM projects WHERE id=? AND user_id=?', (project_id, request.user_id)).fetchone()
+        if not r:
+            return jsonify({'success': False, 'error': '项目不存在'}), 404
+        art = db.execute('SELECT * FROM project_artifacts WHERE project_id=?', (project_id,)).fetchone()
+        return jsonify({'success': True, 'project': _project_row_to_dict(r, art)})
+    finally:
+        db.close()
+
+
+@app.route('/api/projects', methods=['POST'])
+@require_auth
+def projects_upsert():
+    """创建或更新项目（含 artifacts）。"""
+    import json as _json
+    data = request.get_json() or {}
+    p = data.get('project') or data
+    pid = (p.get('id') or '').strip()
+    if not pid:
+        pid = 'p_' + secrets.token_hex(8)
+    title = (p.get('title') or '未命名论文项目').strip()[:200]
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    stage_status = p.get('stageStatus') or {}
+    artifacts = p.get('artifacts') or {}
+    db = get_db()
+    try:
+        exists = db.execute('SELECT id FROM projects WHERE id=? AND user_id=?', (pid, request.user_id)).fetchone()
+        payload = (
+            title,
+            p.get('idea') or '',
+            p.get('field') or '',
+            p.get('keywords') or '',
+            p.get('degree') or '硕士',
+            int(p.get('goalWords') or 30000),
+            p.get('currentStage') or 'ideation',
+            p.get('mode') or 'create',
+            1 if p.get('hasManuscript') else 0,
+            _json.dumps(stage_status, ensure_ascii=False),
+            p.get('schoolTemplate') or '',
+            p.get('notes') or '',
+            now,
+            pid,
+            request.user_id,
+        )
+        if exists:
+            db.execute(
+                "UPDATE projects SET title=?, idea=?, field=?, keywords=?, degree=?, goal_words=?, current_stage=?, mode=?, "
+                "has_manuscript=?, stage_status=?, school_template=?, notes=?, updated_at=? "
+                "WHERE id=? AND user_id=?",
+                payload
+            )
+        else:
+            db.execute(
+                "INSERT INTO projects "
+                "(title, idea, field, keywords, degree, goal_words, current_stage, mode, has_manuscript, stage_status, school_template, notes, updated_at, id, user_id, created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                payload + (p.get('createdAt') or now,)
+            )
+        # artifacts upsert
+        db.execute(
+            "INSERT INTO project_artifacts(project_id, outline_json, chapters_json, versions_json, skill_logs_json, manuscript_meta_json, updated_at) "
+            "VALUES (?,?,?,?,?,?,?) "
+            "ON CONFLICT(project_id) DO UPDATE SET "
+            "outline_json=excluded.outline_json, "
+            "chapters_json=excluded.chapters_json, "
+            "versions_json=excluded.versions_json, "
+            "skill_logs_json=excluded.skill_logs_json, "
+            "manuscript_meta_json=excluded.manuscript_meta_json, "
+            "updated_at=excluded.updated_at",
+            (
+                pid,
+                _json.dumps(artifacts.get('outline'), ensure_ascii=False),
+                _json.dumps(artifacts.get('chapters') or {}, ensure_ascii=False),
+                _json.dumps(artifacts.get('_versions') or {}, ensure_ascii=False),
+                _json.dumps(artifacts.get('skillLogs') or [], ensure_ascii=False),
+                _json.dumps(artifacts.get('manuscriptMeta'), ensure_ascii=False),
+                now,
+            )
+        )
+        db.commit()
+        row = db.execute('SELECT * FROM projects WHERE id=? AND user_id=?', (pid, request.user_id)).fetchone()
+        art = db.execute('SELECT * FROM project_artifacts WHERE project_id=?', (pid,)).fetchone()
+        return jsonify({'success': True, 'project': _project_row_to_dict(row, art)})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route('/api/projects/<project_id>', methods=['DELETE'])
+@require_auth
+def projects_delete(project_id):
+    db = get_db()
+    try:
+        r = db.execute('SELECT id FROM projects WHERE id=? AND user_id=?', (project_id, request.user_id)).fetchone()
+        if not r:
+            return jsonify({'success': False, 'error': '项目不存在'}), 404
+        db.execute('DELETE FROM project_artifacts WHERE project_id=?', (project_id,))
+        db.execute('DELETE FROM projects WHERE id=? AND user_id=?', (project_id, request.user_id))
+        db.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         db.close()
 

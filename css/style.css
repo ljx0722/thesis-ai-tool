@@ -1656,3 +1656,13 @@ body.dark .bar, body:not(.light) .bar { background: rgba(2, 6, 23, 0.95); }
 
 .ml-steps{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}
 .ml-step{font-size:.62rem;padding:4px 10px;border-radius:999px;background:rgba(99,102,241,.1);color:var(--accent);border:1px solid rgba(99,102,241,.18);font-weight:600}
+
+
+.merged-paper{padding:18px 18px 40px;max-width:860px;margin:0 auto;color:var(--text-primary)}
+.merged-title{font-size:1.5rem;font-weight:800;margin:0 0 8px;letter-spacing:-0.02em}
+.merged-meta{color:var(--text-muted);font-size:.75rem;margin:0 0 18px}
+.merged-chapter{margin:18px 0 22px}
+.merged-chapter h2{font-size:1.1rem;margin:0 0 10px}
+.merged-chapter p{font-size:.86rem;line-height:1.85;margin:0 0 10px;text-indent:2em}
+.merged-refs p{text-indent:0;font-size:.8rem;line-height:1.7;margin:0 0 8px}
+#mergedPaperRoot{min-height:100%;background:var(--bg-card)}

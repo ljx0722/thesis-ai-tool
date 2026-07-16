@@ -100,6 +100,67 @@
     } catch (e) {}
   }
 
+  function authHeaders() {
+    var token = null;
+    try { token = sessionStorage.getItem('thesis_ai_token'); } catch (e) {}
+    var h = { 'Content-Type': 'application/json' };
+    if (token) h['Authorization'] = 'Bearer ' + token;
+    return h;
+  }
+  function cloudEnabled() {
+    try { return !!sessionStorage.getItem('thesis_ai_token'); } catch (e) { return false; }
+  }
+  function upsertLocal(project) {
+    var list = loadAll();
+    var found = false;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === project.id) { list[i] = project; found = true; break; }
+    }
+    if (!found) list.unshift(project);
+    saveAll(list);
+    setCurrentId(project.id);
+    return project;
+  }
+  function syncProjectToCloud(project, cb) {
+    if (!cloudEnabled() || !project) { if (cb) cb(null); return; }
+    fetch('/api/projects', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ project: project })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if (d && d.success && d.project) {
+        upsertLocal(d.project);
+        if (cb) cb(d.project);
+      } else if (cb) cb(null);
+    }).catch(function(){ if (cb) cb(null); });
+  }
+  function pullCloudProjects(cb) {
+    if (!cloudEnabled()) { if (cb) cb([]); return; }
+    fetch('/api/projects', { headers: authHeaders() })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || !d.success) { if (cb) cb([]); return; }
+        var remote = d.projects || [];
+        // merge remote over local by updatedAt
+        var map = {};
+        loadAll().forEach(function(p){ map[p.id] = p; });
+        remote.forEach(function(rp){
+          var lp = map[rp.id];
+          if (!lp) map[rp.id] = rp;
+          else {
+            var lt = Date.parse(lp.updatedAt || lp.createdAt || 0) || 0;
+            var rt = Date.parse(rp.updatedAt || rp.createdAt || 0) || 0;
+            map[rp.id] = rt >= lt ? rp : lp;
+          }
+        });
+        var merged = Object.keys(map).map(function(k){ return map[k]; });
+        merged.sort(function(a,b){ return Date.parse(b.updatedAt||0) - Date.parse(a.updatedAt||0); });
+        saveAll(merged);
+        if (cb) cb(merged);
+      }).catch(function(){ if (cb) cb([]); });
+  }
+
+
   function getCurrentId() {
     try { return localStorage.getItem(CURRENT_KEY) || ''; } catch (e) { return ''; }
   }
@@ -120,19 +181,11 @@
   }
 
   function upsertProject(project) {
-    var list = loadAll();
-    var found = false;
-    for (var i = 0; i < list.length; i++) {
-      if (list[i].id === project.id) {
-        list[i] = project;
-        found = true;
-        break;
-      }
-    }
-    if (!found) list.unshift(project);
-    saveAll(list);
-    setCurrentId(project.id);
-    return project;
+    if (!project.updatedAt) project.updatedAt = nowISO();
+    var saved = upsertLocal(project);
+    // fire-and-forget cloud sync
+    try { syncProjectToCloud(saved); } catch (e) {}
+    return saved;
   }
 
   function createProject(opts) {
@@ -425,6 +478,9 @@
     if (getCurrentId() === projectId) {
       setCurrentId(list.length ? list[0].id : '');
     }
+    if (cloudEnabled()) {
+      fetch('/api/projects/' + encodeURIComponent(projectId), { method: 'DELETE', headers: authHeaders() }).catch(function(){});
+    }
     renderProjectChrome();
     if (typeof switchView === 'function') switchView('workspace');
     if (typeof ttp === 'function') ttp('已删除项目');
@@ -612,7 +668,7 @@
               '<div class="home-choice-next">下一步：上传 .docx → 查看目录树</div>' +
             '</button>' +
           '</div>' +
-          '<div class="home-help-note">左侧「写作阶段」是主导航；下方「能力」是工具箱。先选路径，再按阶段推进。</div>' +
+          '<div class="home-help-note">左侧「写作阶段」是主导航；下方「能力」是工具箱。先选路径，再按阶段推进。登录后项目会自动云同步。</div>' +
         '</div>';
     }
 
@@ -653,6 +709,8 @@
         '<details class="project-more-tools"><summary>更多工具</summary><div class="project-tools-row">' +
           '<button class="ai-btn-clear" onclick="openOutlineEditor()">大纲</button>' +
           '<button class="ai-btn-clear" onclick="openChapterBoard()">分章草稿</button>' +
+          '<button class="ai-btn-clear" onclick="openFullPaperPreview()">完整预览</button>' +
+          '<button class="ai-btn-clear" onclick="mergeDraftsIntoThesis()">合并到正文</button>' +
           '<button class="ai-btn-clear" onclick="openTemplateChooser()">学校模板</button>' +
           '<button class="ai-btn-clear" onclick="openProjectSettings()">设置</button>' +
           '<button class="ai-btn-clear" onclick="exportFullPaperDocx()">导出DOCX</button>' +
@@ -1628,4 +1686,114 @@
 
   window.syncSectionsToChapterDrafts = syncSectionsToChapterDrafts;
   window.renderCitePreview = renderCitePreview;
+
+  function buildMergedHtmlFromDrafts(project) {
+    var payload = buildPaperPayload ? buildPaperPayload() : null;
+    if (!payload) return '';
+    var html = '';
+    html += '<div class="merged-paper">';
+    html += '<h1 class="merged-title">' + escapeHtml(payload.title || project.title || '论文草稿') + '</h1>';
+    if (payload.degree || payload.field) {
+      html += '<p class="merged-meta">' + escapeHtml([payload.degree, payload.field].filter(Boolean).join(' · ')) + '</p>';
+    }
+    (payload.chapters || []).forEach(function(ch, idx) {
+      html += '<section class="merged-chapter" id="merged-ch-' + idx + '">';
+      html += '<h2>' + escapeHtml(ch.title || ('第'+(idx+1)+'章')) + '</h2>';
+      var content = (ch.content || '').trim();
+      if (content) {
+        content.split(/\n+/).forEach(function(para){
+          if (para.trim()) html += '<p>' + escapeHtml(para.trim()) + '</p>';
+        });
+      } else if (ch.sections && ch.sections.length) {
+        ch.sections.forEach(function(s){ html += '<p><b>' + escapeHtml(s) + '</b></p><p>（待完善）</p>'; });
+      } else {
+        html += '<p>（本章暂无草稿）</p>';
+      }
+      html += '</section>';
+    });
+    if (payload.references && payload.references.length) {
+      html += '<section class="merged-refs"><h2>参考文献</h2>';
+      payload.references.forEach(function(r){
+        html += '<p class="merged-ref-item">[' + (r.num || '') + '] ' + escapeHtml(r.text || '') + '</p>';
+      });
+      html += '</section>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function mergeDraftsIntoThesis() {
+    var p = getCurrentProject();
+    if (!p) { alert('请先创建项目'); return; }
+    var outline = getOutline();
+    if (!outline || !outline.chapters || !outline.chapters.length) {
+      alert('请先保存大纲/分章草稿');
+      return;
+    }
+    var box = document.getElementById('thesisBox');
+    if (!box) return;
+    if (!confirm('将把分章草稿合并到中间工作区（会覆盖当前工作区显示，不影响原 DOCX 文件）。继续？')) return;
+    var html = buildMergedHtmlFromDrafts(p);
+    // hide workspace home
+    var ws = document.getElementById('workspaceContent');
+    if (ws) ws.style.display = 'none';
+    // remove previous merged root if any
+    var old = document.getElementById('mergedPaperRoot');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    var root = document.createElement('div');
+    root.id = 'mergedPaperRoot';
+    root.innerHTML = html;
+    box.appendChild(root);
+    // also set manuscriptText for modules that need plain text
+    try {
+      manuscriptText = root.innerText || '';
+      manuscriptHTML = root.innerHTML || '';
+    } catch (e) {}
+    // update sections-like structure for tree
+    try {
+      var fake = (outline.chapters || []).map(function(ch, i){
+        return { ch: i+1, name: ch.title, sections: (ch.sections||[]).map(function(s, j){ return { num: (i+1)+'.'+(j+1), title: s, subs: [], text: '' }; }), text: (getChapterDraft(chapterKey(ch.title,i))||{}).content || '' };
+      });
+      sections = fake;
+      if (typeof renderNavTree === 'function') renderNavTree(sections);
+    } catch (e) {}
+    updateCurrent({ hasManuscript: true });
+    logSkillRun({ moduleId: 'merge-drafts', title: '合并分章草稿到正文', summary: (outline.chapters||[]).length + ' 章' });
+    if (typeof switchView === 'function') switchView('workspace');
+    // show paper, not home
+    if (ws) ws.style.display = 'none';
+    if (typeof ttp === 'function') ttp('已合并到工作区，可继续导出或打开看板');
+    renderProjectChrome();
+  }
+
+  function openFullPaperPreview() {
+    var p = getCurrentProject();
+    if (!p) { alert('请先创建项目'); return; }
+    var html = buildMergedHtmlFromDrafts(p);
+    if (!html) { alert('暂无预览内容'); return; }
+    var ov = document.createElement('div');
+    ov.id = 'fullPreviewOverlay';
+    ov.className = 'project-overlay';
+    ov.innerHTML = '<div class="project-modal" style="width:min(860px,96vw);max-height:88vh" onclick="event.stopPropagation()">' +
+      '<div class="project-modal-head"><div><h3>完整论文预览</h3><p>导出前确认结构与正文</p></div>' +
+      '<button class="project-close" onclick="closeFullPaperPreview()">×</button></div>' +
+      '<div id="fullPreviewBody" style="overflow:auto;max-height:62vh;padding:8px 4px;border:1px solid var(--border);border-radius:12px;background:var(--bg-card)">' + html + '</div>' +
+      '<div class="project-modal-actions">' +
+        '<button class="ai-btn-clear" onclick="closeFullPaperPreview()">关闭</button>' +
+        '<button class="ai-btn-clear" onclick="closeFullPaperPreview();mergeDraftsIntoThesis()">合并到工作区</button>' +
+        '<button class="ai-btn" onclick="closeFullPaperPreview();exportFullPaperDocx()">导出 DOCX</button>' +
+      '</div></div>';
+    ov.onclick = function(){ closeFullPaperPreview(); };
+    document.body.appendChild(ov);
+  }
+  function closeFullPaperPreview(){
+    var ov=document.getElementById('fullPreviewOverlay');
+    if(ov&&ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+
+  window.mergeDraftsIntoThesis = mergeDraftsIntoThesis;
+  window.openFullPaperPreview = openFullPaperPreview;
+  window.closeFullPaperPreview = closeFullPaperPreview;
+  window.pullCloudProjects = pullCloudProjects;
+  window.syncProjectToCloud = syncProjectToCloud;
 }).call(this);

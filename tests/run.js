@@ -1663,6 +1663,19 @@ test('API: export docx + analyze_ml routes exist', function() {
   assert(src.indexOf('model_compare') >= 0, 'model compare missing');
 });
 
+test('API: cloud projects routes exist', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  assert(src.indexOf('/api/projects') >= 0, 'projects api missing');
+  assert(src.indexOf('CREATE TABLE IF NOT EXISTS projects') >= 0, 'projects table missing');
+  assert(src.indexOf('project_artifacts') >= 0, 'project artifacts missing');
+});
+test('PROJECT: merge/preview/cloud helpers exist', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');
+  assert(src.indexOf('function mergeDraftsIntoThesis') >= 0, 'merge missing');
+  assert(src.indexOf('function openFullPaperPreview') >= 0, 'preview missing');
+  assert(src.indexOf('function syncProjectToCloud') >= 0, 'cloud sync missing');
+  assert(src.indexOf('function pullCloudProjects') >= 0, 'cloud pull missing');
+});
 test('PROJECT: citation closed loop + import sync helpers', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');
   assert(src.indexOf('function insertCiteMarkers') >= 0, 'insertCiteMarkers missing');
