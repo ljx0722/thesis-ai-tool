@@ -1633,6 +1633,8 @@ test('API: export docx + analyze_ml routes exist', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
   assert(src.indexOf('/api/export/docx') >= 0, 'export docx route missing');
   assert(src.indexOf('/api/data/analyze_ml') >= 0, 'analyze_ml route missing');
+  assert(src.indexOf('feature_importance') >= 0, 'feature importance missing');
+  assert(src.indexOf('model_compare') >= 0, 'model compare missing');
 });
 
 test('PROJECT: citation closed loop + import sync helpers', function() {

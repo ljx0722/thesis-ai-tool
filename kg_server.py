@@ -1658,17 +1658,20 @@ def export_docx():
                      mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
 
 
+
 @app.route('/api/data/analyze_ml', methods=['POST'])
 @require_auth
 def analyze_ml():
-    """轻量特征重要性/模型对比（无 SHAP 重依赖）。
-    输入 JSON: {headers:[], rows:[{}], target: str, task: 'classify'|'regress'}
+    """无代码风格轻量机器学习分析。
+    输入: headers, rows, target, task(auto/classify/regress), test_size, top_k
     """
     data = request.get_json() or {}
     headers = data.get('headers') or []
     rows = data.get('rows') or []
     target = data.get('target') or ''
-    task = data.get('task') or 'classify'
+    task = (data.get('task') or 'auto').lower()
+    test_size = float(data.get('test_size') or 0.3)
+    top_k = int(data.get('top_k') or 12)
     if not headers or not rows or not target or target not in headers:
         return jsonify({'success': False, 'error': '需要 headers/rows/target'}), 400
     try:
@@ -1676,120 +1679,281 @@ def analyze_ml():
     except Exception as e:
         return jsonify({'success': False, 'error': '服务器缺少 numpy: ' + str(e)}), 500
 
-    # Build matrix
-    feats = [h for h in headers if h != target]
-    X, y_raw = [], []
+    def to_float(v):
+        try:
+            if v is None or str(v).strip() == '':
+                return None
+            return float(v)
+        except Exception:
+            return None
+
+    # Keep mostly numeric features
+    feats = []
+    for h in headers:
+        if h == target:
+            continue
+        vals = [to_float(r.get(h)) for r in rows]
+        non = [v for v in vals if v is not None]
+        if len(non) >= max(10, int(0.5 * len(rows))):
+            feats.append(h)
+    if not feats:
+        return jsonify({'success': False, 'error': '未找到足够的数值特征列'}), 400
+
+    X_list, y_raw = [], []
     for r in rows:
         yv = r.get(target, '')
-        if yv == '' or yv is None:
+        if yv is None or str(yv).strip() == '':
             continue
         row = []
         ok = True
         for f in feats:
-            try:
-                row.append(float(r.get(f)))
-            except Exception:
+            fv = to_float(r.get(f))
+            if fv is None:
                 ok = False
                 break
+            row.append(fv)
         if not ok:
             continue
-        X.append(row)
+        X_list.append(row)
         y_raw.append(yv)
-    if len(X) < 20:
-        return jsonify({'success': False, 'error': '有效样本不足（需至少约20行数值特征）'}), 400
-    X = np.asarray(X, dtype=float)
-    # encode y
-    classes = sorted(list(set(map(str, y_raw))))
-    if task == 'classify' and len(classes) >= 2:
+    if len(X_list) < 20:
+        return jsonify({'success': False, 'error': '有效样本不足（建议 >=20 行完整数值样本）'}), 400
+
+    X = np.asarray(X_list, dtype=float)
+    # impute nan just in case
+    col_mean = np.nanmean(X, axis=0)
+    inds = np.where(np.isnan(X))
+    if inds[0].size:
+        X[inds] = np.take(col_mean, inds[1])
+
+    # auto task
+    y_str = [str(v) for v in y_raw]
+    uniq = sorted(list(set(y_str)))
+    numeric_y = all(to_float(v) is not None for v in y_raw)
+    if task == 'auto':
+        task = 'classify' if (not numeric_y or len(uniq) <= max(12, int(0.2 * len(uniq)))) and len(uniq) >= 2 else 'regress'
+        if numeric_y and len(uniq) > 15:
+            task = 'regress'
+
+    n = X.shape[0]
+    rng = np.random.default_rng(42)
+    idx = np.arange(n)
+    rng.shuffle(idx)
+    cut = max(1, min(n - 1, int(n * (1 - test_size))))
+    tr, te = idx[:cut], idx[cut:]
+
+    def corr_importance(y_num):
+        imp = []
+        for j, f in enumerate(feats):
+            col = X[:, j]
+            if col.std() < 1e-12 or np.std(y_num) < 1e-12:
+                score = 0.0
+            else:
+                score = float(abs(np.corrcoef(col, y_num)[0, 1]))
+                if np.isnan(score):
+                    score = 0.0
+            imp.append({'feature': f, 'score': round(score, 4)})
+        imp.sort(key=lambda d: d['score'], reverse=True)
+        return imp
+
+    result = {
+        'success': True,
+        'task': task,
+        'n_samples': int(n),
+        'n_features': int(len(feats)),
+        'n_train': int(len(tr)),
+        'n_test': int(len(te)),
+        'note': ''
+    }
+
+    # try sklearn models when available
+    has_sk = False
+    try:
+        from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, AdaBoostClassifier
+        from sklearn.linear_model import LogisticRegression, Ridge
+        from sklearn.tree import DecisionTreeClassifier
+        from sklearn.metrics import accuracy_score, f1_score, roc_auc_score, r2_score, confusion_matrix
+        from sklearn.preprocessing import StandardScaler
+        has_sk = True
+    except Exception:
+        has_sk = False
+
+    if task == 'classify':
+        classes = uniq
         y_map = {c: i for i, c in enumerate(classes)}
-        y = np.array([y_map[str(v)] for v in y_raw], dtype=int)
-        # train/test split
-        n = len(y)
-        idx = np.arange(n)
-        rng = np.random.default_rng(42)
-        rng.shuffle(idx)
-        cut = max(1, int(n * 0.7))
-        tr, te = idx[:cut], idx[cut:]
-        # LogReg one-vs-rest via least squares proxy + tree-free importance: abs corr / ANOVA-like
-        # Feature importance: mutual mean-diff for top classes or abs pearson with y
-        imp = []
-        for j, f in enumerate(feats):
-            col = X[:, j]
-            # standardized abs correlation with y
-            yc = y.astype(float)
-            if col.std() < 1e-12 or yc.std() < 1e-12:
-                score = 0.0
+        y = np.array([y_map[s] for s in y_str], dtype=int)
+        imp = corr_importance(y.astype(float))
+        selected = [d['feature'] for d in imp[:max(1, min(top_k, len(imp)))]]
+        sel_idx = [feats.index(f) for f in selected]
+        Xs = X[:, sel_idx]
+        result['classes'] = classes
+        result['feature_importance'] = imp[:20]
+        result['selected_features'] = selected
+        models = []
+        best = None
+
+        if has_sk:
+            Xtr, Xte = Xs[tr], Xs[te]
+            ytr, yte = y[tr], y[te]
+            scaler = StandardScaler()
+            Xtr_s = scaler.fit_transform(Xtr)
+            Xte_s = scaler.transform(Xte)
+            candidates = []
+            # Logistic
+            try:
+                lr = LogisticRegression(max_iter=300, multi_class='auto')
+                lr.fit(Xtr_s, ytr)
+                pred = lr.predict(Xte_s)
+                proba = None
+                if hasattr(lr, 'predict_proba') and len(classes) == 2:
+                    proba = lr.predict_proba(Xte_s)[:, 1]
+                acc = float(accuracy_score(yte, pred))
+                f1 = float(f1_score(yte, pred, average='weighted'))
+                auc = float(roc_auc_score(yte, proba)) if proba is not None and len(np.unique(yte)) > 1 else None
+                candidates.append({'model': '逻辑回归', 'accuracy': round(acc, 4), 'f1': round(f1, 4), 'auc': None if auc is None else round(auc, 4), '_proba': proba, '_pred': pred})
+            except Exception:
+                pass
+            try:
+                rf = RandomForestClassifier(n_estimators=120, random_state=42)
+                rf.fit(Xtr, ytr)
+                pred = rf.predict(Xte)
+                proba = rf.predict_proba(Xte)[:, 1] if len(classes) == 2 else None
+                acc = float(accuracy_score(yte, pred))
+                f1 = float(f1_score(yte, pred, average='weighted'))
+                auc = float(roc_auc_score(yte, proba)) if proba is not None and len(np.unique(yte)) > 1 else None
+                # tree importance remap to selected
+                fi = getattr(rf, 'feature_importances_', None)
+                if fi is not None:
+                    for i, f in enumerate(selected):
+                        # blend into imp display for top features
+                        pass
+                    tree_imp = [{'feature': selected[i], 'score': round(float(fi[i]), 4)} for i in range(len(selected))]
+                    tree_imp.sort(key=lambda d: d['score'], reverse=True)
+                    result['feature_importance_model'] = tree_imp[:20]
+                candidates.append({'model': '随机森林', 'accuracy': round(acc, 4), 'f1': round(f1, 4), 'auc': None if auc is None else round(auc, 4), '_proba': proba, '_pred': pred})
+            except Exception:
+                pass
+            try:
+                ada = AdaBoostClassifier(n_estimators=80, random_state=42)
+                ada.fit(Xtr, ytr)
+                pred = ada.predict(Xte)
+                proba = ada.predict_proba(Xte)[:, 1] if len(classes) == 2 and hasattr(ada, 'predict_proba') else None
+                acc = float(accuracy_score(yte, pred))
+                f1 = float(f1_score(yte, pred, average='weighted'))
+                auc = float(roc_auc_score(yte, proba)) if proba is not None and len(np.unique(yte)) > 1 else None
+                candidates.append({'model': 'AdaBoost', 'accuracy': round(acc, 4), 'f1': round(f1, 4), 'auc': None if auc is None else round(auc, 4), '_proba': proba, '_pred': pred})
+            except Exception:
+                pass
+            try:
+                dt = DecisionTreeClassifier(max_depth=6, random_state=42)
+                dt.fit(Xtr, ytr)
+                pred = dt.predict(Xte)
+                acc = float(accuracy_score(yte, pred))
+                f1 = float(f1_score(yte, pred, average='weighted'))
+                candidates.append({'model': '决策树', 'accuracy': round(acc, 4), 'f1': round(f1, 4), 'auc': None, '_proba': None, '_pred': pred})
+            except Exception:
+                pass
+            if candidates:
+                best = max(candidates, key=lambda d: (d.get('auc') is not None, d.get('auc') or 0, d.get('accuracy') or 0))
+                models = [{k: v for k, v in c.items() if not k.startswith('_')} for c in candidates]
+                result['model_compare'] = models
+                result['best_model'] = best['model']
+                # ROC curve for best binary
+                if best.get('_proba') is not None and len(classes) == 2:
+                    # build ROC points
+                    scores = np.asarray(best['_proba'], dtype=float)
+                    y_true = y[te]
+                    thresholds = np.linspace(0, 1, 51)
+                    fpr_list, tpr_list = [], []
+                    for th in thresholds:
+                        pred_b = (scores >= th).astype(int)
+                        tp = float(np.sum((pred_b == 1) & (y_true == 1)))
+                        fp = float(np.sum((pred_b == 1) & (y_true == 0)))
+                        tn = float(np.sum((pred_b == 0) & (y_true == 0)))
+                        fn = float(np.sum((pred_b == 0) & (y_true == 1)))
+                        tpr = tp / (tp + fn + 1e-12)
+                        fpr = fp / (fp + tn + 1e-12)
+                        fpr_list.append(round(fpr, 4))
+                        tpr_list.append(round(tpr, 4))
+                    result['roc'] = {'fpr': fpr_list, 'tpr': tpr_list, 'auc': best.get('auc'), 'model': best['model']}
+                # confusion
+                try:
+                    cm = confusion_matrix(y[te], best['_pred']).tolist()
+                    result['confusion'] = {'matrix': cm, 'labels': classes}
+                except Exception:
+                    pass
+                result['note'] = '已完成特征评分 + 多模型训练/对比。可解释性为模型特征重要性（非完整SHAP）。'
             else:
-                score = float(abs(np.corrcoef(col, yc)[0, 1]))
-            imp.append({'feature': f, 'score': round(score, 4)})
-        imp.sort(key=lambda d: d['score'], reverse=True)
-        # simple nearest-centroid accuracy
-        def predict_centroid(Xtr, ytr, Xte):
-            preds = []
-            for x in Xte:
-                best, bd = 0, 1e18
-                for c in np.unique(ytr):
-                    mu = Xtr[ytr == c].mean(axis=0)
-                    d = np.sum((x - mu) ** 2)
-                    if d < bd:
-                        bd, best = d, int(c)
-                preds.append(best)
-            return np.array(preds)
-        pred = predict_centroid(X[tr], y[tr], X[te]) if len(te) else np.array([])
-        acc = float((pred == y[te]).mean()) if len(te) else None
-        # confusion lite
-        return jsonify({
-            'success': True,
-            'task': 'classify',
-            'n_samples': int(len(y)),
-            'n_features': len(feats),
-            'classes': classes,
-            'feature_importance': imp[:20],
-            'model_compare': [
-                {'model': 'NearestCentroid', 'accuracy': None if acc is None else round(acc, 4)},
-                {'model': 'CorrelationRanker', 'accuracy': None}
-            ],
-            'note': '轻量实现：特征评分为与目标的绝对相关；模型为最近质心分类。完整 SHAP/多模型训练可后续增强。'
-        })
-    else:
-        # regression: y float
-        try:
-            y = np.array([float(v) for v in y_raw], dtype=float)
-        except Exception:
-            return jsonify({'success': False, 'error': '回归目标无法转为数值'}), 400
-        imp = []
-        for j, f in enumerate(feats):
-            col = X[:, j]
-            if col.std() < 1e-12 or y.std() < 1e-12:
-                score = 0.0
-            else:
-                score = float(abs(np.corrcoef(col, y)[0, 1]))
-            imp.append({'feature': f, 'score': round(score, 4)})
-        imp.sort(key=lambda d: d['score'], reverse=True)
-        # ridge-less closed form OLS on top 5 features
-        top = [i for i, _ in sorted(enumerate(imp), key=lambda z: -z[1]['score'])[: min(5, len(imp))]]
-        if not top:
-            return jsonify({'success': False, 'error': '无有效特征'}), 400
-        Xk = np.c_[np.ones(len(X)), X[:, top]]
-        try:
+                has_sk = False
+
+        if not has_sk or not result.get('model_compare'):
+            # fallback nearest centroid
+            def predict_centroid(Xtr, ytr, Xte):
+                preds = []
+                for x in Xte:
+                    best_c, bd = 0, 1e18
+                    for c in np.unique(ytr):
+                        mu = Xtr[ytr == c].mean(axis=0)
+                        d = float(np.sum((x - mu) ** 2))
+                        if d < bd:
+                            bd, best_c = d, int(c)
+                    preds.append(best_c)
+                return np.array(preds)
+            pred = predict_centroid(Xs[tr], y[tr], Xs[te]) if len(te) else np.array([])
+            acc = float((pred == y[te]).mean()) if len(te) else None
+            result['model_compare'] = [{'model': 'NearestCentroid', 'accuracy': None if acc is None else round(acc, 4), 'f1': None, 'auc': None}]
+            result['best_model'] = 'NearestCentroid'
+            result['feature_importance'] = imp[:20]
+            result['selected_features'] = selected
+            result['note'] = 'sklearn 不可用时的轻量回退：相关评分 + 最近质心分类。'
+
+    else:  # regress
+        y = np.array([float(v) for v in y_raw], dtype=float)
+        imp = corr_importance(y)
+        selected = [d['feature'] for d in imp[:max(1, min(top_k, len(imp)))]]
+        sel_idx = [feats.index(f) for f in selected]
+        Xs = X[:, sel_idx]
+        result['feature_importance'] = imp[:20]
+        result['selected_features'] = selected
+        models = []
+        if has_sk:
+            Xtr, Xte = Xs[tr], Xs[te]
+            ytr, yte = y[tr], y[te]
+            try:
+                ridge = Ridge(alpha=1.0)
+                ridge.fit(Xtr, ytr)
+                pred = ridge.predict(Xte)
+                models.append({'model': 'Ridge回归', 'r2': round(float(r2_score(yte, pred)), 4)})
+            except Exception:
+                pass
+            try:
+                rf = RandomForestRegressor(n_estimators=120, random_state=42)
+                rf.fit(Xtr, ytr)
+                pred = rf.predict(Xte)
+                models.append({'model': '随机森林回归', 'r2': round(float(r2_score(yte, pred)), 4)})
+                fi = getattr(rf, 'feature_importances_', None)
+                if fi is not None:
+                    tree_imp = [{'feature': selected[i], 'score': round(float(fi[i]), 4)} for i in range(len(selected))]
+                    tree_imp.sort(key=lambda d: d['score'], reverse=True)
+                    result['feature_importance_model'] = tree_imp[:20]
+            except Exception:
+                pass
+        if not models:
+            # OLS top features
+            Xk = np.c_[np.ones(len(Xs)), Xs]
             beta, *_ = np.linalg.lstsq(Xk, y, rcond=None)
             yhat = Xk @ beta
             ss_res = float(np.sum((y - yhat) ** 2))
             ss_tot = float(np.sum((y - y.mean()) ** 2)) or 1.0
             r2 = 1 - ss_res / ss_tot
-        except Exception:
-            r2 = None
-        return jsonify({
-            'success': True,
-            'task': 'regress',
-            'n_samples': int(len(y)),
-            'n_features': len(feats),
-            'feature_importance': imp[:20],
-            'model_compare': [
-                {'model': 'OLS-TopFeatures', 'r2': None if r2 is None else round(float(r2), 4)}
-            ],
-            'note': '轻量实现：特征评分=绝对相关；模型=前若干特征最小二乘。'
-        })
+            models = [{'model': 'OLS-TopFeatures', 'r2': round(float(r2), 4)}]
+            result['note'] = '回归轻量实现：相关评分 + 最小二乘/可选随机森林。'
+        else:
+            result['note'] = '已完成回归特征评分与模型对比。'
+        result['model_compare'] = models
+        result['best_model'] = max(models, key=lambda d: d.get('r2') or -1e9)['model']
+
+    return jsonify(result)
 
 
 if __name__ == '__main__':

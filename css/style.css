@@ -1652,3 +1652,7 @@ body.dark .bar, body:not(.light) .bar { background: rgba(2, 6, 23, 0.95); }
 }
 .cite-preview-box .cite-link{color:var(--accent);font-weight:700;text-decoration:none;margin:0 1px}
 .cite-preview-box .cite-link:hover{text-decoration:underline}
+
+
+.ml-steps{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.ml-step{font-size:.62rem;padding:4px 10px;border-radius:999px;background:rgba(99,102,241,.1);color:var(--accent);border:1px solid rgba(99,102,241,.18);font-weight:600}

@@ -719,7 +719,7 @@ function analyzeCSV(f,container){
     h+='<div style="margin:16px 0;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-alt)">';
     h+='<div style="font-weight:700;font-size:.78rem;margin-bottom:6px">🤖 AI 结果表述（论文写作辅助）</div>';
     h+='<div style="font-size:.65rem;color:var(--text-muted);margin-bottom:8px">把统计表转成可放入论文的“结果分析”段落。前端不显示固定点数，按实际 token 消耗计费。</div>';
-    h+='<div style="display:flex;gap:8px;flex-wrap:wrap">'+'<button class="ai-btn" style="max-width:220px" onclick="runDataAISummary()">生成论文结果段落</button>'+'<button class="ai-btn-clear" onclick="runDataFeatureScore()">3. 特征评分/轻量模型</button>'+'</div>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap">'+'<button class="ai-btn" style="max-width:220px" onclick="runDataAISummary()">生成论文结果段落</button>'+'<button class="ai-btn-clear" onclick="runDataFeatureScore()">3. 3-6 特征·训练·对比·解释</button>'+'</div>';
     h+='<div id="dataAIOutput" style="margin-top:10px"></div></div>';
 
     container.innerHTML=h;
@@ -792,28 +792,98 @@ function welchTTest(a,b){
 window._dataAnalysisCache=null;
 window.runDataFeatureScore=function(){
   var cache=window._dataAnalysisCache; if(!cache||!cache.raw){alert('请先上传数据');return;}
-  var target=prompt('请输入目标列名（分类/回归标签列）：');
+  var headers=cache.raw.headers||[];
+  var guess='';
+  // guess target: last categorical-like or name contains 是否/label/target/y
+  for(var i=headers.length-1;i>=0;i--){
+    var h=headers[i];
+    if(/是否|标签|label|target|^y$/i.test(h)){guess=h;break;}
+  }
+  if(!guess && headers.length) guess=headers[headers.length-1];
+  var target=prompt('请输入目标列名（分类/回归标签列）：', guess||'');
   if(!target) return;
   var token=sessionStorage.getItem('thesis_ai_token'); if(!token){alert('请先登录');return;}
-  var out=document.getElementById('dataAIOutput'); if(out) out.innerHTML='<div class="ai-loading">⏳ 正在计算特征评分/轻量模型对比...</div>';
+  var out=document.getElementById('dataAIOutput'); if(out) out.innerHTML='<div class="ai-loading">⏳ 正在进行特征评分与多模型训练...</div>';
   fetch('/api/data/analyze_ml',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-    body:JSON.stringify({headers:cache.raw.headers, rows:cache.raw.rows, target:target, task:'classify'})})
+    body:JSON.stringify({headers:cache.raw.headers, rows:cache.raw.rows, target:target, task:'auto', test_size:0.3, top_k:12})})
   .then(function(r){return r.json();}).then(function(d){
     if(!out) return;
     if(!d.success){ out.innerHTML='<div class="ai-output-error">❌ '+(d.error||'失败')+'</div>'; return; }
-    var h='<div class="ai-output"><b>3. 特征评分（轻量）</b><br>样本 '+d.n_samples+' · 特征 '+d.n_features+(d.classes?(' · 类别 '+d.classes.join('/')):'')+'<br><br>';
-    h+='<table style="border-collapse:collapse;font-size:.68rem;width:100%">';
-    h+='<tr style="background:var(--surface-alt)"><th style="padding:6px;border:1px solid var(--border);text-align:left">特征</th><th style="padding:6px;border:1px solid var(--border)">评分</th></tr>';
-    (d.feature_importance||[]).forEach(function(it){
-      h+='<tr><td style="padding:5px;border:1px solid var(--border)">'+it.feature+'</td><td style="padding:5px;border:1px solid var(--border);text-align:center">'+it.score+'</td></tr>';
+    window._mlResult=d;
+    var h='';
+    h+='<div class="ml-steps">';
+    h+='<div class="ml-step">3 特征评分</div><div class="ml-step">4 模型训练</div><div class="ml-step">5 结果对比</div><div class="ml-step">6 可解释性</div>';
+    h+='</div>';
+    h+='<div class="ai-output">';
+    h+='<b>任务：</b>'+(d.task==='classify'?'分类':'回归')+' · 样本 '+d.n_samples+' · 特征 '+d.n_features+' · 训练/测试 '+d.n_train+'/'+d.n_test+'<br>';
+    if(d.best_model) h+='<b>最优模型：</b>'+d.best_model+'<br>';
+    h+='<br><b>3. 特征评分及优选</b>';
+    if(d.selected_features&&d.selected_features.length) h+='<div style="font-size:.65rem;color:var(--text-muted);margin:4px 0 8px">入选特征（TopK）：'+d.selected_features.join('，')+'</div>';
+    h+='<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:.68rem;width:100%">';
+    h+='<tr style="background:var(--surface-alt)"><th style="padding:6px;border:1px solid var(--border);text-align:left">特征</th><th style="padding:6px;border:1px solid var(--border)">评分</th><th style="padding:6px;border:1px solid var(--border)">入选</th></tr>';
+    var imp=d.feature_importance_model||d.feature_importance||[];
+    var selMap={}; (d.selected_features||[]).forEach(function(f){selMap[f]=1;});
+    imp.forEach(function(it){
+      h+='<tr'+(selMap[it.feature]?' style="background:rgba(16,185,129,.06)"':'')+'><td style="padding:5px;border:1px solid var(--border)">'+it.feature+'</td><td style="padding:5px;border:1px solid var(--border);text-align:center;font-family:var(--font-mono)">'+it.score+'</td><td style="padding:5px;border:1px solid var(--border);text-align:center">'+(selMap[it.feature]?'✓':'')+'</td></tr>';
     });
-    h+='</table><br><b>模型对比</b><br>';
-    (d.model_compare||[]).forEach(function(m){
-      h+=m.model+': '+(m.accuracy!=null?('acc='+m.accuracy):(m.r2!=null?('R²='+m.r2):'-'))+'<br>';
-    });
-    h+='<div style="margin-top:8px;color:var(--text-muted);font-size:.62rem">'+(d.note||'')+'</div></div>';
+    h+='</table></div>';
+    // bar chart for importance
+    h+='<canvas id="mlImpChart" width="640" height="220" style="width:100%;max-width:640px;height:220px;margin-top:8px;border-radius:8px;background:rgba(255,255,255,.03)"></canvas>';
+
+    h+='<br><b>4/5. 模型训练与对比</b>';
+    h+='<div style="overflow-x:auto;margin-top:6px"><table style="border-collapse:collapse;font-size:.68rem;width:100%">';
+    if(d.task==='classify'){
+      h+='<tr style="background:var(--surface-alt)"><th style="padding:6px;border:1px solid var(--border);text-align:left">模型</th><th style="padding:6px;border:1px solid var(--border)">准确率</th><th style="padding:6px;border:1px solid var(--border)">F1</th><th style="padding:6px;border:1px solid var(--border)">AUC</th></tr>';
+      (d.model_compare||[]).forEach(function(m){
+        var best=d.best_model&&m.model===d.best_model;
+        h+='<tr'+(best?' style="background:rgba(99,102,241,.08)"':'')+'><td style="padding:5px;border:1px solid var(--border)">'+(best?'★ ':'')+m.model+'</td><td style="padding:5px;border:1px solid var(--border);text-align:center">'+(m.accuracy!=null?m.accuracy:'-')+'</td><td style="padding:5px;border:1px solid var(--border);text-align:center">'+(m.f1!=null?m.f1:'-')+'</td><td style="padding:5px;border:1px solid var(--border);text-align:center">'+(m.auc!=null?m.auc:'-')+'</td></tr>';
+      });
+    }else{
+      h+='<tr style="background:var(--surface-alt)"><th style="padding:6px;border:1px solid var(--border);text-align:left">模型</th><th style="padding:6px;border:1px solid var(--border)">R²</th></tr>';
+      (d.model_compare||[]).forEach(function(m){
+        var best=d.best_model&&m.model===d.best_model;
+        h+='<tr'+(best?' style="background:rgba(99,102,241,.08)"':'')+'><td style="padding:5px;border:1px solid var(--border)">'+(best?'★ ':'')+m.model+'</td><td style="padding:5px;border:1px solid var(--border);text-align:center">'+(m.r2!=null?m.r2:'-')+'</td></tr>';
+      });
+    }
+    h+='</table></div>';
+
+    if(d.roc&&d.roc.fpr&&d.roc.tpr){
+      h+='<br><b>ROC 曲线</b>（'+ (d.roc.model||'') + (d.roc.auc!=null?(' · AUC='+d.roc.auc):'') +'）';
+      h+='<canvas id="mlRocChart" width="640" height="260" style="width:100%;max-width:640px;height:260px;margin-top:8px;border-radius:8px;background:rgba(255,255,255,.03)"></canvas>';
+    }
+    if(d.confusion&&d.confusion.matrix){
+      h+='<br><b>混淆矩阵</b><div style="overflow-x:auto;margin-top:6px"><table style="border-collapse:collapse;font-size:.68rem">';
+      h+='<tr><th style="padding:5px;border:1px solid var(--border)"></th>';
+      (d.confusion.labels||[]).forEach(function(lb){h+='<th style="padding:5px;border:1px solid var(--border)">预测:'+lb+'</th>';});
+      h+='</tr>';
+      d.confusion.matrix.forEach(function(row,i){
+        h+='<tr><th style="padding:5px;border:1px solid var(--border)">真实:'+((d.confusion.labels||[])[i]||i)+'</th>';
+        row.forEach(function(v){h+='<td style="padding:5px;border:1px solid var(--border);text-align:center">'+v+'</td>';});
+        h+='</tr>';
+      });
+      h+='</table></div>';
+    }
+
+    h+='<br><b>6. 可解释性分析（模型特征重要性）</b>';
+    h+='<div style="font-size:.65rem;color:var(--text-muted);margin:4px 0 8px">'+(d.note||'基于树模型特征重要性或相关评分，非完整 SHAP 交互依赖。')+'</div>';
+    h+='</div>';
     out.innerHTML=h;
-  }).catch(function(){ if(out) out.innerHTML='<div class="ai-output-error">网络错误</div>'; });
+
+    setTimeout(function(){
+      // importance bar
+      var c1=document.getElementById('mlImpChart');
+      if(c1&&imp.length&&typeof drawBarChart==='function'){
+        var items=imp.slice(0,10).map(function(it){return [it.feature, Math.round(it.score*1000)/1000];});
+        // drawBarChart expects [label,count]
+        try{ drawBarChart(c1, items.map(function(e){return [e[0], e[1]];})); }catch(e){}
+      }
+      // ROC line
+      var c2=document.getElementById('mlRocChart');
+      if(c2&&d.roc){
+        try{ drawROCCurve(c2, d.roc.fpr, d.roc.tpr, d.roc.auc); }catch(e){ console.warn(e); }
+      }
+    }, 40);
+  }).catch(function(err){ if(out) out.innerHTML='<div class="ai-output-error">网络错误</div>'; });
 };
 window.runDataAISummary=function(){
   var cache=window._dataAnalysisCache; if(!cache){alert('请先上传并完成数据分析');return;}
@@ -967,6 +1037,32 @@ function drawHistogram(canvas, values, label) {
 }
 
 // Horizontal bar chart for categorical data
+function drawROCCurve(canvas, fpr, tpr, auc){
+  if(!canvas||!fpr||!tpr) return;
+  var dpr=window.devicePixelRatio||1;
+  var W=canvas.clientWidth||640, H=canvas.clientHeight||260;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  var ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+  var pad={top:16,right:16,bottom:34,left:42};
+  var pw=W-pad.left-pad.right, ph=H-pad.top-pad.bottom;
+  ctx.fillStyle='rgba(255,255,255,0.02)'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.strokeRect(pad.left,pad.top,pw,ph);
+  // diagonal
+  ctx.setLineDash([4,4]); ctx.beginPath();
+  ctx.moveTo(pad.left, pad.top+ph); ctx.lineTo(pad.left+pw, pad.top); ctx.stroke(); ctx.setLineDash([]);
+  // curve
+  ctx.strokeStyle='#6366f1'; ctx.lineWidth=2; ctx.beginPath();
+  for(var i=0;i<fpr.length;i++){
+    var x=pad.left+fpr[i]*pw; var y=pad.top+(1-tpr[i])*ph;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.font='11px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('FPR', pad.left+pw/2, H-10);
+  ctx.save(); ctx.translate(12, pad.top+ph/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText('TPR', 0, 0); ctx.restore();
+  if(auc!=null){ ctx.textAlign='left'; ctx.fillText('AUC='+auc, pad.left+8, pad.top+16); }
+}
 function drawBarChart(canvas, items) {
   var dpr=window.devicePixelRatio||1;
   var W=canvas.clientWidth, H=canvas.clientHeight;
