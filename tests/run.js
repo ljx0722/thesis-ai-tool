@@ -1574,7 +1574,7 @@ test('UI: Landing highlights + invite + consumption history', function() {
 });
 test('PRICING: 3/day free limit in usage_module', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
-  assert(src.indexOf('free_count < 3') >= 0, '3 free/day not found');
+  assert(src.indexOf('DAILY_FREE_OPS') >= 0 || src.indexOf('free_limit') >= 0 || src.indexOf('free_count <') >= 0, 'daily free ops missing');
 });
 test('SECURITY: Admin dashboard requires auth', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
@@ -1627,6 +1627,13 @@ test('IMPORT: heading style patterns cover custom TJ styles', function() {
   assert(src.indexOf('二级标题') >= 0, '二级标题 pattern missing');
   assert(src.indexOf('标题_TJ') >= 0, '标题_TJ pattern missing');
   assert(src.indexOf('extractRefsFromRawDocx') >= 0, 'ref extraction missing');
+});
+
+test('API: pricing endpoint exists', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  assert(src.indexOf("/api/pricing") >= 0, 'pricing route missing');
+  assert(src.indexOf('CREDIT_PER_YUAN') >= 0 || src.indexOf('LLM_MIN_CHARGE') >= 0, 'pricing constants missing');
+  assert(src.indexOf("'data-ml'") >= 0 || src.indexOf('data-ml') >= 0, 'data-ml price missing');
 });
 
 test('API: export docx + analyze_ml routes exist', function() {

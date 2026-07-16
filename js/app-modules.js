@@ -719,6 +719,12 @@ function analyzeCSV(f,container){
     h+='<div style="margin:16px 0;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-alt)">';
     h+='<div style="font-weight:700;font-size:.78rem;margin-bottom:6px">🤖 AI 结果表述（论文写作辅助）</div>';
     h+='<div style="font-size:.65rem;color:var(--text-muted);margin-bottom:8px">把统计表转成可放入论文的“结果分析”段落。前端不显示固定点数，按实际 token 消耗计费。</div>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">'+
+'<label style="font-size:.65rem;color:var(--text-muted)">测试集比例</label>'+
+'<select id="mlTestSize" style="font-size:.65rem;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary)"><option value="0.2">20%</option><option value="0.3" selected>30%</option><option value="0.4">40%</option></select>'+
+'<label style="font-size:.65rem;color:var(--text-muted)">TopK特征</label>'+
+'<select id="mlTopK" style="font-size:.65rem;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary)"><option>8</option><option selected>12</option><option>16</option></select>'+
+'</div>';
     h+='<div style="display:flex;gap:8px;flex-wrap:wrap">'+'<button class="ai-btn" style="max-width:220px" onclick="runDataAISummary()">生成论文结果段落</button>'+'<button class="ai-btn-clear" onclick="runDataFeatureScore()">3. 3-6 特征·训练·对比·解释</button>'+'</div>';
     h+='<div id="dataAIOutput" style="margin-top:10px"></div></div>';
 
@@ -802,10 +808,13 @@ window.runDataFeatureScore=function(){
   if(!guess && headers.length) guess=headers[headers.length-1];
   var target=prompt('请输入目标列名（分类/回归标签列）：', guess||'');
   if(!target) return;
+  var tsEl=document.getElementById('mlTestSize'); var tkEl=document.getElementById('mlTopK');
+  window._mlTestSize=tsEl?parseFloat(tsEl.value)||0.3:0.3;
+  window._mlTopK=tkEl?parseInt(tkEl.value)||12:12;
   var token=sessionStorage.getItem('thesis_ai_token'); if(!token){alert('请先登录');return;}
   var out=document.getElementById('dataAIOutput'); if(out) out.innerHTML='<div class="ai-loading">⏳ 正在进行特征评分与多模型训练...</div>';
   fetch('/api/data/analyze_ml',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-    body:JSON.stringify({headers:cache.raw.headers, rows:cache.raw.rows, target:target, task:'auto', test_size:0.3, top_k:12})})
+    body:JSON.stringify({headers:cache.raw.headers, rows:cache.raw.rows, target:target, task:'auto', test_size:window._mlTestSize||0.3, top_k:window._mlTopK||12})})
   .then(function(r){return r.json();}).then(function(d){
     if(!out) return;
     if(!d.success){ out.innerHTML='<div class="ai-output-error">❌ '+(d.error||'失败')+'</div>'; return; }
@@ -1161,3 +1170,27 @@ function drawBarChart(canvas, items) {
     if (pollCount > 120) clearInterval(pollTimer);
   }, 1000);
 })();
+
+
+function downloadText(filename, text){
+  var blob=new Blob([text],{type:'text/csv;charset=utf-8;'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(a.href);},500);
+}
+window.exportMlMetrics=function(){
+  var d=window._mlResult; if(!d){alert('请先运行模型分析');return;}
+  var rows=['model,accuracy,f1,auc,r2'];
+  (d.model_compare||[]).forEach(function(m){
+    rows.push([m.model,m.accuracy!=null?m.accuracy:'',m.f1!=null?m.f1:'',m.auc!=null?m.auc:'',m.r2!=null?m.r2:''].join(','));
+  });
+  downloadText('model_metrics.csv', rows.join('\n'));
+};
+window.exportMlFeatures=function(){
+  var d=window._mlResult; if(!d){alert('请先运行模型分析');return;}
+  var imp=d.feature_importance_model||d.feature_importance||[];
+  var rows=['feature,score,selected'];
+  var sel={}; (d.selected_features||[]).forEach(function(f){sel[f]=1;});
+  imp.forEach(function(it){ rows.push([JSON.stringify(it.feature), it.score, sel[it.feature]?1:0].join(',')); });
+  downloadText('feature_scores.csv', rows.join('\n'));
+};

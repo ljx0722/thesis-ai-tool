@@ -126,7 +126,7 @@
   <div class="bar-right">
     <span id="statusBar" style="font-size:.62rem;color:var(--m)">等待上传...</span>
     <span id="balanceBar" style="font-size:.65rem;color:rgba(255,255,255,.4);cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.06);padding:3px 10px;border-radius:12px;margin-left:6px" onclick="showRechargeModal()" title="点击充值">✨ <strong id="balanceAmount" style="color:#fff;font-weight:700">0.0</strong> 点 <span style="font-size:.5rem;color:rgba(255,255,255,.3)">+</span></span>
-    <button onclick="window.location.href='/admin.html'" style="background:rgba(99,102,241,.15);color:#c7d2fe;border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:4px;display:none" id="adminPanelBtn" title="管理员看板">⚙️</button><button id="changelogLink" onclick="toggleChangelog()" style="background:transparent;color:rgba(255,255,255,.35);border:none;border-radius:12px;padding:4px 8px;cursor:pointer;font-size:.58rem;margin-left:4px" title="更新日志">日志</button><button onclick="doLogout()" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:6px">登出</button>
+    <button onclick="window.location.href='/admin.html'" style="background:rgba(99,102,241,.15);color:#c7d2fe;border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:4px;display:none" id="adminPanelBtn" title="管理员看板">⚙️</button><button onclick="showPricingInfo()" style="background:transparent;color:rgba(255,255,255,.35);border:none;border-radius:12px;padding:4px 8px;cursor:pointer;font-size:.58rem;margin-left:2px" title="计费说明">计费</button><button id="changelogLink" onclick="toggleChangelog()" style="background:transparent;color:rgba(255,255,255,.35);border:none;border-radius:12px;padding:4px 8px;cursor:pointer;font-size:.58rem;margin-left:4px" title="更新日志">日志</button><button onclick="doLogout()" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:6px">登出</button>
   </div>
 </div>
 <!-- ====== 更新日志按钮 ====== -->
@@ -382,23 +382,23 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
 <script defer src="mammoth.browser.min.js"></script>
 <script defer src="jszip.min.js"></script>
-<script src="app.js?v=37"></script>
-<script src="js/modules/optimization.js?v=37"></script>
-<script src="js/modules/format-check.js?v=37"></script>
-<script src="js/modules/terminology.js?v=37"></script>
-<script src="js/modules/paragraph-analysis.js?v=37"></script>
-<script src="js/modules/dashboard.js?v=37"></script>
-<script src="js/modules/thesis-review.js?v=37"></script>
-<script src="js/modules/proposal.js?v=37"></script>
-<script src="js/modules/onboarding.js?v=37"></script>
-<script src="js/modules/cat-game.js?v=37"></script>
-<script src="js/modules/topic-finder.js?v=37"></script>
-<script src="js/modules/proofread.js?v=37"></script>
-<script src="js/modules/de-duplicate.js?v=37"></script>
-<script src="js/modules/defense-ppt.js?v=37"></script>
-<script src="js/modules/en-abstract.js?v=37"></script>
-<script src="js/modules/project.js?v=37"></script>
-<script src="js/app-modules.js?v=37"></script>
+<script src="app.js?v=38"></script>
+<script src="js/modules/optimization.js?v=38"></script>
+<script src="js/modules/format-check.js?v=38"></script>
+<script src="js/modules/terminology.js?v=38"></script>
+<script src="js/modules/paragraph-analysis.js?v=38"></script>
+<script src="js/modules/dashboard.js?v=38"></script>
+<script src="js/modules/thesis-review.js?v=38"></script>
+<script src="js/modules/proposal.js?v=38"></script>
+<script src="js/modules/onboarding.js?v=38"></script>
+<script src="js/modules/cat-game.js?v=38"></script>
+<script src="js/modules/topic-finder.js?v=38"></script>
+<script src="js/modules/proofread.js?v=38"></script>
+<script src="js/modules/de-duplicate.js?v=38"></script>
+<script src="js/modules/defense-ppt.js?v=38"></script>
+<script src="js/modules/en-abstract.js?v=38"></script>
+<script src="js/modules/project.js?v=38"></script>
+<script src="js/app-modules.js?v=38"></script>
 <script>
 (function(){
   var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');
@@ -755,4 +755,17 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
   </div>
 </div>
 
+<script>
+function showPricingInfo(){
+  fetch('/api/pricing').then(function(r){return r.json();}).then(function(d){
+    if(!d.success){alert('无法获取计费信息');return;}
+    var msg='【计费单位】'+d.unit.ratio+'，充值 '+d.unit.recharge+'\n';
+    msg+='【AI写作】'+d.llm.formula+'，倍率×'+d.llm.markup+'，最低 '+d.llm.min_charge_points+' 点\n';
+    msg+='【每日免费本地操作】'+d.daily_free_local_ops+' 次\n';
+    msg+='【注册赠送】'+d.register_bonus_points+' 点\n\n';
+    msg+='说明：\n- '+(d.notes||[]).join('\n- ');
+    alert(msg);
+  }).catch(function(){alert('网络错误');});
+}
+</script>
 </body></html>

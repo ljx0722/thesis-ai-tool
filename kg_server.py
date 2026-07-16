@@ -105,9 +105,13 @@ def init_db():
     ''')
     conn.commit()
     # Default pricing config (单位：分点 = 0.1点)
-    for k,v in [('upload_price','1000'),('module_price','1000'),('search_price','0'),
-                ('kg_price','0'),('domain_analysis_price','0'),('register_bonus','5000'),('invite_bonus','1000')]:
-        conn.execute('INSERT OR IGNORE INTO config (key,value) VALUES (?,?)',(k,v))
+    for k,v in [('upload_price','0'),('module_price','50'),('search_price','0'),
+                ('kg_price','0'),('domain_analysis_price','0'),('data-ml_price','200'),('export-docx_price','100'),
+                ('format-check_price','30'),('terminology_price','30'),('paragraph_price','30'),
+                ('dashboard_price','50'),('data-analysis_price','80'),
+                ('register_bonus','3000'),('invite_bonus','1000')]:  # 注册送3.0点, 邀请送1.0点
+        # INSERT OR IGNORE 对已有库不更新；关键计费项强制刷新到新默认
+        conn.execute('INSERT INTO config (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',(k,v))
     # Seed admin
     try:
         admin_pwd = os.environ.get('ADMIN_PASSWORD', 'admin123')
@@ -209,7 +213,10 @@ DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.co
 DEEPSEEK_MODEL = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
 DEEPSEEK_INPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_INPUT_PRICE', '1.0'))
 DEEPSEEK_OUTPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_OUTPUT_PRICE', '2.0'))
-USER_MARKUP = 3.0  # 用户扣点倍率，覆盖 API 成本 + 服务器运维
+USER_MARKUP = float(os.environ.get('USER_MARKUP', '3.0'))  # 用户扣点倍率（覆盖 API + 运维）
+CREDIT_PER_YUAN = 1000  # 1元=1000厘=1.0显示点
+LLM_MIN_CHARGE = int(os.environ.get('LLM_MIN_CHARGE', '20'))  # LLM 最低扣 20 厘=0.02点
+DAILY_FREE_OPS = int(os.environ.get('DAILY_FREE_OPS', '5'))  # 每日免费本地模块次数
 QUICK_RECHARGE_AMOUNTS = [1, 5, 10, 20, 50]  # 快充金额（1元=1点）
 ADMIN_SECRET = os.environ.get('ADMIN_SECRET', 'admin123')
 if ADMIN_SECRET == 'admin123' and os.environ.get('FLASK_ENV') == 'production':
@@ -1198,16 +1205,22 @@ def usage_mark_free():
 @app.route('/api/usage/module', methods=['POST'])
 @require_auth
 def usage_module():
-    """模块使用扣点（0.1点/次 = 1分点）"""
-    # 首次使用免费（当天），否则扣 module_price 分点
+    """本地/固定价模块扣点。
+    credits 存库单位=厘；前端展示点=credits/1000。
+    每日前 DAILY_FREE_OPS 次本地模块免费。
+    """
+    data = request.get_json(silent=True) or {}
+    module = (data.get('module') or 'module').strip() or 'module'
+    # LLM modules should not use this endpoint for real charge
     db = get_db()
     try:
         today = date.today().isoformat()
         free_row = db.execute('SELECT used FROM daily_free_usage WHERE user_id = ? AND usage_date = ?',
                               (request.user_id, today)).fetchone()
         free_count = free_row['used'] if free_row else 0
-        if free_count < 3:  # 3 free ops per day
-            db.execute('INSERT OR IGNORE INTO daily_free_usage (user_id, usage_date, used) VALUES (?, ?, 1)',
+        free_limit = DAILY_FREE_OPS if 'DAILY_FREE_OPS' in globals() else 5
+        if free_count < free_limit:
+            db.execute('INSERT OR IGNORE INTO daily_free_usage (user_id, usage_date, used) VALUES (?, ?, 0)',
                        (request.user_id, today))
             db.execute('UPDATE daily_free_usage SET used = used + 1 WHERE user_id = ? AND usage_date = ?',
                        (request.user_id, today))
@@ -1215,22 +1228,50 @@ def usage_module():
             db.commit()
             new_count = db.execute('SELECT used FROM daily_free_usage WHERE user_id = ? AND usage_date = ?',
                                    (request.user_id, today)).fetchone()['used']
-            return jsonify({'success': True, 'free': True, 'message': '今日免费(' + str(new_count) + '/3)'})
-    finally: db.close()
-    # Not free — deduct
-    price = get_price('module')
-    if price <= 0: return jsonify({'success': True, 'free': False, 'cost': 0})
-    ok, err, after = deduct_credits(request.user_id, price, '模块使用')
-    if not ok: return jsonify({'success': False, 'error': err, 'needed': price}), 402
-    return jsonify({'success': True, 'free': False, 'cost': price, 'credits_after': after})
+            return jsonify({'success': True, 'free': True, 'module': module,
+                            'message': f'今日免费({new_count}/{free_limit})',
+                            'cost': 0, 'cost_points': 0})
+    finally:
+        db.close()
+    price = get_price(module)
+    if price <= 0:
+        price = get_price('module')
+    if price <= 0:
+        return jsonify({'success': True, 'free': False, 'module': module, 'cost': 0, 'cost_points': 0})
+    ok, err, after = deduct_credits(request.user_id, price, f'模块使用:{module}')
+    if not ok:
+        return jsonify({'success': False, 'error': err, 'needed': price, 'needed_points': price/1000}), 402
+    return jsonify({'success': True, 'free': False, 'module': module, 'cost': price,
+                    'cost_points': round(price/1000, 3), 'credits_after': after,
+                    'points_after': round((after or 0)/1000, 3)})
 
 # 模块扣点定价（从 config 表读取，默认值兜底）
 PRICING_DEFAULTS = {
-    'module': 1, 'upload': 10, 'llm_analysis': 1,
-    'topic-finder': 5, 'proposal': 5, 'review': 3, 'optimization': 3,
-    'expand': 5, 'proofread': 5, 'de-duplicate': 10,
-    'defense-ppt': 5, 'en-abstract': 3,
-    'domain_analysis': 0, 'kg': 0, 'search': 0
+    # 单位：厘（1点=1000厘，1元充值=1000厘）
+    # 本地/轻计算（固定价）
+    'module': 50,            # 通用本地模块兜底 0.05点
+    'upload': 0,             # 上传解析免费（本地）
+    'search': 0,             # 文献检索免费（外部公开源）
+    'kg': 0,                 # 知识图谱免费（本地）
+    'domain_analysis': 0,    # 领域分析免费引流
+    'format-check': 30,
+    'terminology': 30,
+    'paragraph': 30,
+    'dashboard': 50,
+    'data-analysis': 80,     # 含本地统计
+    'data-ml': 200,          # 多模型训练/特征评分 0.2点
+    'export-docx': 100,      # 导出 DOCX 0.1点
+    # AI 模块若走 /api/llm/analyze 则按 token 实扣；下列作预估展示/兼容旧 usage_module
+    'topic-finder': 0,
+    'proposal': 0,
+    'review': 0,
+    'optimization': 0,
+    'expand': 0,
+    'proofread': 0,
+    'de-duplicate': 0,
+    'defense-ppt': 0,
+    'en-abstract': 0,
+    'llm_analysis': 0,
 }
 def get_price(key):
     try:
@@ -1245,7 +1286,7 @@ def deduct_credits(user_id, amount, desc):
     try:
         u = db.execute('SELECT credits FROM users WHERE id = ?', (user_id,)).fetchone()
         if not u: return False, '用户不存在', None
-        if u['credits'] < amount: return False, f'点数不足。需要 {amount} 点，当前 {u["credits"]} 点', u['credits']
+        if u['credits'] < amount: return False, f'点数不足。需要 {amount/1000:.3f} 点，当前 {u["credits"]/1000:.3f} 点', u['credits']
         after = u['credits'] - amount
         db.execute('UPDATE users SET credits = ? WHERE id = ?', (after, user_id))
         db.execute("INSERT INTO transactions (user_id, type, amount_credits, credits_after, description, created_at) VALUES (?,?,?,?,?,datetime('now','localtime'))",
@@ -1283,7 +1324,7 @@ def llm_analyze():
     est_input = int(cn * 0.6 + (len(total_text) - cn) * 0.25)
     est_api_cost = (est_input / 1000000 * DEEPSEEK_INPUT_PRICE_PER_1M +
                     max_tokens / 1000000 * DEEPSEEK_OUTPUT_PRICE_PER_1M)  # 元
-    est_credits = max(1, int(est_api_cost * USER_MARKUP + 0.999))  # 预估扣点，向上取整
+    est_credits = max(LLM_MIN_CHARGE if 'LLM_MIN_CHARGE' in globals() else 20, int(est_api_cost * USER_MARKUP * 1000 + 0.999))  # 预估扣厘
 
     # 检查余额
     db = get_db()
@@ -1291,8 +1332,8 @@ def llm_analyze():
         u = db.execute('SELECT credits FROM users WHERE id = ?', (request.user_id,)).fetchone()
         if not u: return jsonify({'success': False, 'error': '用户不存在'}), 404
         if u['credits'] < est_credits:
-            return jsonify({'success': False, 'error': f'点数不足。预计需 {est_credits} 点，当前 {u["credits"]} 点',
-                            'credits': u['credits'], 'needed': est_credits}), 402
+            return jsonify({'success': False, 'error': f'点数不足。预计需 {est_credits/1000:.3f} 点，当前 {u["credits"]/1000:.3f} 点',
+                            'credits': u['credits'], 'needed': est_credits, 'needed_points': round(est_credits/1000,3), 'points': round(u['credits']/1000,3)}), 402
     finally: db.close()
 
     # 调用 DeepSeek
@@ -1316,7 +1357,7 @@ def llm_analyze():
     api_cost = (actual_input / 1000000 * DEEPSEEK_INPUT_PRICE_PER_1M +
                 actual_output / 1000000 * DEEPSEEK_OUTPUT_PRICE_PER_1M)
     # 用户扣点：实际成本（元）×3，折算到厘（×1000），四舍五入，最低 5 厘（≈0.05元/次地板价覆盖运维）
-    charge_credits = max(5, round(api_cost * USER_MARKUP * 1000))
+    charge_credits = max(LLM_MIN_CHARGE if 'LLM_MIN_CHARGE' in globals() else 20, round(api_cost * USER_MARKUP * 1000))
     content = result['choices'][0]['message']['content']
 
     # 扣点
@@ -1336,7 +1377,9 @@ def llm_analyze():
     return jsonify({'success': True, 'content': content, 'usage': {
         'input_tokens': actual_input, 'output_tokens': actual_output,
         'api_cost': round(api_cost, 4), 'cost_credits': charge_credits,
-        'credits_after': after
+        'cost_points': round(charge_credits/1000, 3),
+        'credits_after': after, 'points_after': round((after or 0)/1000, 3),
+        'markup': USER_MARKUP
     }})
 
 # ========== 领域分析 API（检索前先由AI分析论文领域） ==========
@@ -1605,6 +1648,12 @@ def export_docx():
     degree = data.get('degree') or ''
     if not chapters:
         return jsonify({'success': False, 'error': '没有可导出的章节'}), 400
+
+    price = get_price('export-docx')
+    if price > 0:
+        ok, err, after = deduct_credits(request.user_id, price, '导出DOCX')
+        if not ok:
+            return jsonify({'success': False, 'error': err, 'needed': price}), 402
 
     doc = Document()
     # basic CN font
@@ -1953,7 +2002,52 @@ def analyze_ml():
         result['model_compare'] = models
         result['best_model'] = max(models, key=lambda d: d.get('r2') or -1e9)['model']
 
+    # 固定价扣点（本地/服务器计算，非 LLM token）
+    price = get_price('data-ml')
+    if price > 0:
+        ok, err, after = deduct_credits(request.user_id, price, '数据分析-特征/模型训练')
+        if not ok:
+            return jsonify({'success': False, 'error': err, 'needed': price}), 402
+        result['usage'] = {'cost_credits': price, 'cost_points': round(price/1000,3), 'credits_after': after, 'points_after': round((after or 0)/1000,3)}
+    else:
+        result['usage'] = {'cost_credits': 0, 'cost_points': 0}
     return jsonify(result)
+
+
+
+
+@app.route('/api/pricing', methods=['GET'])
+def pricing_info():
+    """公开计费说明（不展示敏感配置）。"""
+    items = []
+    for k, v in PRICING_DEFAULTS.items():
+        items.append({
+            'key': k,
+            'milli_credits': get_price(k) if k not in ('topic-finder','proposal','review','optimization','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis') else 0,
+            'points': round((get_price(k) if k not in ('topic-finder','proposal','review','optimization','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis') else 0)/1000, 3),
+            'billing': 'llm-token' if k in ('topic-finder','proposal','review','optimization','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis') else 'fixed'
+        })
+    return jsonify({
+        'success': True,
+        'unit': {'credit_name': '点', 'storage': 'milli-credit(厘)', 'ratio': '1点=1000厘', 'recharge': '1元=1点=1000厘'},
+        'llm': {
+            'formula': '扣点(厘)=max(最低扣点, round(API成本元 × 倍率 × 1000))',
+            'markup': USER_MARKUP if 'USER_MARKUP' in globals() else 3.0,
+            'min_charge_points': (LLM_MIN_CHARGE if 'LLM_MIN_CHARGE' in globals() else 20)/1000,
+            'provider_prices_yuan_per_1m_tokens': {
+                'input': DEEPSEEK_INPUT_PRICE_PER_1M if 'DEEPSEEK_INPUT_PRICE_PER_1M' in globals() else 1.0,
+                'output': DEEPSEEK_OUTPUT_PRICE_PER_1M if 'DEEPSEEK_OUTPUT_PRICE_PER_1M' in globals() else 2.0
+            }
+        },
+        'daily_free_local_ops': DAILY_FREE_OPS if 'DAILY_FREE_OPS' in globals() else 5,
+        'register_bonus_points': 3.0,
+        'items': items,
+        'notes': [
+            'AI 写作类功能按实际 token 消耗计费，前端不展示固定点数。',
+            '本地统计/检索/图谱默认低价或免费，仅覆盖服务器成本。',
+            '多模型训练等服务器计算按固定小额点数计费。'
+        ]
+    })
 
 
 if __name__ == '__main__':
