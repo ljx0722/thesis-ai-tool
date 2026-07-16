@@ -497,15 +497,22 @@ function runExpandModule(container) {
 
 function runDataAnalysis(container) {
   container.innerHTML = '<div class="module-panel">'+
-    '<h4>📈 数据分析</h4>'+
+    '<h4>数据分析</h4>'+
+    '<div class="ai-desc" style="padding:10px 14px;font-size:.72rem">上传 CSV/TSV 数据，自动识别变量类型并生成统计摘要与可视化图表。<br>'+
+    '<b>支持：</b>描述性统计 · 频次分布 · 相关性矩阵 · 散点图 · 箱线图 · 直方图 · 条形图<br>'+
+    '<b>进阶：</b>可用「论文扩写」模块将分析结果生成论文段落 · 导出数据后搭配专业可视化工具出图</div>'+
     '<div style="padding:20px;border:2px dashed var(--border);border-radius:var(--radius-lg);text-align:center">'+
-    '<div style="font-size:3rem;margin-bottom:8px">📊</div>'+
+    '<div style="font-size:3rem;margin-bottom:8px"></div>'+
     '<div style="font-size:.85rem;font-weight:700;margin-bottom:4px;color:var(--text-primary)">上传数据文件进行智能分析</div>'+
     '<div style="font-size:.7rem;color:var(--text-muted);margin-bottom:12px">支持 .csv / .tsv，自动识别变量类型、计算统计量并可视化</div>'+
     '<input type="file" id="dataFileInput" accept=".csv,.tsv,.txt" style="display:none" onchange="handleDataFile(this)">'+
-    '<button onclick="document.getElementById(\'dataFileInput\').click()" style="background:var(--accent);color:#fff;border:none;border-radius:var(--radius-full);padding:10px 28px;cursor:pointer;font-weight:600;font-size:.78rem;font-family:var(--font-sans)">📁 选择数据文件</button>'+
+    '<button onclick="document.getElementById(\'dataFileInput\').click()" style="background:var(--accent);color:#fff;border:none;border-radius:var(--radius-full);padding:10px 28px;cursor:pointer;font-weight:600;font-size:.78rem;font-family:var(--font-sans)"> 选择数据文件</button>'+
     '</div>'+
     '<div id="dataAnalysisResult" style="margin-top:16px"></div>'+
+    '<div style="margin-top:16px;padding:10px 14px;border-radius:var(--radius-md);background:var(--surface-alt);border:1px solid var(--border)">'+
+    '<b style="font-size:.72rem">进阶分析</b><br>'+
+    '<span style="font-size:.65rem;color:var(--text-muted)">分析结果可直接复制到论文草稿中。如需专业图表（Nature/Science 级配图），建议用 Python matplotlib+seaborn+SciencePlots 出图。如需统计检验（t-test/ANOVA/回归），可用 Python statsmodels。</span>'+
+    '</div>'+
     '</div>';
 }
 

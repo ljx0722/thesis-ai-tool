@@ -612,7 +612,7 @@
             '<button class="ai-btn-clear" onclick="completeCurrentStage()">标记本阶段完成</button>' +
           '</div>' +
         '</div>' +
-        renderChapterBoardInline(project) +
+        renderSmartTips(project) + renderChapterBoardInline(project) +
         renderSkillLogInline(project) +
         '<div class="project-cta-row" style="justify-content:flex-end">' +
           '<button class="ai-btn" onclick="exportFullPaper()">📄 导出论文全文</button>' +
@@ -635,7 +635,7 @@
       var badgeCls = c.status === 'ready' ? 'ok' : (c.status === 'draft' ? 'warn' : 'muted');
       return '<div class="chapter-card" onclick="openChapterEditor(\'' + c.key + '\')">' +
         '<div class="chapter-card-top"><b>' + escapeHtml(c.title) + '</b><span class="chapter-badge ' + badgeCls + '">' + badge + '</span></div>' +
-        '<div class="chapter-card-meta">' + c.words + ' 字 · ' + (c.sections.length || 0) + ' 个小节</div>' +
+        '<div class="chapter-card-meta">' + c.words + ' 字 &middot; 引用 ' + ((c.content||'').match(/\[\d+\]/g)||[]).length + ' 处 · 引用 ' + ((c.content||'').match(/\[\d+\]/g)||[]).length + ' 处 · ' + (c.sections.length || 0) + ' 个小节</div>' +
         '<div class="chapter-card-preview">' + escapeHtml((c.content || c.sections.join(' / ') || '点击开始写这一章').slice(0, 72)) + '</div>' +
       '</div>';
     }).join('');
@@ -945,7 +945,7 @@
       var bc = c.status === "ready" ? "ok" : (c.status === "draft" ? "warn" : "muted");
       return '<div class="chapter-card" onclick="openChapterEditor(\'' + c.key + '\')">' +
         '<div class="chapter-card-top"><b>' + escapeHtml(c.title) + '</b><span class="chapter-badge ' + bc + '">' + b + '</span></div>' +
-        '<div class="chapter-card-meta">' + c.words + ' 字 · ' + (c.sections.length||0) + ' 小节' + (c.updatedAt ? ' · ' + formatTime(c.updatedAt) : '') + '</div>' +
+        '<div class="chapter-card-meta">' + c.words + ' 字 &middot; 引用 ' + ((c.content||'').match(/\[\d+\]/g)||[]).length + ' 处 · 引用 ' + ((c.content||'').match(/\[\d+\]/g)||[]).length + ' 处 · ' + (c.sections.length||0) + ' 小节' + (c.updatedAt ? ' · ' + formatTime(c.updatedAt) : '') + '</div>' +
         '<div class="chapter-card-preview">' + escapeHtml((c.content||'小节：'+(c.sections.join('、')||'待补充')).slice(0,80)) + '</div>' +
         '<div class="chapter-card-actions" onclick="event.stopPropagation()"><button class="ai-btn-clear" onclick="openChapterEditor(\''+c.key+'\')">编辑</button><button class="ai-btn-clear" onclick="seedChapterFromSections(\''+c.key+'\')">小节骨架</button></div>' +
       '</div>';
@@ -1088,8 +1088,14 @@
   window.showVersionHistory = showVersionHistory;
   window.closeVersionHistory = closeVersionHistory;
   window.rollbackChapterVersion = rollbackChapterVersion;
+  window.showVersionDiff = showVersionDiff;
+  window.closeVersionDiff = closeVersionDiff;
+  window.jumpToReference = jumpToReference;
+  window.stageTips = stageTips;
+  window.renderSmartTips = renderSmartTips;
 
   // ============ Version History Viewer ============
+
   function showVersionHistory(key) {
     var meta = findChapterMeta(key);
     if (!meta) return;
@@ -1097,12 +1103,13 @@
     var draft = getChapterDraft(key) || {};
     var rows = '';
     if (!versions.length) {
-      rows = '<div class="project-progress-sub" style="text-align:center;padding:16px">暂无历史版本。多次保存章节后，这里会显示变更记录。</div>';
+      rows = '<div class="project-progress-sub" style="text-align:center;padding:16px">暂无历史版本。多次保存章节后自动记录。</div>';
     } else {
-      rows = versions.map(function (v) {
+      rows = versions.map(function(v) {
         return '<div class="version-row">' +
-          '<div class="version-top"><b>' + formatTime(v.ts) + '</b><span>' + v.words + ' 字 · ' + (v.status === 'ready' ? '较完整' : (v.status === 'draft' ? '草稿' : '空白')) + '</span></div>' +
-          '<div class="version-preview">' + escapeHtml(v.content.substring(0, 100)) + (v.content.length > 100 ? '…' : '') + '</div>' +
+          '<div class="version-top"><b>' + formatTime(v.ts) + '</b><span>' + v.words + ' 字</span></div>' +
+          '<div class="version-preview">' + escapeHtml(v.content.substring(0, 100)) + (v.content.length > 100 ? '...' : '') + '</div>' +
+          '<button class="ai-btn-clear" onclick="showVersionDiff(\'' + key + '\',\'' + v.ts + '\')">对比</button>' +
           '<button class="ai-btn-clear" onclick="rollbackChapterVersion(\'' + key + '\',\'' + v.ts + '\')">恢复此版本</button>' +
         '</div>';
       }).join('');
@@ -1111,13 +1118,13 @@
     var ov = document.createElement('div');
     ov.id = 'versionHistoryOverlay';
     ov.className = 'project-overlay';
-    ov.innerHTML =
+    ov.innerHTML = '' +
       '<div class="project-modal" style="width:min(520px,100%)" onclick="event.stopPropagation()">' +
-        '<div class="project-modal-head"><div><h3>版本历史：' + escapeHtml(meta.title) + '</h3><p>当前：' + currentWords + ' 字</p></div><button class="project-close" onclick="closeVersionHistory()">×</button></div>' +
+        '<div class="project-modal-head"><div><h3>版本历史：' + escapeHtml(meta.title) + '</h3><p>当前：' + currentWords + ' 字</p></div><button class="project-close" onclick="closeVersionHistory()">x</button></div>' +
         '<div style="max-height:55vh;overflow:auto">' + rows + '</div>' +
         '<div class="project-modal-actions"><button class="ai-btn-clear" onclick="closeVersionHistory()">关闭</button></div>' +
       '</div>';
-    ov.onclick = function () { closeVersionHistory(); };
+    ov.onclick = function() { closeVersionHistory(); };
     document.body.appendChild(ov);
   }
 
@@ -1126,7 +1133,79 @@
     if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
   }
 
-  // ============ Smart Tips ============
+  function showVersionDiff(key, ts) {
+    var meta = findChapterMeta(key);
+    if (!meta) return;
+    var versions = getVersionHistory(key);
+    var found = null;
+    for (var i = 0; i < versions.length; i++) { if (versions[i].ts === ts) { found = versions[i]; break; } }
+    if (!found) { alert('未找到该版本'); return; }
+    var current = getChapterDraft(key) || { content: '' };
+    closeVersionHistory();
+    var curText = current.content || '';
+    var prevText = found.content || '';
+    var curLines = curText.split('\n');
+    var prevLines = prevText.split('\n');
+    var allLines = Math.max(curLines.length, prevLines.length);
+    var diff = [];
+    for (var i = 0; i < allLines; i++) {
+      var pl = i < prevLines.length ? prevLines[i] : '';
+      var cl = i < curLines.length ? curLines[i] : '';
+      if (pl === cl) { diff.push({ type: 'same', prev: pl, cur: cl }); }
+      else if (!pl) { diff.push({ type: 'added', prev: '', cur: cl }); }
+      else if (!cl) { diff.push({ type: 'removed', prev: pl, cur: '' }); }
+      else { diff.push({ type: 'changed', prev: pl, cur: cl }); }
+    }
+    var rows = diff.map(function(d) {
+      var style = 'background:transparent;';
+      if (d.type === 'added') style = 'background:rgba(16,185,129,.08);';
+      if (d.type === 'removed') style = 'background:rgba(239,68,68,.06);';
+      if (d.type === 'changed') style = 'background:rgba(245,158,11,.05);';
+      return '<div style="' + style + 'font-size:.64rem;line-height:1.6;padding:2px 6px;font-family:var(--font-mono)">' +
+        (d.prev ? '<span style="text-decoration:line-through;color:rgba(239,68,68,.5)">' + escapeHtml(d.prev) + '</span><br>' : '') +
+        (d.cur ? '<span style="color:var(--text-primary)">' + escapeHtml(d.cur) + '</span>' : '') +
+      '</div>';
+    }).join('');
+    var curWords = curText.replace(/\s/g, '').length;
+    var ov = document.createElement('div');
+    ov.id = 'versionDiffOverlay';
+    ov.className = 'project-overlay';
+    ov.innerHTML = '' +
+      '<div class="project-modal" style="width:min(820px,95%)" onclick="event.stopPropagation()">' +
+        '<div class="project-modal-head"><div><h3>版本对比：' + escapeHtml(meta.title) + '</h3><p>历史版本 (' + formatTime(ts) + ' &middot; ' + found.words + '字) &nbsp; &rarr; &nbsp; 当前版本 (' + curWords + '字)</p></div><button class="project-close" onclick="closeVersionDiff()">x</button></div>' +
+        '<div style="max-height:60vh;overflow:auto;padding:4px">' + rows + '</div>' +
+        '<div class="project-modal-actions">' +
+          '<button class="ai-btn-clear" onclick="closeVersionDiff()">关闭</button>' +
+          '<button class="ai-btn" onclick="closeVersionDiff();rollbackChapterVersion(\'' + key + '\',\'' + ts + '\')">恢复到此历史版本</button>' +
+        '</div>' +
+      '</div>';
+    ov.onclick = function() { closeVersionDiff(); };
+    document.body.appendChild(ov);
+  }
+
+  function closeVersionDiff() {
+    var ov = document.getElementById('versionDiffOverlay');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+
+  // ============ Citation Jumping ============
+
+  function jumpToReference(num) {
+    if (num < 1) return;
+    var el = document.getElementById('r' + (num - 1)) || document.getElementById('er' + (num - 1));
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.transition = 'background .3s';
+      el.style.background = 'rgba(99,102,241,.12)';
+      setTimeout(function() { el.style.background = ''; }, 2000);
+      if (typeof ttp === 'function') ttp('已定位参考文献 [' + num + ']');
+    } else {
+      if (typeof ttp === 'function') ttp('未找到 [' + num + ']，请先在参考文献模块中检索');
+    }
+  }
+
+  // ============ Smart Stage Tips ============
+
   function stageTips(project) {
     if (!project) return [];
     var tips = [];
@@ -1135,131 +1214,34 @@
 
     if (stage === 'ideation') {
       if (!project.field) tips.push({ title: '先确定学科领域', desc: '在项目设置中填写领域，选题推荐会更精准' });
-      if (!project.keywords) tips.push({ title: '补充关键词', desc: '关键词帮你聚焦研究方向，也用于文献检索' });
+      if (!project.keywords) tips.push({ title: '补充关键词', desc: '关键词帮你聚焦研究方向' });
       tips.push({ title: '试试选题推荐', desc: '输入领域后 AI 可推荐 5 个可行题目' });
     } else if (stage === 'literature') {
-      if (!project.hasManuscript) tips.push({ title: '还没上传论文？', desc: '可以先在大纲编辑器中写骨架，再用论文扩写生成初稿' });
-      tips.push({ title: '文献检索策略', desc: '先用主题词检索，再看每章关联文献密度，补薄弱章节' });
+      tips.push({ title: '文献检索策略', desc: '先用主题词检索，再看每章关联文献密度' });
     } else if (stage === 'writing') {
       if (stats.total < 3) tips.push({ title: '大纲不完整', desc: '至少 5 章才算标准硕士论文结构' });
-      if (stats.words < 1000) tips.push({ title: '开始写第一段', desc: '先打开分章草稿，从绪论或你最熟的一章开始写' });
-      if (stats.ready < stats.total && stats.words > 500) tips.push({ title: '章节进度：' + stats.ready + '/' + stats.total, desc: '用 AI 扩写提升草稿完成度，每章目标 ≥2000 字' });
-      if (stats.words > 5000) tips.push({ title: '考虑插入文献', desc: '用章节编辑器的「插入文献引用标记」在关键位置标注引用' });
+      if (stats.words < 1000) tips.push({ title: '开始写第一段', desc: '打开分章草稿，从绪论或最熟的一章开始' });
+      if (stats.ready > 0 && stats.ready < stats.total) tips.push({ title: '章节进度：' + stats.ready + '/' + stats.total, desc: '用 AI 扩写提升草稿完成度' });
+      if (stats.words > 5000) tips.push({ title: '考虑插入文献', desc: '用章节编辑器插入引用标记标注关键位置' });
     } else if (stage === 'polish') {
-      tips.push({ title: '逐章查错', desc: '用论文查错逐章扫描，优先修绪论和结论（导师最关注）' });
-      tips.push({ title: '降重建议', desc: '复制容易重复的段落到查重降重模块，AI 帮你改写' });
+      tips.push({ title: '逐章查错', desc: '用论文查错逐章扫描' });
+      tips.push({ title: '降重建议', desc: '复制容易重复的段落到查重降重模块' });
     } else if (stage === 'review') {
-      tips.push({ title: '看十维看板', desc: '论文看板会告诉你哪些维度偏低，优先修高分影响的维度' });
+      tips.push({ title: '看十维看板', desc: '论文看板会告诉你哪些维度偏低' });
     } else if (stage === 'defense') {
-      tips.push({ title: '答辩准备', desc: '先跑英文摘要润色，再生成答辩 PPT 大纲，查漏补缺' });
+      tips.push({ title: '答辩准备', desc: '先跑英文摘要润色，再生成答辩 PPT 大纲' });
     }
     return tips.slice(0, 3);
   }
 
-  // Update renderProjectOverviewHTML to include tips
   function renderSmartTips(project) {
     var tips = stageTips(project);
     if (!tips.length) return '';
     return '<div class="project-smart-tips">' +
-      '<div class="smart-tips-head">💬 写作提示</div>' +
-      tips.map(function (t) { return '<div class="smart-tip-item"><b>' + escapeHtml(t.title) + '</b><p>' + escapeHtml(t.desc) + '</p></div>'; }).join('') +
+      '<div class="smart-tips-head">写作提示</div>' +
+      tips.map(function(t) { return '<div class="smart-tip-item"><b>' + escapeHtml(t.title) + '</b><p>' + escapeHtml(t.desc) + '</p></div>'; }).join('') +
     '</div>';
   }
-
-  // ============ Smart Citation Marker Insertion ============
-
-  function openTemplateChooser() {
-    closeTemplateChooser();
-    var p = getCurrentProject();
-    var rows = SCHOOL_TEMPLATES.map(function (t) {
-      return '<div class="template-card" onclick="applySchoolTemplate(\'' + t.id + '\')">' +
-        '<div class="template-card-head"><b>' + escapeHtml(t.name) + '</b><span>' + escapeHtml(t.degree) + ' · ≥' + t.minWords / 1000 + 'k字</span></div>' +
-        '<div class="template-card-desc">' + escapeHtml(t.styleNotes) + '</div>' +
-        '<div class="template-card-meta">' + t.outline.length + '章大纲 · ' + Object.values(t.headingMap).join(' | ') + '</div>' +
-        '<button class="ai-btn-clear" onclick="event.stopPropagation();applySchoolTemplate(\'' + t.id + '\')">应用此模板</button>' +
-      '</div>';
-    }).join('');
-    var ov = document.createElement('div');
-    ov.id = 'templateChooserOverlay';
-    ov.className = 'project-overlay';
-    ov.innerHTML =
-      '<div class="project-modal" style="width:min(640px,100%)" onclick="event.stopPropagation()">' +
-        '<div class="project-modal-head"><div><h3>选择学校模板</h3><p>模板会提供预设大纲、标题格式和参考文献规范。应用后可在编辑器中调整。</p></div><button class="project-close" onclick="closeTemplateChooser()">×</button></div>' +
-        '<div style="max-height:55vh;overflow:auto">' + rows + '</div>' +
-        '<div class="project-modal-actions"><button class="ai-btn-clear" onclick="closeTemplateChooser()">关闭</button></div>' +
-      '</div>';
-    ov.onclick = function () { closeTemplateChooser(); };
-    document.body.appendChild(ov);
-  }
-
-  function closeTemplateChooser() {
-    var ov = document.getElementById('templateChooserOverlay');
-    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
-  }
-
-  function applySchoolTemplate(templateId) {
-    var t = null;
-    for (var i = 0; i < SCHOOL_TEMPLATES.length; i++) { if (SCHOOL_TEMPLATES[i].id === templateId) { t = SCHOOL_TEMPLATES[i]; break; } }
-    if (!t) return;
-    var p = getCurrentProject();
-    if (!p) { openIdeaWizard(); return; }
-    if (p.artifacts && p.artifacts.outline && p.artifacts.outline.chapters && p.artifacts.outline.chapters.length >= t.outline.length) {
-      if (!confirm('当前已有完整大纲。应用模板将覆盖现有大纲，各章节草稿会保留。确定应用？')) return;
-    }
-    saveOutline({ title: p.title, chapters: t.outline.map(function (ch) { return { title: ch.title, sections: ch.sections.slice() }; }) });
-    updateCurrent({ degree: t.degree, goalWords: t.minWords, schoolTemplate: templateId });
-    logSkillRun({ moduleId: 'template', title: '应用学校模板', summary: t.name + ' · ' + t.outline.length + '章' });
-    closeTemplateChooser();
-    renderProjectChrome();
-    if (typeof ttp === 'function') ttp('已应用模板：' + t.name);
-  }
-
-  function insertCiteMarkers(key) {
-    var meta = findChapterMeta(key);
-    if (!meta) return;
-    var draft = getChapterDraft(key) || { content: '' };
-    if (!draft.content || draft.content.trim().length < 30) { alert('请先写一些内容（至少 30 字），再插入引用标记'); return; }
-    var refs = (typeof mergedRefs !== 'undefined' && mergedRefs.length) ? mergedRefs : (typeof existingRefs !== 'undefined' ? existingRefs : []);
-    if (!refs.length) { alert('还没有检索文献。请先在参考文献模块中检索。'); return; }
-    // Find good insertion points: end of sentences (。, .!?) that don't already have [N] after them
-    var text = draft.content;
-    var parts = text.split(/(?<=[。！？\.\!\?]\s*)(?!\s*\[)/);
-    if (parts.length < 2) {
-      // No clear sentence boundaries – just append at end of each paragraph
-      parts = text.split(/\n{2,}/);
-    }
-    var refIdx = 1;
-    var result = parts.map(function (part, i) {
-      if (i === parts.length - 1) return part;
-      // Don't insert after every sentence - sample ~1 per 3 sentences or key positions
-      if ((i % 3 === 1) && refIdx <= refs.length) {
-        var marker = ' [' + refIdx + ']';
-        refIdx++;
-        return part + marker;
-      }
-      return part;
-    }).join('');
-
-    // Also ensure at least 3 citation markers exist
-    var existingCount = (result.match(/\[\d+\]/g) || []).length;
-    if (existingCount < 3) {
-      result = text.replace(/([。！？\.\!\?])\s*/g, function (match, p1) {
-        if (refIdx <= Math.min(refs.length, 5)) {
-          return p1 + ' [' + (refIdx++) + '] ';
-        }
-        return match;
-      });
-    }
-
-    var ta = document.getElementById('chapterContent');
-    if (!ta) return;
-    if (ta.value && ta.value !== text && ta.value.trim().length > 30) {
-      ta.value = result;
-      if (typeof ttp === 'function') ttp('已插入 ' + (refIdx - 1) + ' 处引用标记 [N]，可手动调整');
-      logSkillRun({ moduleId: 'cite-markers', title: '自动插入引用标记', summary: meta.title + ' · ' + (refIdx - 1) + ' 处' });
-    }
-  }
-
 
   // ============ Export Full Paper ============
   function exportFullPaper() {
