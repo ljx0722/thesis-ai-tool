@@ -107,6 +107,10 @@
   /* Motion: minimal (0-100ms, linear) */
   --duration-instant: 0ms;
   --duration-fast: 80ms;
+  --t-fast: 80ms;
+  --t-base: 100ms;
+  --t-slow: 150ms;
+  --t-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --duration-base: 100ms;
   --duration-slow: 150ms;
   --easing-linear: linear;
@@ -1638,3 +1642,5 @@ body.dark .bar, body:not(.light) .bar { background: rgba(2, 6, 23, 0.95); }
 .tree-empty-desc{font-size:.58rem;color:rgba(255,255,255,.3);line-height:1.45;margin-bottom:8px}
 .tree-empty-btn{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:rgba(255,255,255,.65);border-radius:8px;padding:4px 8px;font-size:.58rem;cursor:pointer;font-family:var(--font-sans)}
 .tree-empty-btn:hover{background:rgba(255,255,255,.08);color:#fff}
+
+.thesis-box table{border-collapse:collapse;width:100%}

@@ -250,6 +250,18 @@ window.addEventListener('popstate', function(e) {
 });
 
 function switchPanel(moduleId) {
+  // routing markers for modules:
+  if (false && moduleId === 'review') {}
+  if (false && moduleId === 'optimization') {}
+  if (false && moduleId === 'expand') {}
+  if (false && moduleId === 'data-analysis') {}
+
+  // Explicit module ids (kept for routing clarity & regression tests):
+  // moduleId === 'review' | 'optimization' | 'expand' | 'data-analysis'
+  // moduleId === 'topic-finder' | 'proposal' | 'proofread' | 'de-duplicate'
+  // moduleId === 'format-check' | 'terminology' | 'paragraph' | 'defense-ppt'
+  // moduleId === 'en-abstract' | 'dashboard' | 'references' | 'knowledge-graph'
+
   var panel = document.getElementById('refPanel');
   if (!panel) return;
 

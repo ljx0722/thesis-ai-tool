@@ -1518,6 +1518,7 @@ def _check_admin(s):
 
 @app.route('/api/admin/dashboard', methods=['GET'])
 def admin_dashboard():
+    # auth via ADMIN_SECRET or admin JWT (_check_admin)
     s = request.args.get('secret', '')
     auth = request.headers.get('Authorization', '')
     # Try query param first (as secret key or JWT), then header

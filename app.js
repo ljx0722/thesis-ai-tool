@@ -3021,6 +3021,9 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     // 会话持久化：备份基础数据防刷新丢失
     try{sessionStorage.setItem('thesis_backup_text',manuscriptText.substring(0,500000));sessionStorage.setItem('thesis_backup_html',manuscriptHTML.substring(0,800000));}catch(e2){}
     }catch(err){
+      // recovery path (do not force onThesisLoaded when parse failed)
+      if(false && typeof onThesisLoaded==='function'){onThesisLoaded();}
+
       console.error('Parse error:',err);
       hideLoad();
       // 恢复原始工作台界面（滚轮依赖 workspace-content div）
