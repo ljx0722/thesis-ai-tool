@@ -81,6 +81,7 @@
       <a class="active" onclick="loadDashboard()">数据概览</a>
       <a onclick="document.getElementById('userSection').scrollIntoView({behavior:'smooth'})">用户管理</a>
       <a onclick="document.getElementById('orderSection').scrollIntoView({behavior:'smooth'})">充值订单</a>
+      <a onclick="document.getElementById('pricingSection').scrollIntoView({behavior:'smooth'});loadPricing();">计费配置</a>
       <div class="nav-divider"></div>
       <a href="/" style="font-size:0.65rem;color:rgba(255,255,255,0.25)">← 返回主页</a>
     </div>
@@ -96,7 +97,7 @@
         <h2 class="admin-section-title">用户管理</h2>
         <div class="admin-flex-wrap" style="margin-bottom:12px">
           <input id="uidInput" class="admin-input" type="number" placeholder="用户ID" style="width:80px">
-          <input id="creditAmount" class="admin-input" type="number" placeholder="点数(正=加/负=扣)" style="width:160px">
+          <input id="creditAmount" class="admin-input" type="number" placeholder="厘(1000厘=1点，正=加/负=扣)" style="width:160px">
           <input id="creditReason" class="admin-input" placeholder="原因" style="width:200px">
           <button class="admin-btn admin-btn-primary" onclick="adjustCredits()">调整点数</button>
         </div>
@@ -106,6 +107,20 @@
       <div id="orderSection">
         <h2 class="admin-section-title">充值订单</h2>
         <table class="admin-table" id="orderTable"><thead><tr><th>ID</th><th>用户</th><th>金额</th><th>状态</th><th>时间</th><th>操作</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div id="pricingSection">
+        <h2 class="admin-section-title">计费配置</h2>
+        <p style="font-size:.72rem;color:var(--text-muted);margin:0 0 10px">单位：厘（1点=1000厘，1元=1点）。AI 写作类为 token 实扣，固定价仅影响本地/服务器计算。</p>
+        <div id="pricingMeta" style="font-size:.72rem;color:var(--text-secondary);margin-bottom:10px"></div>
+        <div class="admin-flex-wrap" style="margin-bottom:10px">
+          <button class="admin-btn" onclick="loadPricing()">刷新</button>
+          <button class="admin-btn admin-btn-primary" onclick="savePricing()">保存修改</button>
+        </div>
+        <table class="admin-table" id="pricingTable"><thead><tr><th>项目</th><th>计费方式</th><th>当前(厘)</th><th>当前(点)</th><th>新值(厘)</th></tr></thead><tbody></tbody></table>
+        <div style="margin-top:12px" class="admin-flex-wrap">
+          <label style="font-size:.72rem">注册赠送(厘)</label><input id="bonusRegister" class="admin-input" type="number" style="width:120px">
+          <label style="font-size:.72rem">邀请奖励(厘)</label><input id="bonusInvite" class="admin-input" type="number" style="width:120px">
+        </div>
       </div>
     </div>
   </div>
@@ -141,6 +156,8 @@ function loadDashboard(){
     var ohtml='';var sm={pending:'<span class="admin-badge admin-badge-pending">待支付</span>',submitted:'<span class="admin-badge admin-badge-submitted">已提交</span>',confirmed:'<span class="admin-badge admin-badge-confirmed">已到账</span>'};
     s.recent_orders.forEach(function(o){ohtml+='<tr><td>'+o.id+'</td><td>'+o.username+'</td><td>&yen;'+o.amount_yuan+'</td><td>'+(sm[o.status]||o.status)+'</td><td>'+(o.created_at||'').substring(0,16)+'</td><td>'+(o.status==='submitted'?'<button class="admin-btn admin-btn-success" onclick="confirmOrder('+o.id+')">确认到账</button>':'')+'</td></tr>';});
     document.querySelector('#orderTable tbody').innerHTML=ohtml;
+    // preload pricing silently
+    try{loadPricing();}catch(e){}
   }).catch(function(){alert('网络错误')});
 }
 function adjustCredits(){
@@ -149,6 +166,33 @@ function adjustCredits(){
   var reason=document.getElementById('creditReason').value||'管理员调整';
   if(!uid||!amt){alert('请输入用户ID和点数');return}
   fetch('/api/admin/credits',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SECRET},body:JSON.stringify({secret:SECRET,user_id:uid,amount:amt,reason:reason})}).then(r=>r.json()).then(d=>{if(d.success){alert('调整成功');loadDashboard();}else{alert(d.error)}}).catch(function(){alert('网络错误')});
+}
+var _pricingCache=null;
+function loadPricing(){
+  if(!SECRET){alert('请先登录');return;}
+  fetch('/api/admin/pricing?secret='+encodeURIComponent(SECRET),{headers:{'Authorization':'Bearer '+SECRET}})
+    .then(r=>r.json()).then(d=>{
+      if(!d.success){alert(d.error||'无权限');return;}
+      _pricingCache=d;
+      document.getElementById('pricingMeta').textContent='LLM倍率×'+(d.llm_markup||3)+'，最低扣费 '+(d.llm_min_charge_points||0.02)+' 点；每日免费本地操作 '+(d.daily_free_ops||5)+' 次';
+      var tb=document.querySelector('#pricingTable tbody'); var h='';
+      (d.items||[]).forEach(function(it){
+        h+='<tr><td>'+it.key+'</td><td>'+it.billing+'</td><td>'+it.milli_credits+'</td><td>'+it.points+'</td><td><input class="admin-input price-input" data-key="'+it.key+'" type="number" value="'+it.milli_credits+'" style="width:110px" '+(it.billing==='llm-token'?'title="AI模块实际按token扣费，此值仅兼容旧接口"':'')+'></td></tr>';
+      });
+      tb.innerHTML=h;
+      document.getElementById('bonusRegister').value=(d.bonuses&&d.bonuses.register_bonus)||3000;
+      document.getElementById('bonusInvite').value=(d.bonuses&&d.bonuses.invite_bonus)||1000;
+    }).catch(function(){alert('网络错误')});
+}
+function savePricing(){
+  if(!SECRET){alert('请先登录');return;}
+  var updates={};
+  document.querySelectorAll('.price-input').forEach(function(inp){ updates[inp.getAttribute('data-key')]=inp.value; });
+  updates['register_bonus']=document.getElementById('bonusRegister').value;
+  updates['invite_bonus']=document.getElementById('bonusInvite').value;
+  fetch('/api/admin/pricing',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SECRET},body:JSON.stringify({secret:SECRET,updates:updates})})
+    .then(r=>r.json()).then(d=>{ if(d.success){alert('已保存 '+((d.changed||[]).length)+' 项'); loadPricing(); } else alert(d.error||'保存失败'); })
+    .catch(function(){alert('网络错误')});
 }
 function confirmOrder(oid){
   fetch('/api/payment/confirm',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SECRET},body:JSON.stringify({secret:SECRET,order_id:oid})}).then(r=>r.json()).then(d=>{if(d.success){alert('已确认');loadDashboard();}else{alert(d.error)}}).catch(function(){alert('网络错误')});

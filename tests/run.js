@@ -1629,6 +1629,18 @@ test('IMPORT: heading style patterns cover custom TJ styles', function() {
   assert(src.indexOf('extractRefsFromRawDocx') >= 0, 'ref extraction missing');
 });
 
+test('API: usage history + admin pricing exist', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  assert(src.indexOf('/api/usage/history') >= 0, 'usage history missing');
+  assert(src.indexOf('/api/admin/pricing') >= 0, 'admin pricing missing');
+});
+
+test('UI: consumption history entry exists', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf('showConsumptionHistory') >= 0, 'history UI missing');
+  assert(html.indexOf('consumptionHistory') >= 0, 'history holder missing');
+});
+
 test('API: pricing endpoint exists', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
   assert(src.indexOf("/api/pricing") >= 0, 'pricing route missing');

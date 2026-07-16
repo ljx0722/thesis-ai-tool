@@ -1121,7 +1121,7 @@ def payment_submit():
         db.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (pts, request.user_id))
         after = db.execute('SELECT credits FROM users WHERE id = ?', (request.user_id,)).fetchone()['credits']
         db.execute("INSERT INTO transactions (user_id, type, amount_credits, credits_after, description, created_at) VALUES (?,?,?,?,?,datetime('now','localtime'))",
-                   (request.user_id, 'recharge', pts, after, '充值 '+str(pts/10)+'点'))
+                   (request.user_id, 'recharge', pts, after, '充值 '+str(pts/1000)+'点'))
         db.commit()
         return jsonify({'success': True, 'message': '充值成功！到账 '+str(pts/10)+' 点', 'credits': after})
     except Exception as e:
@@ -1157,9 +1157,9 @@ def payment_confirm():
         db.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (pts, order['user_id']))
         after = db.execute('SELECT credits FROM users WHERE id = ?', (order['user_id'],)).fetchone()['credits']
         db.execute("INSERT INTO transactions (user_id, type, amount_credits, credits_after, description, created_at) VALUES (?,?,?,?,?,datetime('now','localtime'))",
-                   (order['user_id'], 'recharge', pts, after, '充值 '+str(pts/10)+'点'))
+                   (order['user_id'], 'recharge', pts, after, '充值 '+str(pts/1000)+'点'))
         db.commit()
-        return jsonify({'success': True, 'message': '已到账 '+str(pts/10)+' 点', 'credits': after})
+        return jsonify({'success': True, 'message': '已到账 '+str(pts/1000)+' 点', 'credits': after, 'points': pts/1000, 'points_after': after/1000})
     except Exception as e:
         db.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1173,7 +1173,19 @@ def payment_balance():
     try:
         u = db.execute('SELECT credits, free_used_date FROM users WHERE id = ?', (request.user_id,)).fetchone()
         today = date.today().isoformat()
-        return jsonify({'success': True, 'credits': u['credits'], 'free_available': (u['free_used_date'] != today)})
+        free_row = db.execute('SELECT used FROM daily_free_usage WHERE user_id = ? AND usage_date = ?',
+                              (request.user_id, today)).fetchone()
+        used = free_row['used'] if free_row else 0
+        free_limit = DAILY_FREE_OPS if 'DAILY_FREE_OPS' in globals() else 5
+        return jsonify({
+            'success': True,
+            'credits': u['credits'],
+            'points': round((u['credits'] or 0)/1000, 3),
+            'free_used_today': used,
+            'free_limit_today': free_limit,
+            'free_remaining_today': max(0, free_limit - used),
+            'free_available': used < free_limit
+        })
     finally:
         db.close()
 @app.route('/api/usage/check_free', methods=['GET'])
@@ -2048,6 +2060,99 @@ def pricing_info():
             '多模型训练等服务器计算按固定小额点数计费。'
         ]
     })
+
+
+
+
+@app.route('/api/usage/history', methods=['GET'])
+@require_auth
+def usage_history():
+    """用户消费明细：交易 + LLM 调用。"""
+    limit = min(100, max(1, int(request.args.get('limit', 50))))
+    db = get_db()
+    try:
+        txs = [dict(r) for r in db.execute(
+            "SELECT id,type,amount_credits,credits_after,description,created_at FROM transactions WHERE user_id=? ORDER BY id DESC LIMIT ?",
+            (request.user_id, limit)).fetchall()]
+        llms = [dict(r) for r in db.execute(
+            "SELECT id,module,prompt_tokens,completion_tokens,cost_credits,user_charged_credits,model,success,created_at FROM llm_usage WHERE user_id=? ORDER BY id DESC LIMIT ?",
+            (request.user_id, limit)).fetchall()]
+        for t in txs:
+            t['points'] = round((t.get('amount_credits') or 0)/1000, 3)
+            t['points_after'] = round((t.get('credits_after') or 0)/1000, 3)
+        for l in llms:
+            l['points_charged'] = round((l.get('user_charged_credits') or 0)/1000, 3)
+        return jsonify({'success': True, 'transactions': txs, 'llm_usage': llms})
+    finally:
+        db.close()
+
+
+@app.route('/api/admin/pricing', methods=['GET', 'POST'])
+def admin_pricing():
+    """管理员查看/修改计费配置。"""
+    s = request.args.get('secret', '') if request.method == 'GET' else (request.get_json() or {}).get('secret', '')
+    if not s:
+        auth = request.headers.get('Authorization', '')
+        if auth.startswith('Bearer '):
+            s = auth[7:]
+    if not _check_admin(s):
+        return jsonify({'success': False, 'error': '无权限'}), 403
+
+    if request.method == 'GET':
+        db = get_db()
+        try:
+            rows = {r['key']: r['value'] for r in db.execute('SELECT key,value FROM config').fetchall()}
+            items = []
+            for k, default in PRICING_DEFAULTS.items():
+                key = k + '_price'
+                val = int(rows.get(key, default))
+                items.append({
+                    'key': k,
+                    'config_key': key,
+                    'milli_credits': val,
+                    'points': round(val/1000, 3),
+                    'billing': 'llm-token' if k in ('topic-finder','proposal','review','optimization','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis') else 'fixed'
+                })
+            # also expose bonus keys
+            bonuses = {
+                'register_bonus': int(rows.get('register_bonus', 3000)),
+                'invite_bonus': int(rows.get('invite_bonus', 1000)),
+            }
+            return jsonify({'success': True, 'items': items, 'bonuses': bonuses,
+                            'unit': {'ratio': '1点=1000厘', 'recharge': '1元=1点'},
+                            'llm_markup': USER_MARKUP if 'USER_MARKUP' in globals() else 3.0,
+                            'llm_min_charge_points': (LLM_MIN_CHARGE if 'LLM_MIN_CHARGE' in globals() else 20)/1000,
+                            'daily_free_ops': DAILY_FREE_OPS if 'DAILY_FREE_OPS' in globals() else 5})
+        finally:
+            db.close()
+
+    # POST update
+    data = request.get_json() or {}
+    updates = data.get('updates') or {}
+    if not isinstance(updates, dict) or not updates:
+        return jsonify({'success': False, 'error': 'updates 不能为空'}), 400
+    db = get_db()
+    try:
+        allowed = set([k+'_price' for k in PRICING_DEFAULTS.keys()] + ['register_bonus', 'invite_bonus'])
+        changed = []
+        for k, v in updates.items():
+            key = k if k.endswith('_price') or k in ('register_bonus','invite_bonus') else (k + '_price')
+            if key not in allowed and k not in ('register_bonus','invite_bonus'):
+                continue
+            try:
+                iv = int(float(v))
+            except Exception:
+                continue
+            if iv < 0: iv = 0
+            db.execute('INSERT INTO config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', (key, str(iv)))
+            changed.append({key: iv})
+        db.commit()
+        return jsonify({'success': True, 'changed': changed})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
 
 
 if __name__ == '__main__':
