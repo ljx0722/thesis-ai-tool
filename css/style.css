@@ -1644,3 +1644,11 @@ body.dark .bar, body:not(.light) .bar { background: rgba(2, 6, 23, 0.95); }
 .tree-empty-btn:hover{background:rgba(255,255,255,.08);color:#fff}
 
 .thesis-box table{border-collapse:collapse;width:100%}
+
+
+.cite-preview-box{
+  margin-top:6px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;
+  background:var(--surface-alt);font-size:.7rem;line-height:1.7;max-height:160px;overflow:auto;color:var(--text-secondary)
+}
+.cite-preview-box .cite-link{color:var(--accent);font-weight:700;text-decoration:none;margin:0 1px}
+.cite-preview-box .cite-link:hover{text-decoration:underline}

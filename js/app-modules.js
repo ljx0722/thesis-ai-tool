@@ -715,11 +715,11 @@ function analyzeCSV(f,container){
       h+='</table></div>';
     }
 
-    window._dataAnalysisCache={fileName:f.name,nVar:headers.length,nObs:rows.length,summary:{numCols:numCols.map(function(c){return {name:c.name,n:c.values.length,mean:c.values.reduce(function(s,v){return s+v;},0)/c.values.length};}),headers:headers.slice(0,30)},sigTop:sigTop.map(function(s){return {a:s.a,b:s.b,method:s.method,stat:+s.stat.toFixed(4),p:+s.p.toFixed(6)};})};
+    window._dataAnalysisCache={fileName:f.name,nVar:headers.length,nObs:rows.length,raw:{headers:headers,rows:rows},summary:{numCols:numCols.map(function(c){return {name:c.name,n:c.values.length,mean:c.values.reduce(function(s,v){return s+v;},0)/c.values.length};}),headers:headers.slice(0,30)},sigTop:sigTop.map(function(s){return {a:s.a,b:s.b,method:s.method,stat:+s.stat.toFixed(4),p:+s.p.toFixed(6)};})};
     h+='<div style="margin:16px 0;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-alt)">';
     h+='<div style="font-weight:700;font-size:.78rem;margin-bottom:6px">🤖 AI 结果表述（论文写作辅助）</div>';
     h+='<div style="font-size:.65rem;color:var(--text-muted);margin-bottom:8px">把统计表转成可放入论文的“结果分析”段落。前端不显示固定点数，按实际 token 消耗计费。</div>';
-    h+='<button class="ai-btn" style="max-width:220px" onclick="runDataAISummary()">生成论文结果段落</button>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap">'+'<button class="ai-btn" style="max-width:220px" onclick="runDataAISummary()">生成论文结果段落</button>'+'<button class="ai-btn-clear" onclick="runDataFeatureScore()">3. 特征评分/轻量模型</button>'+'</div>';
     h+='<div id="dataAIOutput" style="margin-top:10px"></div></div>';
 
     container.innerHTML=h;
@@ -790,6 +790,31 @@ function welchTTest(a,b){
   return {t:tstat,p:p,df:df,mean1:m1,mean2:m2};
 }
 window._dataAnalysisCache=null;
+window.runDataFeatureScore=function(){
+  var cache=window._dataAnalysisCache; if(!cache||!cache.raw){alert('请先上传数据');return;}
+  var target=prompt('请输入目标列名（分类/回归标签列）：');
+  if(!target) return;
+  var token=sessionStorage.getItem('thesis_ai_token'); if(!token){alert('请先登录');return;}
+  var out=document.getElementById('dataAIOutput'); if(out) out.innerHTML='<div class="ai-loading">⏳ 正在计算特征评分/轻量模型对比...</div>';
+  fetch('/api/data/analyze_ml',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+    body:JSON.stringify({headers:cache.raw.headers, rows:cache.raw.rows, target:target, task:'classify'})})
+  .then(function(r){return r.json();}).then(function(d){
+    if(!out) return;
+    if(!d.success){ out.innerHTML='<div class="ai-output-error">❌ '+(d.error||'失败')+'</div>'; return; }
+    var h='<div class="ai-output"><b>3. 特征评分（轻量）</b><br>样本 '+d.n_samples+' · 特征 '+d.n_features+(d.classes?(' · 类别 '+d.classes.join('/')):'')+'<br><br>';
+    h+='<table style="border-collapse:collapse;font-size:.68rem;width:100%">';
+    h+='<tr style="background:var(--surface-alt)"><th style="padding:6px;border:1px solid var(--border);text-align:left">特征</th><th style="padding:6px;border:1px solid var(--border)">评分</th></tr>';
+    (d.feature_importance||[]).forEach(function(it){
+      h+='<tr><td style="padding:5px;border:1px solid var(--border)">'+it.feature+'</td><td style="padding:5px;border:1px solid var(--border);text-align:center">'+it.score+'</td></tr>';
+    });
+    h+='</table><br><b>模型对比</b><br>';
+    (d.model_compare||[]).forEach(function(m){
+      h+=m.model+': '+(m.accuracy!=null?('acc='+m.accuracy):(m.r2!=null?('R²='+m.r2):'-'))+'<br>';
+    });
+    h+='<div style="margin-top:8px;color:var(--text-muted);font-size:.62rem">'+(d.note||'')+'</div></div>';
+    out.innerHTML=h;
+  }).catch(function(){ if(out) out.innerHTML='<div class="ai-output-error">网络错误</div>'; });
+};
 window.runDataAISummary=function(){
   var cache=window._dataAnalysisCache; if(!cache){alert('请先上传并完成数据分析');return;}
   var token=sessionStorage.getItem('thesis_ai_token'); if(!token){alert('请先登录');return;}

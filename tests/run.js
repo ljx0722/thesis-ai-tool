@@ -1629,6 +1629,20 @@ test('IMPORT: heading style patterns cover custom TJ styles', function() {
   assert(src.indexOf('extractRefsFromRawDocx') >= 0, 'ref extraction missing');
 });
 
+test('API: export docx + analyze_ml routes exist', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  assert(src.indexOf('/api/export/docx') >= 0, 'export docx route missing');
+  assert(src.indexOf('/api/data/analyze_ml') >= 0, 'analyze_ml route missing');
+});
+
+test('PROJECT: citation closed loop + import sync helpers', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');
+  assert(src.indexOf('function insertCiteMarkers') >= 0, 'insertCiteMarkers missing');
+  assert(src.indexOf('function syncSectionsToChapterDrafts') >= 0, 'import sync missing');
+  assert(src.indexOf('exportFullPaperDocx') >= 0, 'docx export client missing');
+  assert(src.indexOf('renderCitePreview') >= 0, 'cite preview missing');
+});
+
 test('UX: two-path home exists', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');
   assert(src.indexOf('你想先做什么') >= 0 || src.indexOf('home-choice') >= 0, 'two-path home missing');

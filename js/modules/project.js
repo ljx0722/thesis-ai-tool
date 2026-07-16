@@ -655,7 +655,7 @@
           '<button class="ai-btn-clear" onclick="openChapterBoard()">分章草稿</button>' +
           '<button class="ai-btn-clear" onclick="openTemplateChooser()">学校模板</button>' +
           '<button class="ai-btn-clear" onclick="openProjectSettings()">设置</button>' +
-          '<button class="ai-btn-clear" onclick="exportFullPaper()">导出全文</button>' +
+          '<button class="ai-btn-clear" onclick="exportFullPaperDocx()">导出DOCX</button>' +
         '</div></details>' +
         '<div class="project-stage-grid">' + stagesHtml + '</div>' +
       '</div>';
@@ -933,7 +933,11 @@
     } else {
       updateCurrent({ hasManuscript: true, mode: p.mode === 'create' ? 'create' : 'import' });
     }
+    // P1: align imported sections to project outline + chapter drafts
+    try { syncSectionsToChapterDrafts(false); } catch (e) { console.warn('[import-sync]', e); }
     renderProjectChrome();
+    if (typeof switchView === 'function') switchView('workspace');
+    if (typeof ttp === 'function') ttp('论文已导入：目录与分章草稿已同步，请按「导入后3步」继续');
   }
 
   // exports
@@ -1116,9 +1120,190 @@
   window.switchToProject = switchToProject;
   window.deleteProject = deleteProject;
   window.exportFullPaper = exportFullPaper;
+  window.exportFullPaperDocx = exportFullPaperDocx;
+  window.buildPaperPayload = buildPaperPayload;
   window.openProjectSettings = openProjectSettings;
   window.closeProjectSettings = closeProjectSettings;
   window.saveProjectSettings = saveProjectSettings;
+
+  // ===== P0: Citation closed loop =====
+  function getRefLibrary() {
+    var refs = (typeof mergedRefs !== 'undefined' && mergedRefs && mergedRefs.length) ? mergedRefs
+      : ((typeof existingRefs !== 'undefined' && existingRefs) ? existingRefs : []);
+    return refs || [];
+  }
+
+  function normalizeRefNum(r, idx) {
+    var n = parseInt(r.displayNum || r.num || (idx + 1), 10);
+    return isNaN(n) ? (idx + 1) : n;
+  }
+
+  function insertCiteMarkers(key) {
+    var meta = findChapterMeta(key);
+    if (!meta) { alert('未找到章节'); return; }
+    var ta = document.getElementById('chapterContent');
+    if (!ta) { alert('请先打开章节编辑器'); return; }
+    var text = ta.value || '';
+    if (text.trim().length < 20) { alert('请先写一些内容，再插入引用标记'); return; }
+    var refs = getRefLibrary();
+    if (!refs.length) {
+      if (confirm('还没有文献库。是否先打开参考文献模块？')) {
+        if (typeof switchView === 'function') switchView('references');
+      }
+      return;
+    }
+
+    // Prefer chapter-associated refs, else whole library
+    var chNo = (meta.idx || 0) + 1;
+    var pool = refs.filter(function(r){
+      return r.ch === chNo || r._chName === ('第' + chNo + '章') || String(r.ch) === String(chNo);
+    });
+    if (pool.length < 2) pool = refs.slice();
+    // map to stable numbers from library order
+    var nums = [];
+    refs.forEach(function(r, i) {
+      var n = normalizeRefNum(r, i);
+      if (pool.indexOf(r) >= 0) nums.push(n);
+    });
+    nums = Array.from(new Set(nums)).sort(function(a,b){return a-b;}).slice(0, 12);
+    if (!nums.length) nums = refs.slice(0, 8).map(function(r,i){return normalizeRefNum(r,i);});
+
+    // Split by sentence end; insert markers deterministically on every 2nd sentence
+    var parts = text.split(/([。！？!?])/);
+    var out = [];
+    var sent = 0;
+    var ni = 0;
+    for (var i = 0; i < parts.length; i++) {
+      var part = parts[i];
+      out.push(part);
+      if (/[。！？!?]/.test(part)) {
+        sent++;
+        // avoid double markers
+        var prev = out.join('');
+        if (sent % 2 === 0 && ni < nums.length && !/\[\d+\]\s*$/.test(prev)) {
+          out.push('[' + nums[ni++] + ']');
+        }
+      }
+    }
+    var result = out.join('');
+    // ensure at least 3 markers if possible
+    var have = (result.match(/\[\d+\]/g) || []).length;
+    if (have < 3 && nums.length) {
+      var extra = [];
+      for (var k = 0; k < nums.length && have + extra.length < 3; k++) {
+        if (result.indexOf('[' + nums[k] + ']') < 0) extra.push('[' + nums[k] + ']');
+      }
+      if (extra.length) result = result.replace(/([。！？!?])/g, function(m, p1, offset) {
+        if (extra.length && offset > result.length * 0.2) return p1 + extra.shift();
+        return m;
+      });
+      // fallback append
+      if (extra.length) result += ' ' + extra.join('');
+    }
+    ta.value = result;
+    var used = (result.match(/\[\d+\]/g) || []).length;
+    logSkillRun({ moduleId: 'cite-markers', title: '插入文献引用标记', summary: meta.title + ' · ' + used + ' 处' });
+    if (typeof ttp === 'function') ttp('已按文献库编号插入 ' + used + ' 处引用标记，可点击预览跳转');
+    // refresh preview
+    renderCitePreview(key);
+  }
+
+  function renderCitePreview(key) {
+    var ta = document.getElementById('chapterContent');
+    var box = document.getElementById('citePreviewBox');
+    if (!ta || !box) return;
+    var html = escapeHtml(ta.value || '');
+    html = html.replace(/\[(\d+)\]/g, '<a href="javascript:void(0)" class="cite-link" onclick="jumpToReference($1)">[$1]</a>');
+    html = html.replace(/\n/g, '<br>');
+    box.innerHTML = html || '<span class="project-progress-sub">正文预览（引用标记可点击跳转文献）</span>';
+  }
+
+  // enhance jumpToReference: open refs panel first
+  function jumpToReference(num) {
+    num = parseInt(num, 10);
+    if (!num || num < 1) return;
+    if (typeof switchView === 'function') {
+      try { switchView('references'); } catch (e) {}
+    }
+    setTimeout(function() {
+      var el = document.getElementById('r' + (num - 1)) || document.getElementById('er' + (num - 1));
+      // also try data-num attributes
+      if (!el) {
+        el = document.querySelector('[data-ref-num="' + num + '"]') || document.querySelector('#refs [data-num="' + num + '"]');
+      }
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.style.transition = 'background .3s';
+        el.style.background = 'rgba(99,102,241,.14)';
+        setTimeout(function() { el.style.background = ''; }, 2200);
+        if (typeof ttp === 'function') ttp('已定位参考文献 [' + num + ']');
+      } else {
+        if (typeof ttp === 'function') ttp('未找到文献 [' + num + ']，请先完成文献提取/检索');
+      }
+    }, 120);
+  }
+
+  // ===== P1: import sections -> chapter drafts =====
+  function syncSectionsToChapterDrafts(force) {
+    if (typeof sections === 'undefined' || !sections || !sections.length) return null;
+    var p = getCurrentProject();
+    if (!p) {
+      p = createProject({
+        title: '导入论文项目',
+        idea: '从已有 DOCX 进入打磨与增强流程',
+        mode: 'import',
+        currentStage: 'literature',
+        hasManuscript: true
+      });
+      p.stageStatus.ideation = 'done';
+      p.stageStatus.literature = 'active';
+      upsertProject(p);
+    }
+    var arts = ensureArtifacts(p);
+    // Build outline from imported sections if missing or force
+    var outlineChapters = sections.map(function(cs, idx) {
+      var secs = (cs.sections || []).map(function(s) { return (s.num ? (s.num + ' ') : '') + (s.title || ''); });
+      return { title: cs.name || ('第' + (cs.ch || (idx + 1)) + '章'), sections: secs };
+    });
+    if (force || !arts.outline || !arts.outline.chapters || !arts.outline.chapters.length) {
+      arts.outline = { title: p.title, chapters: outlineChapters, updatedAt: nowISO(), source: 'import' };
+    }
+    // Fill chapter drafts from section text if empty
+    var filled = 0;
+    outlineChapters.forEach(function(ch, idx) {
+      var key = chapterKey(ch.title, idx);
+      var prev = arts.chapters[key];
+      var src = sections[idx] || {};
+      var content = (src.text || '').trim();
+      // include subsections text lightly
+      if ((!content || content.length < 20) && src.sections) {
+        content = (src.sections || []).map(function(s) {
+          return ((s.num || '') + ' ' + (s.title || '')).trim() + '\n' + (s.text || '');
+        }).join('\n\n').trim();
+      }
+      if (!content) return;
+      if (prev && prev.content && prev.content.trim() && !force) return; // don't overwrite user drafts
+      arts.chapters[key] = {
+        key: key,
+        title: ch.title,
+        sections: ch.sections || [],
+        content: content,
+        status: content.replace(/\s+/g, '').length >= 300 ? 'ready' : 'draft',
+        updatedAt: nowISO(),
+        createdAt: (prev && prev.createdAt) || nowISO(),
+        source: 'import'
+      };
+      filled++;
+    });
+    p.hasManuscript = true;
+    if (p.mode !== 'create') p.mode = 'import';
+    p.updatedAt = nowISO();
+    upsertProject(p);
+    logSkillRun({ moduleId: 'import-sync', title: '导入结构同步到分章草稿', summary: '填充 ' + filled + ' 章 · 共 ' + sections.length + ' 章' });
+    return p;
+  }
+
+
   window.insertCiteMarkers = insertCiteMarkers;
   window.openTemplateChooser = openTemplateChooser;
   window.closeTemplateChooser = closeTemplateChooser;
@@ -1283,6 +1468,59 @@
   }
 
   // ============ Export Full Paper ============
+  function buildPaperPayload() {
+    var p = getCurrentProject();
+    if (!p) return null;
+    var outline = getOutline();
+    var refs = getRefLibrary();
+    var chapters = [];
+    if (outline && outline.chapters) {
+      outline.chapters.forEach(function(ch, idx) {
+        var key = chapterKey(ch.title, idx);
+        var d = getChapterDraft(key) || {};
+        chapters.push({ title: ch.title, sections: ch.sections || [], content: d.content || '' });
+      });
+    }
+    return {
+      title: (outline && outline.title) || p.title || '论文草稿',
+      field: p.field || '',
+      degree: p.degree || '',
+      idea: p.idea || '',
+      chapters: chapters,
+      references: refs.map(function(r, i) {
+        return { num: normalizeRefNum(r, i), text: (r.ci || r.title || '').replace(/<[^>]+>/g, '') };
+      })
+    };
+  }
+
+  function exportFullPaperDocx() {
+    var payload = buildPaperPayload();
+    if (!payload) { alert('请先创建项目'); return; }
+    if (!payload.chapters.length) { alert('请先编辑大纲/分章草稿'); return; }
+    var token = sessionStorage.getItem('thesis_ai_token');
+    if (!token) { alert('请先登录'); return; }
+    if (typeof showLoad === 'function') showLoad('正在导出 DOCX...', 20, payload.title);
+    fetch('/api/export/docx', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload)
+    }).then(function(r) {
+      if (!r.ok) return r.json().then(function(j){ throw new Error(j.error || ('HTTP ' + r.status)); });
+      return r.blob();
+    }).then(function(blob) {
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = (payload.title || '论文').replace(/[\\/:\s]+/g, '_') + '.docx';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+      logSkillRun({ moduleId: 'export-docx', title: '导出 DOCX', summary: payload.chapters.length + ' 章' });
+      if (typeof ttp === 'function') ttp('DOCX 已导出');
+    }).catch(function(e) {
+      alert('DOCX 导出失败：' + (e.message || e) + '。将回退为 TXT 导出。');
+      exportFullPaper();
+    }).finally(function(){ if (typeof hideLoad === 'function') hideLoad(); });
+  }
+
   function exportFullPaper() {
     var p = getCurrentProject();
     if (!p) { alert('请先创建项目'); return; }
@@ -1388,4 +1626,6 @@
     if (typeof ttp === 'function') ttp('项目设置已保存');
   }
 
+  window.syncSectionsToChapterDrafts = syncSectionsToChapterDrafts;
+  window.renderCitePreview = renderCitePreview;
 }).call(this);

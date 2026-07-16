@@ -1584,6 +1584,214 @@ def admin_credits():
     finally: db.close()
 
 
+
+
+# ========== 导出 / 数据分析（轻量） ==========
+@app.route('/api/export/docx', methods=['POST'])
+@require_auth
+def export_docx():
+    """将项目大纲+分章草稿+参考文献导出为 DOCX。"""
+    try:
+        from docx import Document
+        from docx.shared import Pt, Inches
+        from docx.oxml.ns import qn
+    except Exception as e:
+        return jsonify({'success': False, 'error': '服务器未安装 python-docx: ' + str(e)}), 500
+    data = request.get_json() or {}
+    title = (data.get('title') or '论文草稿').strip()
+    chapters = data.get('chapters') or []
+    references = data.get('references') or []
+    field = data.get('field') or ''
+    degree = data.get('degree') or ''
+    if not chapters:
+        return jsonify({'success': False, 'error': '没有可导出的章节'}), 400
+
+    doc = Document()
+    # basic CN font
+    try:
+        style = doc.styles['Normal']
+        style.font.name = 'Times New Roman'
+        style.font.size = Pt(12)
+        style._element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
+    except Exception:
+        pass
+
+    h = doc.add_heading(title, level=0)
+    meta = []
+    if degree: meta.append(degree)
+    if field: meta.append(field)
+    if meta:
+        p = doc.add_paragraph(' / '.join(meta))
+    doc.add_paragraph('')
+
+    for ch in chapters:
+        ctitle = (ch.get('title') or '未命名章节').strip()
+        doc.add_heading(ctitle, level=1)
+        secs = ch.get('sections') or []
+        content = (ch.get('content') or '').strip()
+        if content:
+            for para in content.split('\n'):
+                if para.strip():
+                    doc.add_paragraph(para.strip())
+        else:
+            for s in secs:
+                if str(s).strip():
+                    doc.add_paragraph(str(s).strip(), style=None)
+            doc.add_paragraph('（本章暂无草稿）')
+
+    if references:
+        doc.add_heading('参考文献', level=1)
+        for r in references:
+            num = r.get('num') or ''
+            text = (r.get('text') or '').strip()
+            if not text:
+                continue
+            prefix = f'[{num}] ' if num != '' else ''
+            doc.add_paragraph(prefix + text)
+
+    import io
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    filename = re.sub(r'[\\/:*?"<>|]+', '_', title)[:80] + '.docx'
+    return send_file(buf, as_attachment=True, download_name=filename,
+                     mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+
+
+@app.route('/api/data/analyze_ml', methods=['POST'])
+@require_auth
+def analyze_ml():
+    """轻量特征重要性/模型对比（无 SHAP 重依赖）。
+    输入 JSON: {headers:[], rows:[{}], target: str, task: 'classify'|'regress'}
+    """
+    data = request.get_json() or {}
+    headers = data.get('headers') or []
+    rows = data.get('rows') or []
+    target = data.get('target') or ''
+    task = data.get('task') or 'classify'
+    if not headers or not rows or not target or target not in headers:
+        return jsonify({'success': False, 'error': '需要 headers/rows/target'}), 400
+    try:
+        import numpy as np
+    except Exception as e:
+        return jsonify({'success': False, 'error': '服务器缺少 numpy: ' + str(e)}), 500
+
+    # Build matrix
+    feats = [h for h in headers if h != target]
+    X, y_raw = [], []
+    for r in rows:
+        yv = r.get(target, '')
+        if yv == '' or yv is None:
+            continue
+        row = []
+        ok = True
+        for f in feats:
+            try:
+                row.append(float(r.get(f)))
+            except Exception:
+                ok = False
+                break
+        if not ok:
+            continue
+        X.append(row)
+        y_raw.append(yv)
+    if len(X) < 20:
+        return jsonify({'success': False, 'error': '有效样本不足（需至少约20行数值特征）'}), 400
+    X = np.asarray(X, dtype=float)
+    # encode y
+    classes = sorted(list(set(map(str, y_raw))))
+    if task == 'classify' and len(classes) >= 2:
+        y_map = {c: i for i, c in enumerate(classes)}
+        y = np.array([y_map[str(v)] for v in y_raw], dtype=int)
+        # train/test split
+        n = len(y)
+        idx = np.arange(n)
+        rng = np.random.default_rng(42)
+        rng.shuffle(idx)
+        cut = max(1, int(n * 0.7))
+        tr, te = idx[:cut], idx[cut:]
+        # LogReg one-vs-rest via least squares proxy + tree-free importance: abs corr / ANOVA-like
+        # Feature importance: mutual mean-diff for top classes or abs pearson with y
+        imp = []
+        for j, f in enumerate(feats):
+            col = X[:, j]
+            # standardized abs correlation with y
+            yc = y.astype(float)
+            if col.std() < 1e-12 or yc.std() < 1e-12:
+                score = 0.0
+            else:
+                score = float(abs(np.corrcoef(col, yc)[0, 1]))
+            imp.append({'feature': f, 'score': round(score, 4)})
+        imp.sort(key=lambda d: d['score'], reverse=True)
+        # simple nearest-centroid accuracy
+        def predict_centroid(Xtr, ytr, Xte):
+            preds = []
+            for x in Xte:
+                best, bd = 0, 1e18
+                for c in np.unique(ytr):
+                    mu = Xtr[ytr == c].mean(axis=0)
+                    d = np.sum((x - mu) ** 2)
+                    if d < bd:
+                        bd, best = d, int(c)
+                preds.append(best)
+            return np.array(preds)
+        pred = predict_centroid(X[tr], y[tr], X[te]) if len(te) else np.array([])
+        acc = float((pred == y[te]).mean()) if len(te) else None
+        # confusion lite
+        return jsonify({
+            'success': True,
+            'task': 'classify',
+            'n_samples': int(len(y)),
+            'n_features': len(feats),
+            'classes': classes,
+            'feature_importance': imp[:20],
+            'model_compare': [
+                {'model': 'NearestCentroid', 'accuracy': None if acc is None else round(acc, 4)},
+                {'model': 'CorrelationRanker', 'accuracy': None}
+            ],
+            'note': '轻量实现：特征评分为与目标的绝对相关；模型为最近质心分类。完整 SHAP/多模型训练可后续增强。'
+        })
+    else:
+        # regression: y float
+        try:
+            y = np.array([float(v) for v in y_raw], dtype=float)
+        except Exception:
+            return jsonify({'success': False, 'error': '回归目标无法转为数值'}), 400
+        imp = []
+        for j, f in enumerate(feats):
+            col = X[:, j]
+            if col.std() < 1e-12 or y.std() < 1e-12:
+                score = 0.0
+            else:
+                score = float(abs(np.corrcoef(col, y)[0, 1]))
+            imp.append({'feature': f, 'score': round(score, 4)})
+        imp.sort(key=lambda d: d['score'], reverse=True)
+        # ridge-less closed form OLS on top 5 features
+        top = [i for i, _ in sorted(enumerate(imp), key=lambda z: -z[1]['score'])[: min(5, len(imp))]]
+        if not top:
+            return jsonify({'success': False, 'error': '无有效特征'}), 400
+        Xk = np.c_[np.ones(len(X)), X[:, top]]
+        try:
+            beta, *_ = np.linalg.lstsq(Xk, y, rcond=None)
+            yhat = Xk @ beta
+            ss_res = float(np.sum((y - yhat) ** 2))
+            ss_tot = float(np.sum((y - y.mean()) ** 2)) or 1.0
+            r2 = 1 - ss_res / ss_tot
+        except Exception:
+            r2 = None
+        return jsonify({
+            'success': True,
+            'task': 'regress',
+            'n_samples': int(len(y)),
+            'n_features': len(feats),
+            'feature_importance': imp[:20],
+            'model_compare': [
+                {'model': 'OLS-TopFeatures', 'r2': None if r2 is None else round(float(r2), 4)}
+            ],
+            'note': '轻量实现：特征评分=绝对相关；模型=前若干特征最小二乘。'
+        })
+
+
 if __name__ == '__main__':
     print("=" * 50)
     print("论文文献AI利器 - Python知识图谱服务")
