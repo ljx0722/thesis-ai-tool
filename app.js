@@ -2091,7 +2091,11 @@ async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;
 function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
   // ① 构建标题树（章/节/小节）
   var tree=[],hdMap=new Map();
-  allHeadings.forEach(function(h){if(h.level>=0)hdMap.set(h.el,{el:h.el,txt:h.txt,level:h.level});});
+  allHeadings.forEach(function(h){
+    var lv=h.level;
+    if(lv<0 && h.tagLevel>0) lv=h.tagLevel<=1?0:(h.tagLevel===2?1:2);
+    if(lv>=0){h.level=lv; hdMap.set(h.el,{el:h.el,txt:h.txt,level:lv});}
+  });
   var chCounter=0,stack=[];
   for(var hi=0;hi<allHeadings.length;hi++){
     var hd=allHeadings[hi];if(hd.level<0)continue;
@@ -2566,16 +2570,16 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
       if (/^\d{1,3}$/.test(txt)||/^[ivxlcdm]+$/i.test(txt)) return -1;
       // 章标题
       if (/^第[一二三四五六七八九十123456789]+章/.test(txt) || /^Chapter\s+\d/.test(txt)) return 0;
-      // 数字编号 + 标题文字
-      var nm = txt.match(/^(\d+(?:\.\d+)+)\s+(\S.{1,})/);
-      if (nm && nm[2] && nm[2].length >= 2) {
-        var dots = nm[1].split('.').length - 1;
-        return dots <= 2 ? dots : -1;
+      // 数字编号 + 标题文字：1.1 标题 / 1.1.1标题 / 1．1 标题
+      var nm = txt.match(/^(\d+(?:[.．]\d+){1,3})[\s、，,.．]*(.+)$/);
+      if (nm && nm[2] && nm[2].trim().length >= 2 && nm[2].trim().length < 80) {
+        var dots = (nm[1].match(/[.．]/g)||[]).length;
+        return dots <= 2 ? dots : 2;
       }
-      // 纯数字 + 标题
-      var sm = txt.match(/^(\d+)[\s、，,.]+\s*(\S.{1,})/);
-      if (sm && sm[2] && sm[2].length >= 2 && sm[2].length < 80) {
-        return sm[1] === '1' ? 0 : 1;
+      // 纯数字 + 标题：1 标题 / 1、标题 → 节
+      var sm = txt.match(/^(\d+)[\s、，,.．]+(.+)$/);
+      if (sm && sm[2] && sm[2].trim().length >= 2 && sm[2].trim().length < 80) {
+        return 1;
       }
       // 中文序号：一、xxx → 节; (一)xxx → 小节
       var cnm = txt.match(/^([\(（]?[一二三四五六七八九十]+[\)）]?)[\s、，,.]+\s*(\S.{1,})/);
@@ -2662,17 +2666,24 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
         if (/\t\d{1,3}$/.test(txt2) || /[\s\.]{2,}\d{1,3}$/.test(txt2) || /[\s]+\d{1,3}$/.test(txt2)) continue;
         var tagName = (el2.tagName || '').toUpperCase();
         if (/^H[1-6]$/.test(tagName)) {
-          allHeadings.push({ el: el2, txt: txt2, level: -1, tagLevel: parseInt(tagName.charAt(1)), bare: false });
+          var tl = parseInt(tagName.charAt(1));
+          // H1→章(0) H2→节(1) H3+→小节(2)
+          var lvFromTag = tl<=1 ? 0 : (tl===2 ? 1 : 2);
+          allHeadings.push({ el: el2, txt: txt2, level: lvFromTag, tagLevel: tl, bare: false });
         }
       }
       // ---- 样式数据驱动检测：_docxStyleGroups._els 直接映射到 DOM ----
       // 策略：利用已解析的 Word 样式名 + 字体属性推断层级，不再纯靠文本正则
       var styleToLevel={};
       var headingStylePatterns=[
-        {re:/(一级|1级|章标题|一[级級]|h1|heading\s*1|标题_TJ|第.*章)/i, lv:0},
-        {re:/(二级|2级|节标题|二[级級]|h2|heading\s*2)/i, lv:1},
-        {re:/(三级|3级|小节标题|三[级級]|h3|heading\s*3)/i, lv:2},
-        {re:/(四级|4级|h4|heading\s*4)/i, lv:2},
+        // more specific first — avoid 标题_TJ matching 一级标题_TJ as substring
+        {re:/(二级标题|2级标题|节标题|二[级級]标题|^heading\s*2$|^标题\s*2$)/i, lv:1},
+        {re:/(三级标题|3级标题|小节标题|三[级級]标题|^heading\s*3$|^标题\s*3$)/i, lv:2},
+        {re:/(四级标题|4级标题|^heading\s*4$|^标题\s*4$)/i, lv:2},
+        {re:/(一级标题|1级标题|章标题|一[级級]标题|^heading\s*1$|^标题\s*1$|^标题_TJ$|^Title$)/i, lv:0},
+        {re:/(^h1$|heading\s*1)/i, lv:0},
+        {re:/(^h2$|heading\s*2)/i, lv:1},
+        {re:/(^h3$|heading\s*3)/i, lv:2},
       ];
       (window._docxStyleGroups||[]).forEach(function(g){
         var nm=g.name||''; if(styleToLevel[nm]!==undefined)return;
@@ -2736,6 +2747,40 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
         console.log('[detect] level breakdown:',JSON.stringify(lvs));
         console.log('[detect] first 5 headings:',allHeadings.slice(0,5).map(function(h){return'<'+((h.el.tagName||'').toUpperCase())+'> lv='+h.level+' '+h.txt.substring(0,60);}));
       }
+
+      // ===== 第3.5步：统一解析 level（tagLevel / 文本 / 样式）=====
+      for(var ni=0;ni<allHeadings.length;ni++){
+        var hh=allHeadings[ni];
+        if(hh.level>=0) continue;
+        if(hh.tagLevel>0){
+          hh.level = hh.tagLevel<=1 ? 0 : (hh.tagLevel===2 ? 1 : 2);
+          continue;
+        }
+        var tl2=detectHeadingLevel(hh.txt||'');
+        if(tl2>=0) hh.level=tl2;
+      }
+      // 过滤目录样式文本（带页码的 TOC 行）
+      allHeadings=allHeadings.filter(function(h){
+        var x=(h.txt||'');
+        if(/[\t\s]+\d{1,3}$/.test(x)||/\.{3,}\d{1,3}$/.test(x)) return false;
+        if(x.length>120 && h.level<0) return false;
+        return true;
+      });
+      // 若仍无 level>=0 的标题，用纯文本再扫一遍
+      var hasResolved=allHeadings.some(function(h){return h.level>=0;});
+      if(!hasResolved){
+        console.warn('[detect] no resolved heading levels — full text rescan');
+        allHeadings=[];
+        for(var ri3=bodyStartIdx;ri3<allEls.length;ri3++){
+          var e3=allEls[ri3], t3=(e3.textContent||'').trim();
+          if(!t3||t3.length<2||t3.length>100) continue;
+          if(refBound&&(e3.compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING)) break;
+          if(/[\t\s]+\d{1,3}$/.test(t3)||/\.{3,}\d{1,3}$/.test(t3)) continue;
+          var lv3=detectHeadingLevel(t3);
+          if(lv3>=0) allHeadings.push({el:e3,txt:t3,level:lv3,tagLevel:-1,bare:false});
+        }
+      }
+
       // ===== 第4步：合并 split 标签标题（h1 "第2章" + 后面的 p 标题文字） =====
       for (var hi = 0; hi < allHeadings.length; hi++) {
         var hc = allHeadings[hi];
@@ -2768,8 +2813,18 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
       }
       // ===== 第4.5步: 标题校准 =====
       updLoad('标题校准...', '37');
+      var preCal = allHeadings.slice();
       var calibrated = await startInlineCalibration(box, allHeadings);
-      if (calibrated !== null && calibrated.length) allHeadings = calibrated;
+      if (calibrated !== null && calibrated.length) {
+        allHeadings = calibrated;
+      } else {
+        // 用户跳过校准：保留自动识别结果
+        allHeadings = preCal.filter(function(h){return h.level>=0 || (h.tagLevel>0);});
+        allHeadings.forEach(function(h){
+          if(h.level<0 && h.tagLevel>0) h.level=h.tagLevel<=1?0:(h.tagLevel===2?1:2);
+        });
+        console.log('[cal] skipped/empty — fallback auto headings:', allHeadings.length);
+      }
       // 兜底：如果校准后仍然没有标题数据，扫描全文所有短元素作为候选
       if (!allHeadings.length){
         console.warn('[cal] No headings after calibration — scanning all body elements');
