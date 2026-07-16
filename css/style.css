@@ -1615,3 +1615,26 @@ body.dark .bar, body:not(.light) .bar { background: rgba(2, 6, 23, 0.95); }
 .stage-nav-item{opacity:.85}
 .stage-nav-item.active{opacity:1;box-shadow:inset 3px 0 0 var(--accent)}
 .kb-hint{z-index:1200}
+
+
+.import-checklist{margin:14px 0 16px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--bg-card)}
+.import-checklist-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:10px}
+.import-checklist-head strong{font-size:.8rem;color:var(--text-primary)}
+.import-checklist-head span{font-size:.62rem;color:var(--text-muted)}
+.checklist-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 8px;border-top:1px solid var(--border-light)}
+.checklist-item:first-of-type{border-top:none}
+.checklist-left{display:flex;gap:10px;align-items:flex-start}
+.checklist-dot{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:var(--text-muted);background:var(--surface-alt);flex-shrink:0;margin-top:1px}
+.checklist-item.is-done .checklist-dot{background:rgba(16,185,129,.12);color:#059669}
+.checklist-item b{display:block;font-size:.72rem;color:var(--text-primary);margin-bottom:2px}
+.checklist-item p{margin:0;font-size:.62rem;color:var(--text-muted);line-height:1.45}
+.checklist-ok{font-size:.62rem;color:#059669;font-weight:600;white-space:nowrap}
+.project-more-tools{margin:10px 0 14px}
+.project-more-tools summary{cursor:pointer;font-size:.68rem;color:var(--text-muted);user-select:none;list-style:none}
+.project-more-tools summary::-webkit-details-marker{display:none}
+.project-more-tools[open] summary{color:var(--text-secondary);margin-bottom:8px}
+.tree-empty{padding:10px 8px 12px;text-align:left}
+.tree-empty-title{font-size:.68rem;color:rgba(255,255,255,.7);font-weight:700;margin-bottom:4px}
+.tree-empty-desc{font-size:.58rem;color:rgba(255,255,255,.3);line-height:1.45;margin-bottom:8px}
+.tree-empty-btn{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:rgba(255,255,255,.65);border-radius:8px;padding:4px 8px;font-size:.58rem;cursor:pointer;font-family:var(--font-sans)}
+.tree-empty-btn:hover{background:rgba(255,255,255,.08);color:#fff}

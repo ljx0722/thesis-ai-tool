@@ -364,21 +364,37 @@
   function nextAction(project) {
     if (!project) {
       return {
-        title: '创建你的第一个论文项目',
-        desc: '从一句话想法开始，或上传已有 DOCX 进入打磨模式。',
+        title: '先选一条路径',
+        desc: '从想法立项，或上传已有论文开始打磨。',
         primary: { label: '从想法开始', action: 'open-idea-wizard' },
         secondary: { label: '上传论文', action: 'upload' }
       };
+    }
+    var hasPaper = !!(project.hasManuscript || (typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100));
+    var chCount = (typeof sections !== 'undefined' && sections && sections.length) ? sections.length : 0;
+    var refCount = 0;
+    if (typeof mergedRefs !== 'undefined' && mergedRefs && mergedRefs.length) refCount = mergedRefs.length;
+    else if (typeof existingRefs !== 'undefined' && existingRefs && existingRefs.length) refCount = existingRefs.length;
+    if (hasPaper && !chCount) {
+      return { title: '目录树还没识别出来', desc: '先看左侧底部目录；若为空，请重新上传论文。', primary: { label: '重新上传论文', action: 'upload' }, secondary: { label: '打开参考文献', action: 'open-stage', stageId: 'literature', moduleId: 'references' } };
+    }
+    if (hasPaper && !refCount) {
+      return { title: '去确认参考文献', desc: '正文结构已有。下一步检查文末文献是否提取成功。', primary: { label: '打开参考文献', action: 'open-stage', stageId: 'literature', moduleId: 'references' }, secondary: { label: '打开论文看板', action: 'open-stage', stageId: 'review', moduleId: 'dashboard' } };
     }
     var stage = null;
     for (var i = 0; i < STAGES.length; i++) if (STAGES[i].id === project.currentStage) stage = STAGES[i];
     if (!stage) stage = STAGES[0];
     var mod = stage.modules && stage.modules[0];
+    if (stage.id === 'writing') {
+      var outline = getOutline();
+      if (!outline) return { title: '先定大纲', desc: '分章写作前先保存大纲，后面草稿才有结构。', primary: { label: '打开大纲编辑器', action: 'open-outline' }, secondary: hasPaper ? { label: '去论文扩写', action: 'open-stage', stageId: 'writing', moduleId: 'expand' } : null };
+      return { title: '继续分章草稿', desc: '按大纲把每章骨架写出来，再扩写细化。', primary: { label: '打开分章看板', action: 'open-chapters' }, secondary: { label: '论文扩写', action: 'open-stage', stageId: 'writing', moduleId: 'expand' } };
+    }
     return {
       title: '继续「' + stage.name + '」',
-      desc: stage.desc + (mod ? ' · 推荐先做：' + moduleLabel(mod) : ''),
+      desc: stage.desc + (mod ? ' · 推荐：' + moduleLabel(mod) : ''),
       primary: { label: '进入本阶段', action: 'open-stage', stageId: stage.id, moduleId: mod },
-      secondary: project.hasManuscript ? null : { label: '上传已有草稿', action: 'upload' }
+      secondary: hasPaper ? null : { label: '上传已有草稿', action: 'upload' }
     };
   }
 
@@ -547,6 +563,30 @@
   }
 
   // ---------- UI: Project overview in workspace ----------
+
+  function renderImportChecklist(project) {
+    var hasPaper = !!(typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100);
+    if (!hasPaper && !(project && project.hasManuscript)) return '';
+    var chCount = (typeof sections !== 'undefined' && sections && sections.length) ? sections.length : 0;
+    var refCount = 0;
+    if (typeof mergedRefs !== 'undefined' && mergedRefs && mergedRefs.length) refCount = mergedRefs.length;
+    else if (typeof existingRefs !== 'undefined' && existingRefs && existingRefs.length) refCount = existingRefs.length;
+    function item(done, title, desc, btnLabel, onclick) {
+      return '<div class="checklist-item' + (done ? ' is-done' : '') + '">' +
+        '<div class="checklist-left"><span class="checklist-dot">' + (done ? '\u2713' : '\u25cb') + '</span>' +
+        '<div><b>' + title + '</b><p>' + desc + '</p></div></div>' +
+        (done ? '<span class="checklist-ok">已完成</span>' :
+          '<button class="ai-btn-clear" onclick="' + onclick + '">' + btnLabel + '</button>') +
+      '</div>';
+    }
+    return '<div class="import-checklist">' +
+      '<div class="import-checklist-head"><strong>导入后 3 步</strong><span>按顺序做，先别点一圈工具箱</span></div>' +
+      item(chCount > 0, '1. 检查目录树', chCount > 0 ? ('已识别 ' + chCount + ' 章') : '左侧底部「目录」应出现章节；没有就重新上传', '看目录树', "document.getElementById('navTree')&&document.getElementById('navTree').scrollIntoView({behavior:'smooth'})") +
+      item(refCount > 0, '2. 检查参考文献', refCount > 0 ? ('已提取 ' + refCount + ' 条') : '到参考文献面板确认是否识别到文末文献', '打开参考文献', "switchView('references')") +
+      item(false, '3. 打开论文看板', '用十维评分看整体缺口，再决定改哪一章', '打开看板', 'showDashboard()') +
+    '</div>';
+  }
+
   function renderProjectOverviewHTML(project) {
     var prog = calcProgress(project);
     var next = nextAction(project);
@@ -610,13 +650,13 @@
           '</div>' +
         '</div>' +
         renderSmartTips(project) +
-        '<div class="project-tools-row">' +
+        '<details class="project-more-tools"><summary>更多工具</summary><div class="project-tools-row">' +
           '<button class="ai-btn-clear" onclick="openOutlineEditor()">大纲</button>' +
           '<button class="ai-btn-clear" onclick="openChapterBoard()">分章草稿</button>' +
           '<button class="ai-btn-clear" onclick="openTemplateChooser()">学校模板</button>' +
           '<button class="ai-btn-clear" onclick="openProjectSettings()">设置</button>' +
           '<button class="ai-btn-clear" onclick="exportFullPaper()">导出全文</button>' +
-        '</div>' +
+        '</div></details>' +
         '<div class="project-stage-grid">' + stagesHtml + '</div>' +
       '</div>';
   }
@@ -634,7 +674,7 @@
       var badgeCls = c.status === 'ready' ? 'ok' : (c.status === 'draft' ? 'warn' : 'muted');
       return '<div class="chapter-card" onclick="openChapterEditor(\'' + c.key + '\')">' +
         '<div class="chapter-card-top"><b>' + escapeHtml(c.title) + '</b><span class="chapter-badge ' + badgeCls + '">' + badge + '</span></div>' +
-        '<div class="chapter-card-meta">' + c.words + ' 字 &middot; 引用 ' + ((c.content||'').match(/\[\d+\]/g)||[]).length + ' 处 · 引用 ' + ((c.content||'').match(/\[\d+\]/g)||[]).length + ' 处 · ' + (c.sections.length || 0) + ' 个小节</div>' +
+        '<div class="chapter-card-meta">' + c.words + ' 字 · 引用 ' + ((c.content||'').match(/\[\d+\]/g)||[]).length + ' 处 · 引用 ' + ((c.content||'').match(/\[\d+\]/g)||[]).length + ' 处 · ' + (c.sections.length || 0) + ' 个小节</div>' +
         '<div class="chapter-card-preview">' + escapeHtml((c.content || c.sections.join(' / ') || '点击开始写这一章').slice(0, 72)) + '</div>' +
       '</div>';
     }).join('');
@@ -944,7 +984,7 @@
       var bc = c.status === "ready" ? "ok" : (c.status === "draft" ? "warn" : "muted");
       return '<div class="chapter-card" onclick="openChapterEditor(\'' + c.key + '\')">' +
         '<div class="chapter-card-top"><b>' + escapeHtml(c.title) + '</b><span class="chapter-badge ' + bc + '">' + b + '</span></div>' +
-        '<div class="chapter-card-meta">' + c.words + ' 字 &middot; 引用 ' + ((c.content||'').match(/\[\d+\]/g)||[]).length + ' 处 · 引用 ' + ((c.content||'').match(/\[\d+\]/g)||[]).length + ' 处 · ' + (c.sections.length||0) + ' 小节' + (c.updatedAt ? ' · ' + formatTime(c.updatedAt) : '') + '</div>' +
+        '<div class="chapter-card-meta">' + c.words + ' 字 · 引用 ' + ((c.content||'').match(/\[\d+\]/g)||[]).length + ' 处 · 引用 ' + ((c.content||'').match(/\[\d+\]/g)||[]).length + ' 处 · ' + (c.sections.length||0) + ' 小节' + (c.updatedAt ? ' · ' + formatTime(c.updatedAt) : '') + '</div>' +
         '<div class="chapter-card-preview">' + escapeHtml((c.content||'小节：'+(c.sections.join('、')||'待补充')).slice(0,80)) + '</div>' +
         '<div class="chapter-card-actions" onclick="event.stopPropagation()"><button class="ai-btn-clear" onclick="openChapterEditor(\''+c.key+'\')">编辑</button><button class="ai-btn-clear" onclick="seedChapterFromSections(\''+c.key+'\')">小节骨架</button></div>' +
       '</div>';

@@ -181,7 +181,7 @@ function renderNavTree(tree){
   var meta=document.getElementById('navTreeMeta');
   if(!c)return;
   if(!tree||!tree.length){
-    c.innerHTML='<i style="color:rgba(255,255,255,.25);font-size:.65rem;padding:8px;display:block">未检测到章节，可在标题校准中指定</i>';
+    c.innerHTML='<div class="tree-empty"><div class="tree-empty-title">未识别到目录</div><div class="tree-empty-desc">请确认 Word 使用了标题样式，或重新上传 DOCX</div><button class="tree-empty-btn" onclick="triggerUpload()">重新上传论文</button></div>';
     if(meta){meta.style.display='none';}
     return;
   }

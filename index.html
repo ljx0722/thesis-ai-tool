@@ -125,11 +125,11 @@
   <div class="bar-right">
     <span id="statusBar" style="font-size:.62rem;color:var(--m)">等待上传...</span>
     <span id="balanceBar" style="font-size:.65rem;color:rgba(255,255,255,.4);cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.06);padding:3px 10px;border-radius:12px;margin-left:6px" onclick="showRechargeModal()" title="点击充值">✨ <strong id="balanceAmount" style="color:#fff;font-weight:700">0.0</strong> 点 <span style="font-size:.5rem;color:rgba(255,255,255,.3)">+</span></span>
-    <button onclick="window.location.href='/admin.html'" style="background:rgba(99,102,241,.15);color:#c7d2fe;border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:4px;display:none" id="adminPanelBtn" title="管理员看板">⚙️</button><button onclick="doLogout()" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:6px">登出</button>
+    <button onclick="window.location.href='/admin.html'" style="background:rgba(99,102,241,.15);color:#c7d2fe;border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:4px;display:none" id="adminPanelBtn" title="管理员看板">⚙️</button><button id="changelogLink" onclick="toggleChangelog()" style="background:transparent;color:rgba(255,255,255,.35);border:none;border-radius:12px;padding:4px 8px;cursor:pointer;font-size:.58rem;margin-left:4px" title="更新日志">日志</button><button onclick="doLogout()" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:6px">登出</button>
   </div>
 </div>
 <!-- ====== 更新日志按钮 ====== -->
-<div id="changelogBtn" onclick="toggleChangelog()" title="更新日志" style="position:fixed;top:52px;right:12px;z-index:1000;font-size:.62rem;color:#0071e3;cursor:pointer;background:rgba(0,113,227,.08);padding:3px 10px;border-radius:12px;border:1px solid rgba(0,113,227,.2);transition:all .2s;font-weight:600" onmouseenter="this.style.background='rgba(0,113,227,.15)'" onmouseleave="this.style.background='rgba(0,113,227,.08)'">📜 更新日志</div>
+<div id="changelogBtn" onclick="toggleChangelog()" title="更新日志" style="display:none;position:fixed;top:52px;right:12px;z-index:1000;font-size:.62rem;color:#0071e3;cursor:pointer;background:rgba(0,113,227,.08);padding:3px 10px;border-radius:12px;border:1px solid rgba(0,113,227,.2);transition:all .2s;font-weight:600" onmouseenter="this.style.background='rgba(0,113,227,.15)'" onmouseleave="this.style.background='rgba(0,113,227,.08)'">📜 更新日志</div>
 <div id="changelogPanel" style="display:none;position:fixed;top:88px;right:12px;width:340px;max-height:70vh;overflow-y:auto;background:#fff;border-radius:12px;padding:16px;box-shadow:0 8px 40px rgba(0,0,0,.15);z-index:1001;font-size:.68rem;line-height:1.7;color:#333;border:1px solid #e5e7eb">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-size:.8rem">📜 功能更新日志</b><span onclick="document.getElementById('changelogPanel').style.display='none'" style="cursor:pointer;font-size:.7rem;color:#999">✕</span></div>
   <div style="border-left:2px solid #0071e3;padding-left:10px">
@@ -381,23 +381,23 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
 <script defer src="mammoth.browser.min.js"></script>
 <script defer src="jszip.min.js"></script>
-<script src="app.js?v=33"></script>
-<script src="js/modules/optimization.js?v=33"></script>
-<script src="js/modules/format-check.js?v=33"></script>
-<script src="js/modules/terminology.js?v=33"></script>
-<script src="js/modules/paragraph-analysis.js?v=33"></script>
-<script src="js/modules/dashboard.js?v=33"></script>
-<script src="js/modules/thesis-review.js?v=33"></script>
-<script src="js/modules/proposal.js?v=33"></script>
-<script src="js/modules/onboarding.js?v=33"></script>
-<script src="js/modules/cat-game.js?v=33"></script>
-<script src="js/modules/topic-finder.js?v=33"></script>
-<script src="js/modules/proofread.js?v=33"></script>
-<script src="js/modules/de-duplicate.js?v=33"></script>
-<script src="js/modules/defense-ppt.js?v=33"></script>
-<script src="js/modules/en-abstract.js?v=33"></script>
-<script src="js/modules/project.js?v=33"></script>
-<script src="js/app-modules.js?v=33"></script>
+<script src="app.js?v=34"></script>
+<script src="js/modules/optimization.js?v=34"></script>
+<script src="js/modules/format-check.js?v=34"></script>
+<script src="js/modules/terminology.js?v=34"></script>
+<script src="js/modules/paragraph-analysis.js?v=34"></script>
+<script src="js/modules/dashboard.js?v=34"></script>
+<script src="js/modules/thesis-review.js?v=34"></script>
+<script src="js/modules/proposal.js?v=34"></script>
+<script src="js/modules/onboarding.js?v=34"></script>
+<script src="js/modules/cat-game.js?v=34"></script>
+<script src="js/modules/topic-finder.js?v=34"></script>
+<script src="js/modules/proofread.js?v=34"></script>
+<script src="js/modules/de-duplicate.js?v=34"></script>
+<script src="js/modules/defense-ppt.js?v=34"></script>
+<script src="js/modules/en-abstract.js?v=34"></script>
+<script src="js/modules/project.js?v=34"></script>
+<script src="js/app-modules.js?v=34"></script>
 <script>
 (function(){
   var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');
