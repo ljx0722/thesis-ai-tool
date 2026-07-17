@@ -182,7 +182,7 @@ function renderNavTree(tree){
   if(!c)return;
   if(!tree||!tree.length){
     c.innerHTML='<div class="tree-empty"><div class="tree-empty-title">未识别到目录</div><div class="tree-empty-desc">请确认 Word 使用了标题样式，或重新上传 DOCX</div><button class="tree-empty-btn" onclick="triggerUpload()">重新上传论文</button></div>';
-    if(meta){meta.style.display='none';}
+    if(meta){meta.style.display='block'; meta.textContent='论文生长过程中会逐步出现章节';}
     return;
   }
   var h='',idx=0,chN=0,secN=0,subN=0;

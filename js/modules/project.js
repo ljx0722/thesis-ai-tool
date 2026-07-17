@@ -685,7 +685,7 @@
           '<div class="project-overview-head">' +
             '<div class="project-badge">开始使用</div>' +
             '<h2>你想先做什么？</h2>' +
-            '<p>只有一条主线：立项/导入 → 大纲与分章 → 文献 → 打磨 → 评审答辩。先选入口。</p>' +
+            '<p>中间是论文全貌，左侧是目录树——内容会一点点长出来。右侧工具台可随时用（如数据分析）。</p>' +
           '</div>' +
           '<div class="home-choice-grid">' +
             '<button class="home-choice primary" onclick="openIdeaWizard()">' +
@@ -823,6 +823,7 @@
   }
 
   function renderProjectChrome() {
+    try{ if(typeof renderToolboxFavorites==='function') renderToolboxFavorites(); }catch(e){}
     var project = getCurrentProject();
     var titleEl = document.getElementById('projectTitleChip');
     var progEl = document.getElementById('projectProgressChip');

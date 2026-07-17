@@ -11,6 +11,123 @@ function isBodyChapter(s) {
 // ==================== 模块清单 ====================
 // requiresThesis: 是否需要先上传论文才能使用
 // aiDriven: 是否调用 AI 大模型（消耗点数）
+
+// ===== Tool dock (right panel home) + favorites =====
+var TOOLBOX_KEY = 'thesis_ai_toolbox_favs_v1';
+var DEFAULT_FAVS = ['data-analysis','topic-finder','proofread','defense-ppt','materials','pipeline'];
+
+function loadToolboxFavs(){
+  try{
+    var raw = localStorage.getItem(TOOLBOX_KEY);
+    if(!raw) return DEFAULT_FAVS.slice();
+    var arr = JSON.parse(raw);
+    return Array.isArray(arr) && arr.length ? arr : DEFAULT_FAVS.slice();
+  }catch(e){ return DEFAULT_FAVS.slice(); }
+}
+function saveToolboxFavs(arr){
+  try{ localStorage.setItem(TOOLBOX_KEY, JSON.stringify(arr||[])); }catch(e){}
+}
+function toolMeta(id){
+  if(id==='materials') return {id:id, name:'资料库', icon:'📁', requiresThesis:false, desc:'上传/选用 CSV 等项目文件'};
+  if(id==='pipeline') return {id:id, name:'一键流水线', icon:'⚡', requiresThesis:false, desc:'大纲+章节骨架一次生成'};
+  if(id==='defense-pack') return {id:id, name:'答辩材料包', icon:'🎤', requiresThesis:false, desc:'PPT/讲稿/问答提纲'};
+  if(id==='ref-norm') return {id:id, name:'文献规范化', icon:'📚', requiresThesis:false, desc:'GB/T 7714 风格整理'};
+  if(id==='preview') return {id:id, name:'完整预览', icon:'👁', requiresThesis:false, desc:'导出前看全文'};
+  var m = (typeof APP_MODULES!=='undefined'?APP_MODULES:[]).find(function(x){return x.id===id;});
+  return m || {id:id, name:id, icon:'•', requiresThesis:true, desc:''};
+}
+function launchTool(id){
+  if(id==='materials'){ if(typeof openMaterialsLibrary==='function') openMaterialsLibrary(); return; }
+  if(id==='pipeline'){ if(typeof runOneClickPipeline==='function') runOneClickPipeline(); return; }
+  if(id==='defense-pack'){ if(typeof openDefensePack==='function') openDefensePack(); return; }
+  if(id==='ref-norm'){ if(typeof normalizeRefsGBT7714==='function') normalizeRefsGBT7714(); return; }
+  if(id==='preview'){ if(typeof openFullPaperPreview==='function') openFullPaperPreview(); return; }
+  switchModule(id);
+}
+function renderToolboxFavorites(){
+  var host=document.getElementById('toolboxFavorites'); if(!host) return;
+  var favs=loadToolboxFavs();
+  if(!favs.length){ host.innerHTML='<div style="padding:6px 10px;color:rgba(255,255,255,.35);font-size:.62rem">还没有快捷入口</div>'; return; }
+  host.innerHTML = favs.map(function(id){
+    var m=toolMeta(id);
+    return '<button class="toolbox-fav" onclick="launchTool(\''+id+'\')">'+ (m.icon||'') + ' ' + (m.name||id) + '</button>';
+  }).join('');
+}
+function openToolboxPicker(){
+  var favs=loadToolboxFavs();
+  var all = (APP_MODULES||[]).map(function(m){return m.id;}).concat(['materials','pipeline','defense-pack','ref-norm','preview']);
+  var seen={}; all=all.filter(function(id){ if(seen[id])return false; seen[id]=1; return true; });
+  var html='<div style="display:flex;flex-direction:column;gap:6px;max-height:55vh;overflow:auto">';
+  all.forEach(function(id){
+    var m=toolMeta(id);
+    var checked = favs.indexOf(id)>=0 ? 'checked' : '';
+    html += '<label style="display:flex;gap:8px;align-items:flex-start;padding:8px;border:1px solid var(--border);border-radius:10px;cursor:pointer">'+
+      '<input type="checkbox" data-tool-id="'+id+'" '+checked+'>'+
+      '<span><b>'+ (m.icon||'') + ' ' + m.name + '</b><br><span style="font-size:.65rem;color:var(--text-muted)">'+ (m.desc|| (m.requiresThesis?'需要论文':'可随时使用')) +'</span></span></label>';
+  });
+  html+='</div>';
+  if(typeof openAccountModal==='function'){
+    openAccountModal('自定义百宝箱', html + '<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="ai-btn" onclick="saveToolboxPicker()">保存快捷入口</button></div>');
+  } else {
+    // fallback modal
+    var ov=document.createElement('div'); ov.className='project-overlay'; ov.id='toolboxPickerOv';
+    ov.innerHTML='<div class="project-modal" onclick="event.stopPropagation()"><div class="project-modal-head"><h3>自定义百宝箱</h3><button class="project-close" onclick="this.closest(\'.project-overlay\').remove()">×</button></div>'+html+'<div class="project-modal-actions"><button class="ai-btn" onclick="saveToolboxPicker()">保存</button></div></div>';
+    document.body.appendChild(ov);
+  }
+}
+function saveToolboxPicker(){
+  var boxes=document.querySelectorAll('[data-tool-id]');
+  var arr=[]; boxes.forEach(function(b){ if(b.checked) arr.push(b.getAttribute('data-tool-id')); });
+  if(!arr.length) arr=DEFAULT_FAVS.slice();
+  saveToolboxFavs(arr);
+  renderToolboxFavorites();
+  if(typeof closeAccountModal==='function') closeAccountModal();
+  var ov=document.getElementById('toolboxPickerOv'); if(ov) ov.remove();
+  if(typeof ttp==='function') ttp('百宝箱已更新');
+}
+function openFeatureCatalog(){ openToolHome(); }
+function openToolHome(){
+  var home=document.getElementById('toolHome');
+  if(home) home.style.display='';
+  // hide ref-only and module area content view conceptually by showing home on top
+  var panel=document.getElementById('refPanel');
+  if(panel){
+    panel.querySelectorAll('.ref-only').forEach(function(el){ el.style.display='none'; });
+    var ma=panel.querySelector('.module-area'); if(ma) ma.style.display='none';
+  }
+  document.querySelectorAll('.tool-tab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-tooltab')==='home'); });
+  var title=document.getElementById('toolPanelTitle'); if(title) title.textContent='工具台';
+  var sub=document.getElementById('toolPanelSub'); if(sub) sub.textContent='先选功能；论文全貌与目录始终保留在左侧';
+  renderToolHome();
+  renderToolboxFavorites();
+}
+function renderToolHome(){
+  var freeHost=document.getElementById('toolHomeGrid');
+  var thesisHost=document.getElementById('toolHomeGridThesis');
+  if(!freeHost||!thesisHost) return;
+  var free=[], need=[];
+  (APP_MODULES||[]).forEach(function(m){ (m.requiresThesis?need:free).push(m); });
+  // ensure data-analysis highlighted
+  freeHost.innerHTML = free.map(function(m){
+    return '<button class="tool-card" onclick="launchTool(\''+m.id+'\')"><b>'+m.icon+' '+m.name+'</b><span>'+(m.aiDriven?'AI 能力 · 按 token 计费':'本地/随时可用')+'</span></button>';
+  }).join('') +
+  '<button class="tool-card" onclick="launchTool(\'materials\')"><b>📁 资料库</b><span>上传 CSV 等，供分析模块复用</span></button>'+
+  '<button class="tool-card" onclick="launchTool(\'pipeline\')"><b>⚡ 一键流水线</b><span>大纲+章节骨架</span></button>'+
+  '<button class="tool-card" onclick="launchTool(\'defense-pack\')"><b>🎤 答辩材料包</b><span>讲稿/问答/PPT结构</span></button>';
+  thesisHost.innerHTML = need.map(function(m){
+    return '<button class="tool-card" onclick="launchTool(\''+m.id+'\')"><b>'+m.icon+' '+m.name+'</b><span>基于论文内容分析</span><div class="need-tag">建议先有论文/草稿</div></button>';
+  }).join('');
+}
+function toggleTocPanel(){
+  var p=document.getElementById('tocPanel'); if(!p) return;
+  p.classList.toggle('collapsed');
+}
+function setToolPanelHeader(name, sub){
+  var t=document.getElementById('toolPanelTitle'); if(t) t.textContent=name||'工具台';
+  var s=document.getElementById('toolPanelSub'); if(s) s.textContent=sub||'';
+}
+
+
 var APP_MODULES = [
   // 选题阶段 — 无需论文, AI驱动
   { id: 'topic-finder',    name: '选题推荐',   icon: '💡', requiresThesis: false, aiDriven: true },
@@ -226,6 +343,10 @@ function resetSearch() {
 function switchModule(moduleId) {
   if (typeof searchRunning !== 'undefined' && searchRunning) { ttp('检索进行中，请等待完成'); return; }
   _activeModule = moduleId;
+  var home=document.getElementById('toolHome'); if(home) home.style.display='none';
+  document.querySelectorAll('.tool-tab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-tooltab')==='refs' && moduleId==='references'); });
+  var meta = (APP_MODULES||[]).find(function(m){return m.id===moduleId;});
+  setToolPanelHeader(meta ? (meta.icon+' '+meta.name) : moduleId, meta && meta.requiresThesis ? '基于论文内容；左侧正文/目录保持可见' : '可直接使用');
 
   // Highlight nav items
   document.querySelectorAll('.nav-item').forEach(function(n) {
@@ -272,8 +393,11 @@ function switchPanel(moduleId) {
   var moduleArea = panel.querySelector('.module-area');
 
   if (moduleId === 'references') {
+    var home2=document.getElementById('toolHome'); if(home2) home2.style.display='none';
     for (var i = 0; i < refOnlyEls.length; i++) refOnlyEls[i].style.display = '';
     if (moduleArea) moduleArea.style.display = 'none';
+    setToolPanelHeader('📋 参考文献', '检索、筛选、校验与引用');
+    document.querySelectorAll('.tool-tab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-tooltab')==='refs'); });
     if (typeof mergedRefs !== 'undefined' && mergedRefs.length) renderRefs();
     else if (typeof existingRefs !== 'undefined' && existingRefs.length) renderExistingOnly();
     updateStatusBar2();
@@ -281,6 +405,7 @@ function switchPanel(moduleId) {
   }
 
   // Non-reference modules
+  var home=document.getElementById('toolHome'); if(home) home.style.display='none';
   for (var i = 0; i < refOnlyEls.length; i++) refOnlyEls[i].style.display = 'none';
   if (!moduleArea) {
     moduleArea = document.createElement('div');
@@ -529,7 +654,7 @@ function runDataAnalysis(container) {
     }
   }catch(e){}
   container.innerHTML = '<div class="module-panel">'+
-    '<h4>数据分析</h4>'+
+    '<h4>数据分析</h4>'+'<div class="materials-pick" id="daMaterialsPick">'+'<div style="font-size:.72rem;font-weight:600;margin-bottom:4px">📁 从项目资料库选择 CSV/TSV</div>'+'<div style="font-size:.62rem;color:var(--text-muted);margin-bottom:6px">不用重复上传：先在资料库上传，再这里一键分析</div>'+'<select id="daMaterialSelect"><option value="">加载资料列表…</option></select>'+'<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">'+'<button class="ai-btn" style="flex:0 0 auto;padding:8px 12px" onclick="analyzeSelectedMaterial()">用所选资料分析</button>'+'<button class="ai-btn-clear" style="padding:8px 12px" onclick="openMaterialsLibrary()">打开资料库</button>'+'</div></div>'+
     '<div class="ai-desc" style="padding:10px 14px;font-size:.72rem">参考无代码分析工具流程：导入 → 自动预处理 → 统计检验 → 可视化 → AI 论文表述。<br>'+
     '<b>本地计算：</b>变量概览 · 缺失率 · 描述统计 · Pearson相关 · t检验 · 直方图/箱线图/散点图<br>'+
     '<b>AI 辅助：</b>一键生成「结果描述 + 论文段落建议」（按实际 token 扣点）</div>'+
@@ -1194,4 +1319,42 @@ window.exportMlFeatures=function(){
   var sel={}; (d.selected_features||[]).forEach(function(f){sel[f]=1;});
   imp.forEach(function(it){ rows.push([JSON.stringify(it.feature), it.score, sel[it.feature]?1:0].join(',')); });
   downloadText('feature_scores.csv', rows.join('\n'));
+};
+
+try{ renderToolboxFavorites(); openToolHome(); }catch(e){}
+
+function loadDataAnalysisMaterials(){
+  var sel=document.getElementById('daMaterialSelect'); if(!sel) return;
+  var p = window.ThesisProject && ThesisProject.getCurrentProject && ThesisProject.getCurrentProject();
+  if(!p || !p.id){ sel.innerHTML='<option value="">请先创建/选择项目</option>'; return; }
+  var token=null; try{token=sessionStorage.getItem('thesis_ai_token');}catch(e){}
+  if(!token){ sel.innerHTML='<option value="">请先登录后使用资料库</option>'; return; }
+  fetch('/api/projects/'+encodeURIComponent(p.id)+'/materials', {headers:{'Authorization':'Bearer '+token}})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.success){ sel.innerHTML='<option value="">资料库加载失败</option>'; return; }
+      var items=(d.materials||[]).filter(function(m){
+        var n=(m.filename||'').toLowerCase();
+        return /csv|tsv|txt$/.test(n) || (m.kind||'').toLowerCase().indexOf('csv')>=0;
+      });
+      if(!items.length){ sel.innerHTML='<option value="">资料库暂无 CSV/TSV，请先上传</option>'; return; }
+      sel.innerHTML='<option value="">选择一个数据文件…</option>'+items.map(function(m){
+        return '<option value="'+m.id+'">'+m.filename+' ('+Math.round((m.size_bytes||0)/1024)+'KB)</option>';
+      }).join('');
+    }).catch(function(){ sel.innerHTML='<option value="">网络错误</option>'; });
+}
+window.analyzeSelectedMaterial=function(){
+  var sel=document.getElementById('daMaterialSelect');
+  if(!sel||!sel.value){ alert('请先选择资料库中的 CSV/TSV'); return; }
+  var token=null; try{token=sessionStorage.getItem('thesis_ai_token');}catch(e){}
+  var container=document.getElementById('dataAnalysisResult'); if(!container) return;
+  container.innerHTML='<div class="ai-loading">⏳ 正在从资料库读取并分析…</div>';
+  fetch('/api/materials/'+encodeURIComponent(sel.value), {headers:{'Authorization':'Bearer '+token}})
+    .then(function(r){ if(!r.ok) throw new Error('读取失败'); return r.blob(); })
+    .then(function(blob){
+      var name=(sel.options[sel.selectedIndex].text||'data.csv').split(' (')[0];
+      var file=new File([blob], name, {type: blob.type||'text/csv'});
+      analyzeCSV(file, container);
+    })
+    .catch(function(e){ container.innerHTML='<div class="ai-output-error">❌ '+(e.message||'分析失败')+'</div>'; });
 };

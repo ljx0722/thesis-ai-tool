@@ -119,9 +119,10 @@
     <span id="projectProgressChip" class="project-progress-chip">创建项目后显示进度</span>
   </div>
   <div class="bar-tabs" id="barTabs">
-    <button class="bar-tab active" data-view="workspace" onclick="switchView('workspace')">工作台</button>
-    <button class="bar-tab" data-view="refs" onclick="switchView('references')">参考文献</button>
-    <button class="bar-tab" data-view="dashboard" onclick="showDashboard()">论文看板</button>
+    <button class="bar-tab active" data-view="workspace" onclick="switchView('workspace')">总览</button>
+    <button class="bar-tab" data-view="refs" onclick="switchModule('references')">文献</button>
+    <button class="bar-tab" data-view="tools" onclick="openToolHome()">工具台</button>
+    <button class="bar-tab" data-view="dashboard" onclick="showDashboard()">看板</button>
   </div>
   <div class="bar-right">
     <span id="statusBar" style="font-size:.62rem;color:var(--m)">等待上传...</span>
@@ -156,8 +157,9 @@
 </div>
 <script>function toggleChangelog(){var p=document.getElementById('changelogPanel');p.style.display=p.style.display==='none'?'block':'none';}</script>
 
-<!-- ====== 三栏布局 ====== -->
-<div class="main">
+<!-- ====== 四栏工作台：导航 | 目录 | 正文 | 工具台 ====== -->
+<div class="main" id="mainLayout">
+  <!-- 1) 左侧导航轨 -->
   <div class="nav-sidebar" id="navSidebar">
     <div class="nav-brand-mini">论文工作台</div>
     <div class="nav-upload" id="navUpload">
@@ -165,71 +167,92 @@
       <button onclick="triggerUpload()" class="nav-upload-btn">📎 导入论文</button>
     </div>
 
-    <div class="nav-section-label">同一条主线（1→6）</div>
+    <div class="nav-section-label">主线进度</div>
     <div id="stageNav" class="stage-nav"></div>
 
-    <div class="nav-section-label toc-label">📑 目录树 <span id="navTreeMeta" style="display:none"></span></div>
-    <div class="nav-tree-wrap">
-      <div class="nav-tree" id="navTree" title="点击章/节/小节跳转"><div class="tree-empty"><div class="tree-empty-title">暂无目录</div><div class="tree-empty-desc">导入论文或合并草稿后显示</div></div></div>
+    <div class="nav-section-label">百宝箱
+      <button class="nav-mini-btn" onclick="openToolboxPicker()" title="自定义快捷入口">⚙</button>
     </div>
-
-    <details class="nav-tools-details">
-      <summary>全部工具（按需）</summary>
-      <div class="nav-modules" id="navModules">
-        <div class="nav-item" data-module="topic-finder" data-needs-thesis="0" onclick="switchModule('topic-finder')">💡 选题推荐</div>
-        <div class="nav-item" data-module="proposal" data-needs-thesis="0" onclick="switchModule('proposal')">📝 开题大纲</div>
-        <div class="nav-item" data-module="references" data-needs-thesis="1" onclick="switchModule('references')">📋 参考文献</div>
-        <div class="nav-item" data-module="knowledge-graph" data-needs-thesis="1" onclick="switchModule('knowledge-graph')">🕸️ 知识图谱</div>
-        <div class="nav-item" data-module="expand" data-needs-thesis="1" onclick="switchModule('expand')">✍️ 论文扩写</div>
-        <div class="nav-item" data-module="data-analysis" data-needs-thesis="0" onclick="switchModule('data-analysis')">📈 数据分析</div>
-        <div class="nav-item" data-module="proofread" data-needs-thesis="0" onclick="switchModule('proofread')">✏️ 论文查错</div>
-        <div class="nav-item" data-module="de-duplicate" data-needs-thesis="0" onclick="switchModule('de-duplicate')">📋 查重降重</div>
-        <div class="nav-item" data-module="format-check" data-needs-thesis="1" onclick="switchModule('format-check')">✅ 格式检查</div>
-        <div class="nav-item" data-module="terminology" data-needs-thesis="1" onclick="switchModule('terminology')">🔤 术语分析</div>
-        <div class="nav-item" data-module="paragraph" data-needs-thesis="1" onclick="switchModule('paragraph')">📝 段落分析</div>
-        <div class="nav-item" data-module="review" data-needs-thesis="1" onclick="switchModule('review')">🔍 论文审阅</div>
-        <div class="nav-item" data-module="optimization" data-needs-thesis="1" onclick="switchModule('optimization')">💡 优化建议</div>
-        <div class="nav-item" data-module="dashboard" data-needs-thesis="1" onclick="switchModule('dashboard')">📊 论文看板</div>
-        <div class="nav-item" data-module="defense-ppt" data-needs-thesis="0" onclick="switchModule('defense-ppt')">📊 答辩PPT</div>
-        <div class="nav-item" data-module="en-abstract" data-needs-thesis="0" onclick="switchModule('en-abstract')">🌐 英文摘要</div>
-        <div class="nav-item" onclick="runOneClickPipeline()">⚡ 一键流水线</div>
-        <div class="nav-item" onclick="openDefensePack()">🎤 答辩材料包</div>
-        <div class="nav-item" onclick="normalizeRefsGBT7714()">📚 文献规范化</div>
-        <div class="nav-item" onclick="openFullPaperPreview()">👁 完整预览</div>
-        <div class="nav-item" onclick="mergeDraftsIntoThesis()">🧩 合并到正文</div>
-      </div>
-    </details>
+    <div id="toolboxFavorites" class="toolbox-favs"></div>
+    <button class="nav-linkish" onclick="openToolboxPicker()">＋ 添加快捷功能</button>
+    <button class="nav-linkish" onclick="openMaterialsLibrary()">📁 项目资料库</button>
+    <button class="nav-linkish" onclick="openFeatureCatalog()">☰ 全部功能目录</button>
   </div>
-<div class="resizer" id="navResizer"></div>
-  <div class="thesis-panel">
+
+  <div class="resizer" id="navResizer"></div>
+
+  <!-- 2) 目录树专列（始终可见） -->
+  <div class="toc-panel" id="tocPanel">
+    <div class="toc-panel-head">
+      <div>
+        <div class="toc-panel-title">📑 目录树</div>
+        <div class="toc-panel-sub" id="navTreeMeta">论文生长过程中会逐步出现章节</div>
+      </div>
+      <button class="toc-collapse-btn" onclick="toggleTocPanel()" title="折叠/展开目录">‹</button>
+    </div>
+    <div class="nav-tree" id="navTree">
+      <div class="tree-empty">
+        <div class="tree-empty-title">目录还是空的</div>
+        <div class="tree-empty-desc">从想法创建大纲，或导入 DOCX 后，这里会显示全文结构。点击可跳转正文。</div>
+        <button class="tree-empty-btn" onclick="openIdeaWizard()">从想法开始</button>
+        <button class="tree-empty-btn" onclick="triggerUpload()">导入论文</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="resizer" id="tocResizer"></div>
+
+  <!-- 3) 正文全貌（始终可见，内容逐步生长） -->
+  <div class="thesis-panel" id="thesisPanel">
     <div class="thesis-bar">
-      <h3>📄 论文工作区 <span id="upStatus" style="font-size:.68rem;color:var(--m);font-weight:400">未导入论文</span></h3>
-      <div style="display:flex;gap:4px;align-items:center;font-size:.68rem">
-        <button onclick="triggerUpload()" style="font-size:.65rem;padding:3px 8px;border-radius:6px;border:1px solid var(--bd);cursor:pointer;background:var(--cardSolid);color:var(--t);font-weight:500">📎 换论文</button>
-        <button onclick="zoomThesis(-0.1)" style="font-size:.68rem;padding:3px 8px;border-radius:6px;border:1px solid var(--bd);cursor:pointer;background:var(--cardSolid);color:var(--t)">-</button>
+      <h3>📄 论文全貌 <span id="upStatus" style="font-size:.68rem;color:var(--m);font-weight:400">尚未生长内容</span></h3>
+      <div class="thesis-bar-actions">
+        <button class="bar-mini" onclick="triggerUpload()">导入/换论文</button>
+        <button class="bar-mini" onclick="openFullPaperPreview()">预览</button>
+        <button class="bar-mini" onclick="mergeDraftsIntoThesis()">合并草稿</button>
+        <button class="bar-mini" onclick="zoomThesis(-0.1)">-</button>
         <span id="zoomLabel">100%</span>
-        <button onclick="zoomThesis(0.1)" style="font-size:.68rem;padding:3px 8px;border-radius:6px;border:1px solid var(--bd);cursor:pointer;background:var(--cardSolid);color:var(--t)">+</button>
-        <button onclick="zoomThesis(0,1)" style="font-size:.68rem;padding:3px 8px;border-radius:6px;border:1px solid var(--bd);cursor:pointer;background:var(--cardSolid);color:var(--t)">↺</button>
-        <button class="ba-btn ba-search" disabled id="baSearch" onclick="startSearch()" style="margin-left:4px">🔍 检索</button>
+        <button class="bar-mini" onclick="zoomThesis(0.1)">+</button>
+        <button class="bar-mini" onclick="zoomThesis(0,1)">↺</button>
+        <button class="ba-btn ba-search" disabled id="baSearch" onclick="startSearch()">🔍 检索</button>
         <button class="ba-btn ba-verify" disabled id="baVerify" onclick="batchVerify()">✅ 校验</button>
       </div>
     </div>
     <div class="thesis-box" id="thesisBox">
-      <div id="workspaceContent" class="workspace-content">
-        <!-- filled by project.js -->
-      </div>
+      <div id="workspaceContent" class="workspace-content"><!-- project home / growing paper --></div>
     </div>
     <div class="skeleton-full" id="thesisSkeleton" style="display:none"><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-block"></div><div class="skeleton skeleton-line"></div></div>
   </div>
+
   <div class="resizer" id="refResizer"></div>
-  <div class="ref-panel" id="refPanel">
+
+  <!-- 4) 右侧工具台（模块/文献，不依赖是否已有论文也能打开免费工具） -->
+  <div class="ref-panel tool-panel" id="refPanel">
+    <div class="tool-panel-head">
+      <div>
+        <div class="tool-panel-title" id="toolPanelTitle">工具台</div>
+        <div class="tool-panel-sub" id="toolPanelSub">选择功能后在此操作；论文与目录始终在左侧可见</div>
+      </div>
+      <div class="tool-panel-tabs">
+        <button class="tool-tab active" data-tooltab="home" onclick="openToolHome()">功能</button>
+        <button class="tool-tab" data-tooltab="refs" onclick="switchModule('references')">文献</button>
+      </div>
+    </div>
+
+    <div id="toolHome" class="tool-home">
+      <div class="tool-home-hint">不导入论文也能先用这些：</div>
+      <div class="tool-home-grid" id="toolHomeGrid"></div>
+      <div class="tool-home-hint" style="margin-top:14px">需要论文后才能发挥的：</div>
+      <div class="tool-home-grid muted" id="toolHomeGridThesis"></div>
+    </div>
+
     <div class="kw-bar ref-only" id="kwBar" style="display:none"><h4>🔑 论文主题词</h4><div class="kw-tags" id="kwTags"></div></div>
-    <div class="dashboard ref-only" id="dashboard"><div class="dash-card"><div class="dv" id="dashTotal">0</div><div class="dl">总文献</div></div><div class="dash-card"><div class="dv" id="dashCN">0</div><div class="dl">中文</div></div><div class="dash-card"><div class="dv" id="dashEN">0</div><div class="dl">英文</div></div><div class="dash-card"><div class="dv" id="dash3Y">0</div><div class="dl">3年内</div></div><div class="dash-card"><div class="dv" id="dash5Y">0</div><div class="dl">5年内</div></div></div>
-    <div class="filters ref-only"><label title="检索文献总数（自动推荐=每千字1条）">共</label><input id="fTotal" value="0" min="5" max="200" placeholder="自动"><label title="中文文献最高占比。实际会根据英文最低占比自动调整">中≤</label><input id="fCN" value="45">%<label title="英文文献最低占比。如果中文上限太低，英文会自动补齐">英≥</label><input id="fEN" value="30">%<label title="近3年文献目标占比">3年≥</label><input id="fY3" value="50">%<label title="近5年文献目标占比">5年≥</label><input id="fY5" value="75">%<label>分布</label><select id="fDist"><option value="auto">模型自动</option><option value="uniform">按章节平均</option><option value="weighted">按内容多少</option></select></div>
-    <div class="ref-list ref-only" id="refs"><div style="text-align:center;padding:60px;color:#9ca3af;font-size:.82rem">← 请先上传论文</div></div>
+    <div class="dashboard ref-only" id="dashboard" style="display:none"><div class="dash-card"><div class="dv" id="dashTotal">0</div><div class="dl">总文献</div></div><div class="dash-card"><div class="dv" id="dashCN">0</div><div class="dl">中文</div></div><div class="dash-card"><div class="dv" id="dashEN">0</div><div class="dl">英文</div></div><div class="dash-card"><div class="dv" id="dash3Y">0</div><div class="dl">3年内</div></div><div class="dash-card"><div class="dv" id="dash5Y">0</div><div class="dl">5年内</div></div></div>
+    <div class="filters ref-only" style="display:none"><label title="检索文献总数">共</label><input id="fTotal" value="0" min="5" max="200" placeholder="自动"><label>中≤</label><input id="fCN" value="45">%<label>英≥</label><input id="fEN" value="30">%<label>3年≥</label><input id="fY3" value="50">%<label>5年≥</label><input id="fY5" value="75">%<label>分布</label><select id="fDist"><option value="auto">模型自动</option><option value="uniform">按章节平均</option><option value="weighted">按内容多少</option></select></div>
+    <div class="ref-list ref-only" id="refs" style="display:none"><div class="panel-empty">导入论文或检索后，文献会出现在这里</div></div>
   </div>
 </div>
-    <input type="file" id="fileInput" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none">
+<input type="file" id="fileInput" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none">
     <script>window._pendingFile=null;window.triggerUpload=function(){document.getElementById('fileInput').click();};</script>
 
 <!-- ====== 上传弹窗 ====== -->
@@ -367,23 +390,23 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
 <script defer src="mammoth.browser.min.js"></script>
 <script defer src="jszip.min.js"></script>
-<script src="app.js?v=44"></script>
-<script src="js/modules/optimization.js?v=44"></script>
-<script src="js/modules/format-check.js?v=44"></script>
-<script src="js/modules/terminology.js?v=44"></script>
-<script src="js/modules/paragraph-analysis.js?v=44"></script>
-<script src="js/modules/dashboard.js?v=44"></script>
-<script src="js/modules/thesis-review.js?v=44"></script>
-<script src="js/modules/proposal.js?v=44"></script>
-<script src="js/modules/onboarding.js?v=44"></script>
-<script src="js/modules/cat-game.js?v=44"></script>
-<script src="js/modules/topic-finder.js?v=44"></script>
-<script src="js/modules/proofread.js?v=44"></script>
-<script src="js/modules/de-duplicate.js?v=44"></script>
-<script src="js/modules/defense-ppt.js?v=44"></script>
-<script src="js/modules/en-abstract.js?v=44"></script>
-<script src="js/modules/project.js?v=44"></script>
-<script src="js/app-modules.js?v=44"></script>
+<script src="app.js?v=45"></script>
+<script src="js/modules/optimization.js?v=45"></script>
+<script src="js/modules/format-check.js?v=45"></script>
+<script src="js/modules/terminology.js?v=45"></script>
+<script src="js/modules/paragraph-analysis.js?v=45"></script>
+<script src="js/modules/dashboard.js?v=45"></script>
+<script src="js/modules/thesis-review.js?v=45"></script>
+<script src="js/modules/proposal.js?v=45"></script>
+<script src="js/modules/onboarding.js?v=45"></script>
+<script src="js/modules/cat-game.js?v=45"></script>
+<script src="js/modules/topic-finder.js?v=45"></script>
+<script src="js/modules/proofread.js?v=45"></script>
+<script src="js/modules/de-duplicate.js?v=45"></script>
+<script src="js/modules/defense-ppt.js?v=45"></script>
+<script src="js/modules/en-abstract.js?v=45"></script>
+<script src="js/modules/project.js?v=45"></script>
+<script src="js/app-modules.js?v=45"></script>
 <script>
 (function(){
   var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');

@@ -1560,11 +1560,9 @@ test('UI: Nav sidebar has 4 stage groups', function() {
 });
 test('UI: All 16 modules in nav sidebar', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(html.indexOf("switchModule('topic-finder')") >= 0, 'topic-finder nav missing');
-  assert(html.indexOf("switchModule('proofread')") >= 0, 'proofread nav missing');
-  assert(html.indexOf("switchModule('de-duplicate')") >= 0, 'de-duplicate nav missing');
-  assert(html.indexOf("switchModule('defense-ppt')") >= 0, 'defense-ppt nav missing');
-  assert(html.indexOf("switchModule('en-abstract')") >= 0, 'en-abstract nav missing');
+  var am = fs.readFileSync(path.join(projectRoot, 'js/app-modules.js'), 'utf8');
+  assert(html.indexOf('toolHome') >= 0 || html.indexOf('toolboxFavorites') >= 0, 'tool dock missing');
+  assert(am.indexOf('topic-finder') >= 0 && am.indexOf('data-analysis') >= 0 && am.indexOf('proofread') >= 0, 'core modules missing from registry');
 });
 test('UI: Landing highlights + invite + consumption history', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
@@ -1701,11 +1699,19 @@ test('PROJECT: pipeline/defense/refnorm exist', function() {
   assert(src.indexOf('function normalizeRefsGBT7714') >= 0, 'ref normalize missing');
   assert(src.indexOf('function submitIdeaWizard') >= 0, 'idea wizard missing');
 });
+test('UI: four-column layout + toolbox + tool home', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf('id="tocPanel"') >= 0, 'toc column missing');
+  assert(html.indexOf('id="toolHome"') >= 0, 'tool home missing');
+  assert(html.indexOf('toolboxFavorites') >= 0, 'toolbox missing');
+  var am = fs.readFileSync(path.join(projectRoot, 'js/app-modules.js'), 'utf8');
+  assert(am.indexOf('analyzeSelectedMaterial') >= 0, 'materials-to-analysis missing');
+  assert(am.indexOf('openToolHome') >= 0, 'openToolHome missing');
+});
 test('UI: simplified sidebar has TOC wrap', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(html.indexOf('nav-tree-wrap') >= 0, 'toc wrap missing');
-  assert(html.indexOf('nav-tools-details') >= 0, 'tools details missing');
-  assert(html.indexOf('同一条主线') >= 0, 'mainline label missing');
+  assert(html.indexOf('tocPanel') >= 0 || html.indexOf('nav-tree') >= 0, 'toc area missing');
+  assert(html.indexOf('toolboxFavorites') >= 0 || html.indexOf('toolHome') >= 0, 'toolbox/tool home missing');
 });
 test('PROJECT: merge/preview/cloud helpers exist', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');
