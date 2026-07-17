@@ -208,8 +208,8 @@ def init_db():
     except Exception:
         pass
     # Default pricing config (单位：厘，1点=1000厘)
-    for k,v in [('upload_price','0'),('module_price','50'),('search_price','0'),
-                ('kg_price','0'),('domain_analysis_price','0'),('data-ml_price','200'),('export-docx_price','100'),
+    for k,v in [('upload_price','0'),('module_price','50'),('search_price','20'),
+                ('kg_price','50'),('domain_analysis_price','0'),('data-ml_price','500'),('export-docx_price','200'),
                 ('format-check_price','30'),('terminology_price','30'),('paragraph_price','30'),
                 ('dashboard_price','50'),('data-analysis_price','80'),
                 ('register_bonus','3000'),('invite_bonus','1000')]:  # 注册送3.0点, 邀请送1.0点
@@ -327,6 +327,8 @@ TOKEN_YUAN_PER_10M = float(os.environ.get('TOKEN_YUAN_PER_10M', '1.0'))
 DEEPSEEK_INPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_INPUT_PRICE', str(TOKEN_YUAN_PER_10M / 10.0)))
 DEEPSEEK_OUTPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_OUTPUT_PRICE', str(TOKEN_YUAN_PER_10M / 10.0)))
 USER_MARKUP = float(os.environ.get('USER_MARKUP', '3.0'))  # 用户扣点倍率（覆盖 API + 运维），默认 ×3
+SEARCH_DAILY_FREE = int(os.environ.get('SEARCH_DAILY_FREE', '20'))
+KG_DAILY_FREE = int(os.environ.get('KG_DAILY_FREE', '5'))
 CREDIT_PER_YUAN = 1000  # 1元=1000厘=1.0显示点
 LLM_MIN_CHARGE = int(os.environ.get('LLM_MIN_CHARGE', '20'))  # LLM 最低扣 20 厘=0.02点
 DAILY_FREE_OPS = int(os.environ.get('DAILY_FREE_OPS', '5'))  # 每日免费本地模块次数
@@ -705,6 +707,56 @@ def search_baidu_xueshu(query, max_rows=80):
     return results
 
 
+
+def _consume_daily_quota(user_id, free_limit, price_key, usage_desc):
+    """日免费额度用尽后按 price_key 扣点。返回 (ok, err, meta, http_status)。"""
+    from datetime import date as _date
+    today = _date.today().isoformat()
+    prefix = usage_desc.split(':')[0]
+    used = 0
+    db = get_db()
+    try:
+        used_row = db.execute(
+            "SELECT COUNT(*) as c FROM transactions WHERE user_id=? AND type='usage' "
+            "AND description LIKE ? AND created_at LIKE ?",
+            (user_id, prefix + '%', today + '%')
+        ).fetchone()
+        used = int(used_row['c'] or 0) if used_row else 0
+        if used < int(free_limit or 0):
+            u = db.execute('SELECT credits FROM users WHERE id=?', (user_id,)).fetchone()
+            after = u['credits'] if u else 0
+            db.execute(
+                "INSERT INTO transactions (user_id, type, amount_credits, credits_after, description, created_at) "
+                "VALUES (?,?,?,?,?,datetime('now','localtime'))",
+                (user_id, 'usage', 0, after, f'{usage_desc}:free({used+1}/{free_limit})')
+            )
+            db.commit()
+            return True, None, {
+                'free': True, 'cost': 0, 'cost_points': 0,
+                'free_used': used + 1, 'free_limit': free_limit,
+                'free_remaining': max(0, free_limit - used - 1),
+                'credits_after': after, 'points_after': round((after or 0) / 1000, 3)
+            }, None
+    finally:
+        db.close()
+    price = int(get_price(price_key) or 0)
+    if price <= 0:
+        return True, None, {
+            'free': False, 'cost': 0, 'cost_points': 0,
+            'free_used': used, 'free_limit': free_limit, 'free_remaining': 0
+        }, None
+    ok, err, after = deduct_credits(user_id, price, f'{usage_desc}:paid')
+    if not ok:
+        return False, err, {
+            'needed_points': price / 1000, 'free_used': used,
+            'free_limit': free_limit, 'free_remaining': 0
+        }, 402
+    return True, None, {
+        'free': False, 'cost': price, 'cost_points': round(price / 1000, 3),
+        'free_used': used, 'free_limit': free_limit, 'free_remaining': 0,
+        'credits_after': after, 'points_after': round((after or 0) / 1000, 3)
+    }, None
+
 # ========== 统一检索 API ==========
 @app.route('/ping', methods=['GET'])
 def ping():
@@ -718,19 +770,23 @@ def _run_source(fn, *args):
 @app.route('/search_api', methods=['POST'])
 @require_auth
 def search_api():
-    """单词搜索：每次只查1个词、多源聚合。需登录；每用户限流。"""
+    """单词搜索：每次只查1个词、多源聚合。需登录；限流 + 日免费后扣点。"""
     uid = getattr(request, 'user_id', None) or request.remote_addr or 'unknown'
     if not _check_rate('search:'+str(uid), max_calls=30, window_sec=60):
         return jsonify({'success': False, 'error': '检索过于频繁，请稍后再试'}), 429
     if not _check_rate('search_ip:'+str(request.remote_addr or 'unknown'), max_calls=60, window_sec=60):
         return jsonify({'success': False, 'error': '检索过于频繁，请稍后再试'}), 429
+    free_limit = SEARCH_DAILY_FREE if 'SEARCH_DAILY_FREE' in globals() else 20
+    ok_c, err_c, meta_c, st_c = _consume_daily_quota(request.user_id, free_limit, 'search', '文献检索')
+    if not ok_c:
+        return jsonify({'success': False, 'error': err_c or '点数不足', 'needed_points': (meta_c or {}).get('needed_points')}), (st_c or 402)
     try:
         data = request.get_json() or {}
         queries = data.get('queries', [])
-        max_per = data.get('max_per_query', 400)
+        max_per = min(int(data.get('max_per_query', 100) or 100), 100)
         all_results = []
 
-        for q in queries[:30]:
+        for q in queries[:8]:
             if not q.strip(): continue
             is_cn = bool(re.search(r'[一-鿿]', q))
 
@@ -763,7 +819,7 @@ def search_api():
         all_results = dedup_results(all_results)
         all_results.sort(key=lambda r: r.get('year') or 0, reverse=True)
         cn = sum(1 for r in all_results if r.get('isCN'))
-        return jsonify({'success': True, 'count': len(all_results), 'cn': cn, 'en': len(all_results) - cn, 'results': all_results})
+        return jsonify({'success': True, 'count': len(all_results), 'cn': cn, 'en': len(all_results) - cn, 'results': all_results, 'usage': meta_c})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -984,16 +1040,15 @@ def compute_force_layout(entities, links, width=1400, height=800, iterations=80)
 @app.route('/kg_api/generate', methods=['POST'])
 @require_auth
 def kg_api():
-    """知识图谱生成。需登录；限流。可选固定价扣点（kg 默认 0）。"""
+    """知识图谱生成。需登录；限流 + 日免费后扣点。"""
     uid = getattr(request, 'user_id', None) or request.remote_addr or 'unknown'
     if not _check_rate('kg:'+str(uid), max_calls=10, window_sec=60):
         return jsonify({'success': False, 'error': '图谱生成过于频繁，请稍后再试'}), 429
+    free_limit = KG_DAILY_FREE if 'KG_DAILY_FREE' in globals() else 5
+    ok_c, err_c, meta_c, st_c = _consume_daily_quota(request.user_id, free_limit, 'kg', '知识图谱生成')
+    if not ok_c:
+        return jsonify({'success': False, 'error': err_c or '点数不足', 'needed_points': (meta_c or {}).get('needed_points')}), (st_c or 402)
     try:
-        price = get_price('kg')
-        if price > 0:
-            ok, err, after = deduct_credits(request.user_id, price, '知识图谱生成')
-            if not ok:
-                return jsonify({'success': False, 'error': err, 'needed_points': price/1000}), 402
         data = request.get_json() or {}
         # 节点/章节规模保护
         secs = data.get('sections') or []
@@ -1003,7 +1058,7 @@ def kg_api():
         if len(refs) > 500:
             refs = refs[:500]
         result = build_knowledge_graph(data.get('paper_topics', []), secs, refs, data.get('manuscript_text', ''))
-        return jsonify({'success': True, 'data': result})
+        return jsonify({'success': True, 'data': result, 'usage': meta_c})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -1549,9 +1604,9 @@ PRICING_DEFAULTS = {
     # 本地/轻计算（固定价）
     'module': 100,            # 通用本地模块兜底 0.05点
     'upload': 0,             # 上传解析免费（本地）
-    'search': 0,             # 文献检索免费（外部公开源）
-    'kg': 0,                 # 知识图谱免费（本地）
-    'domain_analysis': 0,    # 领域分析免费引流
+    'search': 20,            # 文献检索：0.02点/次（超日免费后）
+    'kg': 50,                # 知识图谱：0.05点/次
+    'domain_analysis': 0,    # 兼容键；domain_analyze 按 token 扣
     'format-check': 50,
     'terminology': 50,
     'paragraph': 50,
@@ -2955,6 +3010,18 @@ def analyze_ml():
         y_raw.append(yv)
     if len(X_list) < 20:
         return jsonify({'success': False, 'error': '有效样本不足（建议 >=20 行完整数值样本）'}), 400
+    if len(rows) > 50000:
+        return jsonify({'success': False, 'error': '数据行数过多（上限 50000）'}), 400
+
+    # 先扣后算：余额不足直接 402，避免白嫖 CPU
+    price = get_price('data-ml')
+    charged = 0
+    after = None
+    if price > 0:
+        ok, err, after = deduct_credits(request.user_id, price, '数据分析-特征/模型训练')
+        if not ok:
+            return jsonify({'success': False, 'error': err, 'needed': price, 'needed_points': price/1000}), 402
+        charged = price
 
     X = np.asarray(X_list, dtype=float)
     # impute nan just in case
@@ -3190,24 +3257,12 @@ def analyze_ml():
         result['model_compare'] = models
         result['best_model'] = max(models, key=lambda d: d.get('r2') or -1e9)['model']
 
-    # 固定价扣点（本地/服务器计算，非 LLM token）— 先扣后算失败则退
-    price = get_price('data-ml')
-    charged = 0
-    after = None
-    if price > 0:
-        ok, err, after = deduct_credits(request.user_id, price, '数据分析-特征/模型训练')
-        if not ok:
-            return jsonify({'success': False, 'error': err, 'needed': price, 'needed_points': price/1000}), 402
-        charged = price
-        result['usage'] = {'cost_credits': price, 'cost_points': round(price/1000,3), 'credits_after': after, 'points_after': round((after or 0)/1000,3)}
+    # 扣点已在计算前完成；此处仅挂 usage
+    if charged > 0:
+        result['usage'] = {'cost_credits': charged, 'cost_points': round(charged/1000,3), 'credits_after': after, 'points_after': round((after or 0)/1000,3)}
     else:
         result['usage'] = {'cost_credits': 0, 'cost_points': 0}
-    try:
-        return jsonify(result)
-    except Exception as e:
-        if charged > 0:
-            refund_credits(request.user_id, charged, '数据分析失败退款')
-        return jsonify({'success': False, 'error': str(e)}), 500
+    return jsonify(result)
 
 
 
@@ -3219,9 +3274,9 @@ def pricing_info():
     for k, v in PRICING_DEFAULTS.items():
         items.append({
             'key': k,
-            'milli_credits': get_price(k) if k not in ('topic-finder','proposal','review','optimization','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis') else 0,
-            'points': round((get_price(k) if k not in ('topic-finder','proposal','review','optimization','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis') else 0)/1000, 3),
-            'billing': 'llm-token' if k in ('topic-finder','proposal','review','optimization','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis') else 'fixed'
+            'milli_credits': get_price(k) if k not in ('topic-finder','proposal','review','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis','domain_analysis') else 0,
+            'points': round((get_price(k) if k not in ('topic-finder','proposal','review','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis','domain_analysis') else 0)/1000, 3),
+            'billing': 'llm-token' if k in ('topic-finder','proposal','review','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis','domain_analysis') else 'fixed'
         })
     return jsonify({
         'success': True,
@@ -3240,7 +3295,7 @@ def pricing_info():
         'items': items,
         'notes': [
             'AI 写作类功能按实际 token 消耗计费，前端不展示固定点数。',
-            '本地统计/检索/图谱默认低价或免费，仅覆盖服务器成本。',
+            '检索每日免费 SEARCH_DAILY_FREE 次后按 search 价扣点；图谱每日免费 KG_DAILY_FREE 次后按 kg 价扣点。',
             '多模型训练等服务器计算按固定小额点数计费。'
         ]
     })
@@ -3295,7 +3350,7 @@ def admin_pricing():
                     'config_key': key,
                     'milli_credits': val,
                     'points': round(val/1000, 3),
-                    'billing': 'llm-token' if k in ('topic-finder','proposal','review','optimization','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis') else 'fixed'
+                    'billing': 'llm-token' if k in ('topic-finder','proposal','review','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis','domain_analysis') else 'fixed'
                 })
             # also expose bonus keys
             bonuses = {
@@ -3766,15 +3821,24 @@ def payment_webhook():
         pass
     if not enable:
         return jsonify({'success': False, 'error': 'webhook disabled; use admin manual confirm', 'received': True}), 200
-    # Minimal auto-confirm contract:
-    # { order_id, trade_status=SUCCESS, amount_yuan, sign }
+    # Contract: order_id|out_trade_no, trade_status, amount_yuan, ts, sign
+    # sign = hmac_sha256_hex(secret, f"{order_id}|{status}|{amount_yuan}|{ts}")
     order_id = data.get('order_id') or data.get('out_trade_no')
     status = str(data.get('trade_status') or data.get('status') or '').upper()
     if not order_id or status not in ('SUCCESS', 'TRADE_SUCCESS', 'PAID', 'CONFIRMED'):
         return jsonify({'success': False, 'error': 'invalid payload'}), 400
-    # TODO: verify signature with PAYMENT_WEBHOOK_SECRET
     secret = os.environ.get('PAYMENT_WEBHOOK_SECRET', '')
-    if secret and data.get('sign') != secret:
+    if not secret:
+        return jsonify({'success': False, 'error': 'PAYMENT_WEBHOOK_SECRET not configured'}), 503
+    ts = str(data.get('ts') or data.get('timestamp') or '')
+    amount_yuan_cb = data.get('amount_yuan')
+    sign = str(data.get('sign') or data.get('signature') or '')
+    import hmac as _hmac
+    import hashlib as _hashlib
+    base = f"{order_id}|{status}|{amount_yuan_cb}|{ts}"
+    expect = _hmac.new(secret.encode('utf-8'), base.encode('utf-8'), _hashlib.sha256).hexdigest()
+    legacy_ok = (os.environ.get('PAYMENT_WEBHOOK_ALLOW_LEGACY', '0') == '1' and sign == secret)
+    if not sign or (not _hmac.compare_digest(sign, expect) and not legacy_ok):
         return jsonify({'success': False, 'error': 'bad sign'}), 403
     db = get_db()
     try:
@@ -3783,7 +3847,15 @@ def payment_webhook():
             return jsonify({'success': False, 'error': 'order not found'}), 404
         if order['status'] == 'confirmed':
             return jsonify({'success': True, 'message': 'already confirmed'})
-        pts = int(order['amount_yuan'] * 1000)
+        if order['status'] not in ('pending', 'submitted'):
+            return jsonify({'success': False, 'error': f"order status not confirmable: {order['status']}"}), 400
+        if amount_yuan_cb is not None:
+            try:
+                if abs(float(amount_yuan_cb) - float(order['amount_yuan'])) > 0.009:
+                    return jsonify({'success': False, 'error': 'amount mismatch'}), 400
+            except Exception:
+                return jsonify({'success': False, 'error': 'invalid amount'}), 400
+        pts = int(round(float(order['amount_yuan']) * 1000))
         db.execute("UPDATE recharge_orders SET status='confirmed', confirmed_at=datetime('now','localtime') WHERE id=?", (order_id,))
         db.execute('UPDATE users SET credits = credits + ? WHERE id=?', (pts, order['user_id']))
         after = db.execute('SELECT credits FROM users WHERE id=?', (order['user_id'],)).fetchone()['credits']

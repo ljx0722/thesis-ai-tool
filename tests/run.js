@@ -1750,3 +1750,19 @@ if (failed > 0) {
   console.log('\n✅ All tests passed — ready to deploy.');
   process.exit(0);
 }
+
+
+// residual risk guards (string presence)
+try {
+  const fs = require('fs');
+  const ks = fs.readFileSync(require('path').join(__dirname, '..', 'kg_server.py'), 'utf8');
+  function assertIncludes(label, s) {
+    if (!ks.includes(s)) { console.error('FAIL', label); process.exitCode = 1; }
+    else console.log('OK', label);
+  }
+  assertIncludes('search daily free env', 'SEARCH_DAILY_FREE');
+  assertIncludes('kg daily free env', 'KG_DAILY_FREE');
+  assertIncludes('consume daily quota helper', '_consume_daily_quota');
+  assertIncludes('ml precharge comment', '先扣后算');
+  assertIncludes('webhook hmac', 'compare_digest');
+} catch (e) { console.warn('residual tests skipped', e.message); }

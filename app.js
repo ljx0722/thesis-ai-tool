@@ -1651,7 +1651,7 @@ function cwGetUnassigned(){return[];}
 async function startSearch(){
   if(!manuscriptText){alert('请先上传论文文件');return}
   if(searchRunning)return;searchRunning=true;
-  showLoad('诊断API连接...',0);if(typeof startCatGame==='function')setTimeout(function(){startCatGame();},500);
+  showLoad('诊断API连接...',0);/* cat-game disabled for release */
   try{
   // STEP 0: 检测Flask服务连通性（用轻量ping接口）
   var connected=false;
@@ -2169,7 +2169,7 @@ function copyOne(idx){var r=mergedRefs[idx];if(!r)return;var gb=formatGB7714(r);
 function copyBib(){navigator.clipboard.writeText(mergedRefs.map(function(r,i){return'['+(r.displayNum||(i+1))+'] '+formatGB7714(r).replace(/<[^>]+>/g,'')}).join('\n\n'));ttp('已复制')}
 async function reverify(idx){var r=mergedRefs[idx];if(!r)return;showLoad('校验中...',0);var title=r.title||'',jr=r.journal||'',yr=r.year||'';if(!title&&r.ci){var m=parseRefMeta(r.ci);title=m.title;jr=m.journal;yr=m.yr}if(!title&&r.ci){title=r.ci.replace(/\s+/g,' ').substring(0,100).replace(/^\[\d+\]\s*/,'').trim()}var v=await verifyRef(title,jr,yr,r.doi||'');r.conf=v.score||Math.min(35,r.conf||0);if(v.doi&&!r.doi)r.doi=v.doi;r._citations=v.citations||0;r._retracted=v.retracted;r._verified=v.verified;r._pubType=v.pub_type;r._verifySource=v.source;hideLoad();renderRefs();ttp(v.verified?'✅ DOI验证通过 ('+v.score+'%)':(v.score>=50?'⚠ 部分匹配 ('+v.score+'%)':'❓ 未验证'))}
 async function reverifyExisting(idx){var r=existingRefs[idx];if(!r)return;showLoad('校验中...',0);var title=r.title||'',jr=r.journal||'',yr=r.year||'';if(!title&&r.ci){var m=parseRefMeta(r.ci);title=m.title;jr=m.journal;yr=m.yr}if(!title&&r.ci){title=r.ci.replace(/\s+/g,' ').substring(0,100).replace(/^\[\d+\]\s*/,'').trim()}var v=await verifyRef(title,jr,yr,r.doi||'');r.conf=v.score||Math.min(35,r.conf||0);if(v.doi&&!r.doi)r.doi=v.doi;r._citations=v.citations||0;r._retracted=v.retracted;r._verified=v.verified;r._pubType=v.pub_type;r._verifySource=v.source;hideLoad();renderExistingOnly();ttp(v.verified?'✅ DOI验证通过 ('+v.score+'%)':(v.score>=50?'⚠ 部分匹配 ('+v.score+'%)':'❓ 未验证'))}
-async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;if(!list.length)return ttp('请先检索');showLoad('批量校验中...',0);if(typeof startCatGame==='function')setTimeout(function(){startCatGame();},500);var done=0,total=list.length;
+async function batchVerify(){var list=mergedRefs.length?mergedRefs:existingRefs;if(!list.length)return ttp('请先检索');showLoad('批量校验中...',0);/* cat-game disabled for release */var done=0,total=list.length;
   // 并发校验（每批4个）
   for(var bi=0;bi<total;bi+=4){
     var batch=list.slice(bi,Math.min(bi+4,total));
@@ -4001,3 +4001,5 @@ function showOptimizeSentence(refIdx){
   document.body.appendChild(modal);
   modal.addEventListener('click',function(e){if(e.target===modal)modal.remove()});
 }
+// release: disable cat mini-game autostart/entry
+window.startCatGame=function(){/* disabled */};

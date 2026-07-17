@@ -90,7 +90,7 @@
     <input id="secretInput" class="admin-input" type="password" placeholder="管理密钥（免密码）" style="width:100%;margin-bottom:10px"><br>
     <button class="admin-btn admin-btn-primary" onclick="login()" style="width:100%;margin-bottom:6px">账号登录</button>
     <button class="admin-btn admin-btn-ghost" onclick="loginWithSecret()" style="width:100%;font-size:0.7rem">使用密钥登录</button>
-    <p class="hint">默认账号: admin / admin123（若改过密码或线上设置了 ADMIN_PASSWORD，请用新密码）<br>或使用管理密钥 ADMIN_SECRET 登录（在 Sealos 环境变量/部署配置中查看）</p>
+    <p class="hint">请使用服务器配置的管理员账号密码登录；或使用环境变量 ADMIN_SECRET 作为管理密钥。生产环境请务必修改默认口令。</p>
   </div>
 
   <div id="dashboard" style="display:none">
