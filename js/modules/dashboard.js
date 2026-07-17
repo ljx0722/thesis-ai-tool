@@ -11,6 +11,11 @@ function showDashboard() {
   if (!overlay) return;
   overlay.style.display = 'flex';
   buildDashboard();
+  try {
+    if (window.ThesisProject && ThesisProject.logSkillRun) {
+      ThesisProject.logSkillRun({ moduleId: 'dashboard', title: '论文看板', summary: '打开综合评估' });
+    }
+  } catch (e) {}
 }
 function closeDashboard() {
   var overlay = document.getElementById('dbOverlay');

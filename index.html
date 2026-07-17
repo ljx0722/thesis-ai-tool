@@ -126,8 +126,20 @@
   </div>
   <div class="bar-right">
     <span id="statusBar" style="font-size:.62rem;color:var(--m)">等待上传...</span>
-    <span id="balanceBar" style="font-size:.65rem;color:rgba(255,255,255,.4);cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.06);padding:3px 10px;border-radius:12px;margin-left:6px" onclick="showRechargeModal()" title="点击充值">✨ <strong id="balanceAmount" style="color:#fff;font-weight:700">0.000000</strong> 点 <span style="font-size:.5rem;color:rgba(255,255,255,.3)">+</span></span>
+    <span id="balanceBar" style="font-size:.65rem;color:rgba(255,255,255,.4);cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.06);padding:3px 10px;border-radius:12px;margin-left:6px" onclick="showRechargeModal()" title="点击充值">✨ <strong id="balanceAmount" style="color:#fff;font-weight:700">0.000000</strong> 点 <span id="freeQuotaChip" style="font-size:.5rem;color:rgba(255,255,255,.35);margin-left:2px"></span> <span style="font-size:.5rem;color:rgba(255,255,255,.3)">+</span></span>
+    <button id="notifyBellBtn" onclick="toggleNotifyPanel()" style="position:relative;background:rgba(255,255,255,.06);color:rgba(255,255,255,.55);border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.62rem;margin-left:4px" title="消息中心">🔔<span id="notifyBadge" style="display:none;position:absolute;top:-3px;right:-2px;min-width:14px;height:14px;padding:0 3px;border-radius:8px;background:#ef4444;color:#fff;font-size:.5rem;line-height:14px;font-weight:700">0</span></button>
+    <button onclick="openAccountCenter()" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.55);border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:4px" title="账户中心">账户</button>
     <button onclick="window.location.href='/admin.html'" style="background:rgba(99,102,241,.15);color:#c7d2fe;border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:4px;display:none" id="adminPanelBtn" title="管理员看板">⚙️</button><button onclick="showConsumptionHistory()" style="background:transparent;color:rgba(255,255,255,.35);border:none;border-radius:12px;padding:4px 8px;cursor:pointer;font-size:.58rem;margin-left:2px" title="消费明细">明细</button><button onclick="showPricingInfo()" style="background:transparent;color:rgba(255,255,255,.35);border:none;border-radius:12px;padding:4px 8px;cursor:pointer;font-size:.58rem;margin-left:2px" title="计费说明">计费</button><button id="changelogLink" onclick="toggleChangelog()" style="background:transparent;color:rgba(255,255,255,.35);border:none;border-radius:12px;padding:4px 8px;cursor:pointer;font-size:.58rem;margin-left:4px" title="更新日志">日志</button><button onclick="doLogout()" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:6px">登出</button>
+    <div id="notifyPanel" style="display:none;position:absolute;top:44px;right:12px;width:360px;max-width:92vw;max-height:70vh;overflow:hidden;background:var(--bg-card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.18);z-index:100010">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border,#e5e7eb)">
+        <b style="font-size:.85rem;color:var(--text-primary,#111)">消息中心</b>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button onclick="markAllNotificationsRead()" style="background:none;border:none;color:var(--accent,#0071e3);font-size:.68rem;cursor:pointer;font-weight:600">全部已读</button>
+          <button onclick="toggleNotifyPanel(false)" style="background:none;border:none;color:var(--text-muted,#999);cursor:pointer;font-size:.9rem">✕</button>
+        </div>
+      </div>
+      <div id="notifyList" style="max-height:56vh;overflow-y:auto;padding:6px 0"></div>
+    </div>
   </div>
 </div>
 <!-- ====== 更新日志按钮 ====== -->
@@ -390,23 +402,23 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
 <script defer src="mammoth.browser.min.js"></script>
 <script defer src="jszip.min.js"></script>
-<script src="app.js?v=45"></script>
-<script src="js/modules/optimization.js?v=45"></script>
-<script src="js/modules/format-check.js?v=45"></script>
-<script src="js/modules/terminology.js?v=45"></script>
-<script src="js/modules/paragraph-analysis.js?v=45"></script>
-<script src="js/modules/dashboard.js?v=45"></script>
-<script src="js/modules/thesis-review.js?v=45"></script>
-<script src="js/modules/proposal.js?v=45"></script>
-<script src="js/modules/onboarding.js?v=45"></script>
-<script src="js/modules/cat-game.js?v=45"></script>
-<script src="js/modules/topic-finder.js?v=45"></script>
-<script src="js/modules/proofread.js?v=45"></script>
-<script src="js/modules/de-duplicate.js?v=45"></script>
-<script src="js/modules/defense-ppt.js?v=45"></script>
-<script src="js/modules/en-abstract.js?v=45"></script>
-<script src="js/modules/project.js?v=45"></script>
-<script src="js/app-modules.js?v=45"></script>
+<script src="app.js?v=47"></script>
+<script src="js/modules/optimization.js?v=47"></script>
+<script src="js/modules/format-check.js?v=47"></script>
+<script src="js/modules/terminology.js?v=47"></script>
+<script src="js/modules/paragraph-analysis.js?v=47"></script>
+<script src="js/modules/dashboard.js?v=47"></script>
+<script src="js/modules/thesis-review.js?v=47"></script>
+<script src="js/modules/proposal.js?v=47"></script>
+<script src="js/modules/onboarding.js?v=47"></script>
+<script src="js/modules/cat-game.js?v=47"></script>
+<script src="js/modules/topic-finder.js?v=47"></script>
+<script src="js/modules/proofread.js?v=47"></script>
+<script src="js/modules/de-duplicate.js?v=47"></script>
+<script src="js/modules/defense-ppt.js?v=47"></script>
+<script src="js/modules/en-abstract.js?v=47"></script>
+<script src="js/modules/project.js?v=47"></script>
+<script src="js/app-modules.js?v=47"></script>
 <script>
 (function(){
   var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');
@@ -517,6 +529,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
           }
           hideLogin();
           updateBalanceDisplay();
+          if (window.pollNotifications) window.pollNotifications();
         } else { err.textContent = d.error; }
       }).catch(function() { err.textContent = '网络错误'; });
   };
@@ -578,6 +591,16 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
         if (d.success && balEl) {
           balEl.textContent = formatPoints(d.points != null ? d.points : (d.credits / 1000));
           var pts = (d.points != null ? d.points : (d.credits / 1000)); balEl.style.color = pts >= 1 ? '#10b981' : (pts > 0 ? '#f59e0b' : '#f87171');
+          var fq = document.getElementById('freeQuotaChip');
+          if (fq) {
+            if (d.free_remaining_today != null && d.free_limit_today != null) {
+              fq.textContent = '免费' + d.free_remaining_today + '/' + d.free_limit_today;
+              fq.title = '今日本地模块免费剩余 ' + d.free_remaining_today + ' / ' + d.free_limit_today;
+              fq.style.color = d.free_remaining_today > 0 ? 'rgba(52,211,153,.85)' : 'rgba(255,255,255,.3)';
+            } else {
+              fq.textContent = '';
+            }
+          }
         }
       }).catch(function() {});
   };
@@ -585,23 +608,31 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
   // 充值弹窗
   window._selectedAmount = 0;
   window._selectedPayment = 'alipay';
+  window._pendingOrderId = null;
   window.showRechargeModal = function() {
     var el = document.getElementById('rechargeModal');
     if (el) el.style.display = 'flex';
+    window._pendingOrderId = null;
     updateRechargeBalance();
     loadRechargeHistory();
+    var btn = document.querySelector('#rechargePayment button');
+    if (btn) { btn.textContent = '我已支付，提交申请'; btn.disabled = false; btn.onclick = submitRecharge; }
   };
   window.hideRechargeModal = function() {
     var el = document.getElementById('rechargeModal');
     if (el) { el.style.display = 'none'; }
     window._selectedAmount = 0;
+    window._pendingOrderId = null;
     document.getElementById('rechargePayment').style.display = 'none';
   };
   window.selectRechargeAmount = function(amount) {
     window._selectedAmount = amount;
+    window._pendingOrderId = null;
     document.getElementById('rechargePayment').style.display = '';
     var btns = document.querySelectorAll('.recharge-amt-btn');
     for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('active', parseInt(btns[i].getAttribute('data-amt')) === amount);
+    var btn = document.querySelector('#rechargePayment button');
+    if (btn) { btn.textContent = '我已支付，提交申请'; btn.disabled = false; btn.onclick = submitRecharge; }
   };
   window.switchQR = function(method) {
     window._selectedPayment = method;
@@ -613,7 +644,6 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
   window.submitRecharge = function() {
     if (!window._selectedAmount) { alert('请选择充值金额'); return; }
     var token = sessionStorage.getItem(TOKEN_KEY);
-    // Step 1: Create order + show QR
     fetch('/api/payment/recharge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
@@ -621,32 +651,45 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
     }).then(function(r) { return r.json(); })
       .then(function(d) {
         if (d.success) {
-          alert('请扫码支付 ¥'+window._selectedAmount+'，支付完成后回来点击"确认已支付"');
-          // Change button to "确认已支付" mode
+          window._pendingOrderId = d.order_id || null;
+          alert('请扫码支付 ¥'+window._selectedAmount+(d.order_id?'（订单#'+d.order_id+'，转账备注请填订单号）':'')+'，支付完成后回来点击"确认已支付"');
           var btn = document.querySelector('#rechargePayment button');
-          if (btn) { btn.textContent = '✅ 确认已支付，提交审核'; btn.onclick = confirmPaid; }
+          if (btn) { btn.textContent = '✅ 确认已支付，提交审核'; btn.onclick = confirmPaid; btn.disabled = false; }
+          loadRechargeHistory();
         } else { alert(d.error); }
       }).catch(function() { alert('网络错误'); });
   };
   window.confirmPaid = function() {
-    // Re-submit recharge to get latest pending order ID, then mark submitted
     var token = sessionStorage.getItem(TOKEN_KEY);
+    function doSubmit(orderId) {
+      fetch('/api/payment/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ order_id: orderId })
+      }).then(function(r2) { return r2.json(); })
+        .then(function(d2) {
+          if (d2.success) {
+            alert(d2.message || '已提交审核，请等待管理员确认到账');
+            loadRechargeHistory();
+            if (window.pollNotifications) window.pollNotifications();
+            var btn = document.querySelector('#rechargePayment button');
+            if (btn) { btn.textContent = '已提交，等待确认'; btn.disabled = true; }
+            window._pendingOrderId = null;
+          } else { alert(d2.error); }
+        });
+    }
+    if (window._pendingOrderId) {
+      doSubmit(window._pendingOrderId);
+      return;
+    }
     fetch('/api/payment/orders', { headers: { 'Authorization': 'Bearer ' + token } })
       .then(function(r) { return r.json(); })
       .then(function(d) {
         if (d.success && d.orders && d.orders.length) {
-          var last = d.orders[0];
-          if (last.status === 'pending') {
-            fetch('/api/payment/submit', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-              body: JSON.stringify({ order_id: last.id })
-            }).then(function(r2) { return r2.json(); })
-              .then(function(d2) {
-                if (d2.success) { alert(d2.message); window.hideRechargeModal(); updateBalanceDisplay(); }
-                else { alert(d2.error); }
-              });
-          }
+          var last = d.orders.find(function(o){ return o.status === 'pending'; }) || d.orders[0];
+          if (last && last.status === 'pending') doSubmit(last.id);
+          else if (last && last.status === 'submitted') alert('该订单已提交，请等待管理员确认到账');
+          else alert('未找到待支付订单，请重新选择金额发起充值');
         }
       });
   };
@@ -666,7 +709,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
         var el = document.getElementById('rechargeHistory');
         if (!d.success || !d.orders) return;
         var h = '<table style="width:100%;font-size:.72rem"><tr style="color:rgba(255,255,255,.4)"><th>金额</th><th>状态</th><th>时间</th></tr>';
-        var sm = { pending: '待确认', confirmed: '已到账', rejected: '已拒绝' };
+        var sm = { pending: '待支付', submitted: '待确认', confirmed: '已到账', rejected: '已拒绝' };
         d.orders.forEach(function(o) {
           h += '<tr style="color:rgba(255,255,255,.7)"><td>' + o.amount_yuan + '元</td><td>' + (sm[o.status] || o.status) + '</td><td>' + (o.created_at || '').substring(0,16) + '</td></tr>';
         });
@@ -726,6 +769,93 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
       });
   },1000);
   setInterval(updateBalanceDisplay, 15000);
+
+  // ====== 站内消息（管理员赠送/充值到账等） ======
+  var _notifyOpen = false;
+  var _lastUnread = 0;
+  window.toggleNotifyPanel = function(force) {
+    var p = document.getElementById('notifyPanel');
+    if (!p) return;
+    if (typeof force === 'boolean') _notifyOpen = force;
+    else _notifyOpen = !_notifyOpen;
+    p.style.display = _notifyOpen ? 'block' : 'none';
+    if (_notifyOpen) {
+      window.pollNotifications(true);
+      // 打开时自动标已读可选手动；这里先刷新列表
+    }
+  };
+  window.pollNotifications = function(render) {
+    var token = sessionStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    fetch('/api/notifications?limit=40', { headers: { 'Authorization': 'Bearer ' + token } })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d.success) return;
+        var unread = d.unread || 0;
+        var badge = document.getElementById('notifyBadge');
+        if (badge) {
+          if (unread > 0) { badge.style.display = ''; badge.textContent = unread > 99 ? '99+' : String(unread); }
+          else { badge.style.display = 'none'; }
+        }
+        // 新消息轻提示
+        if (unread > _lastUnread && _lastUnread >= 0 && document.visibilityState === 'visible') {
+          var newest = (d.notifications || []).find(function(n){ return !n.is_read; });
+          if (newest && window.ttp) try { ttp('📬 ' + (newest.title || '新消息')); } catch(e) {}
+        }
+        _lastUnread = unread;
+        if (render || _notifyOpen) renderNotifyList(d.notifications || []);
+      }).catch(function(){});
+  };
+  function renderNotifyList(list) {
+    var el = document.getElementById('notifyList');
+    if (!el) return;
+    if (!list.length) {
+      el.innerHTML = '<div style="padding:28px 16px;text-align:center;color:var(--text-muted,#999);font-size:.75rem">暂无消息</div>';
+      return;
+    }
+    var typeIcon = { gift: '🎁', recharge: '💳', system: '📢' };
+    var h = '';
+    list.forEach(function(n){
+      var unread = !n.is_read;
+      h += '<div onclick="markNotificationRead('+n.id+')" style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.04);cursor:pointer;background:'+(unread?'rgba(0,113,227,.04)':'transparent')+'">'+
+        '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">'+
+          '<div style="font-size:.78rem;font-weight:'+(unread?700:600)+';color:var(--text-primary,#111)">'+(typeIcon[n.type]||'📢')+' '+(n.title||'')+'</div>'+
+          '<div style="font-size:.58rem;color:var(--text-muted,#999);white-space:nowrap">'+(n.created_at||'').substring(5,16)+'</div>'+
+        '</div>'+
+        '<div style="font-size:.7rem;color:var(--text-secondary,#555);margin-top:4px;line-height:1.5">'+(n.body||'')+'</div>'+
+        (unread?'<div style="font-size:.58rem;color:var(--accent,#0071e3);margin-top:4px">未读 · 点击标记已读</div>':'')+
+      '</div>';
+    });
+    el.innerHTML = h;
+  }
+  window.markNotificationRead = function(id) {
+    var token = sessionStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    fetch('/api/notifications/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ ids: [id] })
+    }).then(function(r){ return r.json(); }).then(function(){ window.pollNotifications(true); updateBalanceDisplay(); });
+  };
+  window.markAllNotificationsRead = function() {
+    var token = sessionStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    fetch('/api/notifications/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ all: true })
+    }).then(function(r){ return r.json(); }).then(function(){ window.pollNotifications(true); });
+  };
+  // close panel on outside click
+  document.addEventListener('click', function(e){
+    var p = document.getElementById('notifyPanel');
+    var b = document.getElementById('notifyBellBtn');
+    if (!p || !_notifyOpen) return;
+    if (p.contains(e.target) || (b && b.contains(e.target))) return;
+    toggleNotifyPanel(false);
+  });
+  setTimeout(function(){ window.pollNotifications(); }, 800);
+  setInterval(function(){ window.pollNotifications(); }, 20000);
 })();
 </script>
 
@@ -756,7 +886,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
         <img id="qrImage" src="static/qr-alipay.png" alt="收款码" style="width:180px;height:180px;border-radius:var(--radius-md);background:var(--surface-alt);object-fit:contain">
       </div>
       <button onclick="submitRecharge()" style="width:100%;padding:10px;border-radius:var(--radius-md);border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:var(--font-weight-bold);font-size:var(--font-size-base);font-family:var(--font-sans);transition:all var(--duration-fast)">我已支付，提交申请</button>
-      <p style="font-size:var(--font-size-xs);color:var(--text-muted);text-align:center;margin:6px 0 0">支付完成后请等待管理员确认</p>
+      <p style="font-size:var(--font-size-xs);color:var(--text-muted);text-align:center;margin:6px 0 0">支付后点击下方按钮提交审核，管理员确认后到账；到账会通过消息中心通知你</p>
     </div>
     <h4 style="font-size:var(--font-size-md);color:var(--text-secondary);margin:12px 0 6px;font-weight:var(--font-weight-semibold)">修改密码</h4>
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
@@ -769,6 +899,163 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
     <div id="rechargeHistory" style="max-height:160px;overflow-y:auto;font-size:var(--font-size-sm);color:var(--text-muted)"></div>
   </div>
 </div>
+
+<!-- ====== 账户中心 ====== -->
+<div id="accountCenterMask" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(6px);z-index:100020;align-items:center;justify-content:center" onclick="closeAccountCenter()">
+  <div id="accountCenter" style="background:var(--bg-card,#fff);border-radius:16px;width:min(920px,96vw);max-height:88vh;overflow:hidden;border:1px solid var(--border,#e5e7eb);box-shadow:0 24px 64px rgba(0,0,0,.22);display:flex;flex-direction:column" onclick="event.stopPropagation()">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border,#e5e7eb)">
+      <div>
+        <b style="font-size:1rem;color:var(--text-primary,#111)">账户中心</b>
+        <span id="acctUserMeta" style="margin-left:10px;font-size:.72rem;color:var(--text-muted,#888)"></span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="openAccountCenter()" style="border:1px solid var(--border);background:var(--bg-card);border-radius:8px;padding:5px 10px;font-size:.72rem;cursor:pointer">刷新</button>
+        <button onclick="closeAccountCenter()" style="border:none;background:transparent;font-size:1.1rem;cursor:pointer;color:var(--text-muted)">✕</button>
+      </div>
+    </div>
+    <div id="acctKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:14px 18px;border-bottom:1px solid var(--border,#eef2f7)"></div>
+    <div style="display:flex;gap:6px;padding:10px 18px 0;flex-wrap:wrap" id="acctTabs">
+      <button class="acct-tab active" data-tab="tx" onclick="switchAcctTab('tx')">消费流水</button>
+      <button class="acct-tab" data-tab="orders" onclick="switchAcctTab('orders')">充值订单</button>
+      <button class="acct-tab" data-tab="msgs" onclick="switchAcctTab('msgs')">消息</button>
+      <button class="acct-tab" data-tab="invite" onclick="switchAcctTab('invite')">邀请</button>
+    </div>
+    <div id="acctBody" style="padding:12px 18px 18px;overflow:auto;flex:1;font-size:.78rem;color:var(--text-secondary,#444)"></div>
+    <div style="padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="showRechargeModal();closeAccountCenter()" style="background:var(--accent,#0071e3);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;font-size:.8rem">去充值</button>
+    </div>
+  </div>
+</div>
+<style>
+  .acct-tab{border:1px solid var(--border,#e5e7eb);background:var(--bg-card,#fff);color:var(--text-muted,#666);border-radius:999px;padding:5px 12px;font-size:.72rem;font-weight:600;cursor:pointer}
+  .acct-tab.active{background:var(--accent,#0071e3);color:#fff;border-color:var(--accent,#0071e3)}
+  .acct-kpi{background:var(--surface-alt,#f8fafc);border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:10px 12px}
+  .acct-kpi .v{font-size:1.15rem;font-weight:800;color:var(--text-primary,#111);font-family:ui-monospace,monospace}
+  .acct-kpi .l{font-size:.62rem;color:var(--text-muted,#888);margin-top:2px;text-transform:uppercase;letter-spacing:.04em}
+  .acct-table{width:100%;border-collapse:collapse}
+  .acct-table th,.acct-table td{padding:7px 8px;border-bottom:1px solid rgba(0,0,0,.05);text-align:left;font-size:.72rem}
+  .acct-table th{color:var(--text-muted,#888);font-weight:700}
+</style>
+<script>
+(function(){
+  // 402 全局拦截：余额不足 → 引导充值
+  if (!window.__fetchPatched402) {
+    window.__fetchPatched402 = true;
+    var _origFetch = window.fetch;
+    window.fetch = function() {
+      return _origFetch.apply(this, arguments).then(function(res) {
+        if (res && res.status === 402) {
+          try {
+            res.clone().json().then(function(d) {
+              var msg = (d && d.error) ? d.error : '点数不足';
+              if (confirm(msg + '\n\n是否立即充值？')) {
+                if (typeof showRechargeModal === 'function') showRechargeModal();
+              }
+              if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
+            }).catch(function(){});
+          } catch (e) {}
+        }
+        return res;
+      });
+    };
+  }
+
+  var _acctCache = null;
+  var _acctTab = 'tx';
+  window.openAccountCenter = function() {
+    var mask = document.getElementById('accountCenterMask');
+    if (!mask) return;
+    mask.style.display = 'flex';
+    var token = sessionStorage.getItem('thesis_ai_token');
+    if (!token) { document.getElementById('acctBody').innerHTML = '请先登录'; return; }
+    document.getElementById('acctBody').innerHTML = '<div style="padding:20px;color:#999">加载中…</div>';
+    fetch('/api/account/overview', { headers: { 'Authorization': 'Bearer ' + token } })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d.success) { document.getElementById('acctBody').textContent = d.error || '加载失败'; return; }
+        _acctCache = d;
+        var u = d.user || {};
+        document.getElementById('acctUserMeta').textContent = (u.username || '') + ' · ID ' + (u.id || '');
+        var free = d.free || {}, st = d.stats || {};
+        document.getElementById('acctKpis').innerHTML =
+          '<div class="acct-kpi"><div class="v">'+Number(u.points||0).toFixed(3)+'</div><div class="l">余额(点)</div></div>'+
+          '<div class="acct-kpi"><div class="v">'+(free.remaining||0)+'/'+(free.limit||0)+'</div><div class="l">今日免费剩余</div></div>'+
+          '<div class="acct-kpi"><div class="v">'+Number(st.spent_points||0).toFixed(3)+'</div><div class="l">累计消耗</div></div>'+
+          '<div class="acct-kpi"><div class="v">¥'+Number(st.recharged_yuan||0).toFixed(2)+'</div><div class="l">累计充值</div></div>'+
+          '<div class="acct-kpi"><div class="v">'+(st.unread_notifications||0)+'</div><div class="l">未读消息</div></div>'+
+          '<div class="acct-kpi"><div class="v">'+(st.invite_used||0)+'</div><div class="l">邀请成功</div></div>';
+        switchAcctTab(_acctTab);
+      }).catch(function(){ document.getElementById('acctBody').textContent = '网络错误'; });
+  };
+  window.closeAccountCenter = function(){
+    var mask = document.getElementById('accountCenterMask');
+    if (mask) mask.style.display = 'none';
+  };
+  window.switchAcctTab = function(tab){
+    _acctTab = tab || 'tx';
+    document.querySelectorAll('#acctTabs .acct-tab').forEach(function(b){
+      b.classList.toggle('active', b.getAttribute('data-tab') === _acctTab);
+    });
+    var d = _acctCache; if (!d) return;
+    var body = document.getElementById('acctBody');
+    if (_acctTab === 'tx') {
+      var h = '<table class="acct-table"><thead><tr><th>时间</th><th>类型</th><th>变动</th><th>余额后</th><th>说明</th></tr></thead><tbody>';
+      (d.transactions||[]).forEach(function(t){
+        var p = Number(t.points||0);
+        h += '<tr><td>'+(t.created_at||'').substring(0,16)+'</td><td>'+t.type+'</td>'+
+          '<td style="color:'+(p>=0?'#059669':'#dc2626')+'">'+(p>=0?'+':'')+p.toFixed(3)+'</td>'+
+          '<td>'+Number(t.points_after||0).toFixed(3)+'</td><td>'+(t.description||'')+'</td></tr>';
+      });
+      h += '</tbody></table>';
+      if (!(d.transactions||[]).length) h = '<div style="padding:16px;color:#999">暂无流水</div>';
+      body.innerHTML = h;
+    } else if (_acctTab === 'orders') {
+      var sm = {pending:'待支付',submitted:'待确认',confirmed:'已到账',rejected:'已拒绝'};
+      var h2 = '<table class="acct-table"><thead><tr><th>订单</th><th>金额</th><th>状态</th><th>附言码</th><th>时间</th><th></th></tr></thead><tbody>';
+      (d.orders||[]).forEach(function(o){
+        var ops = '';
+        if (o.status === 'rejected' || o.status === 'pending') {
+          ops = '<button onclick="resubmitOrder('+o.id+')" style="font-size:.68rem;padding:3px 8px;border-radius:6px;border:1px solid #ddd;background:#fff;cursor:pointer">重新提交</button>';
+        }
+        h2 += '<tr><td>#'+o.id+'</td><td>¥'+o.amount_yuan+'</td><td>'+(sm[o.status]||o.status)+'</td><td>'+(o.note||o.id)+'</td><td>'+(o.created_at||'').substring(0,16)+'</td><td>'+ops+'</td></tr>';
+      });
+      h2 += '</tbody></table>';
+      if (!(d.orders||[]).length) h2 = '<div style="padding:16px;color:#999">暂无充值订单</div>';
+      body.innerHTML = h2 + '<p style="margin:10px 0 0;font-size:.68rem;color:#888">转账备注请填写订单号（附言码），便于管理员核对到账。</p>';
+    } else if (_acctTab === 'msgs') {
+      var list = d.notifications || [];
+      if (!list.length) { body.innerHTML = '<div style="padding:16px;color:#999">暂无消息</div>'; return; }
+      var h3 = '';
+      list.forEach(function(n){
+        h3 += '<div style="padding:10px 0;border-bottom:1px solid rgba(0,0,0,.05)">' +
+          '<div style="display:flex;justify-content:space-between"><b style="font-size:.8rem">'+(n.title||'')+'</b><span style="color:#999;font-size:.65rem">'+(n.created_at||'').substring(5,16)+'</span></div>' +
+          '<div style="margin-top:4px;line-height:1.5">'+(n.body||'')+'</div>' +
+          (!n.is_read ? '<div style="color:#0071e3;font-size:.65rem;margin-top:4px">未读</div>' : '') +
+          '</div>';
+      });
+      body.innerHTML = h3;
+    } else if (_acctTab === 'invite') {
+      var code = (d.user && d.user.invite_code) || '----';
+      body.innerHTML =
+        '<div style="padding:8px 0"><div style="color:#888;font-size:.7rem;margin-bottom:6px">我的邀请码</div>' +
+        '<div style="display:flex;gap:8px;align-items:center"><code style="font-size:1.1rem;font-weight:800;letter-spacing:.08em">'+code+'</code>' +
+        '<button onclick="navigator.clipboard.writeText(\''+code+'\').then(function(){alert(\'已复制\')})" style="padding:5px 10px;border-radius:6px;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:.72rem">复制</button></div>' +
+        '<p style="margin:12px 0 0;color:#666;line-height:1.6;font-size:.75rem">好友注册时填写你的邀请码，双方各得奖励点数。今日成功邀请：'+(d.stats&&d.stats.invite_used||0)+' 人（累计）。</p></div>';
+    }
+  };
+  window.resubmitOrder = function(oid){
+    var token = sessionStorage.getItem('thesis_ai_token');
+    fetch('/api/payment/resubmit', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body: JSON.stringify({order_id: oid})
+    }).then(function(r){return r.json()}).then(function(d){
+      alert(d.success ? (d.message||'已提交') : (d.error||'失败'));
+      if (d.success) openAccountCenter();
+    });
+  };
+})();
+</script>
 
 <script>
 function showPricingInfo(){

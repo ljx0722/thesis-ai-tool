@@ -46,6 +46,7 @@ window.runEnAI = function() {
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.success) {
       out.innerHTML = '<div class="ai-output">'+d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>';
+      if (window.ThesisProject && ThesisProject.logSkillRun) ThesisProject.logSkillRun({ moduleId: 'en-abstract', title: '英文摘要', summary: 'AI 完成' });
       if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
     } else { out.innerHTML = '<div class="ai-output-error">❌ '+d.error+'</div>'; }
   });

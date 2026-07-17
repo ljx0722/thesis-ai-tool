@@ -41,7 +41,8 @@ window.runProposalAI = function() {
     .then(function(d) {
       if (d.success) {
         output.innerHTML = '<div class="ai-output">' + d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>';
-        if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
+        if (window.ThesisProject && ThesisProject.logSkillRun) ThesisProject.logSkillRun({ moduleId: 'proposal', title: '开题大纲', summary: 'AI 完成' });
+      if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
       } else {
         output.innerHTML = '<div class="ai-output-error">❌ ' + d.error + '</div>';
       }

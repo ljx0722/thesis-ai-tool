@@ -27,6 +27,7 @@ window.runDedupAI = function(mode) {
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.success) {
       out.innerHTML = '<div class="ai-output">'+d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>';
+      if (window.ThesisProject && ThesisProject.logSkillRun) ThesisProject.logSkillRun({ moduleId: 'de-duplicate', title: '查重降重', summary: 'AI 完成' });
       if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
     } else { out.innerHTML = '<div class="ai-output-error">❌ '+d.error+'</div>'; }
   });

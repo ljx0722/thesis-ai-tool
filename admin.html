@@ -3,34 +3,32 @@
 <style>
   body { background: var(--bg-app); font-family: var(--font-sans); color: var(--text-primary); padding: 0; min-height: 100vh; overflow: auto; }
   .admin-layout { display: flex; min-height: 100vh; }
-  /* Sidebar: dark sidebar style matching main app */
-  .admin-sidebar { width: 220px; flex-shrink: 0; background: var(--bg-sidebar); border-right: 1px solid var(--border-sidebar); display: flex; flex-direction: column; gap: 2px; padding: 20px 12px; position: fixed; top: 0; left: 0; bottom: 0; z-index: 10; }
+  .admin-sidebar { width: 220px; flex-shrink: 0; background: var(--bg-sidebar); border-right: 1px solid var(--border-sidebar); display: flex; flex-direction: column; gap: 2px; padding: 20px 12px; position: fixed; top: 0; left: 0; bottom: 0; z-index: 10; overflow-y: auto; }
   .admin-sidebar h2 { font-size: var(--font-size-lg); font-weight: var(--font-weight-bold); padding: 8px 12px 16px; color: #f1f5f9; letter-spacing: -0.01em; }
   .admin-sidebar a { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: var(--radius-sm); font-size: var(--font-size-sm); color: rgba(255,255,255,0.5); text-decoration: none; cursor: pointer; transition: all var(--duration-fast) var(--easing-default); font-weight: var(--font-weight-medium); }
   .admin-sidebar a:hover, .admin-sidebar a.active { background: var(--bg-sidebar-hover); color: #f1f5f9; }
   .admin-sidebar a.active { background: var(--bg-sidebar-active); color: var(--accent-light); font-weight: var(--font-weight-semibold); }
   .admin-sidebar .nav-divider { height: 1px; background: var(--border-sidebar); margin: 8px 0; }
-  /* Main content */
   .admin-main { margin-left: 220px; flex: 1; padding: 24px 32px; min-width: 0; }
-  .admin-topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .admin-topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; gap: 12px; flex-wrap: wrap; }
   .admin-topbar h1 { font-size: var(--font-size-2xl); font-weight: var(--font-weight-bold); color: var(--text-primary); letter-spacing: -0.02em; margin: 0; }
-  /* Stat cards: kpi-console grid */
-  .admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 28px; }
-  .admin-stat { background: var(--bg-card); border-radius: var(--radius-lg); padding: 20px 16px; border: 1px solid var(--border); position: relative; overflow: hidden; transition: all var(--duration-fast) var(--easing-default); box-shadow: var(--shadow-xs); }
+  .admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .admin-stat { background: var(--bg-card); border-radius: var(--radius-lg); padding: 16px 14px; border: 1px solid var(--border); position: relative; overflow: hidden; transition: all var(--duration-fast) var(--easing-default); box-shadow: var(--shadow-xs); }
   .admin-stat:hover { box-shadow: var(--shadow-sm); transform: translateY(-1px); border-color: var(--border-strong); }
   .admin-stat::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--accent), var(--accent-light)); }
-  .admin-stat .stat-value { font-size: 1.8rem; font-weight: var(--font-weight-heavy); color: var(--text-primary); position: relative; z-index: 1; font-family: var(--font-mono); }
+  .admin-stat.profit::before { background: linear-gradient(90deg, #059669, #34d399); }
+  .admin-stat.warn::before { background: linear-gradient(90deg, #d97706, #fbbf24); }
+  .admin-stat.danger::before { background: linear-gradient(90deg, #dc2626, #f87171); }
+  .admin-stat .stat-value { font-size: 1.55rem; font-weight: var(--font-weight-heavy); color: var(--text-primary); position: relative; z-index: 1; font-family: var(--font-mono); line-height: 1.2; }
   .admin-stat .stat-label { font-size: var(--font-size-xs); color: var(--text-muted); margin-top: 4px; position: relative; z-index: 1; font-weight: var(--font-weight-medium); text-transform: uppercase; letter-spacing: 0.04em; }
-  /* Section headings */
-  .admin-section-title { font-size: var(--font-size-lg); margin: 24px 0 12px; color: var(--text-primary); font-weight: var(--font-weight-bold); letter-spacing: -0.01em; }
-  /* Tables */
+  .admin-stat .stat-hint { font-size: .62rem; color: var(--text-muted); margin-top: 2px; position: relative; z-index: 1; }
+  .admin-section-title { font-size: var(--font-size-lg); margin: 28px 0 12px; color: var(--text-primary); font-weight: var(--font-weight-bold); letter-spacing: -0.01em; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
   .admin-table { width: 100%; border-collapse: collapse; font-size: var(--font-size-sm); background: var(--bg-card); border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow-xs); }
-  .admin-table th { text-align: left; padding: 10px 14px; color: var(--text-muted); font-weight: var(--font-weight-semibold); border-bottom: 1px solid var(--border); font-size: var(--font-size-xs); background: var(--surface-alt); text-transform: uppercase; letter-spacing: 0.04em; }
-  .admin-table td { padding: 10px 14px; border-bottom: 1px solid var(--border-light); color: var(--text-secondary); }
+  .admin-table th { text-align: left; padding: 10px 12px; color: var(--text-muted); font-weight: var(--font-weight-semibold); border-bottom: 1px solid var(--border); font-size: var(--font-size-xs); background: var(--surface-alt); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  .admin-table td { padding: 9px 12px; border-bottom: 1px solid var(--border-light); color: var(--text-secondary); vertical-align: middle; }
   .admin-table tr:last-child td { border-bottom: none; }
   .admin-table tr:hover td { background: var(--bg-card-hover); }
-  /* Buttons */
-  .admin-btn { padding: 7px 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); transition: all var(--duration-fast) var(--easing-default); font-family: var(--font-sans); background: var(--bg-card); color: var(--text-secondary); }
+  .admin-btn { padding: 7px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); transition: all var(--duration-fast) var(--easing-default); font-family: var(--font-sans); background: var(--bg-card); color: var(--text-secondary); }
   .admin-btn:hover { transform: translateY(-1px); }
   .admin-btn:active { transform: translateY(0); }
   .admin-btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -41,28 +39,49 @@
   .admin-btn-success:hover { background: rgba(16,185,129,0.12); }
   .admin-btn-ghost { background: transparent; border-color: transparent; color: var(--text-muted); }
   .admin-btn-ghost:hover { background: var(--bg-card-hover); color: var(--text-secondary); }
-  /* Inputs */
+  .admin-btn-sm { padding: 4px 10px; font-size: .7rem; }
   .admin-input { background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; color: var(--text-primary); font-size: var(--font-size-sm); outline: none; transition: border-color var(--duration-fast) var(--easing-default); font-family: var(--font-sans); }
   .admin-input:focus { border-color: var(--accent); box-shadow: var(--shadow-ring); }
   .admin-input::placeholder { color: var(--text-muted); }
-  /* Flex utilities */
   .admin-flex { display: flex; gap: 8px; align-items: center; }
-  .admin-flex-wrap { display: flex; gap: 8px; flex-wrap: wrap; }
-  .admin-flex-between { display: flex; align-items: center; justify-content: space-between; }
-  .admin-gap { gap: 8px; }
-  /* Login box */
+  .admin-flex-wrap { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .admin-login { max-width: 420px; margin: 80px auto; background: var(--bg-card); border-radius: var(--radius-xl); padding: 40px 36px; text-align: center; box-shadow: var(--shadow-lg); border: 1px solid var(--border); }
   .admin-login h1 { font-size: var(--font-size-2xl); font-weight: var(--font-weight-bold); color: var(--text-primary); margin-bottom: 16px; letter-spacing: -0.02em; }
   .admin-login .divider-text { font-size: var(--font-size-xs); color: var(--text-muted); margin: 8px 0; }
   .admin-login .hint { font-size: var(--font-size-xs); color: var(--text-muted); margin-top: 10px; line-height: 1.6; }
-  /* Badge */
   .admin-badge { display: inline-block; padding: 2px 8px; border-radius: var(--radius-full); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); }
   .admin-badge-pending { background: var(--warning-bg); color: #b45309; }
   .admin-badge-confirmed { background: var(--success-bg); color: #059669; }
   .admin-badge-submitted { background: var(--info-bg); color: var(--info); }
+  .admin-badge-rejected { background: var(--danger-bg); color: var(--danger); }
+  .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; margin-bottom: 8px; }
+  .chart-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 14px 10px; box-shadow: var(--shadow-xs); }
+  .chart-card h3 { margin: 0 0 8px; font-size: .82rem; color: var(--text-secondary); font-weight: 700; display: flex; justify-content: space-between; align-items: baseline; }
+  .chart-card h3 span { font-size: .65rem; color: var(--text-muted); font-weight: 500; }
+  .chart-svg { width: 100%; height: 160px; display: block; }
+  .chart-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px; font-size: .65rem; color: var(--text-muted); }
+  .chart-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  .gift-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px; margin-bottom: 12px; box-shadow: var(--shadow-xs); }
+  .gift-panel h3 { margin: 0 0 10px; font-size: .9rem; }
+  .filter-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .filter-tab { padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted); font-size: .72rem; cursor: pointer; font-weight: 600; }
+  .filter-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .user-pick { cursor: pointer; color: var(--accent); font-weight: 600; }
+  .user-pick:hover { text-decoration: underline; }
+  .toast { position: fixed; top: 16px; right: 16px; z-index: 9999; background: #0f172a; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: .8rem; box-shadow: 0 8px 24px rgba(0,0,0,.25); opacity: 0; transform: translateY(-8px); transition: all .25s; pointer-events: none; max-width: 360px; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .section-anchor { scroll-margin-top: 16px; }
+  .drawer-mask { display:none; position:fixed; inset:0; background:rgba(15,23,42,.4); z-index:100; }
+  .drawer { position:fixed; top:0; right:0; bottom:0; width:min(480px,96vw); background:var(--bg-card); border-left:1px solid var(--border); box-shadow:var(--shadow-lg); z-index:101; display:flex; flex-direction:column; transform:translateX(100%); transition:transform .25s ease; }
+  .drawer.open { transform:translateX(0); }
+  .drawer-head { padding:14px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+  .drawer-body { padding:14px 16px; overflow:auto; flex:1; font-size:.78rem; }
+  @media (max-width: 900px) {
+    .admin-sidebar { display: none; }
+    .admin-main { margin-left: 0; padding: 16px; }
+  }
 </style></head><body>
 <div class="admin-layout">
-  <!-- Login Box -->
   <div id="loginBox" class="admin-login">
     <h1>管理员登录</h1>
     <input id="loginUser" class="admin-input" type="text" placeholder="用户名" style="width:100%;margin-bottom:8px"><br>
@@ -74,49 +93,158 @@
     <p class="hint">管理员账号: admin / admin123<br>密钥: 首次启动时自动生成，查看服务器日志中的 ADMIN_SECRET</p>
   </div>
 
-  <!-- Dashboard (hidden until login) -->
   <div id="dashboard" style="display:none">
     <div class="admin-sidebar">
       <h2>管理看板</h2>
-      <a class="active" onclick="loadDashboard()">数据概览</a>
-      <a onclick="document.getElementById('userSection').scrollIntoView({behavior:'smooth'})">用户管理</a>
-      <a onclick="document.getElementById('orderSection').scrollIntoView({behavior:'smooth'})">充值订单</a>
-      <a onclick="document.getElementById('pricingSection').scrollIntoView({behavior:'smooth'});loadPricing();">计费配置</a>
-      <a onclick="document.getElementById('llmEcoSection').scrollIntoView({behavior:'smooth'});loadLlmEconomics();">AI成本看板</a>
-      <a onclick="document.getElementById('opsSection').scrollIntoView({behavior:'smooth'});loadOpsStats();">运营看板</a>
-      <a onclick="document.getElementById('pricingScheduleSection').scrollIntoView({behavior:'smooth'});loadPricingSchedules();">定价排期</a>
+      <a class="active" data-nav="overview" onclick="goSection('overview')">数据概览</a>
+      <a data-nav="charts" onclick="goSection('charts')">盈利曲线</a>
+      <a data-nav="userSection" onclick="goSection('userSection')">用户 / 赠送</a>
+      <a data-nav="orderSection" onclick="goSection('orderSection')">充值订单</a>
+      <a data-nav="txSection" onclick="goSection('txSection')">全站流水</a>
+      <a data-nav="auditSection" onclick="goSection('auditSection');loadAuditLogs();">审计日志</a>
+      <a data-nav="llmEcoSection" onclick="goSection('llmEcoSection');loadLlmEconomics();">AI成本看板</a>
+      <a data-nav="opsSection" onclick="goSection('opsSection');loadOpsStats();">运营看板</a>
+      <a data-nav="pricingSection" onclick="goSection('pricingSection');loadPricing();">计费配置</a>
+      <a data-nav="pricingScheduleSection" onclick="goSection('pricingScheduleSection');loadPricingSchedules();">定价排期</a>
       <div class="nav-divider"></div>
       <a href="/" style="font-size:0.65rem;color:rgba(255,255,255,0.25)">← 返回主页</a>
     </div>
     <div class="admin-main">
       <div class="admin-topbar">
         <h1>管理员看板</h1>
-        <button class="admin-btn admin-btn-danger" onclick="logout()">退出</button>
-      </div>
-
-      <div class="admin-stats" id="statCards"></div>
-
-      <div id="userSection">
-        <h2 class="admin-section-title">用户管理</h2>
-        <div class="admin-flex-wrap" style="margin-bottom:12px">
-          <input id="uidInput" class="admin-input" type="number" placeholder="用户ID" style="width:80px">
-          <input id="creditAmount" class="admin-input" type="number" placeholder="厘(1000厘=1点，正=加/负=扣)" style="width:160px">
-          <input id="creditReason" class="admin-input" placeholder="原因" style="width:200px">
-          <button class="admin-btn admin-btn-primary" onclick="adjustCredits()">调整点数</button>
+        <div class="admin-flex-wrap">
+          <button class="admin-btn" onclick="refreshAll()">刷新全部</button>
+          <button class="admin-btn admin-btn-danger" onclick="logout()">退出</button>
         </div>
-        <table class="admin-table" id="userTable"><thead><tr><th>ID</th><th>用户名</th><th>点数</th><th>邀请码</th><th>注册时间</th></tr></thead><tbody></tbody></table>
       </div>
 
-      <div id="orderSection">
-        <h2 class="admin-section-title">充值订单</h2>
-        <table class="admin-table" id="orderTable"><thead><tr><th>ID</th><th>用户</th><th>金额</th><th>状态</th><th>时间</th><th>操作</th></tr></thead><tbody></tbody></table>
+      <div id="overview" class="section-anchor">
+        <div class="admin-stats" id="statCards"></div>
       </div>
-      <div id="opsSection">
+
+      <div id="charts" class="section-anchor">
+        <h2 class="admin-section-title">
+          <span>盈利与运营曲线</span>
+          <span class="admin-flex-wrap">
+            <select id="chartDays" class="admin-input" style="width:110px" onchange="loadTimeseries()">
+              <option value="7">近7天</option>
+              <option value="14" selected>近14天</option>
+              <option value="30">近30天</option>
+              <option value="60">近60天</option>
+            </select>
+            <button class="admin-btn" onclick="loadTimeseries()">刷新曲线</button>
+          </span>
+        </h2>
+        <div class="admin-stats" id="profitCards"></div>
+        <div class="chart-grid">
+          <div class="chart-card">
+            <h3>充值收入（元） <span id="chartRechargeHint"></span></h3>
+            <div id="chartRecharge"></div>
+          </div>
+          <div class="chart-card">
+            <h3>AI 毛利（扣点−API成本） <span id="chartMarginHint"></span></h3>
+            <div id="chartMargin"></div>
+          </div>
+          <div class="chart-card">
+            <h3>新用户 vs AI 调用 <span id="chartUsersHint"></span></h3>
+            <div id="chartUsers"></div>
+          </div>
+          <div class="chart-card">
+            <h3>点数消耗 / 赠送 <span id="chartUsageHint"></span></h3>
+            <div id="chartUsage"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="userSection" class="section-anchor">
+        <h2 class="admin-section-title">
+          <span>用户管理 / 赠送点数</span>
+          <button class="admin-btn" onclick="loadUsers()">刷新用户</button>
+        </h2>
+        <div class="gift-panel">
+          <h3>🎁 赠送 / 调整点数</h3>
+          <div class="admin-flex-wrap" style="margin-bottom:8px">
+            <input id="uidInput" class="admin-input" type="number" placeholder="用户ID" style="width:90px">
+            <input id="unameHint" class="admin-input" type="text" placeholder="用户名（可搜索）" style="width:140px" oninput="searchUsersLive()">
+            <input id="giftPoints" class="admin-input" type="number" step="0.001" placeholder="点数(正赠/负扣)" style="width:140px">
+            <input id="creditReason" class="admin-input" placeholder="原因，如：活动赠送" style="width:220px">
+            <label style="font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:4px">
+              <input type="checkbox" id="giftNotify" checked> 通知用户
+            </label>
+            <button class="admin-btn admin-btn-primary" onclick="giftCredits()">确认赠送/调整</button>
+          </div>
+          <p style="margin:0;font-size:.7rem;color:var(--text-muted)">单位：点（1元=1点）。赠送后用户会收到「系统管理员于…赠送了你 X 点」站内消息。也可在下方表格点用户ID快捷填入。</p>
+          <div id="userSearchHint" style="margin-top:8px;font-size:.72rem;color:var(--text-muted)"></div>
+        </div>
+        <div class="admin-flex-wrap" style="margin-bottom:10px">
+          <input id="userFilter" class="admin-input" placeholder="搜索用户名/ID" style="width:200px" onkeydown="if(event.key==='Enter')loadUsers()">
+          <button class="admin-btn" onclick="loadUsers()">搜索</button>
+        </div>
+        <table class="admin-table" id="userTable"><thead><tr><th>ID</th><th>用户名</th><th>点数</th><th>邀请码</th><th>注册时间</th><th>操作</th></tr></thead><tbody></tbody></table>
+      </div>
+
+      <div id="orderSection" class="section-anchor">
+        <h2 class="admin-section-title">
+          <span>全部充值记录</span>
+          <span class="admin-flex-wrap">
+            <button class="admin-btn" onclick="loadOrders()">刷新订单</button>
+            <button class="admin-btn admin-btn-success" onclick="batchConfirmSelected()">批量确认勾选</button>
+            <button class="admin-btn" onclick="exportOrdersCsv()">导出CSV</button>
+          </span>
+        </h2>
+        <div class="admin-flex-wrap" style="margin-bottom:10px">
+          <div class="filter-tabs" id="orderFilterTabs">
+            <button class="filter-tab active" data-st="" onclick="setOrderFilter(this,'')">全部</button>
+            <button class="filter-tab" data-st="submitted" onclick="setOrderFilter(this,'submitted')">待确认</button>
+            <button class="filter-tab" data-st="pending" onclick="setOrderFilter(this,'pending')">待支付</button>
+            <button class="filter-tab" data-st="confirmed" onclick="setOrderFilter(this,'confirmed')">已到账</button>
+            <button class="filter-tab" data-st="rejected" onclick="setOrderFilter(this,'rejected')">已拒绝</button>
+          </div>
+          <input id="orderQ" class="admin-input" placeholder="用户名/订单ID" style="width:160px" onkeydown="if(event.key==='Enter')loadOrders()">
+          <button class="admin-btn" onclick="loadOrders()">筛选</button>
+        </div>
+        <div class="admin-stats" id="orderSummary" style="margin-bottom:12px"></div>
+        <table class="admin-table" id="orderTable"><thead><tr><th><input type="checkbox" id="orderCheckAll" onclick="toggleOrderChecks(this.checked)"></th><th>ID</th><th>用户</th><th>金额</th><th>点数</th><th>方式</th><th>状态</th><th>附言</th><th>创建</th><th>确认</th><th>操作</th></tr></thead><tbody></tbody></table>
+      </div>
+
+      <div id="txSection" class="section-anchor">
+        <h2 class="admin-section-title">
+          <span>全站流水</span>
+          <span class="admin-flex-wrap">
+            <button class="admin-btn" onclick="loadTransactions()">刷新流水</button>
+            <button class="admin-btn" onclick="exportTxCsv()">导出CSV</button>
+          </span>
+        </h2>
+        <div class="admin-flex-wrap" style="margin-bottom:10px">
+          <select id="txType" class="admin-input" style="width:160px" onchange="loadTransactions()">
+            <option value="">全部类型</option>
+            <option value="recharge">充值</option>
+            <option value="usage">消耗</option>
+            <option value="admin_gift">管理员赠送</option>
+            <option value="admin_deduct">管理员扣减</option>
+            <option value="register_bonus">注册赠送</option>
+            <option value="invite_bonus">邀请奖励</option>
+            <option value="admin_adjust">历史调整</option>
+          </select>
+        </div>
+        <table class="admin-table" id="txTable"><thead><tr><th>ID</th><th>用户</th><th>类型</th><th>变动(点)</th><th>余额后</th><th>说明</th><th>时间</th></tr></thead><tbody></tbody></table>
+      </div>
+
+      <div id="auditSection" class="section-anchor">
+        <h2 class="admin-section-title">
+          <span>审计日志</span>
+          <button class="admin-btn" onclick="loadAuditLogs()">刷新</button>
+        </h2>
+        <p style="font-size:.72rem;color:var(--text-muted)">记录管理员确认/拒绝订单、赠送点数等敏感操作。</p>
+        <table class="admin-table" id="auditTable"><thead><tr><th>ID</th><th>操作者</th><th>动作</th><th>对象</th><th>详情</th><th>时间</th></tr></thead><tbody></tbody></table>
+      </div>
+
+      <div id="opsSection" class="section-anchor">
         <h2 class="admin-section-title">运营看板</h2>
         <div class="admin-stats" id="opsCards"></div>
-        <p style="font-size:.72rem;color:var(--text-muted)">待确认充值请在下方订单列表处理。支付自动到账可配置 webhook（默认关闭，人工确认更稳妥）。</p>
+        <p style="font-size:.72rem;color:var(--text-muted)">待确认充值请在「充值订单」处理。支付自动到账可配置 webhook（默认关闭，人工确认更稳妥）。毛利口径：1 点 ≈ 1 元。</p>
       </div>
-      <div id="pricingScheduleSection">
+      <div id="pricingScheduleSection" class="section-anchor">
         <h2 class="admin-section-title">定价排期（全局生效）</h2>
         <p style="font-size:.72rem;color:var(--text-muted)">设置 config（键值，单位：厘，1点=1000厘）。到 effective_at 后自动生效。LLM 基价可用 token_yuan_per_10m / user_markup 等键。</p>
         <div class="admin-flex-wrap" style="gap:8px;margin-bottom:8px">
@@ -128,12 +256,12 @@
         </div>
         <table class="admin-table" id="psTable"><thead><tr><th>ID</th><th>名称</th><th>生效时间</th><th>状态</th><th>配置</th></tr></thead><tbody></tbody></table>
       </div>
-      <div id="llmEcoSection">
+      <div id="llmEcoSection" class="section-anchor">
         <h2 class="admin-section-title">AI 成本看板</h2>
         <div class="admin-stats" id="llmEcoCards"></div>
         <table class="admin-table" id="llmEcoTable"><thead><tr><th>模块</th><th>调用次数</th><th>输入Token</th><th>输出Token</th><th>API成本(元)</th><th>用户扣费(点)</th><th>毛利(点-元)</th></tr></thead><tbody></tbody></table>
       </div>
-      <div id="pricingSection">
+      <div id="pricingSection" class="section-anchor">
         <h2 class="admin-section-title">计费配置</h2>
         <p style="font-size:.72rem;color:var(--text-muted);margin:0 0 10px">单位：厘（1点=1000厘，1元=1点）。AI 写作类为 token 实扣，固定价仅影响本地/服务器计算。</p>
         <div id="pricingMeta" style="font-size:.72rem;color:var(--text-secondary);margin-bottom:10px"></div>
@@ -150,69 +278,460 @@
     </div>
   </div>
 </div>
+<div id="toast" class="toast"></div>
+<div class="drawer-mask" id="userDrawerMask" onclick="closeUserDrawer()"></div>
+<div class="drawer" id="userDrawer">
+  <div class="drawer-head">
+    <b id="userDrawerTitle">用户详情</b>
+    <button class="admin-btn admin-btn-ghost" onclick="closeUserDrawer()">关闭</button>
+  </div>
+  <div class="drawer-body" id="userDrawerBody"></div>
+</div>
 
 <script>
 var SECRET = '';
-function login(){var u=document.getElementById('loginUser').value;var p=document.getElementById('loginPass').value;if(!u||!p){alert('请输入用户名和密码');return}fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})}).then(r=>r.json()).then(d=>{if(d.success){SECRET=d.token;loadDashboard();}else{alert(d.error)}}).catch(function(){alert('网络错误');});}
-function loginWithSecret(){SECRET=document.getElementById('secretInput').value;if(!SECRET){alert('请输入密钥');return}loadDashboard();}
-function logout(){SECRET='';document.getElementById('loginBox').style.display='';document.getElementById('dashboard').style.display='none';}
-function loadDashboard(){
+var orderFilter = '';
+var _usersCache = [];
+var _refreshTimer = null;
+
+function toast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2600);
+}
+function authHeaders(json){
+  var h={'Authorization':'Bearer '+SECRET};
+  if(json) h['Content-Type']='application/json';
+  return h;
+}
+function login(){
+  var u=document.getElementById('loginUser').value;
+  var p=document.getElementById('loginPass').value;
+  if(!u||!p){alert('请输入用户名和密码');return}
+  fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})})
+    .then(r=>r.json()).then(d=>{
+      if(d.success){
+        if(!d.user || !d.user.is_admin){ alert('该账号不是管理员'); return; }
+        SECRET=d.token; sessionStorage.setItem('thesis_ai_admin_secret', SECRET); loadDashboard();
+      } else alert(d.error);
+    }).catch(function(){alert('网络错误');});
+}
+function loginWithSecret(){
+  SECRET=document.getElementById('secretInput').value;
+  if(!SECRET){alert('请输入密钥');return}
+  sessionStorage.setItem('thesis_ai_admin_secret', SECRET);
+  loadDashboard();
+}
+function logout(){
+  SECRET=''; sessionStorage.removeItem('thesis_ai_admin_secret');
+  if(_refreshTimer){clearInterval(_refreshTimer);_refreshTimer=null;}
+  document.getElementById('loginBox').style.display='';
+  document.getElementById('dashboard').style.display='none';
+}
+function goSection(id){
+  document.querySelectorAll('.admin-sidebar a[data-nav]').forEach(function(a){
+    a.classList.toggle('active', a.getAttribute('data-nav')===id || (id==='overview' && a.getAttribute('data-nav')==='overview'));
+  });
+  var el=document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function refreshAll(){
+  loadDashboard(true);
+  loadOrders();
+  loadUsers();
+  loadTransactions();
+  loadTimeseries();
+  try{loadPricing();loadLlmEconomics();loadOpsStats();loadPricingSchedules();}catch(e){}
+  toast('已刷新');
+}
+
+/* ===== SVG charts (no external lib) ===== */
+function sparkline(el, labels, seriesList, opts){
+  opts=opts||{};
+  var w=560, h=160, padL=36, padR=10, padT=12, padB=28;
+  var all=[]; seriesList.forEach(function(s){ (s.data||[]).forEach(function(v){ all.push(+v||0); }); });
+  var maxV=Math.max.apply(null, all.concat([0.0001]));
+  var minV=Math.min.apply(null, all.concat([0]));
+  if(minV>0) minV=0;
+  var range=maxV-minV || 1;
+  var n=Math.max(labels.length,1);
+  function x(i){ return padL + (n<=1?0:i*(w-padL-padR)/(n-1)); }
+  function y(v){ return padT + (1-((v-minV)/range))*(h-padT-padB); }
+  var svg='<svg class="chart-svg" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">';
+  // grid
+  for(var g=0;g<4;g++){
+    var gy=padT+g*(h-padT-padB)/3;
+    svg+='<line x1="'+padL+'" y1="'+gy+'" x2="'+(w-padR)+'" y2="'+gy+'" stroke="rgba(148,163,184,.25)" stroke-width="1"/>';
+    var gv=maxV-g*range/3;
+    svg+='<text x="'+(padL-4)+'" y="'+(gy+3)+'" text-anchor="end" font-size="9" fill="#94a3b8">'+(Math.abs(gv)>=10?gv.toFixed(0):gv.toFixed(2))+'</text>';
+  }
+  seriesList.forEach(function(s){
+    var pts=[];
+    (s.data||[]).forEach(function(v,i){ pts.push(x(i)+','+y(+v||0)); });
+    if(s.area){
+      var area=pts.slice();
+      if(area.length){
+        area.push(x((s.data||[]).length-1)+','+y(0));
+        area.push(x(0)+','+y(0));
+        svg+='<polygon points="'+area.join(' ')+'" fill="'+s.color+'" opacity="0.12"/>';
+      }
+    }
+    svg+='<polyline fill="none" stroke="'+s.color+'" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" points="'+pts.join(' ')+'"/>';
+    (s.data||[]).forEach(function(v,i){
+      svg+='<circle cx="'+x(i)+'" cy="'+y(+v||0)+'" r="2.4" fill="'+s.color+'"/>';
+    });
+  });
+  // x labels sparse
+  var step=Math.max(1, Math.floor(n/6));
+  labels.forEach(function(lb,i){
+    if(i%step!==0 && i!==n-1) return;
+    svg+='<text x="'+x(i)+'" y="'+(h-8)+'" text-anchor="middle" font-size="9" fill="#94a3b8">'+lb+'</text>';
+  });
+  svg+='</svg>';
+  var legend='<div class="chart-legend">';
+  seriesList.forEach(function(s){ legend+='<span><i style="background:'+s.color+'"></i>'+s.name+'</span>'; });
+  legend+='</div>';
+  el.innerHTML=svg+legend;
+}
+
+function loadDashboard(skipSide){
   if(!SECRET){alert('请先登录');return}
-  var headers = {'Authorization': 'Bearer ' + SECRET};
-  fetch('/api/admin/dashboard?secret='+encodeURIComponent(SECRET), {headers: headers}).then(r=>r.json()).then(d=>{
-    if(!d.success){alert(d.error||'无权限');return}
-    document.getElementById('loginBox').style.display='none';
-    document.getElementById('dashboard').style.display='block';
-    var s=d.stats;
-    document.getElementById('statCards').innerHTML=
-      '<div class="admin-stat"><div class="stat-value">'+s.total_users+'</div><div class="stat-label">总用户</div></div>'+
-      '<div class="admin-stat"><div class="stat-value">'+s.today_users+'</div><div class="stat-label">今日新增</div></div>'+
-      '<div class="admin-stat"><div class="stat-value">'+(s.total_credits/1000).toFixed(1)+'</div><div class="stat-label">总点数</div></div>'+
-      '<div class="admin-stat"><div class="stat-value">&yen;'+s.total_recharge+'</div><div class="stat-label">充值总额</div></div>'+
-      '<div class="admin-stat"><div class="stat-value">'+s.pending_orders+'</div><div class="stat-label">待确认订单</div></div>'+
-      '<div class="admin-stat"><div class="stat-value">'+s.llm_today+'</div><div class="stat-label">今日AI调用</div></div>'+
-      '<div class="admin-stat"><div class="stat-value">'+s.llm_total+'</div><div class="stat-label">累计AI调用</div></div>'+
-      '<div class="admin-stat"><div class="stat-value">'+s.total_cost+'</div><div class="stat-label">AI消耗点数</div></div>';
+  fetch('/api/admin/dashboard', {headers: authHeaders()})
+    .then(r=>r.json()).then(d=>{
+      if(!d.success){alert(d.error||'无权限');return}
+      document.getElementById('loginBox').style.display='none';
+      document.getElementById('dashboard').style.display='block';
+      var s=d.stats||{};
+      document.getElementById('statCards').innerHTML=
+        '<div class="admin-stat"><div class="stat-value">'+(s.total_users||0)+'</div><div class="stat-label">总用户</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">'+(s.today_users||0)+'</div><div class="stat-label">今日新增</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">'+Number(s.total_points!=null?s.total_points:(s.total_credits||0)/1000).toFixed(1)+'</div><div class="stat-label">用户点余额(负债)</div><div class="stat-hint">未消耗点数</div></div>'+
+        '<div class="admin-stat profit"><div class="stat-value">&yen;'+Number(s.total_recharge||0).toFixed(2)+'</div><div class="stat-label">累计充值</div><div class="stat-hint">今日 &yen;'+Number(s.recharge_today||0).toFixed(2)+'</div></div>'+
+        '<div class="admin-stat '+(s.pending_orders?'warn':'')+'"><div class="stat-value">'+(s.pending_orders||0)+'</div><div class="stat-label">待确认订单</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">'+(s.llm_today||0)+'</div><div class="stat-label">今日AI调用</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">'+Number(s.llm_api_cost_yuan_total||0).toFixed(2)+'</div><div class="stat-label">累计API成本(元)</div></div>'+
+        '<div class="admin-stat profit"><div class="stat-value">&yen;'+Number(s.approx_cash_profit_yuan||0).toFixed(2)+'</div><div class="stat-label">近似现金毛利</div><div class="stat-hint">充值−API成本</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">'+Number(s.llm_margin_points_total||0).toFixed(2)+'</div><div class="stat-label">用量毛利(点−元)</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">'+Number(s.gift_points_total||0).toFixed(2)+'</div><div class="stat-label">累计赠送点</div></div>';
 
-    var uhtml='';
-    s.recent_users.forEach(function(u){uhtml+='<tr><td>'+u.id+'</td><td>'+u.username+'</td><td>'+(u.credits/1000).toFixed(2)+'</td><td>'+(u.invite_code||'-')+'</td><td>'+(u.created_at||'').substring(0,16)+'</td></tr>';});
-    document.querySelector('#userTable tbody').innerHTML=uhtml;
+      // seed recent tables if full lists not loaded yet
+      if(!skipSide){
+        renderUsers(s.recent_users||[]);
+        renderOrders(s.recent_orders||[], null);
+        loadOrders();
+        loadUsers();
+        loadTransactions();
+        loadTimeseries();
+        try{loadPricing();loadLlmEconomics();loadOpsStats();loadPricingSchedules();}catch(e){}
+        if(!_refreshTimer){
+          _refreshTimer=setInterval(function(){ loadOrders(); loadDashboard(true); }, 30000);
+        }
+      }
+    }).catch(function(){alert('网络错误')});
+}
 
-    var ohtml='';var sm={pending:'<span class="admin-badge admin-badge-pending">待支付</span>',submitted:'<span class="admin-badge admin-badge-submitted">已提交</span>',confirmed:'<span class="admin-badge admin-badge-confirmed">已到账</span>'};
-    s.recent_orders.forEach(function(o){ohtml+='<tr><td>'+o.id+'</td><td>'+o.username+'</td><td>&yen;'+o.amount_yuan+'</td><td>'+(sm[o.status]||o.status)+'</td><td>'+(o.created_at||'').substring(0,16)+'</td><td>'+(o.status==='submitted'?'<button class="admin-btn admin-btn-success" onclick="confirmOrder('+o.id+')">确认到账</button>':'')+'</td></tr>';});
-    document.querySelector('#orderTable tbody').innerHTML=ohtml;
-    // preload pricing silently
-    try{loadPricing();loadLlmEconomics();loadOpsStats();loadPricingSchedules();}catch(e){}
+function loadTimeseries(){
+  if(!SECRET) return;
+  var days=document.getElementById('chartDays').value||14;
+  fetch('/api/admin/timeseries?days='+encodeURIComponent(days),{headers:authHeaders()})
+    .then(r=>r.json()).then(d=>{
+      if(!d.success) return;
+      var p=d.profit||{}, ser=d.series||{}, labels=d.labels||[];
+      document.getElementById('profitCards').innerHTML=
+        '<div class="admin-stat profit"><div class="stat-value">&yen;'+Number(p.total_recharge_yuan||0).toFixed(2)+'</div><div class="stat-label">累计充值现金</div></div>'+
+        '<div class="admin-stat danger"><div class="stat-value">&yen;'+Number(p.total_api_cost_yuan||0).toFixed(3)+'</div><div class="stat-label">累计API成本</div></div>'+
+        '<div class="admin-stat profit"><div class="stat-value">&yen;'+Number(p.approx_cash_profit_yuan||0).toFixed(2)+'</div><div class="stat-label">现金毛利≈充值−API</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">'+Number(p.approx_usage_margin_yuan||0).toFixed(2)+'</div><div class="stat-label">用量毛利≈扣点−API</div></div>'+
+        '<div class="admin-stat warn"><div class="stat-value">'+Number(p.user_credit_liability_points||0).toFixed(1)+'</div><div class="stat-label">点余额负债</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">'+Number(p.total_gift_points||0).toFixed(1)+'</div><div class="stat-label">累计赠送点</div></div>';
+      function sum(arr){return (arr||[]).reduce(function(a,b){return a+(+b||0)},0)}
+      document.getElementById('chartRechargeHint').textContent='合计 ¥'+sum(ser.recharge_yuan).toFixed(2);
+      document.getElementById('chartMarginHint').textContent='合计 '+sum(ser.margin_yuan).toFixed(2);
+      document.getElementById('chartUsersHint').textContent='新用户 '+sum(ser.new_users)+' / 调用 '+sum(ser.llm_calls);
+      document.getElementById('chartUsageHint').textContent='消耗 '+sum(ser.usage_points).toFixed(2)+' / 赠送 '+sum(ser.gift_points).toFixed(2);
+      sparkline(document.getElementById('chartRecharge'), labels, [
+        {name:'充值(元)', data:ser.recharge_yuan||[], color:'#2563eb', area:true}
+      ]);
+      sparkline(document.getElementById('chartMargin'), labels, [
+        {name:'毛利', data:ser.margin_yuan||[], color:'#059669', area:true},
+        {name:'API成本', data:ser.api_cost_yuan||[], color:'#dc2626'},
+        {name:'用户扣点', data:ser.charged_points||[], color:'#7c3aed'}
+      ]);
+      sparkline(document.getElementById('chartUsers'), labels, [
+        {name:'新用户', data:ser.new_users||[], color:'#0891b2', area:true},
+        {name:'AI调用', data:ser.llm_calls||[], color:'#ea580c'}
+      ]);
+      sparkline(document.getElementById('chartUsage'), labels, [
+        {name:'消耗(点)', data:ser.usage_points||[], color:'#4f46e5', area:true},
+        {name:'赠送(点)', data:ser.gift_points||[], color:'#db2777'}
+      ]);
+    }).catch(function(){});
+}
+
+function renderUsers(users){
+  _usersCache=users||[];
+  var uhtml='';
+  _usersCache.forEach(function(u){
+    var pts=u.points!=null?u.points:((u.credits||0)/1000);
+    uhtml+='<tr>'+
+      '<td><span class="user-pick" onclick="pickUser('+u.id+',\''+String(u.username||'').replace(/'/g,"\\'")+'\')">'+u.id+'</span></td>'+
+      '<td>'+u.username+(u.is_admin' <span class="admin-badge admin-badge-submitted">admin</span>':'')+'</td>'+
+      '<td style="font-family:var(--font-mono)">'+Number(pts).toFixed(3)+'</td>'+
+      '<td>'+(u.invite_code||'-')+'</td>'+
+      '<td>'+(u.created_at||'').substring(0,16)+'</td>'+
+      '<td>'+
+        '<button class="admin-btn admin-btn-sm" onclick="openUserDrawer('+u.id+')">详情</button> '+
+        '<button class="admin-btn admin-btn-sm admin-btn-primary" onclick="pickUser('+u.id+',\''+String(u.username||'').replace(/'/g,"\\'")+'\')">赠送</button>'+
+      '</td></tr>';
+  });
+  document.querySelector('#userTable tbody').innerHTML=uhtml||'<tr><td colspan="6">暂无用户</td></tr>';
+}
+function loadUsers(){
+  if(!SECRET) return;
+  var q=document.getElementById('userFilter').value.trim();
+  fetch('/api/admin/users?limit=200&q='+encodeURIComponent(q),{headers:authHeaders()})
+    .then(r=>r.json()).then(d=>{ if(d.success) renderUsers(d.users||[]); });
+}
+function searchUsersLive(){
+  var q=document.getElementById('unameHint').value.trim().toLowerCase();
+  if(!q){ document.getElementById('userSearchHint').textContent=''; return; }
+  var hits=(_usersCache||[]).filter(function(u){ return String(u.username||'').toLowerCase().indexOf(q)>=0 || String(u.id)===q; }).slice(0,5);
+  if(!hits.length){ document.getElementById('userSearchHint').textContent='未匹配到用户（可先点搜索）'; return; }
+  document.getElementById('userSearchHint').innerHTML=hits.map(function(u){
+    return '<a href="javascript:void(0)" class="user-pick" onclick="pickUser('+u.id+',\''+String(u.username).replace(/'/g,"\\'")+'\')">#'+u.id+' '+u.username+' ('+Number(u.points!=null?u.points:u.credits/1000).toFixed(3)+'点)</a>';
+  }).join(' · ');
+}
+function pickUser(id, name){
+  document.getElementById('uidInput').value=id;
+  document.getElementById('unameHint').value=name||'';
+  document.getElementById('giftPoints').focus();
+  toast('已选中用户 #'+id+' '+name);
+  goSection('userSection');
+}
+function giftCredits(){
+  var uid=parseInt(document.getElementById('uidInput').value);
+  var pts=parseFloat(document.getElementById('giftPoints').value);
+  var reason=document.getElementById('creditReason').value||'管理员赠送';
+  var notify=document.getElementById('giftNotify').checked;
+  if(!uid || !isFinite(pts) || pts===0){alert('请输入用户ID和点数（正=赠送，负=扣减）');return}
+  if(!confirm((pts>0'确认赠送 ':'确认扣减 ')+Math.abs(pts)+' 点给用户 #'+uid+'？')) return;
+  fetch('/api/admin/credits',{
+    method:'POST',
+    headers:authHeaders(true),
+    body:JSON.stringify({secret:SECRET,user_id:uid,points:pts,reason:reason,notify:notify})
+  }).then(r=>r.json()).then(d=>{
+    if(d.success){
+      toast('成功：'+(d.username||'')+' 余额 '+Number(d.points).toFixed(3)+' 点');
+      document.getElementById('giftPoints').value='';
+      loadUsers(); loadTransactions(); loadTimeseries(); loadDashboard(true);
+    } else alert(d.error||'失败');
   }).catch(function(){alert('网络错误')});
 }
-function adjustCredits(){
-  var uid=parseInt(document.getElementById('uidInput').value);
-  var amt=parseInt(document.getElementById('creditAmount').value);
-  var reason=document.getElementById('creditReason').value||'管理员调整';
-  if(!uid||!amt){alert('请输入用户ID和点数');return}
-  fetch('/api/admin/credits',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SECRET},body:JSON.stringify({secret:SECRET,user_id:uid,amount:amt,reason:reason})}).then(r=>r.json()).then(d=>{if(d.success){alert('调整成功');loadDashboard();}else{alert(d.error)}}).catch(function(){alert('网络错误')});
+
+function statusBadge(st){
+  var sm={
+    pending:'<span class="admin-badge admin-badge-pending">待支付</span>',
+    submitted:'<span class="admin-badge admin-badge-submitted">待确认</span>',
+    confirmed:'<span class="admin-badge admin-badge-confirmed">已到账</span>',
+    rejected:'<span class="admin-badge admin-badge-rejected">已拒绝</span>'
+  };
+  return sm[st]||st;
 }
+function setOrderFilter(btn, st){
+  orderFilter=st||'';
+  document.querySelectorAll('#orderFilterTabs .filter-tab').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  loadOrders();
+}
+function renderOrders(orders, summary){
+  var ohtml='';
+  (orders||[]).forEach(function(o){
+    var ops='';
+    var canAct = (o.status==='submitted' || o.status==='pending');
+    if(canAct){
+      ops+='<button class="admin-btn admin-btn-sm admin-btn-success" onclick="confirmOrder('+o.id+')">确认到账</button> ';
+      ops+='<button class="admin-btn admin-btn-sm admin-btn-danger" onclick="rejectOrder('+o.id+')">拒绝</button>';
+    }
+    ohtml+='<tr>'+
+      '<td>'+(canAct'<input type="checkbox" class="order-check" value="'+o.id+'">':'')+'</td>'+
+      '<td>'+o.id+'</td>'+
+      '<td><span class="user-pick" onclick="openUserDrawer('+o.user_id+')">'+o.username+'</span> <span style="color:var(--text-muted);font-size:.65rem">#'+o.user_id+'</span></td>'+
+      '<td>&yen;'+o.amount_yuan+'</td>'+
+      '<td>'+Number(o.points!=null?o.points:o.amount_yuan).toFixed(3)+'</td>'+
+      '<td>'+(o.payment_method||'-')+'</td>'+
+      '<td>'+statusBadge(o.status)+'</td>'+
+      '<td style="font-family:var(--font-mono)">'+(o.note||o.id)+'</td>'+
+      '<td>'+(o.created_at||'').substring(0,16)+'</td>'+
+      '<td>'+(o.confirmed_at||'').substring(0,16)+'</td>'+
+      '<td>'+ops+'</td></tr>';
+  });
+  document.querySelector('#orderTable tbody').innerHTML=ohtml||'<tr><td colspan="11">暂无订单</td></tr>';
+  if(summary){
+    document.getElementById('orderSummary').innerHTML=
+      '<div class="admin-stat profit"><div class="stat-value">&yen;'+Number(summary.confirmed_yuan||0).toFixed(2)+'</div><div class="stat-label">已到账合计</div><div class="stat-hint">'+(summary.confirmed_count||0)+' 笔</div></div>'+
+      '<div class="admin-stat warn"><div class="stat-value">'+(summary.submitted_count||0)+'</div><div class="stat-label">待确认</div><div class="stat-hint">&yen;'+Number(summary.submitted_yuan||0).toFixed(2)+'</div></div>'+
+      '<div class="admin-stat"><div class="stat-value">'+(summary.pending_count||0)+'</div><div class="stat-label">待支付</div><div class="stat-hint">&yen;'+Number(summary.pending_yuan||0).toFixed(2)+'</div></div>';
+  }
+}
+function loadOrders(){
+  if(!SECRET) return;
+  var q=document.getElementById('orderQ').value.trim();
+  var url='/api/admin/orders?limit=200';
+  if(orderFilter) url+='&status='+encodeURIComponent(orderFilter);
+  if(q) url+='&q='+encodeURIComponent(q);
+  fetch(url,{headers:authHeaders()}).then(r=>r.json()).then(d=>{
+    if(d.success) renderOrders(d.orders||[], d.summary||{});
+  });
+}
+function confirmOrder(oid){
+  if(!confirm('确认订单 #'+oid+' 已收款并到账？')) return;
+  fetch('/api/payment/confirm',{method:'POST',headers:authHeaders(true),body:JSON.stringify({secret:SECRET,order_id:oid})})
+    .then(r=>r.json()).then(d=>{
+      if(d.success){ toast(d.message||'已确认'); loadOrders(); loadDashboard(true); loadTransactions(); loadTimeseries(); loadAuditLogs(); }
+      else alert(d.error);
+    }).catch(function(){alert('网络错误')});
+}
+function rejectOrder(oid){
+  var reason=prompt('拒绝原因（将通知用户）','未收到款项/金额不符');
+  if(reason===null) return;
+  fetch('/api/admin/reject_order',{method:'POST',headers:authHeaders(true),body:JSON.stringify({secret:SECRET,order_id:oid,reason:reason||'管理员拒绝'})})
+    .then(r=>r.json()).then(d=>{
+      if(d.success){ toast('已拒绝'); loadOrders(); loadAuditLogs(); }
+      else alert(d.error);
+    });
+}
+
+function toggleOrderChecks(on){
+  document.querySelectorAll('.order-check').forEach(function(c){ c.checked=!!on; });
+}
+function batchConfirmSelected(){
+  var ids=[];
+  document.querySelectorAll('.order-check:checked').forEach(function(c){ ids.push(parseInt(c.value,10)); });
+  if(!ids.length){ alert('请先勾选待确认订单'); return; }
+  if(!confirm('批量确认 '+ids.length+' 笔订单到账？')) return;
+  fetch('/api/admin/batch_confirm',{method:'POST',headers:authHeaders(true),body:JSON.stringify({secret:SECRET,order_ids:ids})})
+    .then(r=>r.json()).then(d=>{
+      if(d.success){
+        toast('已确认 '+(d.confirmed||[]).length+' 笔'+(d.failed&&d.failed.length?('，失败 '+d.failed.length):''));
+        loadOrders(); loadDashboard(true); loadTransactions(); loadTimeseries(); loadAuditLogs();
+      } else alert(d.error||'失败');
+    });
+}
+function downloadAdminCsv(path, filename){
+  fetch(path,{headers:authHeaders()}).then(function(r){
+    if(!r.ok) throw new Error('export failed '+r.status);
+    return r.blob();
+  }).then(function(blob){
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=filename||'export.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){URL.revokeObjectURL(a.href);}, 2000);
+  }).catch(function(e){ alert('导出失败: '+(e.message||e)); });
+}
+function exportOrdersCsv(){
+  var url='/api/admin/export/orders.csv';
+  if(orderFilter) url+='?status='+encodeURIComponent(orderFilter);
+  downloadAdminCsv(url, 'orders.csv');
+}
+function exportTxCsv(){
+  downloadAdminCsv('/api/admin/export/transactions.csv','transactions.csv');
+}
+function openUserDrawer(uid){
+  document.getElementById('userDrawerMask').style.display='block';
+  var dr=document.getElementById('userDrawer');
+  dr.classList.add('open');
+  document.getElementById('userDrawerBody').innerHTML='加载中…';
+  fetch('/api/admin/user/'+uid,{headers:authHeaders()})
+    .then(r=>r.json()).then(d=>{
+      if(!d.success){ document.getElementById('userDrawerBody').textContent=d.error||'失败'; return; }
+      var u=d.user||{}, s=d.summary||{};
+      document.getElementById('userDrawerTitle').textContent='用户 #'+u.id+' '+u.username;
+      var h='<div class="admin-stats" style="margin-bottom:12px">'+
+        '<div class="admin-stat"><div class="stat-value">'+Number(u.points||0).toFixed(3)+'</div><div class="stat-label">余额点</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">'+Number(s.spent_points||0).toFixed(2)+'</div><div class="stat-label">累计消耗</div></div>'+
+        '<div class="admin-stat profit"><div class="stat-value">&yen;'+Number(s.recharged_yuan||0).toFixed(2)+'</div><div class="stat-label">累计充值</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">'+(s.projects||0)+'</div><div class="stat-label">项目数</div></div>'+
+        '</div>';
+      h+='<div class="admin-flex-wrap" style="margin-bottom:10px">'+
+        '<button class="admin-btn admin-btn-primary" onclick="pickUser('+u.id+',\''+String(u.username||'').replace(/'/g,"\\'")+'\');closeUserDrawer();">赠送点数</button>'+
+        '</div>';
+      h+='<h3 style="font-size:.85rem;margin:12px 0 6px">最近订单</h3><table class="admin-table"><thead><tr><th>ID</th><th>金额</th><th>状态</th><th>时间</th></tr></thead><tbody>';
+      (d.orders||[]).slice(0,8).forEach(function(o){
+        h+='<tr><td>'+o.id+'</td><td>&yen;'+o.amount_yuan+'</td><td>'+statusBadge(o.status)+'</td><td>'+(o.created_at||'').substring(0,16)+'</td></tr>';
+      });
+      h+='</tbody></table>';
+      h+='<h3 style="font-size:.85rem;margin:14px 0 6px">最近流水</h3><table class="admin-table"><thead><tr><th>类型</th><th>点</th><th>说明</th><th>时间</th></tr></thead><tbody>';
+      (d.transactions||[]).slice(0,12).forEach(function(t){
+        var p=Number(t.points||0);
+        h+='<tr><td>'+t.type+'</td><td style="color:'+(p>=0?'#059669':'#dc2626')+'">'+(p>=0?'+':'')+p.toFixed(3)+'</td><td style="max-width:160px;word-break:break-all">'+(t.description||'')+'</td><td>'+(t.created_at||'').substring(0,16)+'</td></tr>';
+      });
+      h+='</tbody></table>';
+      h+='<h3 style="font-size:.85rem;margin:14px 0 6px">最近 LLM</h3><table class="admin-table"><thead><tr><th>模块</th><th>扣点</th><th>API¥</th><th>时间</th></tr></thead><tbody>';
+      (d.llm_usage||[]).slice(0,10).forEach(function(l){
+        h+='<tr><td>'+l.module+'</td><td>'+Number(l.points_charged||0).toFixed(3)+'</td><td>'+Number(l.api_cost_yuan||0).toFixed(4)+'</td><td>'+(l.created_at||'').substring(0,16)+'</td></tr>';
+      });
+      h+='</tbody></table>';
+      document.getElementById('userDrawerBody').innerHTML=h;
+    });
+}
+function closeUserDrawer(){
+  document.getElementById('userDrawerMask').style.display='none';
+  document.getElementById('userDrawer').classList.remove('open');
+}
+function loadAuditLogs(){
+  if(!SECRET) return;
+  fetch('/api/admin/audit?limit=80',{headers:authHeaders()})
+    .then(r=>r.json()).then(d=>{
+      if(!d.success) return;
+      var h='';
+      (d.logs||[]).forEach(function(l){
+        h+='<tr><td>'+l.id+'</td><td>'+(l.actor_name||'-')+(l.actor_id?' #'+l.actor_id:'')+'</td><td>'+l.action+'</td><td>'+(l.target_type||'')+' '+(l.target_id||'')+'</td><td style="max-width:280px;word-break:break-all;font-size:.65rem">'+(l.detail||'')+'</td><td>'+(l.created_at||'').substring(0,16)+'</td></tr>';
+      });
+      document.querySelector('#auditTable tbody').innerHTML=h||'<tr><td colspan="6">暂无审计记录</td></tr>';
+    });
+}
+
+function loadTransactions(){
+  if(!SECRET) return;
+  var t=document.getElementById('txType').value;
+  var url='/api/admin/transactions?limit=100';
+  if(t) url+='&type='+encodeURIComponent(t);
+  fetch(url,{headers:authHeaders()}).then(r=>r.json()).then(d=>{
+    if(!d.success) return;
+    var h='';
+    (d.transactions||[]).forEach(function(t){
+      var pts=Number(t.points||0);
+      h+='<tr><td>'+t.id+'</td><td>'+t.username+'</td><td>'+t.type+'</td>'+
+        '<td style="color:'+(pts>=0?'#059669':'#dc2626')+';font-family:var(--font-mono)">'+(pts>=0?'+':'')+pts.toFixed(3)+'</td>'+
+        '<td style="font-family:var(--font-mono)">'+Number(t.points_after||0).toFixed(3)+'</td>'+
+        '<td style="max-width:280px;word-break:break-all">'+ (t.description||'') +'</td>'+
+        '<td>'+(t.created_at||'').substring(0,16)+'</td></tr>';
+    });
+    document.querySelector('#txTable tbody').innerHTML=h||'<tr><td colspan="7">暂无流水</td></tr>';
+  });
+}
+
 var _pricingCache=null;
 function loadOpsStats(){
   if(!SECRET) return;
-  fetch('/api/admin/ops_stats?secret='+encodeURIComponent(SECRET),{headers:{'Authorization':'Bearer '+SECRET}})
+  fetch('/api/admin/ops_stats',{headers:authHeaders()})
     .then(r=>r.json()).then(d=>{
       if(!d.success) return;
       var s=d.stats||{};
       document.getElementById('opsCards').innerHTML=
         '<div class="admin-stat"><div class="stat-value">'+(s.users||0)+'</div><div class="stat-label">用户数</div></div>'+
         '<div class="admin-stat"><div class="stat-value">'+(s.projects||0)+'</div><div class="stat-label">项目数</div></div>'+
-        '<div class="admin-stat"><div class="stat-value">'+(s.orders_pending||0)+'</div><div class="stat-label">待确认充值</div></div>'+
-        '<div class="admin-stat"><div class="stat-value">&yen;'+(s.confirmed_amount_today||0)+'</div><div class="stat-label">今日到账</div></div>'+
+        '<div class="admin-stat warn"><div class="stat-value">'+(s.orders_pending||0)+'</div><div class="stat-label">待支付订单</div></div>'+
+        '<div class="admin-stat profit"><div class="stat-value">&yen;'+(s.confirmed_amount_today||0)+'</div><div class="stat-label">今日到账</div></div>'+
         '<div class="admin-stat"><div class="stat-value">'+(s.llm_calls_today||0)+'</div><div class="stat-label">今日AI调用</div></div>'+
         '<div class="admin-stat"><div class="stat-value">'+(s.llm_charged_points_today||0)+'</div><div class="stat-label">今日AI扣点</div></div>';
-    }).catch(()=>{});
+    }).catch(function(){});
 }
 function loadPricingSchedules(){
   if(!SECRET) return;
-  fetch('/api/admin/pricing/schedules?secret='+encodeURIComponent(SECRET),{headers:{'Authorization':'Bearer '+SECRET}})
+  fetch('/api/admin/pricing/schedules',{headers:authHeaders()})
     .then(r=>r.json()).then(d=>{
-      if(!d.success){alert(d.error||'失败');return;}
+      if(!d.success){return;}
       var h='';
       (d.schedules||[]).forEach(function(r){
         h+='<tr><td>'+r.id+'</td><td>'+(r.name||'')+'</td><td>'+(r.effective_at||'')+'</td><td>'+(r.is_active? '生效中':'预约')+'</td><td style="max-width:360px;word-break:break-all;font-size:.65rem">'+(r.config_json||'')+'</td></tr>';
@@ -229,45 +748,45 @@ function createPricingSchedule(){
   var effective_at=t.replace('T',' ')+':00';
   var config={};
   try{config=JSON.parse(cfgRaw);}catch(e){alert('config 必须是 JSON');return;}
-  fetch('/api/admin/pricing/schedules',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SECRET},body:JSON.stringify({secret:SECRET,name:name,effective_at:effective_at,config:config})})
-    .then(r=>r.json()).then(d=>{ if(d.success){alert('已创建排期'); loadPricingSchedules(); loadPricing();} else alert(d.error||'失败'); });
+  fetch('/api/admin/pricing/schedules',{method:'POST',headers:authHeaders(true),body:JSON.stringify({secret:SECRET,name:name,effective_at:effective_at,config:config})})
+    .then(r=>r.json()).then(d=>{ if(d.success){toast('已创建排期'); loadPricingSchedules(); loadPricing();} else alert(d.error||'失败'); });
 }
 function loadLlmEconomics(){
-  if(!SECRET){alert('请先登录');return;}
-  fetch('/api/admin/llm_economics?secret='+encodeURIComponent(SECRET),{headers:{'Authorization':'Bearer '+SECRET}})
+  if(!SECRET) return;
+  fetch('/api/admin/llm_economics',{headers:authHeaders()})
     .then(r=>r.json()).then(d=>{
-      if(!d.success){alert(d.error||'无权限');return;}
+      if(!d.success) return;
       var s=d.summary||{};
       document.getElementById('llmEcoCards').innerHTML=
         '<div class="admin-stat"><div class="stat-value">'+ (s.today_calls||0) +'</div><div class="stat-label">今日AI调用</div></div>'+
         '<div class="admin-stat"><div class="stat-value">'+ (s.total_calls||0) +'</div><div class="stat-label">累计AI调用</div></div>'+
-        '<div class="admin-stat"><div class="stat-value">&yen;'+ (s.api_cost_yuan_today||0) +'</div><div class="stat-label">今日API成本</div></div>'+
+        '<div class="admin-stat danger"><div class="stat-value">&yen;'+ (s.api_cost_yuan_today||0) +'</div><div class="stat-label">今日API成本</div></div>'+
         '<div class="admin-stat"><div class="stat-value">'+ (s.charged_points_today||0) +'</div><div class="stat-label">今日用户扣费(点)</div></div>'+
-        '<div class="admin-stat"><div class="stat-value">&yen;'+ (s.api_cost_yuan_total||0) +'</div><div class="stat-label">累计API成本</div></div>'+
+        '<div class="admin-stat danger"><div class="stat-value">&yen;'+ (s.api_cost_yuan_total||0) +'</div><div class="stat-label">累计API成本</div></div>'+
         '<div class="admin-stat"><div class="stat-value">'+ (s.charged_points_total||0) +'</div><div class="stat-label">累计用户扣费(点)</div></div>'+
-        '<div class="admin-stat"><div class="stat-value">'+ (s.margin_points_total||0) +'</div><div class="stat-label">累计毛利(点-元)</div></div>';
+        '<div class="admin-stat profit"><div class="stat-value">'+ (s.margin_points_total||0) +'</div><div class="stat-label">累计毛利(点-元)</div></div>';
       var h='';
       (d.by_module||[]).forEach(function(r){
         h+='<tr><td>'+r.module+'</td><td>'+r.calls+'</td><td>'+(r.tin||0)+'</td><td>'+(r.tout||0)+'</td><td>'+r.api_cost_yuan+'</td><td>'+r.charged_points+'</td><td>'+r.margin_points+'</td></tr>';
       });
       document.querySelector('#llmEcoTable tbody').innerHTML=h||'<tr><td colspan="7">暂无数据</td></tr>';
-    }).catch(function(){alert('网络错误')});
+    }).catch(function(){});
 }
 function loadPricing(){
-  if(!SECRET){alert('请先登录');return;}
-  fetch('/api/admin/pricing?secret='+encodeURIComponent(SECRET),{headers:{'Authorization':'Bearer '+SECRET}})
+  if(!SECRET) return;
+  fetch('/api/admin/pricing',{headers:authHeaders()})
     .then(r=>r.json()).then(d=>{
-      if(!d.success){alert(d.error||'无权限');return;}
+      if(!d.success) return;
       _pricingCache=d;
       document.getElementById('pricingMeta').textContent='LLM倍率×'+(d.llm_markup||3)+'，最低扣费 '+(d.llm_min_charge_points||0.02)+' 点；每日免费本地操作 '+(d.daily_free_ops||5)+' 次';
       var tb=document.querySelector('#pricingTable tbody'); var h='';
       (d.items||[]).forEach(function(it){
-        h+='<tr><td>'+it.key+'</td><td>'+it.billing+'</td><td>'+it.milli_credits+'</td><td>'+it.points+'</td><td><input class="admin-input price-input" data-key="'+it.key+'" type="number" value="'+it.milli_credits+'" style="width:110px" '+(it.billing==='llm-token'?'title="AI模块实际按token扣费，此值仅兼容旧接口"':'')+'></td></tr>';
+        h+='<tr><td>'+it.key+'</td><td>'+it.billing+'</td><td>'+it.milli_credits+'</td><td>'+it.points+'</td><td><input class="admin-input price-input" data-key="'+it.key+'" type="number" value="'+it.milli_credits+'" style="width:110px" '+(it.billing==='llm-token''title="AI模块实际按token扣费，此值仅兼容旧接口"':'')+'></td></tr>';
       });
       tb.innerHTML=h;
       document.getElementById('bonusRegister').value=(d.bonuses&&d.bonuses.register_bonus)||3000;
       document.getElementById('bonusInvite').value=(d.bonuses&&d.bonuses.invite_bonus)||1000;
-    }).catch(function(){alert('网络错误')});
+    }).catch(function(){});
 }
 function savePricing(){
   if(!SECRET){alert('请先登录');return;}
@@ -275,12 +794,15 @@ function savePricing(){
   document.querySelectorAll('.price-input').forEach(function(inp){ updates[inp.getAttribute('data-key')]=inp.value; });
   updates['register_bonus']=document.getElementById('bonusRegister').value;
   updates['invite_bonus']=document.getElementById('bonusInvite').value;
-  fetch('/api/admin/pricing',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SECRET},body:JSON.stringify({secret:SECRET,updates:updates})})
-    .then(r=>r.json()).then(d=>{ if(d.success){alert('已保存 '+((d.changed||[]).length)+' 项'); loadPricing(); } else alert(d.error||'保存失败'); })
+  fetch('/api/admin/pricing',{method:'POST',headers:authHeaders(true),body:JSON.stringify({secret:SECRET,updates:updates})})
+    .then(r=>r.json()).then(d=>{ if(d.success){toast('已保存 '+((d.changed||[]).length)+' 项'); loadPricing(); } else alert(d.error||'保存失败'); })
     .catch(function(){alert('网络错误')});
 }
-function confirmOrder(oid){
-  fetch('/api/payment/confirm',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SECRET},body:JSON.stringify({secret:SECRET,order_id:oid})}).then(r=>r.json()).then(d=>{if(d.success){alert('已确认');loadDashboard();}else{alert(d.error)}}).catch(function(){alert('网络错误')});
-}
+
+// auto resume session
+(function(){
+  var saved=sessionStorage.getItem('thesis_ai_admin_secret');
+  if(saved){ SECRET=saved; loadDashboard(); }
+})();
 </script>
 </body></html>

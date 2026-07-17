@@ -223,10 +223,34 @@
   }
 
   function ensureArtifacts(p) {
-    if (!p.artifacts) p.artifacts = { outline: null, chapters: {}, skillLogs: [] };
+    if (!p.artifacts) p.artifacts = { outline: null, chapters: {}, skillLogs: [], exports: [] };
     if (!p.artifacts.chapters) p.artifacts.chapters = {};
     if (!p.artifacts.skillLogs) p.artifacts.skillLogs = [];
+    if (!p.artifacts.exports) p.artifacts.exports = [];
     return p.artifacts;
+  }
+
+  function recordExport(meta) {
+    var p = getCurrentProject();
+    if (!p) return null;
+    var arts = ensureArtifacts(p);
+    arts.exports.unshift({
+      id: uid(),
+      format: (meta && meta.format) || 'txt',
+      title: (meta && meta.title) || p.title || '',
+      chapters: (meta && meta.chapters) || 0,
+      words: (meta && meta.words) || 0,
+      at: nowISO()
+    });
+    arts.exports = arts.exports.slice(0, 30);
+    p.updatedAt = nowISO();
+    upsertProject(p);
+    logSkillRun({
+      moduleId: (meta && meta.moduleId) || 'export',
+      title: (meta && meta.titleLog) || ('导出 ' + ((meta && meta.format) || '文件').toUpperCase()),
+      summary: ((meta && meta.chapters) || 0) + ' 章 · ' + ((meta && meta.words) || 0) + ' 字'
+    });
+    return getCurrentProject();
   }
 
   function saveOutline(outline) {
@@ -366,7 +390,37 @@
     });
     arts.skillLogs = arts.skillLogs.slice(0, 50);
     p.updatedAt = nowISO();
-    return upsertProject(p);
+    try {
+      var mid = String(entry.moduleId || '');
+      p.stageStatus = p.stageStatus || {};
+      if (/topic-finder|proposal/.test(mid) && p.stageStatus.ideation !== 'done') {
+        p.stageStatus.ideation = 'active';
+        p.currentStage = p.currentStage || 'ideation';
+      }
+      if (/references|knowledge-graph|cite|refs/.test(mid) && p.stageStatus.literature !== 'done') {
+        p.stageStatus.literature = 'active';
+      }
+      if (/chapter|outline|expand|pipeline|merge-drafts/.test(mid) && p.stageStatus.writing !== 'done') {
+        p.stageStatus.writing = 'active';
+        p.currentStage = 'writing';
+      }
+      if (/proofread|format-check|de-duplicate|terminology|paragraph|optimization/.test(mid) && p.stageStatus.polish !== 'done') {
+        p.stageStatus.polish = 'active';
+        p.currentStage = 'polish';
+      }
+      if (/review|dashboard/.test(mid) && p.stageStatus.review !== 'done') {
+        p.stageStatus.review = 'active';
+        p.currentStage = 'review';
+      }
+      if (/defense|en-abstract|export/.test(mid) && p.stageStatus.defense !== 'done') {
+        p.stageStatus.defense = 'active';
+        p.currentStage = 'defense';
+      }
+    } catch (e) {}
+    upsertProject(p);
+    try { autoSyncStageProgress(getCurrentProject()); } catch (e) {}
+    try { renderProjectChrome(); } catch (e) {}
+    return getCurrentProject();
   }
 
   function markStage(stageId, status) {
@@ -393,24 +447,172 @@
     return p;
   }
 
+  function paperSignals(project) {
+    var hasPaper = !!(project && (project.hasManuscript || (typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100)));
+    var chCount = (typeof sections !== 'undefined' && sections && sections.length) ? sections.length : 0;
+    var refCount = 0;
+    if (typeof mergedRefs !== 'undefined' && mergedRefs && mergedRefs.length) refCount = mergedRefs.length;
+    else if (typeof existingRefs !== 'undefined' && existingRefs && existingRefs.length) refCount = existingRefs.length;
+    var outline = null;
+    try { outline = project ? getOutline() : null; } catch (e) { outline = null; }
+    var stats = { total: 0, ready: 0, words: 0, cards: [] };
+    try { if (project) stats = chapterStats(project); } catch (e) {}
+    var logs = (project && project.artifacts && project.artifacts.skillLogs) || [];
+    function hasLog(keys) {
+      var arr = Array.isArray(keys) ? keys : [keys];
+      return logs.some(function (l) {
+        var id = String(l.moduleId || '');
+        for (var i = 0; i < arr.length; i++) {
+          if (id === arr[i] || id.indexOf(arr[i]) === 0) return true;
+        }
+        return false;
+      });
+    }
+    return {
+      hasPaper: hasPaper,
+      chCount: chCount,
+      refCount: refCount,
+      outline: outline,
+      stats: stats,
+      hasIdea: !!(project && project.idea && String(project.idea).trim().length >= 8),
+      hasTitle: !!(project && project.title && project.title !== '未命名论文项目'),
+      hasField: !!(project && project.field && String(project.field).trim()),
+      hasOutline: !!(outline && outline.chapters && outline.chapters.length >= 3),
+      hasPolish: hasLog(['proofread', 'format-check', 'de-duplicate', 'terminology', 'paragraph', 'optimization']),
+      hasReview: hasLog(['review', 'dashboard', 'thesis-review']),
+      hasDefense: hasLog(['en-abstract', 'defense-ppt', 'defense-pack', 'defense']),
+      hasExport: hasLog(['export', 'export-docx']) || !!(project.artifacts && project.artifacts.exports && project.artifacts.exports.length),
+      exportCount: (project.artifacts && project.artifacts.exports && project.artifacts.exports.length) || 0
+    };
+  }
+
+  function evaluateStage(project, stageId) {
+    var s = paperSignals(project);
+    var checks = [];
+    if (stageId === 'ideation') {
+      checks = [
+        { ok: s.hasIdea, label: '研究想法 ≥8 字' },
+        { ok: s.hasTitle, label: '已有题目' },
+        { ok: s.hasField || !!(project && project.keywords), label: '领域或关键词' }
+      ];
+    } else if (stageId === 'literature') {
+      checks = [
+        { ok: s.refCount >= 5, label: '文献 ≥5 条（当前 ' + s.refCount + '）' },
+        { ok: s.chCount > 0 || s.hasOutline, label: '有章节/大纲结构' },
+        { ok: s.refCount >= 8 || s.hasPaper, label: '导入正文或文献≥8' }
+      ];
+    } else if (stageId === 'writing') {
+      // 流水线骨架通常 <300 字/章，不能只看 ready；有 pipeline/template 骨架时放宽
+      var hasPipelineSkeleton = false;
+      try {
+        var artsW = project && project.artifacts;
+        if (artsW && artsW.chapters) {
+          Object.keys(artsW.chapters).forEach(function (k) {
+            var ch = artsW.chapters[k];
+            if (ch && (ch.source === 'pipeline' || ch.source === 'template') && (ch.content || '').replace(/\s+/g, '').length >= 40) {
+              hasPipelineSkeleton = true;
+            }
+          });
+        }
+      } catch (e) {}
+      var draftReady = s.stats.ready >= 1 || (hasPipelineSkeleton && s.stats.total >= 3);
+      var wordsOk = s.stats.words >= 1000 || (hasPipelineSkeleton && s.stats.words >= 200);
+      checks = [
+        { ok: s.hasOutline, label: '大纲 ≥3 章' },
+        { ok: wordsOk, label: hasPipelineSkeleton && s.stats.words < 1000
+          ? ('已有骨架草稿 ' + s.stats.words + ' 字（建议继续扩写至 1000+）')
+          : ('草稿 ≥1000 字（' + s.stats.words + '）') },
+        { ok: draftReady, label: s.stats.ready >= 1
+          ? ('至少 1 章较完整（' + s.stats.ready + '/' + s.stats.total + '）')
+          : (hasPipelineSkeleton ? ('已生成 ' + s.stats.total + ' 章骨架（可进扩写）') : '至少 1 章较完整') }
+      ];
+    } else if (stageId === 'polish') {
+      checks = [
+        { ok: s.hasPaper || s.stats.words >= 1000, label: '有可审校正文' },
+        { ok: s.hasPolish, label: '已跑查错/格式/降重等' }
+      ];
+    } else if (stageId === 'review') {
+      checks = [
+        { ok: s.hasReview, label: '已跑论文审阅或看板' },
+        { ok: s.stats.words >= 3000 || s.hasPaper || s.stats.ready >= 2, label: '有足够正文可评' }
+      ];
+    } else if (stageId === 'defense') {
+      checks = [
+        { ok: s.hasDefense || s.hasExport, label: '答辩材料或已导出' + (s.exportCount ? '（' + s.exportCount + ' 次）' : '') },
+        { ok: s.stats.ready >= 2 || s.hasPaper || s.stats.words >= 2000, label: '主体内容就绪' }
+      ];
+    }
+    var passed = 0;
+    checks.forEach(function (c) { if (c.ok) passed++; });
+    return {
+      stageId: stageId,
+      checks: checks,
+      done: checks.length > 0 && passed === checks.length,
+      progress: checks.length ? passed / checks.length : 0,
+      passed: passed,
+      total: checks.length
+    };
+  }
+
+  function autoSyncStageProgress(project) {
+    if (!project) return null;
+    project.stageStatus = project.stageStatus || {};
+    var changed = false;
+    STAGES.forEach(function (st) {
+      var ev = evaluateStage(project, st.id);
+      var cur = project.stageStatus[st.id] || 'todo';
+      if (ev.done && cur !== 'done') {
+        project.stageStatus[st.id] = 'done';
+        changed = true;
+      } else if (!ev.done && cur === 'todo' && project.currentStage === st.id) {
+        project.stageStatus[st.id] = 'active';
+        changed = true;
+      }
+    });
+    if (project.stageStatus[project.currentStage] === 'done') {
+      for (var i = 0; i < STAGES.length; i++) {
+        if (project.stageStatus[STAGES[i].id] !== 'done') {
+          if (project.currentStage !== STAGES[i].id) {
+            project.currentStage = STAGES[i].id;
+            if (project.stageStatus[STAGES[i].id] !== 'done') project.stageStatus[STAGES[i].id] = 'active';
+            changed = true;
+          }
+          break;
+        }
+      }
+    }
+    if (changed) {
+      project.updatedAt = nowISO();
+      upsertProject(project);
+    }
+    return getCurrentProject() || project;
+  }
+
   function calcProgress(project) {
     if (!project) return { percent: 0, done: 0, total: STAGES.length, label: '未创建项目' };
     var done = 0;
+    var soft = 0;
     STAGES.forEach(function (s) {
-      if ((project.stageStatus || {})[s.id] === 'done') done++;
+      if ((project.stageStatus || {})[s.id] === 'done') {
+        done++;
+        soft += 1;
+      } else {
+        var ev = evaluateStage(project, s.id);
+        soft += Math.min(0.95, ev.progress || 0);
+      }
     });
-    // 有正文时给导入/写作路径额外加成感
-    var bonus = project.hasManuscript ? 8 : 0;
-    var percent = Math.min(100, Math.round((done / STAGES.length) * 100 + (done === STAGES.length ? 0 : bonus * 0)));
-    if (project.hasManuscript && done < 2) percent = Math.max(percent, 18);
+    var percent = Math.min(100, Math.round((soft / STAGES.length) * 100));
+    if (project.hasManuscript && percent < 12) percent = 12;
     var stage = null;
     for (var i = 0; i < STAGES.length; i++) if (STAGES[i].id === project.currentStage) stage = STAGES[i];
+    var curEv = stage ? evaluateStage(project, stage.id) : null;
     return {
       percent: percent,
       done: done,
       total: STAGES.length,
-      label: stage ? ('当前：' + stage.name) : '进行中',
-      stage: stage
+      label: stage ? ('当前：' + stage.name + (curEv ? ' ' + curEv.passed + '/' + curEv.total : '')) : '进行中',
+      stage: stage,
+      stageEval: curEv
     };
   }
 
@@ -423,31 +625,60 @@
         secondary: { label: '上传论文', action: 'upload' }
       };
     }
-    var hasPaper = !!(project.hasManuscript || (typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100));
-    var chCount = (typeof sections !== 'undefined' && sections && sections.length) ? sections.length : 0;
-    var refCount = 0;
-    if (typeof mergedRefs !== 'undefined' && mergedRefs && mergedRefs.length) refCount = mergedRefs.length;
-    else if (typeof existingRefs !== 'undefined' && existingRefs && existingRefs.length) refCount = existingRefs.length;
-    if (hasPaper && !chCount) {
+    try { project = autoSyncStageProgress(project) || project; } catch (e) {}
+    var sig = paperSignals(project);
+    if (sig.hasPaper && !sig.chCount && !sig.hasOutline) {
       return { title: '目录树还没识别出来', desc: '先看左侧底部目录；若为空，请重新上传论文。', primary: { label: '重新上传论文', action: 'upload' }, secondary: { label: '打开参考文献', action: 'open-stage', stageId: 'literature', moduleId: 'references' } };
     }
-    if (hasPaper && !refCount) {
+    if (sig.hasPaper && sig.refCount < 1) {
       return { title: '去确认参考文献', desc: '正文结构已有。下一步检查文末文献是否提取成功。', primary: { label: '打开参考文献', action: 'open-stage', stageId: 'literature', moduleId: 'references' }, secondary: { label: '打开论文看板', action: 'open-stage', stageId: 'review', moduleId: 'dashboard' } };
     }
     var stage = null;
     for (var i = 0; i < STAGES.length; i++) if (STAGES[i].id === project.currentStage) stage = STAGES[i];
     if (!stage) stage = STAGES[0];
-    var mod = stage.modules && stage.modules[0];
-    if (stage.id === 'writing') {
-      var outline = getOutline();
-      if (!outline) return { title: '先定大纲', desc: '分章写作前先保存大纲，后面草稿才有结构。', primary: { label: '打开大纲编辑器', action: 'open-outline' }, secondary: hasPaper ? { label: '去论文扩写', action: 'open-stage', stageId: 'writing', moduleId: 'expand' } : null };
-      return { title: '继续分章草稿', desc: '按大纲把每章骨架写出来，再扩写细化。', primary: { label: '打开分章看板', action: 'open-chapters' }, secondary: { label: '论文扩写', action: 'open-stage', stageId: 'writing', moduleId: 'expand' } };
+    var ev = evaluateStage(project, stage.id);
+    if (ev.done) {
+      var nextSt = null;
+      for (var j = 0; j < STAGES.length; j++) {
+        if (STAGES[j].id === stage.id && j < STAGES.length - 1) nextSt = STAGES[j + 1];
+      }
+      return {
+        title: '「' + stage.name + '」标准已达成',
+        desc: '可以进入下一阶段' + (nextSt ? '「' + nextSt.name + '」' : '或导出全文') + '。',
+        primary: nextSt
+          ? { label: '进入' + nextSt.name, action: 'open-stage', stageId: nextSt.id, moduleId: (nextSt.modules && nextSt.modules[0]) || '' }
+          : { label: '导出 DOCX', action: 'export-docx' },
+        secondary: { label: '标记完成并前进', action: 'complete-stage' }
+      };
     }
+    if (stage.id === 'ideation') {
+      if (!sig.hasIdea) return { title: '写下研究想法', desc: '一句话描述你要研究什么，再进入选题。', primary: { label: '打开项目设置', action: 'open-settings' }, secondary: { label: '选题推荐', action: 'open-stage', stageId: 'ideation', moduleId: 'topic-finder' } };
+      return { title: '用 AI 打磨选题', desc: '基于想法生成可行题目与开题大纲。', primary: { label: '选题推荐', action: 'open-stage', stageId: 'ideation', moduleId: 'topic-finder' }, secondary: { label: '开题大纲', action: 'open-stage', stageId: 'ideation', moduleId: 'proposal' } };
+    }
+    if (stage.id === 'literature') {
+      if (sig.refCount < 5) return { title: '补齐参考文献', desc: '至少 5 条可用文献，再进入写作。当前 ' + sig.refCount + ' 条。', primary: { label: '打开参考文献', action: 'open-stage', stageId: 'literature', moduleId: 'references' }, secondary: { label: '知识图谱', action: 'open-stage', stageId: 'literature', moduleId: 'knowledge-graph' } };
+      return { title: '核对文献与图谱', desc: '文献已够起步，可做图谱或进入写作。', primary: { label: '打开知识图谱', action: 'open-stage', stageId: 'literature', moduleId: 'knowledge-graph' }, secondary: { label: '去分章写作', action: 'open-stage', stageId: 'writing' } };
+    }
+    if (stage.id === 'writing') {
+      if (!sig.hasOutline) return { title: '先定大纲', desc: '分章写作前先保存大纲，后面草稿才有结构。', primary: { label: '打开大纲编辑器', action: 'open-outline' }, secondary: { label: '一键流水线', action: 'pipeline' } };
+      if (sig.stats.words < 1000) return { title: '写满首批草稿', desc: '当前 ' + sig.stats.words + ' 字。打开分章看板写骨架，或用流水线生成。', primary: { label: '打开分章看板', action: 'open-chapters' }, secondary: { label: '一键流水线', action: 'pipeline' } };
+      return { title: '充实章节草稿', desc: '已有 ' + sig.stats.ready + '/' + sig.stats.total + ' 章较完整。继续扩写或合并到正文。', primary: { label: '打开分章看板', action: 'open-chapters' }, secondary: { label: '论文扩写', action: 'open-stage', stageId: 'writing', moduleId: 'expand' } };
+    }
+    if (stage.id === 'polish') {
+      return { title: '打磨审校', desc: '依次查错、格式、术语；至少完成一项即记入本阶段。', primary: { label: '论文查错', action: 'open-stage', stageId: 'polish', moduleId: 'proofread' }, secondary: { label: '格式检查', action: 'open-stage', stageId: 'polish', moduleId: 'format-check' } };
+    }
+    if (stage.id === 'review') {
+      return { title: '综合评审', desc: '用审阅与十维看板找短板。', primary: { label: '论文审阅', action: 'open-stage', stageId: 'review', moduleId: 'review' }, secondary: { label: '论文看板', action: 'open-stage', stageId: 'review', moduleId: 'dashboard' } };
+    }
+    if (stage.id === 'defense') {
+      return { title: '答辩与导出', desc: '生成答辩材料包，或导出 DOCX。', primary: { label: '答辩材料包', action: 'defense-pack' }, secondary: { label: '导出 DOCX', action: 'export-docx' } };
+    }
+    var mod = stage.modules && stage.modules[0];
     return {
       title: '继续「' + stage.name + '」',
       desc: stage.desc + (mod ? ' · 推荐：' + moduleLabel(mod) : ''),
       primary: { label: '进入本阶段', action: 'open-stage', stageId: stage.id, moduleId: mod },
-      secondary: hasPaper ? null : { label: '上传已有草稿', action: 'upload' }
+      secondary: sig.hasPaper ? null : { label: '上传已有草稿', action: 'upload' }
     };
   }
 
@@ -660,9 +891,12 @@
     var refCount = 0;
     if (typeof mergedRefs !== 'undefined' && mergedRefs && mergedRefs.length) refCount = mergedRefs.length;
     else if (typeof existingRefs !== 'undefined' && existingRefs && existingRefs.length) refCount = existingRefs.length;
+    var boardDone = !!(project && project.artifacts && (project.artifacts.skillLogs || []).some(function (l) {
+      return /dashboard|review/.test(String(l.moduleId || ''));
+    }));
     function item(done, title, desc, btnLabel, onclick) {
       return '<div class="checklist-item' + (done ? ' is-done' : '') + '">' +
-        '<div class="checklist-left"><span class="checklist-dot">' + (done ? '\u2713' : '\u25cb') + '</span>' +
+        '<div class="checklist-left"><span class="checklist-dot">' + (done ? '✓' : '○') + '</span>' +
         '<div><b>' + title + '</b><p>' + desc + '</p></div></div>' +
         (done ? '<span class="checklist-ok">已完成</span>' :
           '<button class="ai-btn-clear" onclick="' + onclick + '">' + btnLabel + '</button>') +
@@ -672,7 +906,26 @@
       '<div class="import-checklist-head"><strong>导入后 3 步</strong><span>按顺序做，先别点一圈工具箱</span></div>' +
       item(chCount > 0, '1. 检查目录树', chCount > 0 ? ('已识别 ' + chCount + ' 章') : '左侧底部「目录」应出现章节；没有就重新上传', '看目录树', "document.getElementById('navTree')&&document.getElementById('navTree').scrollIntoView({behavior:'smooth'})") +
       item(refCount > 0, '2. 检查参考文献', refCount > 0 ? ('已提取 ' + refCount + ' 条') : '到参考文献面板确认是否识别到文末文献', '打开参考文献', "switchView('references')") +
-      item(false, '3. 打开论文看板', '用十维评分看整体缺口，再决定改哪一章', '打开看板', 'showDashboard()') +
+      item(boardDone, '3. 打开论文看板', boardDone ? '已查看审阅/看板' : '用十维评分看整体缺口，再决定改哪一章', '打开看板', 'showDashboard()') +
+    '</div>';
+  }
+
+  function renderStageCriteriaHTML(project) {
+    if (!project) return '';
+    var stageId = project.currentStage || 'ideation';
+    var stage = null;
+    for (var i = 0; i < STAGES.length; i++) if (STAGES[i].id === stageId) stage = STAGES[i];
+    var ev = evaluateStage(project, stageId);
+    if (!ev.checks || !ev.checks.length) return '';
+    var rows = ev.checks.map(function (c) {
+      return '<div class="stage-criteria-item' + (c.ok ? ' is-ok' : '') + '">' +
+        '<span class="stage-criteria-dot">' + (c.ok ? '✓' : '○') + '</span>' +
+        '<span>' + escapeHtml(c.label) + '</span></div>';
+    }).join('');
+    return '<div class="stage-criteria-card">' +
+      '<div class="stage-criteria-head"><strong>' + escapeHtml(stage ? stage.name : '本阶段') + '完成标准</strong>' +
+      '<span>' + ev.passed + '/' + ev.total + (ev.done ? ' · 已达标' : '') + '</span></div>' +
+      rows +
     '</div>';
   }
 
@@ -705,15 +958,25 @@
         '</div>';
     }
 
+    try { project = autoSyncStageProgress(project) || project; } catch (e) {}
+    var prog = calcProgress(project);
+    var next = nextAction(project);
+
     var stagesHtml = STAGES.map(function (s) {
       var st = (project.stageStatus || {})[s.id] || 'todo';
+      var ev = evaluateStage(project, s.id);
       var cls = 'project-stage-card is-' + st + (s.id === project.currentStage ? ' is-current' : '');
       return '<div class="' + cls + '" onclick="openProjectStage(\'' + s.id + '\')">' +
-        '<div class="project-stage-status">' + (st === 'done' ? '已完成' : (st === 'active' ? '进行中' : '未开始')) + '</div>' +
+        '<div class="project-stage-status">' + (st === 'done' ? '已完成' : (st === 'active' ? '进行中' : '未开始')) +
+          (ev.total ? ' · ' + ev.passed + '/' + ev.total : '') + '</div>' +
         '<div class="project-stage-name">' + s.icon + ' ' + s.name + '</div>' +
         '<div class="project-stage-desc">' + s.desc + '</div>' +
       '</div>';
     }).join('');
+
+    var secAction = next.secondary
+      ? '<button class="ai-btn-clear" onclick="runProjectAction(\'' + next.secondary.action + '\',\'' + (next.secondary.stageId || '') + '\',\'' + (next.secondary.moduleId || '') + '\')">' + next.secondary.label + '</button>'
+      : '';
 
     return '' +
       '<div class="project-overview">' +
@@ -731,14 +994,19 @@
           '</div>' +
         '</div>' +
         '<div class="project-next-card">' +
-          '<div><div class="next-kicker">当前建议</div><strong>' + escapeHtml(next.title) + '</strong><p>' + escapeHtml(next.desc) + '</p></div>' +
+          '<div><div class="next-kicker">下一步只做这一件</div><strong>' + escapeHtml(next.title) + '</strong><p>' + escapeHtml(next.desc) + '</p></div>' +
           '<div class="project-cta-row" style="margin:0">' +
             '<button class="ai-btn" onclick="runProjectAction(\'' + next.primary.action + '\',\'' + (next.primary.stageId || '') + '\',\'' + (next.primary.moduleId || '') + '\')">' + next.primary.label + '</button>' +
-            (next.secondary ? '<button class="ai-btn-clear" onclick="runProjectAction(\'' + next.secondary.action + '\')">' + next.secondary.label + '</button>' : '') +
+            secAction +
             '<button class="ai-btn-clear" onclick="completeCurrentStage()">完成本阶段</button>' +
           '</div>' +
         '</div>' +
+        renderStageCriteriaHTML(project) +
+        renderImportChecklist(project) +
         renderSmartTips(project) +
+        renderChapterBoardInline(project) +
+        renderSkillLogInline(project) +
+        renderExportHistoryInline(project) +
         '<details class="project-more-tools"><summary>更多工具</summary><div class="project-tools-row">' +
           '<button class="ai-btn-clear" onclick="runOneClickPipeline()">一键流水线</button>' +
           '<button class="ai-btn-clear" onclick="openDefensePack()">答辩材料包</button>' +
@@ -750,6 +1018,7 @@
           '<button class="ai-btn-clear" onclick="mergeDraftsIntoThesis()">合并到正文</button>' +
           '<button class="ai-btn-clear" onclick="openTemplateChooser()">学校模板</button>' +
           '<button class="ai-btn-clear" onclick="openProjectSettings()">设置</button>' +
+          '<button class="ai-btn-clear" onclick="openExportHistory()">导出历史</button>' +
           '<button class="ai-btn-clear" onclick="exportFullPaperDocx()">导出DOCX</button>' +
         '</div></details>' +
         '<div class="project-stage-grid">' + stagesHtml + '</div>' +
@@ -785,13 +1054,64 @@
 
   function renderSkillLogInline(project) {
     var logs = (project.artifacts && project.artifacts.skillLogs) || [];
-    if (!logs.length) {
-      return '<div class="project-panel-card"><div class="project-panel-head"><strong>🧾 能力运行记录</strong><span>保存大纲、章节后会自动留下轨迹</span></div></div>';
+    var exports = (project.artifacts && project.artifacts.exports) || [];
+    if (!logs.length && !exports.length) {
+      return '<div class="project-panel-card"><div class="project-panel-head"><strong>能力运行记录</strong><span>用模块、保存章节、导出后会自动留下轨迹</span></div></div>';
     }
-    var rows = logs.slice(0, 5).map(function (l) {
+    var rows = logs.slice(0, 8).map(function (l) {
       return '<div class="skill-log-row"><b>' + escapeHtml(l.title || l.moduleId) + '</b><span>' + escapeHtml(l.summary || '') + '</span><i>' + formatTime(l.at) + '</i></div>';
     }).join('');
-    return '<div class="project-panel-card"><div class="project-panel-head"><strong>🧾 最近能力记录</strong><span>本地保存，便于回溯</span></div>' + rows + '</div>';
+    var exportHint = exports.length
+      ? '<div class="project-cta-row" style="margin:10px 0 0"><button class="ai-btn-clear" onclick="openExportHistory()">导出历史（' + exports.length + '）</button></div>'
+      : '';
+    return '<div class="project-panel-card"><div class="project-panel-head"><strong>最近能力记录</strong><span>本地保存 · 驱动阶段进度</span></div>' + rows + exportHint + '</div>';
+  }
+
+  function renderExportHistoryInline(project) {
+    var list = (project.artifacts && project.artifacts.exports) || [];
+    if (!list.length) return '';
+    var rows = list.slice(0, 5).map(function (e) {
+      return '<div class="skill-log-row"><b>' + escapeHtml((e.format || '').toUpperCase()) + '</b><span>' +
+        escapeHtml(e.title || '') + ' · ' + (e.chapters || 0) + ' 章 · ' + (e.words || 0) + ' 字</span><i>' + formatTime(e.at) + '</i></div>';
+    }).join('');
+    return '<div class="project-panel-card"><div class="project-panel-head"><strong>导出历史</strong><span>最近 ' + list.length + ' 次</span></div>' +
+      rows +
+      '<div class="project-cta-row" style="margin:10px 0 0">' +
+        '<button class="ai-btn-clear" onclick="openExportHistory()">查看全部</button>' +
+        '<button class="ai-btn-clear" onclick="exportFullPaperDocx()">再导 DOCX</button>' +
+      '</div></div>';
+  }
+
+  function openExportHistory() {
+    var p = getCurrentProject();
+    if (!p) { openIdeaWizard(); return; }
+    var list = (ensureArtifacts(p).exports) || [];
+    var rows = list.length
+      ? list.map(function (e, i) {
+          return '<div class="version-row">' +
+            '<div class="version-top"><b>#' + (i + 1) + ' · ' + escapeHtml((e.format || '').toUpperCase()) + '</b><span>' + formatTime(e.at) + '</span></div>' +
+            '<div class="version-preview">' + escapeHtml(e.title || p.title) + ' · ' + (e.chapters || 0) + ' 章 · ' + (e.words || 0) + ' 字</div>' +
+          '</div>';
+        }).join('')
+      : '<div class="project-progress-sub" style="text-align:center;padding:16px">还没有导出记录。大纲/分章就绪后可导出 DOCX 或 TXT。</div>';
+    var ov = document.createElement('div');
+    ov.id = 'exportHistoryOverlay';
+    ov.className = 'project-overlay';
+    ov.innerHTML = '<div class="project-modal" style="width:min(520px,96vw)" onclick="event.stopPropagation()">' +
+      '<div class="project-modal-head"><div><h3>导出历史</h3><p>仅记录本机项目内的导出动作，不保存文件本体</p></div>' +
+      '<button class="project-close" onclick="closeExportHistory()">×</button></div>' +
+      '<div style="max-height:55vh;overflow:auto">' + rows + '</div>' +
+      '<div class="project-modal-actions">' +
+        '<button class="ai-btn-clear" onclick="closeExportHistory()">关闭</button>' +
+        '<button class="ai-btn-clear" onclick="closeExportHistory();exportFullPaper()">导出 TXT</button>' +
+        '<button class="ai-btn" onclick="closeExportHistory();exportFullPaperDocx()">导出 DOCX</button>' +
+      '</div></div>';
+    ov.onclick = function () { closeExportHistory(); };
+    document.body.appendChild(ov);
+  }
+  function closeExportHistory() {
+    var ov = document.getElementById('exportHistoryOverlay');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
   }
 
   function formatTime(iso) {
@@ -846,13 +1166,23 @@
     var host = document.getElementById('stageNav');
     if (!host) return;
     var project = getCurrentProject();
+    if (project) {
+      try { project = autoSyncStageProgress(project) || project; } catch (e) {}
+    }
     var html = '';
     STAGES.forEach(function (s, idx) {
       var st = project ? ((project.stageStatus || {})[s.id] || 'todo') : 'todo';
       var cur = project && project.currentStage === s.id;
+      var meta = '';
+      if (project) {
+        try {
+          var ev = evaluateStage(project, s.id);
+          if (ev.total) meta = ' · ' + ev.passed + '/' + ev.total;
+        } catch (e) {}
+      }
       html += '<div class="stage-nav-item' + (cur ? ' active' : '') + ' is-' + st + '" onclick="openProjectStage(\'' + s.id + '\')">' +
         '<span class="stage-nav-idx">' + (idx + 1) + '</span>' +
-        '<span class="stage-nav-text"><b>' + s.name + '</b><i>' + s.desc + '</i></span>' +
+        '<span class="stage-nav-text"><b>' + s.name + '</b><i>' + s.desc + meta + '</i></span>' +
       '</div>';
     });
     host.innerHTML = html;
@@ -890,9 +1220,16 @@
   function completeCurrentStage() {
     var project = getCurrentProject();
     if (!project) { openIdeaWizard(); return; }
-    completeStage(project.currentStage);
+    var stageId = project.currentStage || 'ideation';
+    var ev = evaluateStage(project, stageId);
+    if (!ev.done) {
+      var missing = (ev.checks || []).filter(function (c) { return !c.ok; }).map(function (c) { return c.label; });
+      var msg = '本阶段标准尚未全部达成' + (missing.length ? ('：\n- ' + missing.join('\n- ')) : '') + '\n\n仍要强制标记完成吗？';
+      if (!confirm(msg)) return;
+    }
+    completeStage(stageId);
     renderProjectChrome();
-    if (typeof ttp === 'function') ttp('已标记阶段完成');
+    if (typeof ttp === 'function') ttp(ev.done ? '阶段达标，已进入下一阶段' : '已强制标记阶段完成');
   }
 
   function runProjectAction(action, stageId, moduleId) {
@@ -900,6 +1237,12 @@
     if (action === 'upload') return typeof triggerUpload === 'function' ? triggerUpload() : null;
     if (action === 'open-stage') return openProjectStage(stageId || 'ideation');
     if (action === 'open-outline') return openOutlineEditor();
+    if (action === 'open-chapters') return openChapterBoard();
+    if (action === 'open-settings') return openProjectSettings();
+    if (action === 'pipeline') return runOneClickPipeline();
+    if (action === 'defense-pack') return openDefensePack();
+    if (action === 'export-docx') return exportFullPaperDocx();
+    if (action === 'complete-stage') return completeCurrentStage();
     if (moduleId && typeof switchModule === 'function') return switchModule(moduleId);
   }
 
@@ -1047,12 +1390,12 @@
     } else {
       updateCurrent({ hasManuscript: true, mode: p.mode === 'create' ? 'create' : 'import' });
     }
-    // P1: align imported sections to project outline + chapter drafts
     try { syncSectionsToChapterDrafts(false); } catch (e) { console.warn('[import-sync]', e); }
+    try { autoSyncStageProgress(getCurrentProject()); } catch (e) {}
     renderProjectChrome();
     if (typeof switchView === 'function') switchView('workspace');
     try { ensureUnifiedProjectState(); } catch (e) {}
-    if (typeof ttp === 'function') ttp('论文已导入：已并入同一项目主线，请按清单继续');
+    if (typeof ttp === 'function') ttp('论文已导入：请按「导入后 3 步」继续');
   }
 
   // exports
@@ -1078,7 +1421,14 @@
     getChapterDraft: getChapterDraft,
     getVersionHistory: getVersionHistory,
     rollbackChapterVersion: rollbackChapterVersion,
+    evaluateStage: evaluateStage,
+    autoSyncStageProgress: autoSyncStageProgress,
+    paperSignals: paperSignals,
+    recordExport: recordExport,
+    openExportHistory: openExportHistory,
   };
+  window.openExportHistory = openExportHistory;
+  window.closeExportHistory = closeExportHistory;
   window.openIdeaWizard = openIdeaWizard;
   window.closeIdeaWizard = closeIdeaWizard;
   window.submitIdeaWizard = submitIdeaWizard;
@@ -1637,7 +1987,8 @@
       tips.push({ title: '文献检索策略', desc: '先用主题词检索，再看每章关联文献密度' });
     } else if (stage === 'writing') {
       if (stats.total < 3) tips.push({ title: '大纲不完整', desc: '至少 5 章才算标准硕士论文结构' });
-      if (stats.words < 1000) tips.push({ title: '开始写第一段', desc: '打开分章草稿，从绪论或最熟的一章开始' });
+      if (stats.words < 200) tips.push({ title: '先跑一键流水线', desc: '自动生成大纲与各章骨架，再逐章扩写' });
+      else if (stats.words < 1000) tips.push({ title: '骨架已有，开始充实', desc: '当前 ' + stats.words + ' 字。打开分章看板，把一章写到 300+ 字' });
       if (stats.ready > 0 && stats.ready < stats.total) tips.push({ title: '章节进度：' + stats.ready + '/' + stats.total, desc: '用 AI 扩写提升草稿完成度' });
       if (stats.words > 5000) tips.push({ title: '考虑插入文献', desc: '用章节编辑器插入引用标记标注关键位置' });
     } else if (stage === 'polish') {
@@ -1706,7 +2057,16 @@
       a.download = (payload.title || '论文').replace(/[\\/:\s]+/g, '_') + '.docx';
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
-      logSkillRun({ moduleId: 'export-docx', title: '导出 DOCX', summary: payload.chapters.length + ' 章' });
+      var words = 0;
+      (payload.chapters || []).forEach(function (ch) { words += String(ch.content || '').replace(/\s+/g, '').length; });
+      recordExport({
+        format: 'docx',
+        title: payload.title,
+        chapters: (payload.chapters || []).length,
+        words: words,
+        moduleId: 'export-docx',
+        titleLog: '导出 DOCX'
+      });
       if (typeof ttp === 'function') ttp('DOCX 已导出');
     }).catch(function(e) {
       alert('DOCX 导出失败：' + (e.message || e) + '。将回退为 TXT 导出。');
@@ -1760,7 +2120,14 @@
     a.download = (outline.title || '论文草稿').replace(/[\\/:\s]+/g, '_') + '_' + new Date().toISOString().slice(0, 10) + '.txt';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-    logSkillRun({ moduleId: 'export', title: '导出论文全文', summary: stats.words + ' 字 · ' + outline.chapters.length + ' 章' });
+    recordExport({
+      format: 'txt',
+      title: outline.title || p.title,
+      chapters: outline.chapters.length,
+      words: stats.words,
+      moduleId: 'export',
+      titleLog: '导出 TXT'
+    });
     if (typeof ttp === 'function') ttp('已导出论文草稿（' + stats.words + ' 字）');
   }
 
@@ -1932,11 +2299,11 @@
   window.pullCloudProjects = pullCloudProjects;
   window.syncProjectToCloud = syncProjectToCloud;
 
-  // ===== 一键流水线：想法/导入 -> 大纲 -> 章节骨架 ->（可选）选题建议 =====
+  // ===== 一键流水线：想法/导入 -> 大纲 -> 章节骨架 -> 推进写作阶段完成度 =====
   function runOneClickPipeline() {
     var p = ensureUnifiedProjectState() || getCurrentProject();
     if (!p) { openIdeaWizard(); return; }
-    if (!confirm('一键流水线将：\\n1) 确认/生成大纲\\n2) 为每章生成骨架草稿\\n3) 进入写作阶段\\n\\n不会自动调用收费 LLM（可随后手动点 AI 扩写）。继续？')) return;
+    if (!confirm('一键流水线将：\n1) 确认/生成大纲\n2) 为每章生成骨架草稿\n3) 进入写作阶段并刷新完成度\n\n不会自动调用收费 LLM（可随后手动点 AI 扩写）。继续？')) return;
 
     // 1 outline
     var outline = getOutline();
@@ -1944,36 +2311,93 @@
       applySchoolTemplate(p.schoolTemplate || 'generic');
       outline = getOutline();
     }
-    // 2 seed chapter skeletons
+    if (!outline || !outline.chapters || !outline.chapters.length) {
+      alert('未能生成大纲，请先打开大纲编辑器手动保存。');
+      openOutlineEditor();
+      return;
+    }
+
+    // 2 seed chapter skeletons（不覆盖用户已写长文）
     var arts = ensureArtifacts(getCurrentProject());
     var n = 0;
+    var skipped = 0;
     (outline.chapters || []).forEach(function(ch, idx) {
       var key = chapterKey(ch.title, idx);
       var prev = arts.chapters[key];
-      if (prev && prev.content && prev.content.replace(/\\s+/g,'').length > 80 && prev.source !== 'template') return;
-      var skeleton = ch.title + '\\n\\n' + (ch.sections || []).map(function(s, i) {
-        return (i + 1) + '. ' + s + '\\n（请补充论据、数据与文献引用）\\n';
-      }).join('\\n');
-      // keep imported content if longer
-      if (prev && prev.content && prev.content.length > skeleton.length) return;
+      var prevWords = prev && prev.content ? prev.content.replace(/\s+/g, '').length : 0;
+      // 用户已写较多内容：跳过
+      if (prevWords > 80 && prev && prev.source !== 'template' && prev.source !== 'pipeline') {
+        skipped++;
+        return;
+      }
+      var skeleton = ch.title + '\n\n' + (ch.sections || []).map(function(s, i) {
+        return (i + 1) + '. ' + s + '\n（请补充论据、数据与文献引用）\n';
+      }).join('\n');
+      // 已有更长正文则保留
+      if (prev && prev.content && prev.content.length > skeleton.length && prevWords > 80) {
+        skipped++;
+        return;
+      }
       arts.chapters[key] = {
-        key: key, title: ch.title, sections: ch.sections || [], content: skeleton,
-        status: 'draft', updatedAt: nowISO(), createdAt: (prev && prev.createdAt) || nowISO(), source: 'pipeline'
+        key: key,
+        title: ch.title,
+        sections: ch.sections || [],
+        content: skeleton,
+        status: 'draft',
+        updatedAt: nowISO(),
+        createdAt: (prev && prev.createdAt) || nowISO(),
+        source: 'pipeline'
       };
       n++;
     });
+
     var cur = getCurrentProject();
     cur.artifacts = arts;
     cur.currentStage = 'writing';
     cur.stageStatus = cur.stageStatus || {};
-    cur.stageStatus.ideation = 'done';
+    // 有想法/题目时，选题阶段可视为完成
+    if ((cur.idea && String(cur.idea).trim().length >= 8) || (cur.title && cur.title !== '未命名论文项目')) {
+      cur.stageStatus.ideation = 'done';
+    } else {
+      cur.stageStatus.ideation = cur.stageStatus.ideation || 'active';
+    }
+    if (cur.hasManuscript || ((typeof manuscriptText !== 'undefined') && manuscriptText && manuscriptText.length > 100)) {
+      // 导入稿：文献阶段至少 active；有文献数时由 autoSync 判定 done
+      if (cur.stageStatus.literature !== 'done') cur.stageStatus.literature = 'active';
+    } else {
+      // 纯创作路径：流水线后优先写作，不强制文献 done
+      if (!cur.stageStatus.literature) cur.stageStatus.literature = 'todo';
+    }
     cur.stageStatus.writing = 'active';
-    if (cur.hasManuscript) cur.stageStatus.literature = cur.stageStatus.literature || 'active';
+    cur.updatedAt = nowISO();
     upsertProject(cur);
-    logSkillRun({ moduleId: 'pipeline', title: '一键流水线', summary: '生成/更新 ' + n + ' 章骨架' });
+
+    // 3 按真实产物重算阶段（writing 的字数/完整章会反映骨架）
+    try { autoSyncStageProgress(getCurrentProject()); } catch (e) {}
+    var after = getCurrentProject() || cur;
+    var stats = chapterStats(after);
+    var writingEv = evaluateStage(after, 'writing');
+
+    logSkillRun({
+      moduleId: 'pipeline',
+      title: '一键流水线',
+      summary: '更新 ' + n + ' 章骨架' + (skipped ? ' · 跳过 ' + skipped + ' 章已有正文' : '') +
+        ' · 写作 ' + writingEv.passed + '/' + writingEv.total +
+        ' · 草稿 ' + stats.words + ' 字'
+    });
     renderProjectChrome();
     openChapterBoard();
-    if (typeof ttp === 'function') ttp('流水线完成：已进入分章写作。可再点「合并到正文 / 完整预览 / 导出」');
+
+    var msg = '流水线完成：生成/更新 ' + n + ' 章骨架';
+    if (skipped) msg += '，保留 ' + skipped + ' 章已有正文';
+    msg += '。写作进度 ' + writingEv.passed + '/' + writingEv.total;
+    if (writingEv.done) {
+      msg += '（写作阶段已达标，可进入打磨）';
+    } else {
+      var miss = (writingEv.checks || []).filter(function (c) { return !c.ok; }).map(function (c) { return c.label; });
+      if (miss.length) msg += '；还差：' + miss.join('、');
+    }
+    if (typeof ttp === 'function') ttp(msg);
   }
 
   // ===== 答辩材料包 =====
@@ -2017,13 +2441,13 @@
     lines.push('总章数：' + stats.total + '，较完整：' + stats.ready + '，总字数：' + stats.words);
     (outline.chapters || []).forEach(function(ch, idx) {
       var d = getChapterDraft(chapterKey(ch.title, idx)) || {};
-      var w = (d.content || '').replace(/\\s+/g, '').length;
+      var w = (d.content || '').replace(/\s+/g, '').length;
       lines.push('- ' + ch.title + '：' + w + ' 字');
     });
     lines.push('');
     lines.push('## 5. 英文摘要草稿提示');
     lines.push('Background / Methods / Results / Conclusion 四段式，约 200-300 words。');
-    return lines.join('\\n');
+    return lines.join('\n');
   }
 
   function openDefensePack() {

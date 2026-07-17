@@ -109,13 +109,15 @@ function renderToolHome(){
   (APP_MODULES||[]).forEach(function(m){ (m.requiresThesis?need:free).push(m); });
   // ensure data-analysis highlighted
   freeHost.innerHTML = free.map(function(m){
-    return '<button class="tool-card" onclick="launchTool(\''+m.id+'\')"><b>'+m.icon+' '+m.name+'</b><span>'+(m.aiDriven?'AI 能力 · 按 token 计费':'本地/随时可用')+'</span></button>';
+    var billing = m.aiDriven ? 'AI · 按 token 计费' : (m.localCharge ? '本地 · 低价/每日免费' : (m.serverFixed ? '服务器计算计费' : '本地/随时可用'));
+    return '<button class="tool-card" onclick="launchTool(\''+m.id+'\')"><b>'+m.icon+' '+m.name+'</b><span>'+billing+'</span></button>';
   }).join('') +
   '<button class="tool-card" onclick="launchTool(\'materials\')"><b>📁 资料库</b><span>上传 CSV 等，供分析模块复用</span></button>'+
   '<button class="tool-card" onclick="launchTool(\'pipeline\')"><b>⚡ 一键流水线</b><span>大纲+章节骨架</span></button>'+
   '<button class="tool-card" onclick="launchTool(\'defense-pack\')"><b>🎤 答辩材料包</b><span>讲稿/问答/PPT结构</span></button>';
   thesisHost.innerHTML = need.map(function(m){
-    return '<button class="tool-card" onclick="launchTool(\''+m.id+'\')"><b>'+m.icon+' '+m.name+'</b><span>基于论文内容分析</span><div class="need-tag">建议先有论文/草稿</div></button>';
+    var billing = m.aiDriven ? 'AI 计费' : (m.localCharge ? '本地低价' : '');
+    return '<button class="tool-card" onclick="launchTool(\''+m.id+'\')"><b>'+m.icon+' '+m.name+'</b><span>基于论文内容分析'+(billing?' · '+billing:'')+'</span><div class="need-tag">建议先有论文/草稿</div></button>';
   }).join('');
 }
 function toggleTocPanel(){
@@ -135,20 +137,20 @@ var APP_MODULES = [
   // 撰写阶段
   { id: 'references',      name: '参考文献',   icon: '📋', requiresThesis: true,  aiDriven: false },
   { id: 'expand',          name: '论文扩写',   icon: '✍️', requiresThesis: true,  aiDriven: true },
-  { id: 'data-analysis',   name: '数据分析',   icon: '📈', requiresThesis: false, aiDriven: false },
-  { id: 'knowledge-graph', name: '知识图谱',   icon: '🕸️', requiresThesis: true,  aiDriven: false },
+  { id: 'data-analysis',   name: '数据分析',   icon: '📈', requiresThesis: false, aiDriven: false, serverFixed: true },
+  { id: 'knowledge-graph', name: '知识图谱',   icon: '🕸️', requiresThesis: true,  aiDriven: false, serverFixed: true },
   // 打磨阶段
   { id: 'proofread',       name: '论文查错',   icon: '✏️', requiresThesis: false, aiDriven: true },
   { id: 'de-duplicate',    name: '查重降重',   icon: '📋', requiresThesis: false, aiDriven: true },
-  { id: 'format-check',    name: '格式检查',   icon: '✅', requiresThesis: true,  aiDriven: false },
-  { id: 'terminology',     name: '术语分析',   icon: '🔤', requiresThesis: true,  aiDriven: false },
-  { id: 'paragraph',       name: '段落分析',   icon: '📝', requiresThesis: true,  aiDriven: true },
+  { id: 'format-check',    name: '格式检查',   icon: '✅', requiresThesis: true,  aiDriven: false, localCharge: true },
+  { id: 'terminology',     name: '术语分析',   icon: '🔤', requiresThesis: true,  aiDriven: false, localCharge: true },
+  { id: 'paragraph',       name: '段落分析',   icon: '📝', requiresThesis: true,  aiDriven: false, localCharge: true },
   // 评审输出
   { id: 'review',          name: '论文审阅',   icon: '🔍', requiresThesis: true,  aiDriven: true },
-  { id: 'optimization',    name: '优化建议',   icon: '💡', requiresThesis: true,  aiDriven: true },
+  { id: 'optimization',    name: '优化建议',   icon: '💡', requiresThesis: true,  aiDriven: false, localCharge: true },
   { id: 'defense-ppt',     name: '答辩PPT',    icon: '📊', requiresThesis: false, aiDriven: true },
   { id: 'en-abstract',     name: '英文摘要',   icon: '🌐', requiresThesis: false, aiDriven: true },
-  { id: 'dashboard',       name: '论文看板',   icon: '📊', requiresThesis: true,  aiDriven: false },
+  { id: 'dashboard',       name: '论文看板',   icon: '📊', requiresThesis: true,  aiDriven: false, localCharge: true },
 ];
 
 // 模块 id → 运行函数名映射 (run + PascalCase 或特定命名)
@@ -157,6 +159,7 @@ var MODULE_RUNNERS = {
   'proposal':        'runProposalModule',
   'expand':          'runExpandModule',
   'data-analysis':   'runDataAnalysis',
+  'knowledge-graph': 'runKnowledgeGraphModule',
   'proofread':       'runProofread',
   'de-duplicate':    'runDeduplicate',
   'format-check':    'runFormatCheck',
@@ -168,6 +171,56 @@ var MODULE_RUNNERS = {
   'en-abstract':     'runEnAbstract',
   'dashboard':       'showDashboard',
 };
+
+/** 统一鉴权头 */
+function getAuthToken(){
+  try{ return sessionStorage.getItem('thesis_ai_token') || ''; }catch(e){ return ''; }
+}
+function authJsonHeaders(){
+  var h={'Content-Type':'application/json'};
+  var t=getAuthToken(); if(t) h['Authorization']='Bearer '+t;
+  return h;
+}
+
+/**
+ * 本地/固定价模块扣点。走 /api/usage/module（含每日免费次数）。
+ * @returns {Promise<{ok:boolean, free?:boolean, cost_points?:number, error?:string}>}
+ */
+function chargeModule(moduleId){
+  var token=getAuthToken();
+  if(!token){
+    return Promise.resolve({ok:false, error:'请先登录'});
+  }
+  return fetch('/api/usage/module', {
+    method:'POST',
+    headers: authJsonHeaders(),
+    body: JSON.stringify({module: moduleId})
+  }).then(function(r){
+    return r.json().then(function(d){
+      if(r.status===402 || (d && d.success===false && (d.needed || d.needed_points))){
+        if(typeof updateBalanceDisplay==='function') updateBalanceDisplay();
+        return {ok:false, error: (d && d.error) || '点数不足', needRecharge:true, needed_points: d && d.needed_points};
+      }
+      if(!d || !d.success){
+        return {ok:false, error:(d && d.error) || '扣点失败'};
+      }
+      if(typeof updateBalanceDisplay==='function') updateBalanceDisplay();
+      if(d.free && typeof ttp==='function'){
+        ttp(d.message || '今日免费额度');
+      } else if(d.cost_points>0 && typeof ttp==='function'){
+        ttp('本次 -'+Number(d.cost_points).toFixed(3)+' 点');
+      }
+      return {ok:true, free:!!d.free, cost_points: d.cost_points||0, points_after: d.points_after};
+    });
+  }).catch(function(){ return {ok:false, error:'网络错误'}; });
+}
+
+function runKnowledgeGraphModule(container){
+  if(container){
+    container.innerHTML = '<div style="text-align:center;padding:40px"><div style="font-size:2.5rem;margin-bottom:12px">🕸️</div><div style="color:var(--text-muted);margin-bottom:14px">正在打开知识图谱…</div><button class="ai-btn" onclick="showKnowledgeGraph()">打开知识图谱</button></div>';
+  }
+  if(typeof showKnowledgeGraph==='function') showKnowledgeGraph();
+}
 
 // 更新侧边栏项目状态（标记哪些需要论文上传才能用）
 function updateNavStates() {
@@ -459,22 +512,53 @@ function switchPanel(moduleId) {
   }
 
   if (needsThesis) {
-    // File-dependent module with thesis loaded
     showLoad('正在' + (modDef ? modDef.name : moduleId) + '...', 15, '分析论文数据中');
   }
 
-  setTimeout(function() {
-    var mc = moduleArea.querySelector('.module-panel');
-    try {
-      var fn = window[runnerName];
-      if (typeof fn === 'function') {
-        fn(mc);
-      } else {
-        mc.innerHTML = '<div style="text-align:center;padding:40px;color:var(--danger)">模块函数 ' + runnerName + ' 未定义，请确认脚本已加载</div>';
+  function invokeRunner(){
+    setTimeout(function() {
+      var mc = moduleArea.querySelector('.module-panel');
+      if(!mc){
+        moduleArea.innerHTML = '<div class="module-panel"></div>';
+        mc = moduleArea.querySelector('.module-panel');
       }
-    } catch (e) { mc.innerHTML = '<div style="text-align:center;padding:40px;color:var(--danger)">加载出错: ' + e.message + '</div>'; }
-    if (needsThesis) hideLoad();
-  }, 100);
+      try {
+        var fn = window[runnerName];
+        if (typeof fn === 'function') {
+          fn(mc);
+          // 本地/工具模块打开时记入学术主线产物（AI 模块在各自 success 回调里记）
+          try {
+            if (window.ThesisProject && ThesisProject.logSkillRun && modDef && !modDef.aiDriven) {
+              ThesisProject.logSkillRun({ moduleId: moduleId, title: modDef.name || moduleId, summary: '打开模块' });
+            }
+          } catch (eLog) {}
+        } else {
+          mc.innerHTML = '<div style="text-align:center;padding:40px;color:var(--danger)">模块函数 ' + runnerName + ' 未定义，请确认脚本已加载</div>';
+        }
+      } catch (e) { mc.innerHTML = '<div style="text-align:center;padding:40px;color:var(--danger)">加载出错: ' + e.message + '</div>'; }
+      if (needsThesis) hideLoad();
+    }, 80);
+  }
+
+  // 本地固定价模块：先扣点/走每日免费，再运行
+  if (modDef && modDef.localCharge) {
+    chargeModule(moduleId).then(function(res){
+      if(!res.ok){
+        if(needsThesis) hideLoad();
+        var msg = res.error || '无法启动模块';
+        moduleArea.querySelector('.module-panel').innerHTML =
+          '<div style="text-align:center;padding:40px 16px">'+
+          '<div style="font-size:1.6rem;margin-bottom:10px">💳</div>'+
+          '<div style="color:var(--danger);margin-bottom:12px">'+msg+'</div>'+
+          (res.needRecharge?'<button class="ai-btn" onclick="showRechargeModal()">去充值</button>':'')+
+          '</div>';
+        return;
+      }
+      invokeRunner();
+    });
+  } else {
+    invokeRunner();
+  }
 
   updateStatusBar2();
 }
@@ -502,7 +586,8 @@ function onThesisLoaded() {
   if (window.ThesisProject && typeof ThesisProject.onManuscriptReady === 'function') {
     ThesisProject.onManuscriptReady();
   }
-  switchView('references');
+  // 学术主线：导入后留在工作区看阶段清单；用户再主动进参考文献
+  if (typeof switchView === 'function') switchView('workspace');
 }
 
 function switchView(view) {
@@ -565,6 +650,15 @@ clearAll = function() {
 function onRefsChanged() {
   _analysisCache = {};
   kgCurrentData = null;
+  // 文献变化记入项目产物并推进「文献地图」阶段
+  try {
+    var n = 0;
+    if (typeof mergedRefs !== 'undefined' && mergedRefs) n = mergedRefs.length;
+    else if (typeof existingRefs !== 'undefined' && existingRefs) n = existingRefs.length;
+    if (window.ThesisProject && typeof ThesisProject.logSkillRun === 'function' && n > 0) {
+      ThesisProject.logSkillRun({ moduleId: 'references', title: '文献库更新', summary: n + ' 条' });
+    }
+  } catch (e) {}
   // 如果当前在分析模块，标记需要刷新
   if (_activeModule !== 'references' && _activeModule !== 'knowledge-graph') {
     var mc = document.querySelector('#refPanel .module-panel');
@@ -585,6 +679,11 @@ function runReviewModule(container) {
     var fc=document.getElementById('reviewFormatContent');if(fc&&typeof runFormatCheck==='function')runFormatCheck(fc);
     var pc=document.getElementById('reviewParaContent');if(pc&&typeof runParagraphAnalysis==='function')runParagraphAnalysis(pc);
     var tc=document.getElementById('reviewTermContent');if(tc&&typeof runTerminology==='function')runTerminology(tc);
+    try {
+      if (window.ThesisProject && ThesisProject.logSkillRun) {
+        ThesisProject.logSkillRun({ moduleId: 'review', title: '论文审阅', summary: '格式+段落+术语' });
+      }
+    } catch (e) {}
   },50);
 }
 
@@ -632,7 +731,16 @@ function runExpandModule(container) {
     '<b>3. 方法论充实：</b>详细描述数据来源、样本量计算、问卷设计、变量测量、分析策略。<br>'+
     '<b>4. 实证分析深化：</b>增加稳健性检验、异质性分析、机制检验，多角度验证结果。'+
     '</div>'+
+    '<div class="project-cta-row" style="margin-top:12px">'+
+      '<button class="ai-btn-clear" onclick="openChapterBoard()">打开分章看板</button>'+
+      '<button class="ai-btn-clear" onclick="runProjectAction(\'pipeline\')">一键流水线</button>'+
+    '</div>'+
     '</div>';
+  try {
+    if (window.ThesisProject && ThesisProject.logSkillRun) {
+      ThesisProject.logSkillRun({ moduleId: 'expand', title: '论文扩写诊断', summary: bodyChs.length + ' 章' });
+    }
+  } catch (e) {}
 }
 
 function runDataAnalysis(container) {

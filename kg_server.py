@@ -156,16 +156,65 @@ def init_db():
             updated_at TEXT,
             FOREIGN KEY (project_id) REFERENCES projects(id)
         );
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            type TEXT NOT NULL DEFAULT 'system',
+            title TEXT NOT NULL,
+            body TEXT,
+            is_read INTEGER NOT NULL DEFAULT 0,
+            meta_json TEXT,
+            created_at TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            actor_id INTEGER,
+            actor_name TEXT,
+            action TEXT NOT NULL,
+            target_type TEXT,
+            target_id TEXT,
+            detail TEXT,
+            created_at TEXT
+        );
     ''')
     conn.commit()
-    # Default pricing config (单位：分点 = 0.1点)
+    # migrations for older DBs
+    try:
+        order_cols = [r[1] for r in conn.execute('PRAGMA table_info(recharge_orders)').fetchall()]
+        if 'note' not in order_cols:
+            conn.execute("ALTER TABLE recharge_orders ADD COLUMN note TEXT")
+        if 'pay_proof' not in order_cols:
+            conn.execute("ALTER TABLE recharge_orders ADD COLUMN pay_proof TEXT")
+        conn.commit()
+    except Exception:
+        pass
+    try:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS audit_logs ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, actor_id INTEGER, actor_name TEXT, "
+            "action TEXT NOT NULL, target_type TEXT, target_id TEXT, detail TEXT, created_at TEXT)"
+        )
+        conn.commit()
+    except Exception:
+        pass
+    try:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS notifications ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, type TEXT NOT NULL DEFAULT 'system', "
+            "title TEXT NOT NULL, body TEXT, is_read INTEGER NOT NULL DEFAULT 0, meta_json TEXT, created_at TEXT)"
+        )
+        conn.commit()
+    except Exception:
+        pass
+    # Default pricing config (单位：厘，1点=1000厘)
     for k,v in [('upload_price','0'),('module_price','50'),('search_price','0'),
                 ('kg_price','0'),('domain_analysis_price','0'),('data-ml_price','200'),('export-docx_price','100'),
                 ('format-check_price','30'),('terminology_price','30'),('paragraph_price','30'),
                 ('dashboard_price','50'),('data-analysis_price','80'),
                 ('register_bonus','3000'),('invite_bonus','1000')]:  # 注册送3.0点, 邀请送1.0点
-        # INSERT OR IGNORE 对已有库不更新；关键计费项强制刷新到新默认
-        conn.execute('INSERT INTO config (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',(k,v))
+        # 仅初始化缺失键，避免每次启动覆盖管理员已改价格
+        conn.execute('INSERT OR IGNORE INTO config (key,value) VALUES (?,?)', (k, v))
     # Seed admin
     try:
         admin_pwd = os.environ.get('ADMIN_PASSWORD', 'admin123')
@@ -269,14 +318,19 @@ DEEPSEEK_MODEL = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
 TOKEN_YUAN_PER_10M = float(os.environ.get('TOKEN_YUAN_PER_10M', '1.0'))
 DEEPSEEK_INPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_INPUT_PRICE', str(TOKEN_YUAN_PER_10M / 10.0)))
 DEEPSEEK_OUTPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_OUTPUT_PRICE', str(TOKEN_YUAN_PER_10M / 10.0)))
-USER_MARKUP = float(os.environ.get('USER_MARKUP', '3.0'))  # 用户扣点倍率（覆盖 API + 运维）
+USER_MARKUP = float(os.environ.get('USER_MARKUP', '3.0'))  # 用户扣点倍率（覆盖 API + 运维），默认 ×3
 CREDIT_PER_YUAN = 1000  # 1元=1000厘=1.0显示点
 LLM_MIN_CHARGE = int(os.environ.get('LLM_MIN_CHARGE', '20'))  # LLM 最低扣 20 厘=0.02点
 DAILY_FREE_OPS = int(os.environ.get('DAILY_FREE_OPS', '5'))  # 每日免费本地模块次数
 QUICK_RECHARGE_AMOUNTS = [1, 5, 10, 20, 50]  # 快充金额（1元=1点）
+INVITE_DAILY_LIMIT = int(os.environ.get('INVITE_DAILY_LIMIT', '20'))  # 每邀请人每日最多成功邀请数
+MAX_OPEN_RECHARGE_ORDERS = int(os.environ.get('MAX_OPEN_RECHARGE_ORDERS', '3'))  # 每用户未完结充值单上限
 ADMIN_SECRET = os.environ.get('ADMIN_SECRET', 'admin123')
-if ADMIN_SECRET == 'admin123' and os.environ.get('FLASK_ENV') == 'production':
-    print('[WARN] ADMIN_SECRET 仍为默认 admin123，生产环境请设置环境变量 ADMIN_SECRET')
+_IS_PROD = (os.environ.get('FLASK_ENV') == 'production') or (os.environ.get('ENV') == 'production') or (os.environ.get('RENDER') == 'true')
+if ADMIN_SECRET == 'admin123' and _IS_PROD:
+    raise RuntimeError('生产环境禁止使用默认 ADMIN_SECRET=admin123，请设置环境变量 ADMIN_SECRET')
+if ADMIN_SECRET == 'admin123':
+    print('[WARN] ADMIN_SECRET 仍为默认 admin123（仅开发可用）。生产必须设置环境变量 ADMIN_SECRET')
 if not os.environ.get('ADMIN_SECRET'):
     print('[INFO] ADMIN_SECRET 使用默认值 admin123（开发模式）。生产请设置环境变量。')
 
@@ -654,8 +708,14 @@ def _run_source(fn, *args):
     except: return []
 
 @app.route('/search_api', methods=['POST'])
+@require_auth
 def search_api():
-    """单词搜索：每次只查1个词、3个核心源，返回前100条"""
+    """单词搜索：每次只查1个词、多源聚合。需登录；每用户限流。"""
+    uid = getattr(request, 'user_id', None) or request.remote_addr or 'unknown'
+    if not _check_rate('search:'+str(uid), max_calls=30, window_sec=60):
+        return jsonify({'success': False, 'error': '检索过于频繁，请稍后再试'}), 429
+    if not _check_rate('search_ip:'+str(request.remote_addr or 'unknown'), max_calls=60, window_sec=60):
+        return jsonify({'success': False, 'error': '检索过于频繁，请稍后再试'}), 429
     try:
         data = request.get_json() or {}
         queries = data.get('queries', [])
@@ -701,8 +761,12 @@ def search_api():
 
 
 @app.route('/verify_api', methods=['POST'])
+@require_auth
 def verify_api():
-    """增强版文献校验：DOI精确解析 + 标题多源匹配 + 引用数 + 撤稿检测"""
+    """增强版文献校验：DOI精确解析 + 标题多源匹配 + 引用数 + 撤稿检测。需登录。"""
+    uid = getattr(request, 'user_id', None) or request.remote_addr or 'unknown'
+    if not _check_rate('verify:'+str(uid), max_calls=60, window_sec=60):
+        return jsonify({'success': False, 'error': '校验过于频繁，请稍后再试'}), 429
     try:
         data = request.get_json() or {}
         title = (data.get('title') or '').strip()
@@ -910,10 +974,27 @@ def compute_force_layout(entities, links, width=1400, height=800, iterations=80)
     return pos
 
 @app.route('/kg_api/generate', methods=['POST'])
+@require_auth
 def kg_api():
+    """知识图谱生成。需登录；限流。可选固定价扣点（kg 默认 0）。"""
+    uid = getattr(request, 'user_id', None) or request.remote_addr or 'unknown'
+    if not _check_rate('kg:'+str(uid), max_calls=10, window_sec=60):
+        return jsonify({'success': False, 'error': '图谱生成过于频繁，请稍后再试'}), 429
     try:
+        price = get_price('kg')
+        if price > 0:
+            ok, err, after = deduct_credits(request.user_id, price, '知识图谱生成')
+            if not ok:
+                return jsonify({'success': False, 'error': err, 'needed_points': price/1000}), 402
         data = request.get_json() or {}
-        result = build_knowledge_graph(data.get('paper_topics', []), data.get('sections', []), data.get('merged_refs', []), data.get('manuscript_text', ''))
+        # 节点/章节规模保护
+        secs = data.get('sections') or []
+        refs = data.get('merged_refs') or []
+        if len(secs) > 200:
+            secs = secs[:200]
+        if len(refs) > 500:
+            refs = refs[:500]
+        result = build_knowledge_graph(data.get('paper_topics', []), secs, refs, data.get('manuscript_text', ''))
         return jsonify({'success': True, 'data': result})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -921,8 +1002,12 @@ def kg_api():
 
 # ========== .doc 文件转换 API（旧版 Word 格式支持） ==========
 @app.route('/convert_doc', methods=['POST'])
+@require_auth
 def convert_doc():
-    """接收 .doc 文件，提取纯文本并包装为 HTML 返回"""
+    """接收 .doc 文件，提取纯文本并包装为 HTML 返回。需登录。"""
+    uid = getattr(request, 'user_id', None) or request.remote_addr or 'unknown'
+    if not _check_rate('convert:'+str(uid), max_calls=10, window_sec=60):
+        return jsonify({'success': False, 'error': '转换过于频繁，请稍后再试'}), 429
     try:
         if 'file' not in request.files:
             return jsonify({'success': False, 'error': 'No file uploaded'}), 400
@@ -930,6 +1015,8 @@ def convert_doc():
         buf = f.read()
         if not buf or len(buf) < 1024:
             return jsonify({'success': False, 'error': 'File too small or empty'}), 400
+        if len(buf) > 25 * 1024 * 1024:
+            return jsonify({'success': False, 'error': '文件超过 25MB 限制'}), 400
 
         import olefile
         from html import escape
@@ -1056,20 +1143,48 @@ def auth_register():
             return jsonify({'success': False, 'error': '用户名已存在'}), 409
         pwd_hash = hash_password(password)
         bonus = int(db.execute("SELECT value FROM config WHERE key='register_bonus'").fetchone()['value'] or 5000)
-        # Apply invite code bonus
         inviter_id = None
+        inv_bonus = 0
         if invite:
             ic = db.execute("SELECT * FROM invite_codes WHERE code = ? AND used_by IS NULL", (invite,)).fetchone()
             if ic and ic['owner_id']:
                 inviter_id = ic['owner_id']
                 inv_bonus = int(db.execute("SELECT value FROM config WHERE key='invite_bonus'").fetchone()['value'] or 1000)
-                db.execute("UPDATE invite_codes SET used_by = (SELECT id FROM users WHERE username = ?), used_at = datetime('now','localtime') WHERE code = ?", (username, invite))
-                db.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (inv_bonus, inviter_id))
                 bonus += inv_bonus
-        db.execute("INSERT INTO users (username, password_hash, credits, invited_by, created_at) VALUES (?, ?, ?, ?, datetime('now','localtime'))",
-                   (username, pwd_hash, bonus, inviter_id))
+        cur = db.execute(
+            "INSERT INTO users (username, password_hash, credits, invited_by, created_at) VALUES (?, ?, ?, ?, datetime('now','localtime'))",
+            (username, pwd_hash, bonus, inviter_id))
+        new_uid = cur.lastrowid
+        db.execute(
+            "INSERT INTO transactions (user_id,type,amount_credits,credits_after,description,created_at) "
+            "VALUES (?,?,?,?,?,datetime('now','localtime'))",
+            (new_uid, 'register_bonus', bonus, bonus, f'注册赠送 {bonus/1000:.3f} 点'))
+        if inviter_id and inv_bonus:
+            # 绑定邀请码 + 给邀请人加奖励（必须在新用户插入之后）
+            db.execute(
+                "UPDATE invite_codes SET used_by = ?, used_at = datetime('now','localtime') WHERE code = ? AND used_by IS NULL",
+                (new_uid, invite))
+            db.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (inv_bonus, inviter_id))
+            inv_after = db.execute('SELECT credits FROM users WHERE id=?', (inviter_id,)).fetchone()['credits']
+            db.execute(
+                "INSERT INTO transactions (user_id,type,amount_credits,credits_after,description,created_at) "
+                "VALUES (?,?,?,?,?,datetime('now','localtime'))",
+                (inviter_id, 'invite_bonus', inv_bonus, inv_after, f'邀请用户 {username} 奖励'))
+            create_notification(
+                inviter_id, 'gift', '邀请奖励到账',
+                f'你邀请的用户 {username} 已注册，系统赠送你 {inv_bonus/1000:.3f} 点。',
+                {'points': inv_bonus / 1000, 'from': 'system'}, db=db)
+            create_notification(
+                new_uid, 'gift', '注册赠送到账',
+                f'欢迎注册！系统赠送你 {bonus/1000:.3f} 点（含邀请奖励）。',
+                {'points': bonus / 1000, 'from': 'system'}, db=db)
+        else:
+            create_notification(
+                new_uid, 'gift', '注册赠送到账',
+                f'欢迎注册！系统赠送你 {bonus/1000:.3f} 点，可直接用于 AI 写作。',
+                {'points': bonus / 1000, 'from': 'system'}, db=db)
         db.commit()
-        return jsonify({'success': True, 'message': f'注册成功！赠送{bonus}点数。','points': bonus})
+        return jsonify({'success': True, 'message': f'注册成功！赠送 {bonus/1000:.3f} 点。', 'points': bonus / 1000})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
@@ -1077,10 +1192,13 @@ def auth_register():
 
 @app.route('/api/auth/login', methods=['POST'])
 def auth_login():
-    # 速率限制：每 IP 每分钟最多 10 次登录尝试
+    # 速率限制：每 IP 每分钟最多 10 次登录尝试（防爆破）
     ip = request.remote_addr or 'unknown'
     if not _check_rate('login:'+ip, max_calls=10, window_sec=60):
         return jsonify({'success': False, 'error': '登录尝试过于频繁，请稍后再试'}), 429
+    # 失败锁定：同 IP 连续失败过多则拉长窗口
+    if not _check_rate('login_fail:'+ip, max_calls=20, window_sec=600):
+        return jsonify({'success': False, 'error': '登录失败次数过多，请 10 分钟后再试'}), 429
     data = request.get_json() or {}
     username = (data.get('username') or '').strip()
     password = data.get('password') or ''
@@ -1091,12 +1209,15 @@ def auth_login():
         user = db.execute('SELECT id, username, password_hash, credits, is_admin, invite_code FROM users WHERE username = ?',
                           (username,)).fetchone()
         if not user or not verify_password(password, user['password_hash']):
+            # 记一次失败（_check_rate 已在入口占位；这里再占 fail 桶）
+            _check_rate('login_fail_hit:'+ip, max_calls=1000, window_sec=600)
             return jsonify({'success': False, 'error': '用户名或密码错误'}), 401
         token = generate_token(user['id'])
         return jsonify({'success': True, 'token': token, 'user': {
             'id': user['id'], 'username': user['username'],
             'credits': user['credits'], 'is_admin': bool(user['is_admin']),
-            'invite_code': user['invite_code'] or ''
+            'invite_code': user['invite_code'] or '',
+            'points': round((user['credits'] or 0) / 1000.0, 3)
         }})
     finally:
         db.close()
@@ -1148,14 +1269,53 @@ def payment_recharge():
     data = request.get_json() or {}
     amount_yuan = data.get('amount_yuan')
     pm = data.get('payment_method', 'alipay')
+    note = (data.get('note') or '').strip()[:200]
     if amount_yuan not in [1, 5, 10, 20, 50]:
         return jsonify({'success': False, 'error': '金额必须为: 1, 5, 10, 20, 50'}), 400
+    # 节流：每用户每分钟最多 5 次建单
+    if not _check_rate('recharge:'+str(request.user_id), max_calls=5, window_sec=60):
+        return jsonify({'success': False, 'error': '操作过于频繁，请稍后再试'}), 429
     db = get_db()
     try:
-        db.execute("INSERT INTO recharge_orders (user_id, amount_yuan, amount_fen, status, payment_method, created_at) VALUES (?, ?, ?, 'pending', ?, datetime('now','localtime'))",
-                   (request.user_id, amount_yuan, int(amount_yuan * 100), pm))
+        open_cnt = db.execute(
+            "SELECT COUNT(*) as c FROM recharge_orders WHERE user_id=? AND status IN ('pending','submitted')",
+            (request.user_id,)).fetchone()['c']
+        if open_cnt >= MAX_OPEN_RECHARGE_ORDERS:
+            return jsonify({
+                'success': False,
+                'error': f'你有 {open_cnt} 笔未完成充值单，请等待确认或联系管理员后再新建（上限 {MAX_OPEN_RECHARGE_ORDERS}）'
+            }), 400
+        # 若已有 pending，优先复用最新一笔同金额，避免垃圾单
+        existing = db.execute(
+            "SELECT id FROM recharge_orders WHERE user_id=? AND status='pending' AND amount_yuan=? ORDER BY id DESC LIMIT 1",
+            (request.user_id, amount_yuan)).fetchone()
+        if existing:
+            oid = existing['id']
+            return jsonify({
+                'success': True,
+                'order_id': oid,
+                'amount_yuan': amount_yuan,
+                'points': float(amount_yuan),
+                'note_code': str(oid),
+                'reused': True,
+                'message': f'已有待支付订单 #{oid}（¥{amount_yuan}），请扫码支付并在转账备注填写订单号 {oid}'
+            })
+        db.execute(
+            "INSERT INTO recharge_orders (user_id, amount_yuan, amount_fen, status, payment_method, note, created_at) "
+            "VALUES (?, ?, ?, 'pending', ?, ?, datetime('now','localtime'))",
+            (request.user_id, amount_yuan, int(amount_yuan * 100), pm, note or None))
+        order_id = db.execute('SELECT last_insert_rowid() as id').fetchone()['id']
+        # 附言码默认=order_id
+        db.execute("UPDATE recharge_orders SET note = COALESCE(note, ?) WHERE id=?", (str(order_id), order_id))
         db.commit()
-        return jsonify({'success': True, 'message': '充值申请已提交 (¥'+str(amount_yuan)+')，请扫码支付后点击"我已支付"'})
+        return jsonify({
+            'success': True,
+            'order_id': order_id,
+            'amount_yuan': amount_yuan,
+            'points': float(amount_yuan),
+            'note_code': str(order_id),
+            'message': f'充值申请已提交 (¥{amount_yuan})。请扫码支付，转账备注务必填写订单号 {order_id}，支付后点击「我已支付」'
+        })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
@@ -1164,22 +1324,26 @@ def payment_recharge():
 @app.route('/api/payment/submit', methods=['POST'])
 @require_auth
 def payment_submit():
-    """用户点击'我已支付'，自动确认到账（模拟即时到账）"""
+    """用户点击'我已支付'：进入 submitted，等待管理员确认到账（闭环：人工审核）。"""
     data = request.get_json() or {}
     order_id = data.get('order_id')
     db = get_db()
     try:
         order = db.execute('SELECT * FROM recharge_orders WHERE id = ? AND user_id = ?', (order_id, request.user_id)).fetchone()
         if not order: return jsonify({'success': False, 'error': '订单不存在'}), 404
-        if order['status'] != 'pending': return jsonify({'success': False, 'error': '订单已处理'}), 400
-        pts = int(order['amount_yuan'] * 1000)
-        db.execute("UPDATE recharge_orders SET status = 'confirmed', confirmed_at = datetime('now','localtime') WHERE id = ?", (order_id,))
-        db.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (pts, request.user_id))
-        after = db.execute('SELECT credits FROM users WHERE id = ?', (request.user_id,)).fetchone()['credits']
-        db.execute("INSERT INTO transactions (user_id, type, amount_credits, credits_after, description, created_at) VALUES (?,?,?,?,?,datetime('now','localtime'))",
-                   (request.user_id, 'recharge', pts, after, '充值 '+str(pts/1000)+'点'))
+        if order['status'] == 'confirmed':
+            return jsonify({'success': False, 'error': '订单已到账'}), 400
+        if order['status'] == 'submitted':
+            return jsonify({'success': True, 'message': '已提交，请等待管理员确认到账', 'status': 'submitted'})
+        if order['status'] != 'pending':
+            return jsonify({'success': False, 'error': '订单状态不可提交'}), 400
+        db.execute("UPDATE recharge_orders SET status = 'submitted' WHERE id = ?", (order_id,))
+        create_notification(
+            request.user_id, 'recharge', '充值申请已提交',
+            f'你提交了 ¥{order["amount_yuan"]} 的充值申请，管理员确认后将到账 {float(order["amount_yuan"]):.3f} 点。',
+            {'order_id': order_id, 'amount_yuan': order['amount_yuan']}, db=db)
         db.commit()
-        return jsonify({'success': True, 'message': '充值成功！到账 '+str(pts/10)+' 点', 'credits': after})
+        return jsonify({'success': True, 'message': '已提交审核，请等待管理员确认到账', 'status': 'submitted', 'order_id': order_id})
     except Exception as e:
         db.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1198,22 +1362,31 @@ def payment_orders():
         db.close()
 
 @app.route('/api/payment/confirm', methods=['POST'])
-@require_auth
 def payment_confirm():
-    """确认到账（兼容直接确认 pending 订单的场景）"""
+    """管理员确认充值到账（仅管理员；防止普通用户确认任意订单）。"""
     data = request.get_json() or {}
+    secret = data.get('secret') or _admin_secret_from_request()
+    if not _check_admin(secret):
+        return jsonify({'success': False, 'error': '无权限'}), 403
     order_id = data.get('order_id')
     db = get_db()
     try:
         order = db.execute('SELECT * FROM recharge_orders WHERE id = ?', (order_id,)).fetchone()
         if not order: return jsonify({'success': False, 'error': '订单不存在'}), 404
         if order['status'] == 'confirmed': return jsonify({'success': False, 'error': '已处理'}), 400
-        pts = int(order['amount_yuan'] * 1000)
+        pts = int(float(order['amount_yuan']) * 1000)
         db.execute("UPDATE recharge_orders SET status = 'confirmed', confirmed_at = datetime('now','localtime') WHERE id = ?", (order_id,))
         db.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (pts, order['user_id']))
         after = db.execute('SELECT credits FROM users WHERE id = ?', (order['user_id'],)).fetchone()['credits']
         db.execute("INSERT INTO transactions (user_id, type, amount_credits, credits_after, description, created_at) VALUES (?,?,?,?,?,datetime('now','localtime'))",
                    (order['user_id'], 'recharge', pts, after, '充值 '+str(pts/1000)+'点'))
+        create_notification(
+            order['user_id'], 'recharge', '充值到账',
+            f'你的充值订单 #{order_id}（¥{order["amount_yuan"]}）已确认，到账 {pts/1000:.3f} 点。当前余额 {after/1000:.3f} 点。',
+            {'order_id': order_id, 'points': pts / 1000, 'points_after': after / 1000}, db=db)
+        actor_id, actor_name = _admin_actor_from_secret(secret)
+        write_audit(actor_id, actor_name, 'confirm_order', 'recharge_order', order_id,
+                    {'user_id': order['user_id'], 'amount_yuan': order['amount_yuan'], 'points': pts/1000}, db=db)
         db.commit()
         return jsonify({'success': True, 'message': '已到账 '+str(pts/1000)+' 点', 'credits': after, 'points': pts/1000, 'points_after': after/1000})
     except Exception as e:
@@ -1222,6 +1395,32 @@ def payment_confirm():
     finally:
         db.close()
 
+
+@app.route('/api/payment/resubmit', methods=['POST'])
+@require_auth
+def payment_resubmit():
+    """拒绝订单允许用户重新提交审核。"""
+    data = request.get_json() or {}
+    order_id = data.get('order_id')
+    db = get_db()
+    try:
+        order = db.execute('SELECT * FROM recharge_orders WHERE id=? AND user_id=?', (order_id, request.user_id)).fetchone()
+        if not order:
+            return jsonify({'success': False, 'error': '订单不存在'}), 404
+        if order['status'] not in ('rejected', 'pending'):
+            return jsonify({'success': False, 'error': '仅待支付或已拒绝订单可重新提交'}), 400
+        db.execute("UPDATE recharge_orders SET status='submitted' WHERE id=?", (order_id,))
+        create_notification(
+            request.user_id, 'recharge', '充值申请已重新提交',
+            f'订单 #{order_id}（¥{order["amount_yuan"]}）已重新提交审核。',
+            {'order_id': order_id}, db=db)
+        db.commit()
+        return jsonify({'success': True, 'message': '已重新提交审核', 'status': 'submitted', 'order_id': order_id})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
 @app.route('/api/payment/balance', methods=['GET'])
 @require_auth
 def payment_balance():
@@ -1247,26 +1446,49 @@ def payment_balance():
 @app.route('/api/usage/check_free', methods=['GET'])
 @require_auth
 def usage_check_free():
+    """统一：返回今日免费本地操作 已用/上限/剩余。"""
     db = get_db()
     try:
         today = date.today().isoformat()
         row = db.execute('SELECT used FROM daily_free_usage WHERE user_id = ? AND usage_date = ?',
                          (request.user_id, today)).fetchone()
-        return jsonify({'success': True, 'free_available': not (row and row['used'])})
+        used = int(row['used']) if row else 0
+        free_limit = DAILY_FREE_OPS if 'DAILY_FREE_OPS' in globals() else 5
+        remaining = max(0, free_limit - used)
+        return jsonify({
+            'success': True,
+            'free_available': remaining > 0,
+            'free_used_today': used,
+            'free_limit_today': free_limit,
+            'free_remaining_today': remaining
+        })
     finally:
         db.close()
 
 @app.route('/api/usage/mark_free', methods=['POST'])
 @require_auth
 def usage_mark_free():
+    """兼容旧前端：消耗 1 次免费额度（计数+1，不再写成布尔）。"""
     db = get_db()
     try:
         today = date.today().isoformat()
-        db.execute('INSERT OR IGNORE INTO daily_free_usage (user_id, usage_date, used) VALUES (?, ?, 1)',
+        free_limit = DAILY_FREE_OPS if 'DAILY_FREE_OPS' in globals() else 5
+        db.execute('INSERT OR IGNORE INTO daily_free_usage (user_id, usage_date, used) VALUES (?, ?, 0)',
+                   (request.user_id, today))
+        row = db.execute('SELECT used FROM daily_free_usage WHERE user_id=? AND usage_date=?',
+                         (request.user_id, today)).fetchone()
+        used = int(row['used']) if row else 0
+        if used >= free_limit:
+            return jsonify({'success': False, 'error': '今日免费次数已用完',
+                            'free_used_today': used, 'free_limit_today': free_limit,
+                            'free_remaining_today': 0}), 400
+        db.execute('UPDATE daily_free_usage SET used = used + 1 WHERE user_id = ? AND usage_date = ?',
                    (request.user_id, today))
         db.execute("UPDATE users SET free_used_date = ? WHERE id = ?", (today, request.user_id))
         db.commit()
-        return jsonify({'success': True})
+        new_used = used + 1
+        return jsonify({'success': True, 'free_used_today': new_used, 'free_limit_today': free_limit,
+                        'free_remaining_today': max(0, free_limit - new_used)})
     finally:
         db.close()
 
@@ -1344,7 +1566,8 @@ PRICING_DEFAULTS = {
 
 
 def get_active_pricing_config():
-    """Return active pricing overrides from schedules (effective_at <= now)."""
+    """Return active pricing overrides from schedules (effective_at <= now).
+    标记 is_active 使用节流，避免每次请求都写库。"""
     import json as _json
     db = get_db()
     try:
@@ -1355,11 +1578,14 @@ def get_active_pricing_config():
         ).fetchone()
         if not row:
             return {}
-        # mark active
+        # mark active at most once per minute
         try:
-            db.execute("UPDATE pricing_schedules SET is_active=0")
-            db.execute("UPDATE pricing_schedules SET is_active=1 WHERE id=?", (row['id'],))
-            db.commit()
+            if not getattr(get_active_pricing_config, '_last_mark', 0) or (time.time() - get_active_pricing_config._last_mark) > 60:
+                if not row['is_active']:
+                    db.execute("UPDATE pricing_schedules SET is_active=0 WHERE is_active=1")
+                    db.execute("UPDATE pricing_schedules SET is_active=1 WHERE id=?", (row['id'],))
+                    db.commit()
+                get_active_pricing_config._last_mark = time.time()
         except Exception:
             pass
         try:
@@ -1401,15 +1627,34 @@ def get_price(key):
         db.close()
 
 def deduct_credits(user_id, amount, desc):
+    """原子扣点：UPDATE WHERE credits>=amount，防止并发超卖。amount 单位=厘。"""
+    amount = int(amount or 0)
+    if amount < 0:
+        return False, '扣点金额无效', None
+    if amount == 0:
+        db = get_db()
+        try:
+            u = db.execute('SELECT credits FROM users WHERE id = ?', (user_id,)).fetchone()
+            if not u:
+                return False, '用户不存在', None
+            return True, None, u['credits']
+        finally:
+            db.close()
     db = get_db()
     try:
-        u = db.execute('SELECT credits FROM users WHERE id = ?', (user_id,)).fetchone()
-        if not u: return False, '用户不存在', None
-        if u['credits'] < amount: return False, f'点数不足。需要 {amount/1000:.3f} 点，当前 {u["credits"]/1000:.3f} 点', u['credits']
-        after = u['credits'] - amount
-        db.execute('UPDATE users SET credits = ? WHERE id = ?', (after, user_id))
-        db.execute("INSERT INTO transactions (user_id, type, amount_credits, credits_after, description, created_at) VALUES (?,?,?,?,?,datetime('now','localtime'))",
-                   (user_id, 'usage', -amount, after, desc))
+        cur = db.execute(
+            'UPDATE users SET credits = credits - ? WHERE id = ? AND credits >= ?',
+            (amount, user_id, amount))
+        if cur.rowcount != 1:
+            u = db.execute('SELECT credits FROM users WHERE id = ?', (user_id,)).fetchone()
+            if not u:
+                return False, '用户不存在', None
+            return False, f'点数不足。需要 {amount/1000:.3f} 点，当前 {u["credits"]/1000:.3f} 点', u['credits']
+        after = db.execute('SELECT credits FROM users WHERE id = ?', (user_id,)).fetchone()['credits']
+        db.execute(
+            "INSERT INTO transactions (user_id, type, amount_credits, credits_after, description, created_at) "
+            "VALUES (?,?,?,?,?,datetime('now','localtime'))",
+            (user_id, 'usage', -amount, after, desc))
         db.commit()
         return True, None, after
     except Exception as e:
@@ -1418,13 +1663,127 @@ def deduct_credits(user_id, amount, desc):
     finally:
         db.close()
 
-# ========== LLM 分析 API（按实际 token 成本 ×2 扣点） ==========
+
+def refund_credits(user_id, amount, desc):
+    """失败退款（正数加回）。"""
+    amount = int(amount or 0)
+    if amount <= 0:
+        return False, '退款金额无效', None
+    db = get_db()
+    try:
+        cur = db.execute('UPDATE users SET credits = credits + ? WHERE id = ?', (amount, user_id))
+        if cur.rowcount != 1:
+            return False, '用户不存在', None
+        after = db.execute('SELECT credits FROM users WHERE id = ?', (user_id,)).fetchone()['credits']
+        db.execute(
+            "INSERT INTO transactions (user_id, type, amount_credits, credits_after, description, created_at) "
+            "VALUES (?,?,?,?,?,datetime('now','localtime'))",
+            (user_id, 'refund', amount, after, desc))
+        db.commit()
+        return True, None, after
+    except Exception as e:
+        db.rollback()
+        return False, str(e), None
+    finally:
+        db.close()
+
+
+def write_audit(actor_id, actor_name, action, target_type=None, target_id=None, detail=None, db=None):
+    own = db is None
+    if own:
+        db = get_db()
+    try:
+        import json as _json
+        detail_s = detail
+        if isinstance(detail, (dict, list)):
+            detail_s = _json.dumps(detail, ensure_ascii=False)
+        db.execute(
+            "INSERT INTO audit_logs (actor_id, actor_name, action, target_type, target_id, detail, created_at) "
+            "VALUES (?,?,?,?,?,?,datetime('now','localtime'))",
+            (actor_id, actor_name or '', action, target_type, str(target_id) if target_id is not None else None, detail_s))
+        if own:
+            db.commit()
+    except Exception as e:
+        print('[audit]', e)
+        if own:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+    finally:
+        if own:
+            db.close()
+
+
+def create_notification(user_id, ntype, title, body='', meta=None, db=None):
+    """写入站内通知。db 可传入已有连接，避免重复开关。"""
+    import json as _json
+    own = db is None
+    if own:
+        db = get_db()
+    try:
+        db.execute(
+            "INSERT INTO notifications (user_id, type, title, body, is_read, meta_json, created_at) "
+            "VALUES (?,?,?,?,0,?,datetime('now','localtime'))",
+            (user_id, ntype or 'system', title or '', body or '',
+             _json.dumps(meta or {}, ensure_ascii=False) if meta is not None else None)
+        )
+        if own:
+            db.commit()
+        return True
+    except Exception as e:
+        if own:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+        print('[notify]', e)
+        return False
+    finally:
+        if own:
+            db.close()
+
+
+def _admin_secret_from_request():
+    """Extract admin secret/JWT from query, body or Authorization header."""
+    s = request.args.get('secret', '') if request.method == 'GET' else ''
+    if not s and request.method != 'GET':
+        body = request.get_json(silent=True) or {}
+        s = body.get('secret', '') or ''
+    if not s:
+        auth = request.headers.get('Authorization', '')
+        if auth.startswith('Bearer '):
+            s = auth[7:]
+    return s
+
+
+def _admin_actor_from_secret(s):
+    """Return (actor_id, actor_name) for audit; secret-key logins use id=None name=secret."""
+    if s == ADMIN_SECRET:
+        return None, 'ADMIN_SECRET'
+    if HAS_JWT and s:
+        try:
+            payload = pyjwt.decode(s, JWT_SECRET, algorithms=['HS256'])
+            db = get_db()
+            try:
+                u = db.execute('SELECT id, username, is_admin FROM users WHERE id=?', (payload['user_id'],)).fetchone()
+                if u and u['is_admin']:
+                    return u['id'], u['username']
+            finally:
+                db.close()
+        except Exception:
+            pass
+    return None, 'unknown'
+
+# ========== LLM 分析 API（按实际 token 成本 × USER_MARKUP 扣点） ==========
 @app.route('/api/llm/analyze', methods=['POST'])
 @require_auth
 def llm_analyze():
-    """LLM 分析：先估算费用检查余额 → 调用 DeepSeek → 按实际 token 成本 ×2 扣点
-    计费公式：DeepSeek 实际花费 N 元 → 扣用户 ceil(2N) 点（最低 1 点）
-    DeepSeek 定价：输入 1元/百万token，输出 2元/百万token"""
+    """LLM 分析：先估算费用检查余额 → 调用 DeepSeek → 按实际 token 成本 × USER_MARKUP 扣点。
+    计费：api_cost_yuan = in/1e6*P_in + out/1e6*P_out
+          charge_milli = max(LLM_MIN_CHARGE, round(api_cost_yuan * USER_MARKUP * 1000))
+    默认 USER_MARKUP=3.0；LLM_MIN_CHARGE 单位=厘。
+    """
     # 速率限制：每用户每分钟最多 20 次 LLM 调用
     uid = getattr(request, 'user_id', None) or request.remote_addr or 'unknown'
     if not _check_rate('llm:'+str(uid), max_calls=20, window_sec=60):
@@ -1466,24 +1825,44 @@ def llm_analyze():
         resp.raise_for_status()
         result = resp.json()
     except Exception as e:
+        # 失败也记 usage success=0，便于监控
+        try:
+            db_f = get_db()
+            db_f.execute(
+                "INSERT INTO llm_usage (user_id, module, prompt_tokens, completion_tokens, cost_credits, user_charged_credits, model, success, created_at) "
+                "VALUES (?,?,?,?,?,?,?,0,datetime('now','localtime'))",
+                (request.user_id, module, 0, 0, 0, 0, DEEPSEEK_MODEL))
+            db_f.commit()
+            db_f.close()
+        except Exception:
+            pass
         return jsonify({'success': False, 'error': f'LLM调用失败: {str(e)}'}), 502
 
     # 按实际用量计算费用
     usage_info = result.get('usage', {})
     actual_input = usage_info.get('prompt_tokens', est_input)
     actual_output = usage_info.get('completion_tokens', 0)
-    # DeepSeek 实际花费（元）
     api_cost = (actual_input / 1000000 * DEEPSEEK_INPUT_PRICE_PER_1M +
                 actual_output / 1000000 * DEEPSEEK_OUTPUT_PRICE_PER_1M)
-    # 用户扣点：实际成本（元）×3，折算到厘（×1000），四舍五入，最低 5 厘（≈0.05元/次地板价覆盖运维）
+    # 用户扣点：实际成本（元）× USER_MARKUP，折算到厘（×1000），最低 LLM_MIN_CHARGE 厘
     charge_credits = max(LLM_MIN_CHARGE if 'LLM_MIN_CHARGE' in globals() else 20, round(api_cost * USER_MARKUP * 1000))
     content = result['choices'][0]['message']['content']
 
     # 扣点
     ok, err, after = deduct_credits(request.user_id, charge_credits,
-        f'LLM分析 {module} (输入{actual_input}+输出{actual_output} tokens, API成本¥{api_cost:.4f}, 扣{charge_credits/1000:.2f}点)')
+        f'LLM分析 {module} (输入{actual_input}+输出{actual_output} tokens, API成本¥{api_cost:.4f}, 扣{charge_credits/1000:.3f}点)')
     if not ok:
-        return jsonify({'success': False, 'error': f'扣费失败: {err}'}), 402
+        try:
+            db2 = get_db()
+            db2.execute(
+                "INSERT INTO llm_usage (user_id, module, prompt_tokens, completion_tokens, cost_credits, user_charged_credits, model, success, created_at) "
+                "VALUES (?,?,?,?,?,?,?,0,datetime('now','localtime'))",
+                (request.user_id, module, actual_input, actual_output, int(api_cost*100), 0, DEEPSEEK_MODEL))
+            db2.commit()
+            db2.close()
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': f'扣费失败: {err}', 'needed_points': round(charge_credits/1000,3)}), 402
 
     # 记录
     db2 = get_db()
@@ -1505,7 +1884,9 @@ def llm_analyze():
 @app.route('/api/ai/domain_analyze', methods=['POST'])
 @require_auth
 def domain_analyze():
-    """AI分析论文领域和关键词，用于优化文献检索"""
+    """AI分析论文领域和关键词，用于优化文献检索。按实际 token × USER_MARKUP 扣点。"""
+    if not DEEPSEEK_API_KEY:
+        return jsonify({'success': False, 'error': 'LLM服务未配置'}), 503
     data = request.get_json() or {}
     text = (data.get('text') or '').strip()
     if not text or len(text) < 100:
@@ -1519,8 +1900,21 @@ def domain_analyze():
 
 论文内容：
 {snippet}"""
-    ok, err, after = deduct_credits(request.user_id, 0, '领域分析（免费）')
-    if not ok: return jsonify({'success': False, 'error': err}), 402
+    # 预估费用
+    cn = len(re.findall(r'[一-鿿]', snippet))
+    est_input = int(cn * 0.6 + (len(snippet) - cn) * 0.25)
+    est_api = est_input / 1000000 * DEEPSEEK_INPUT_PRICE_PER_1M + 600 / 1000000 * DEEPSEEK_OUTPUT_PRICE_PER_1M
+    est_credits = max(LLM_MIN_CHARGE, int(est_api * USER_MARKUP * 1000 + 0.999))
+    db = get_db()
+    try:
+        u = db.execute('SELECT credits FROM users WHERE id=?', (request.user_id,)).fetchone()
+        if not u:
+            return jsonify({'success': False, 'error': '用户不存在'}), 404
+        if u['credits'] < est_credits:
+            return jsonify({'success': False, 'error': f'点数不足。预计需 {est_credits/1000:.3f} 点，当前 {u["credits"]/1000:.3f} 点',
+                            'needed_points': round(est_credits/1000, 3), 'points': round(u['credits']/1000, 3)}), 402
+    finally:
+        db.close()
     try:
         resp = requests.post(f'{DEEPSEEK_BASE_URL}/chat/completions',
             headers={'Authorization': f'Bearer {DEEPSEEK_API_KEY}', 'Content-Type': 'application/json'},
@@ -1529,6 +1923,26 @@ def domain_analyze():
         resp.raise_for_status()
         result = resp.json()
         content = result['choices'][0]['message']['content']
+        usage_info = result.get('usage', {})
+        actual_input = usage_info.get('prompt_tokens', est_input)
+        actual_output = usage_info.get('completion_tokens', 0)
+        api_cost = (actual_input / 1000000 * DEEPSEEK_INPUT_PRICE_PER_1M +
+                    actual_output / 1000000 * DEEPSEEK_OUTPUT_PRICE_PER_1M)
+        charge_credits = max(LLM_MIN_CHARGE, round(api_cost * USER_MARKUP * 1000))
+        ok, err, after = deduct_credits(
+            request.user_id, charge_credits,
+            f'领域分析 (in{actual_input}+out{actual_output}, API¥{api_cost:.4f}, 扣{charge_credits/1000:.3f}点)')
+        if not ok:
+            return jsonify({'success': False, 'error': err, 'needed_points': round(charge_credits/1000, 3)}), 402
+        db2 = get_db()
+        try:
+            db2.execute(
+                "INSERT INTO llm_usage (user_id, module, prompt_tokens, completion_tokens, cost_credits, user_charged_credits, model, success, created_at) "
+                "VALUES (?,?,?,?,?,?,?,1,datetime('now','localtime'))",
+                (request.user_id, 'domain_analyze', actual_input, actual_output, int(api_cost*100), charge_credits, DEEPSEEK_MODEL))
+            db2.commit()
+        finally:
+            db2.close()
         lines = [l.strip() for l in content.split('\n') if l.strip()]
         fields, keywords, search_terms, discipline = '', '', '', ''
         for l in lines:
@@ -1541,8 +1955,21 @@ def domain_analyze():
             'fields': fields or '未识别', 'keywords': keywords or '未识别',
             'search_terms': search_terms or '未识别', 'discipline': discipline or '未识别',
             'raw': content
+        }, 'usage': {
+            'cost_points': round(charge_credits/1000, 3),
+            'points_after': round((after or 0)/1000, 3),
+            'input_tokens': actual_input, 'output_tokens': actual_output
         }})
     except Exception as e:
+        try:
+            db_f = get_db()
+            db_f.execute(
+                "INSERT INTO llm_usage (user_id, module, prompt_tokens, completion_tokens, cost_credits, user_charged_credits, model, success, created_at) "
+                "VALUES (?,?,0,0,0,0,?,0,datetime('now','localtime'))",
+                (request.user_id, 'domain_analyze', DEEPSEEK_MODEL))
+            db_f.commit(); db_f.close()
+        except Exception:
+            pass
         return jsonify({'success': False, 'error': f'AI分析失败: {str(e)}'}), 502
 
 # ========== 邀请码 API ==========
@@ -1572,17 +1999,53 @@ def invite_apply():
     if not code: return jsonify({'success': False, 'error': '请输入邀请码'}), 400
     db = get_db()
     try:
+        me = db.execute('SELECT id, username, credits, invited_by FROM users WHERE id=?', (request.user_id,)).fetchone()
+        if not me: return jsonify({'success': False, 'error': '用户不存在'}), 404
+        if me['invited_by']:
+            return jsonify({'success': False, 'error': '你已使用过邀请码'}), 400
         ic = db.execute("SELECT * FROM invite_codes WHERE code = ? AND used_by IS NULL AND owner_id != ?",
                         (code, request.user_id)).fetchone()
         if not ic: return jsonify({'success': False, 'error': '邀请码无效或已被使用'}), 404
+        # 邀请人每日上限
+        today = date.today().isoformat()
+        used_today = db.execute(
+            "SELECT COUNT(*) as c FROM invite_codes WHERE owner_id=? AND used_by IS NOT NULL AND used_at LIKE ?",
+            (ic['owner_id'], today + '%')).fetchone()['c']
+        if used_today >= INVITE_DAILY_LIMIT:
+            return jsonify({'success': False, 'error': f'该邀请码今日奖励次数已达上限（{INVITE_DAILY_LIMIT}）'}), 400
         inv_bonus = int(db.execute("SELECT value FROM config WHERE key='invite_bonus'").fetchone()['value'] or 1000)
         db.execute("UPDATE invite_codes SET used_by = ?, used_at = datetime('now','localtime') WHERE code = ?",
                    (request.user_id, code))
+        # 邀请人
         db.execute("UPDATE users SET credits = credits + ? WHERE id = ?", (inv_bonus, ic['owner_id']))
+        inv_after = db.execute('SELECT credits FROM users WHERE id=?', (ic['owner_id'],)).fetchone()['credits']
+        db.execute(
+            "INSERT INTO transactions (user_id,type,amount_credits,credits_after,description,created_at) "
+            "VALUES (?,?,?,?,?,datetime('now','localtime'))",
+            (ic['owner_id'], 'invite_bonus', inv_bonus, inv_after, f'邀请用户 {me["username"]} 奖励'))
+        create_notification(
+            ic['owner_id'], 'gift', '邀请奖励到账',
+            f'用户 {me["username"]} 使用了你的邀请码，系统赠送你 {inv_bonus/1000:.3f} 点。',
+            {'points': inv_bonus / 1000}, db=db)
+        # 被邀请人
         db.execute("UPDATE users SET credits = credits + ?, invited_by = ? WHERE id = ?",
-                   (inv_bonus, request.user_id, ic['owner_id']))
+                   (inv_bonus, ic['owner_id'], request.user_id))
+        me_after = db.execute('SELECT credits FROM users WHERE id=?', (request.user_id,)).fetchone()['credits']
+        db.execute(
+            "INSERT INTO transactions (user_id,type,amount_credits,credits_after,description,created_at) "
+            "VALUES (?,?,?,?,?,datetime('now','localtime'))",
+            (request.user_id, 'invite_bonus', inv_bonus, me_after, f'使用邀请码 {code} 奖励'))
+        create_notification(
+            request.user_id, 'gift', '邀请奖励到账',
+            f'邀请码使用成功，系统赠送你 {inv_bonus/1000:.3f} 点。当前余额 {me_after/1000:.3f} 点。',
+            {'points': inv_bonus / 1000}, db=db)
         db.commit()
-        return jsonify({'success': True, 'message': f'邀请码已使用，你和邀请人各获得 {inv_bonus} 点！'})
+        return jsonify({
+            'success': True,
+            'message': f'邀请码已使用，你和邀请人各获得 {inv_bonus/1000:.3f} 点！',
+            'points': inv_bonus / 1000,
+            'credits': me_after
+        })
     except Exception as e:
         db.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1705,8 +2168,10 @@ def admin_dashboard():
         llm_today = db.execute("SELECT COUNT(*) as c FROM llm_usage WHERE created_at LIKE ?", (today+'%',)).fetchone()['c']
         llm_total = db.execute('SELECT COUNT(*) as c FROM llm_usage WHERE success=1').fetchone()['c']
         total_cost = db.execute('SELECT SUM(user_charged_credits) as s FROM llm_usage WHERE success=1').fetchone()['s'] or 0
-        recent_users = [dict(r) for r in db.execute('SELECT id,username,credits,created_at FROM users ORDER BY id DESC LIMIT 10').fetchall()]
-        recent_orders = [dict(r) for r in db.execute("SELECT o.*,u.username FROM recharge_orders o JOIN users u ON o.user_id=u.id ORDER BY o.id DESC LIMIT 10").fetchall()]
+        recent_users = [dict(r) for r in db.execute('SELECT id,username,credits,invite_code,created_at FROM users ORDER BY id DESC LIMIT 20').fetchall()]
+        for u in recent_users:
+            u['points'] = round((u.get('credits') or 0) / 1000.0, 3)
+        recent_orders = [dict(r) for r in db.execute("SELECT o.*,u.username FROM recharge_orders o JOIN users u ON o.user_id=u.id ORDER BY o.id DESC LIMIT 30").fetchall()]
         # LLM economics
         try:
             llm_api_cost_total = db.execute('SELECT SUM(cost_credits) as s FROM llm_usage').fetchone()['s'] or 0  # stored as fen-ish (api_cost*100)
@@ -1715,45 +2180,626 @@ def admin_dashboard():
             llm_charged_today = db.execute("SELECT SUM(user_charged_credits) as s FROM llm_usage WHERE created_at LIKE ?", (today+'%',)).fetchone()['s'] or 0
         except Exception:
             llm_api_cost_total = llm_charged_total = llm_api_cost_today = llm_charged_today = 0
+        recharge_today = db.execute(
+            "SELECT COALESCE(SUM(amount_yuan),0) as s FROM recharge_orders WHERE status='confirmed' AND confirmed_at LIKE ?",
+            (today + '%',)).fetchone()['s'] or 0
+        gift_total = db.execute(
+            "SELECT COALESCE(SUM(amount_credits),0) as s FROM transactions "
+            "WHERE type IN ('admin_gift','register_bonus','invite_bonus') AND amount_credits>0"
+        ).fetchone()['s'] or 0
         return jsonify({'success': True, 'stats': {
             'total_users': total_users, 'today_users': today_users, 'total_credits': total_credits,
-            'total_recharge': total_recharge, 'pending_orders': pending,
-            'llm_today': llm_today, 'llm_total': llm_total, 'total_cost': total_cost, 'llm_api_cost_yuan_total': round((llm_api_cost_total or 0)/100.0, 4), 'llm_charged_points_total': round((llm_charged_total or 0)/1000.0, 3), 'llm_api_cost_yuan_today': round((llm_api_cost_today or 0)/100.0, 4), 'llm_charged_points_today': round((llm_charged_today or 0)/1000.0, 3), 'llm_margin_points_total': round(((llm_charged_total or 0)/1000.0) - ((llm_api_cost_total or 0)/100.0), 3),
+            'total_points': round((total_credits or 0) / 1000.0, 3),
+            'total_recharge': total_recharge, 'recharge_today': float(recharge_today or 0),
+            'pending_orders': pending,
+            'gift_points_total': round((gift_total or 0) / 1000.0, 3),
+            'llm_today': llm_today, 'llm_total': llm_total,
+            'total_cost': round((total_cost or 0) / 1000.0, 3),
+            'llm_api_cost_yuan_total': round((llm_api_cost_total or 0)/100.0, 4),
+            'llm_charged_points_total': round((llm_charged_total or 0)/1000.0, 3),
+            'llm_api_cost_yuan_today': round((llm_api_cost_today or 0)/100.0, 4),
+            'llm_charged_points_today': round((llm_charged_today or 0)/1000.0, 3),
+            'llm_margin_points_total': round(((llm_charged_total or 0)/1000.0) - ((llm_api_cost_total or 0)/100.0), 3),
+            'approx_cash_profit_yuan': round(float(total_recharge or 0) - ((llm_api_cost_total or 0)/100.0), 2),
             'recent_users': recent_users, 'recent_orders': recent_orders
         }})
     finally: db.close()
 
 @app.route('/api/admin/users', methods=['GET'])
 def admin_users():
-    s = request.args.get('secret', '')
+    s = request.args.get('secret', '') or _admin_secret_from_request()
     if not _check_admin(s): return jsonify({'error': '无权限'}), 403
+    q = (request.args.get('q') or '').strip()
+    limit = min(500, max(1, int(request.args.get('limit', 200))))
     db = get_db()
     try:
-        rows = [dict(r) for r in db.execute('SELECT id,username,credits,invite_code,created_at FROM users ORDER BY id DESC LIMIT 100').fetchall()]
+        if q:
+            like = f'%{q}%'
+            rows = [dict(r) for r in db.execute(
+                "SELECT id,username,credits,invite_code,is_admin,created_at FROM users "
+                "WHERE username LIKE ? OR CAST(id AS TEXT)=? ORDER BY id DESC LIMIT ?",
+                (like, q, limit)).fetchall()]
+        else:
+            rows = [dict(r) for r in db.execute(
+                'SELECT id,username,credits,invite_code,is_admin,created_at FROM users ORDER BY id DESC LIMIT ?',
+                (limit,)).fetchall()]
+        for r in rows:
+            r['points'] = round((r.get('credits') or 0) / 1000.0, 3)
         return jsonify({'success': True, 'users': rows})
     finally: db.close()
 
 @app.route('/api/admin/credits', methods=['POST'])
 def admin_credits():
+    """管理员加减点 / 赠送。amount 单位=厘；points 单位=点（优先）。正数赠送，负数扣减。"""
     data = request.get_json() or {}
-    if not _check_admin(data.get('secret','')): return jsonify({'error':'无权限'}), 403
+    if not _check_admin(data.get('secret') or _admin_secret_from_request()):
+        return jsonify({'error':'无权限'}), 403
     uid = data.get('user_id')
-    amount = int(data.get('amount', 0))
-    reason = data.get('reason', '管理员调整')
+    if not uid:
+        return jsonify({'success': False, 'error': '请提供 user_id'}), 400
+    # Prefer points (display unit), fallback to amount (milli-credits)
+    if data.get('points') is not None and data.get('points') != '':
+        try:
+            amount = int(round(float(data.get('points')) * 1000))
+        except Exception:
+            return jsonify({'success': False, 'error': 'points 无效'}), 400
+    else:
+        try:
+            amount = int(data.get('amount', 0))
+        except Exception:
+            return jsonify({'success': False, 'error': 'amount 无效'}), 400
+    reason = (data.get('reason') or '管理员赠送').strip() or '管理员赠送'
+    notify = data.get('notify', True)
+    if amount == 0:
+        return jsonify({'success': False, 'error': '调整数量不能为 0'}), 400
     db = get_db()
     try:
-        db.execute('UPDATE users SET credits = credits + ? WHERE id = ?', (amount, uid))
-        after = db.execute('SELECT credits FROM users WHERE id = ?', (uid,)).fetchone()['credits']
-        db.execute("INSERT INTO transactions (user_id,type,amount_credits,credits_after,description,created_at) VALUES (?,?,?,?,?,datetime('now','localtime'))",
-                   (uid, 'admin_adjust', amount, after, reason))
+        user = db.execute('SELECT id, username, credits FROM users WHERE id = ?', (uid,)).fetchone()
+        if not user:
+            return jsonify({'success': False, 'error': '用户不存在'}), 404
+        new_bal = (user['credits'] or 0) + amount
+        if new_bal < 0:
+            return jsonify({'success': False, 'error': f'扣减后余额不能为负（当前 {user["credits"]/1000:.3f} 点）'}), 400
+        db.execute('UPDATE users SET credits = ? WHERE id = ?', (new_bal, uid))
+        tx_type = 'admin_gift' if amount > 0 else 'admin_deduct'
+        db.execute(
+            "INSERT INTO transactions (user_id,type,amount_credits,credits_after,description,created_at) "
+            "VALUES (?,?,?,?,?,datetime('now','localtime'))",
+            (uid, tx_type, amount, new_bal, reason))
+        if notify:
+            pts = abs(amount) / 1000.0
+            now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
+            if amount > 0:
+                title = '系统管理员赠送点数'
+                body = f'系统管理员于 {now_str} 赠送了你 {pts:.3f} 点。原因：{reason}。当前余额 {new_bal/1000:.3f} 点。'
+            else:
+                title = '系统管理员调整点数'
+                body = f'系统管理员于 {now_str} 扣减了你 {pts:.3f} 点。原因：{reason}。当前余额 {new_bal/1000:.3f} 点。'
+            create_notification(uid, 'gift', title, body,
+                                {'points': amount / 1000.0, 'points_after': new_bal / 1000.0, 'reason': reason},
+                                db=db)
+        secret = data.get('secret') or _admin_secret_from_request()
+        actor_id, actor_name = _admin_actor_from_secret(secret)
+        write_audit(actor_id, actor_name, 'adjust_credits', 'user', uid,
+                    {'delta_points': amount/1000.0, 'reason': reason, 'points_after': new_bal/1000.0}, db=db)
         db.commit()
-        return jsonify({'success': True, 'credits': after})
+        return jsonify({
+            'success': True,
+            'credits': new_bal,
+            'points': round(new_bal / 1000.0, 3),
+            'delta_points': round(amount / 1000.0, 3),
+            'username': user['username']
+        })
     except Exception as e:
         db.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
     finally: db.close()
 
 
+@app.route('/api/admin/orders', methods=['GET'])
+def admin_orders():
+    """全部充值记录（可按状态/关键词筛选）。"""
+    s = request.args.get('secret', '') or _admin_secret_from_request()
+    if not _check_admin(s):
+        return jsonify({'success': False, 'error': '无权限'}), 403
+    status = (request.args.get('status') or '').strip()
+    q = (request.args.get('q') or '').strip()
+    limit = min(500, max(1, int(request.args.get('limit', 100))))
+    db = get_db()
+    try:
+        sql = ("SELECT o.*, u.username FROM recharge_orders o "
+               "JOIN users u ON o.user_id = u.id WHERE 1=1")
+        params = []
+        if status:
+            sql += " AND o.status = ?"
+            params.append(status)
+        if q:
+            sql += " AND (u.username LIKE ? OR CAST(o.id AS TEXT)=? OR CAST(o.user_id AS TEXT)=?)"
+            like = f'%{q}%'
+            params.extend([like, q, q])
+        sql += " ORDER BY o.id DESC LIMIT ?"
+        params.append(limit)
+        rows = [dict(r) for r in db.execute(sql, params).fetchall()]
+        for r in rows:
+            r['points'] = round(float(r.get('amount_yuan') or 0), 3)
+        # summary
+        conf = db.execute(
+            "SELECT COUNT(*) as c, COALESCE(SUM(amount_yuan),0) as s FROM recharge_orders WHERE status='confirmed'"
+        ).fetchone()
+        sub = db.execute(
+            "SELECT COUNT(*) as c, COALESCE(SUM(amount_yuan),0) as s FROM recharge_orders WHERE status='submitted'"
+        ).fetchone()
+        pend = db.execute(
+            "SELECT COUNT(*) as c, COALESCE(SUM(amount_yuan),0) as s FROM recharge_orders WHERE status='pending'"
+        ).fetchone()
+        return jsonify({
+            'success': True,
+            'orders': rows,
+            'summary': {
+                'confirmed_count': conf['c'] or 0,
+                'confirmed_yuan': float(conf['s'] or 0),
+                'submitted_count': sub['c'] or 0,
+                'submitted_yuan': float(sub['s'] or 0),
+                'pending_count': pend['c'] or 0,
+                'pending_yuan': float(pend['s'] or 0),
+            }
+        })
+    finally:
+        db.close()
+
+
+@app.route('/api/admin/reject_order', methods=['POST'])
+def admin_reject_order():
+    data = request.get_json() or {}
+    secret = data.get('secret') or _admin_secret_from_request()
+    if not _check_admin(secret):
+        return jsonify({'success': False, 'error': '无权限'}), 403
+    order_id = data.get('order_id')
+    reason = (data.get('reason') or '管理员拒绝').strip()
+    db = get_db()
+    try:
+        order = db.execute('SELECT * FROM recharge_orders WHERE id=?', (order_id,)).fetchone()
+        if not order:
+            return jsonify({'success': False, 'error': '订单不存在'}), 404
+        if order['status'] == 'confirmed':
+            return jsonify({'success': False, 'error': '已到账订单不可拒绝'}), 400
+        if order['status'] == 'rejected':
+            return jsonify({'success': True, 'message': '已是拒绝状态'})
+        db.execute("UPDATE recharge_orders SET status='rejected' WHERE id=?", (order_id,))
+        create_notification(
+            order['user_id'], 'recharge', '充值申请未通过',
+            f'你的充值订单 #{order_id}（¥{order["amount_yuan"]}）未通过审核。原因：{reason}',
+            {'order_id': order_id, 'reason': reason}, db=db)
+        actor_id, actor_name = _admin_actor_from_secret(secret)
+        write_audit(actor_id, actor_name, 'reject_order', 'recharge_order', order_id,
+                    {'reason': reason, 'user_id': order['user_id']}, db=db)
+        db.commit()
+        return jsonify({'success': True, 'message': '已拒绝'})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route('/api/admin/timeseries', methods=['GET'])
+def admin_timeseries():
+    """近 N 天运营曲线：注册/充值/消耗/API成本/毛利。"""
+    s = request.args.get('secret', '') or _admin_secret_from_request()
+    if not _check_admin(s):
+        return jsonify({'success': False, 'error': '无权限'}), 403
+    days = min(90, max(7, int(request.args.get('days', 14))))
+    db = get_db()
+    try:
+        from datetime import timedelta
+        today = date.today()
+        labels = []
+        series = {
+            'new_users': [],
+            'recharge_yuan': [],
+            'recharge_count': [],
+            'usage_points': [],
+            'gift_points': [],
+            'llm_calls': [],
+            'api_cost_yuan': [],
+            'charged_points': [],
+            'margin_yuan': [],
+        }
+        for i in range(days - 1, -1, -1):
+            d = today - timedelta(days=i)
+            ds = d.isoformat()
+            labels.append(ds[5:])  # MM-DD
+            nu = db.execute("SELECT COUNT(*) as c FROM users WHERE created_at LIKE ?", (ds + '%',)).fetchone()['c'] or 0
+            ro = db.execute(
+                "SELECT COUNT(*) as c, COALESCE(SUM(amount_yuan),0) as s FROM recharge_orders "
+                "WHERE status='confirmed' AND (confirmed_at LIKE ? OR (confirmed_at IS NULL AND created_at LIKE ?))",
+                (ds + '%', ds + '%')).fetchone()
+            usage = db.execute(
+                "SELECT COALESCE(SUM(CASE WHEN amount_credits<0 THEN -amount_credits ELSE 0 END),0) as s "
+                "FROM transactions WHERE type='usage' AND created_at LIKE ?", (ds + '%',)).fetchone()['s'] or 0
+            gift = db.execute(
+                "SELECT COALESCE(SUM(amount_credits),0) as s FROM transactions "
+                "WHERE type IN ('admin_gift','admin_adjust','register_bonus','invite_bonus') "
+                "AND amount_credits>0 AND created_at LIKE ?", (ds + '%',)).fetchone()['s'] or 0
+            llm = db.execute(
+                "SELECT COUNT(*) as c, COALESCE(SUM(cost_credits),0) as api_fen, "
+                "COALESCE(SUM(user_charged_credits),0) as charged "
+                "FROM llm_usage WHERE created_at LIKE ?", (ds + '%',)).fetchone()
+            api_yuan = (llm['api_fen'] or 0) / 100.0
+            charged_pts = (llm['charged'] or 0) / 1000.0
+            series['new_users'].append(nu)
+            series['recharge_yuan'].append(round(float(ro['s'] or 0), 2))
+            series['recharge_count'].append(ro['c'] or 0)
+            series['usage_points'].append(round(usage / 1000.0, 3))
+            series['gift_points'].append(round(gift / 1000.0, 3))
+            series['llm_calls'].append(llm['c'] or 0)
+            series['api_cost_yuan'].append(round(api_yuan, 4))
+            series['charged_points'].append(round(charged_pts, 3))
+            # 1点≈1元收入侧近似：毛利 ≈ 用户扣点 - API成本
+            series['margin_yuan'].append(round(charged_pts - api_yuan, 3))
+        # profit snapshot
+        total_recharge = db.execute(
+            "SELECT COALESCE(SUM(amount_yuan),0) as s FROM recharge_orders WHERE status='confirmed'"
+        ).fetchone()['s'] or 0
+        total_api = (db.execute('SELECT COALESCE(SUM(cost_credits),0) as s FROM llm_usage').fetchone()['s'] or 0) / 100.0
+        total_charged = (db.execute('SELECT COALESCE(SUM(user_charged_credits),0) as s FROM llm_usage').fetchone()['s'] or 0) / 1000.0
+        total_gift = (db.execute(
+            "SELECT COALESCE(SUM(amount_credits),0) as s FROM transactions "
+            "WHERE type IN ('admin_gift','register_bonus','invite_bonus') AND amount_credits>0"
+        ).fetchone()['s'] or 0) / 1000.0
+        liability = (db.execute('SELECT COALESCE(SUM(credits),0) as s FROM users').fetchone()['s'] or 0) / 1000.0
+        return jsonify({
+            'success': True,
+            'days': days,
+            'labels': labels,
+            'series': series,
+            'profit': {
+                'total_recharge_yuan': round(float(total_recharge), 2),
+                'total_api_cost_yuan': round(total_api, 4),
+                'total_charged_points': round(total_charged, 3),
+                'total_gift_points': round(total_gift, 3),
+                'user_credit_liability_points': round(liability, 3),
+                # 近似毛利：充值现金 - API成本；点余额是负债
+                'approx_cash_profit_yuan': round(float(total_recharge) - total_api, 2),
+                'approx_usage_margin_yuan': round(total_charged - total_api, 3),
+            }
+        })
+    finally:
+        db.close()
+
+
+@app.route('/api/admin/transactions', methods=['GET'])
+def admin_transactions():
+    """全站流水（含赠送/充值/消耗）。"""
+    s = request.args.get('secret', '') or _admin_secret_from_request()
+    if not _check_admin(s):
+        return jsonify({'success': False, 'error': '无权限'}), 403
+    tx_type = (request.args.get('type') or '').strip()
+    limit = min(300, max(1, int(request.args.get('limit', 80))))
+    db = get_db()
+    try:
+        if tx_type:
+            rows = [dict(r) for r in db.execute(
+                "SELECT t.*, u.username FROM transactions t JOIN users u ON t.user_id=u.id "
+                "WHERE t.type=? ORDER BY t.id DESC LIMIT ?", (tx_type, limit)).fetchall()]
+        else:
+            rows = [dict(r) for r in db.execute(
+                "SELECT t.*, u.username FROM transactions t JOIN users u ON t.user_id=u.id "
+                "ORDER BY t.id DESC LIMIT ?", (limit,)).fetchall()]
+        for r in rows:
+            r['points'] = round((r.get('amount_credits') or 0) / 1000.0, 3)
+            r['points_after'] = round((r.get('credits_after') or 0) / 1000.0, 3)
+        return jsonify({'success': True, 'transactions': rows})
+    finally:
+        db.close()
+
+
+# ========== 站内通知 API ==========
+@app.route('/api/notifications', methods=['GET'])
+@require_auth
+def notifications_list():
+    limit = min(100, max(1, int(request.args.get('limit', 30))))
+    unread_only = request.args.get('unread') in ('1', 'true', 'yes')
+    db = get_db()
+    try:
+        if unread_only:
+            rows = [dict(r) for r in db.execute(
+                "SELECT id,type,title,body,is_read,meta_json,created_at FROM notifications "
+                "WHERE user_id=? AND is_read=0 ORDER BY id DESC LIMIT ?",
+                (request.user_id, limit)).fetchall()]
+        else:
+            rows = [dict(r) for r in db.execute(
+                "SELECT id,type,title,body,is_read,meta_json,created_at FROM notifications "
+                "WHERE user_id=? ORDER BY id DESC LIMIT ?",
+                (request.user_id, limit)).fetchall()]
+        unread = db.execute(
+            "SELECT COUNT(*) as c FROM notifications WHERE user_id=? AND is_read=0",
+            (request.user_id,)).fetchone()['c'] or 0
+        import json as _json
+        for r in rows:
+            try:
+                r['meta'] = _json.loads(r.get('meta_json') or '{}') if r.get('meta_json') else {}
+            except Exception:
+                r['meta'] = {}
+            r.pop('meta_json', None)
+        return jsonify({'success': True, 'notifications': rows, 'unread': unread})
+    finally:
+        db.close()
+
+
+@app.route('/api/notifications/read', methods=['POST'])
+@require_auth
+def notifications_read():
+    data = request.get_json(silent=True) or {}
+    ids = data.get('ids') or []
+    mark_all = bool(data.get('all'))
+    db = get_db()
+    try:
+        if mark_all:
+            db.execute("UPDATE notifications SET is_read=1 WHERE user_id=? AND is_read=0", (request.user_id,))
+        elif ids:
+            placeholders = ','.join('?' * len(ids))
+            db.execute(
+                f"UPDATE notifications SET is_read=1 WHERE user_id=? AND id IN ({placeholders})",
+                [request.user_id] + list(ids))
+        else:
+            return jsonify({'success': False, 'error': '请提供 ids 或 all=true'}), 400
+        db.commit()
+        unread = db.execute(
+            "SELECT COUNT(*) as c FROM notifications WHERE user_id=? AND is_read=0",
+            (request.user_id,)).fetchone()['c'] or 0
+        return jsonify({'success': True, 'unread': unread})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route('/api/account/overview', methods=['GET'])
+@require_auth
+def account_overview():
+    """用户账户中心聚合：余额 / 免费额度 / 最近流水 / 订单 / 消息 / 邀请。"""
+    db = get_db()
+    try:
+        u = db.execute(
+            'SELECT id, username, credits, is_admin, invite_code, created_at FROM users WHERE id=?',
+            (request.user_id,)).fetchone()
+        if not u:
+            return jsonify({'success': False, 'error': '用户不存在'}), 404
+        today = date.today().isoformat()
+        free_row = db.execute(
+            'SELECT used FROM daily_free_usage WHERE user_id=? AND usage_date=?',
+            (request.user_id, today)).fetchone()
+        free_used = int(free_row['used']) if free_row else 0
+        free_limit = DAILY_FREE_OPS
+        txs = [dict(r) for r in db.execute(
+            "SELECT id,type,amount_credits,credits_after,description,created_at FROM transactions "
+            "WHERE user_id=? ORDER BY id DESC LIMIT 30", (request.user_id,)).fetchall()]
+        for t in txs:
+            t['points'] = round((t.get('amount_credits') or 0)/1000.0, 3)
+            t['points_after'] = round((t.get('credits_after') or 0)/1000.0, 3)
+        orders = [dict(r) for r in db.execute(
+            "SELECT id, amount_yuan, status, payment_method, note, created_at, confirmed_at "
+            "FROM recharge_orders WHERE user_id=? ORDER BY id DESC LIMIT 20",
+            (request.user_id,)).fetchall()]
+        notes = [dict(r) for r in db.execute(
+            "SELECT id,type,title,body,is_read,created_at FROM notifications "
+            "WHERE user_id=? ORDER BY id DESC LIMIT 20", (request.user_id,)).fetchall()]
+        unread = db.execute(
+            "SELECT COUNT(*) as c FROM notifications WHERE user_id=? AND is_read=0",
+            (request.user_id,)).fetchone()['c'] or 0
+        inv_used = db.execute(
+            "SELECT COUNT(*) as c FROM invite_codes WHERE owner_id=? AND used_by IS NOT NULL",
+            (request.user_id,)).fetchone()['c'] or 0
+        spent = db.execute(
+            "SELECT COALESCE(SUM(CASE WHEN amount_credits<0 THEN -amount_credits ELSE 0 END),0) as s "
+            "FROM transactions WHERE user_id=? AND type='usage'", (request.user_id,)).fetchone()['s'] or 0
+        recharged = db.execute(
+            "SELECT COALESCE(SUM(amount_yuan),0) as s FROM recharge_orders WHERE user_id=? AND status='confirmed'",
+            (request.user_id,)).fetchone()['s'] or 0
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': u['id'], 'username': u['username'],
+                'credits': u['credits'],
+                'points': round((u['credits'] or 0)/1000.0, 3),
+                'is_admin': bool(u['is_admin']),
+                'invite_code': u['invite_code'] or '',
+                'created_at': u['created_at'],
+            },
+            'free': {
+                'used': free_used, 'limit': free_limit,
+                'remaining': max(0, free_limit - free_used),
+                'available': free_used < free_limit
+            },
+            'stats': {
+                'spent_points': round(spent/1000.0, 3),
+                'recharged_yuan': float(recharged or 0),
+                'invite_used': inv_used,
+                'unread_notifications': unread
+            },
+            'transactions': txs,
+            'orders': orders,
+            'notifications': notes,
+            'unit': {'ratio': '1点=1000厘', 'recharge': '1元=1点', 'note': '转账备注请填订单号'}
+        })
+    finally:
+        db.close()
+
+
+@app.route('/api/admin/user/<int:uid>', methods=['GET'])
+def admin_user_detail(uid):
+    """管理员：单用户详情（流水+订单+LLM+项目数）。"""
+    s = request.args.get('secret', '') or _admin_secret_from_request()
+    if not _check_admin(s):
+        return jsonify({'success': False, 'error': '无权限'}), 403
+    db = get_db()
+    try:
+        u = db.execute(
+            'SELECT id,username,credits,invite_code,is_admin,invited_by,created_at FROM users WHERE id=?',
+            (uid,)).fetchone()
+        if not u:
+            return jsonify({'success': False, 'error': '用户不存在'}), 404
+        u = dict(u)
+        u['points'] = round((u.get('credits') or 0)/1000.0, 3)
+        txs = [dict(r) for r in db.execute(
+            "SELECT id,type,amount_credits,credits_after,description,created_at FROM transactions "
+            "WHERE user_id=? ORDER BY id DESC LIMIT 50", (uid,)).fetchall()]
+        for t in txs:
+            t['points'] = round((t.get('amount_credits') or 0)/1000.0, 3)
+            t['points_after'] = round((t.get('credits_after') or 0)/1000.0, 3)
+        orders = [dict(r) for r in db.execute(
+            "SELECT * FROM recharge_orders WHERE user_id=? ORDER BY id DESC LIMIT 50", (uid,)).fetchall()]
+        llms = [dict(r) for r in db.execute(
+            "SELECT id,module,prompt_tokens,completion_tokens,cost_credits,user_charged_credits,model,success,created_at "
+            "FROM llm_usage WHERE user_id=? ORDER BY id DESC LIMIT 50", (uid,)).fetchall()]
+        for l in llms:
+            l['points_charged'] = round((l.get('user_charged_credits') or 0)/1000.0, 3)
+            l['api_cost_yuan'] = round((l.get('cost_credits') or 0)/100.0, 4)
+        projects = 0
+        try:
+            projects = db.execute('SELECT COUNT(*) as c FROM projects WHERE user_id=?', (uid,)).fetchone()['c']
+        except Exception:
+            projects = 0
+        spent = db.execute(
+            "SELECT COALESCE(SUM(CASE WHEN amount_credits<0 THEN -amount_credits ELSE 0 END),0) as s "
+            "FROM transactions WHERE user_id=? AND type='usage'", (uid,)).fetchone()['s'] or 0
+        recharged = db.execute(
+            "SELECT COALESCE(SUM(amount_yuan),0) as s FROM recharge_orders WHERE user_id=? AND status='confirmed'",
+            (uid,)).fetchone()['s'] or 0
+        return jsonify({
+            'success': True,
+            'user': u,
+            'summary': {
+                'spent_points': round(spent/1000.0, 3),
+                'recharged_yuan': float(recharged or 0),
+                'projects': projects,
+                'llm_calls': len(llms),
+            },
+            'transactions': txs,
+            'orders': orders,
+            'llm_usage': llms
+        })
+    finally:
+        db.close()
+
+
+@app.route('/api/admin/export/orders.csv', methods=['GET'])
+def admin_export_orders_csv():
+    """对账导出：充值订单 CSV。"""
+    s = request.args.get('secret', '') or _admin_secret_from_request()
+    if not _check_admin(s):
+        return jsonify({'success': False, 'error': '无权限'}), 403
+    status = (request.args.get('status') or '').strip()
+    db = get_db()
+    try:
+        sql = ("SELECT o.id,o.user_id,u.username,o.amount_yuan,o.status,o.payment_method,o.note,"
+               "o.created_at,o.confirmed_at FROM recharge_orders o JOIN users u ON o.user_id=u.id")
+        params = []
+        if status:
+            sql += " WHERE o.status=?"
+            params.append(status)
+        sql += " ORDER BY o.id DESC LIMIT 2000"
+        rows = db.execute(sql, params).fetchall()
+        lines = ['id,user_id,username,amount_yuan,status,payment_method,note,created_at,confirmed_at']
+        for r in rows:
+            def esc(x):
+                s2 = '' if x is None else str(x)
+                if any(c in s2 for c in [',', '"', '\n']):
+                    return '"' + s2.replace('"', '""') + '"'
+                return s2
+            lines.append(','.join(esc(r[k]) for k in r.keys()))
+        from flask import Response
+        csv = '\n'.join(lines)
+        return Response(csv, mimetype='text/csv; charset=utf-8',
+                        headers={'Content-Disposition': 'attachment; filename=orders.csv'})
+    finally:
+        db.close()
+
+
+@app.route('/api/admin/export/transactions.csv', methods=['GET'])
+def admin_export_tx_csv():
+    s = request.args.get('secret', '') or _admin_secret_from_request()
+    if not _check_admin(s):
+        return jsonify({'success': False, 'error': '无权限'}), 403
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT t.id,t.user_id,u.username,t.type,t.amount_credits,t.credits_after,t.description,t.created_at "
+            "FROM transactions t JOIN users u ON t.user_id=u.id ORDER BY t.id DESC LIMIT 3000"
+        ).fetchall()
+        lines = ['id,user_id,username,type,amount_credits,points,credits_after,points_after,description,created_at']
+        for r in rows:
+            pts = (r['amount_credits'] or 0)/1000.0
+            pa = (r['credits_after'] or 0)/1000.0
+            desc = (r['description'] or '').replace('"', '""')
+            lines.append(f"{r['id']},{r['user_id']},{r['username']},{r['type']},{r['amount_credits']},{pts:.3f},{r['credits_after']},{pa:.3f},\"{desc}\",{r['created_at'] or ''}")
+        from flask import Response
+        return Response('\n'.join(lines), mimetype='text/csv; charset=utf-8',
+                        headers={'Content-Disposition': 'attachment; filename=transactions.csv'})
+    finally:
+        db.close()
+
+
+@app.route('/api/admin/audit', methods=['GET'])
+def admin_audit_logs():
+    s = request.args.get('secret', '') or _admin_secret_from_request()
+    if not _check_admin(s):
+        return jsonify({'success': False, 'error': '无权限'}), 403
+    limit = min(200, max(1, int(request.args.get('limit', 50))))
+    db = get_db()
+    try:
+        rows = [dict(r) for r in db.execute(
+            "SELECT id,actor_id,actor_name,action,target_type,target_id,detail,created_at "
+            "FROM audit_logs ORDER BY id DESC LIMIT ?", (limit,)).fetchall()]
+        return jsonify({'success': True, 'logs': rows})
+    finally:
+        db.close()
+
+
+@app.route('/api/admin/batch_confirm', methods=['POST'])
+def admin_batch_confirm():
+    data = request.get_json() or {}
+    secret = data.get('secret') or _admin_secret_from_request()
+    if not _check_admin(secret):
+        return jsonify({'success': False, 'error': '无权限'}), 403
+    ids = data.get('order_ids') or []
+    if not ids:
+        return jsonify({'success': False, 'error': 'order_ids 不能为空'}), 400
+    ok_list, fail_list = [], []
+    for oid in ids[:50]:
+        # reuse confirm logic inline
+        db = get_db()
+        try:
+            order = db.execute('SELECT * FROM recharge_orders WHERE id=?', (oid,)).fetchone()
+            if not order:
+                fail_list.append({'id': oid, 'error': '不存在'}); continue
+            if order['status'] == 'confirmed':
+                fail_list.append({'id': oid, 'error': '已确认'}); continue
+            pts = int(float(order['amount_yuan']) * 1000)
+            db.execute("UPDATE recharge_orders SET status='confirmed', confirmed_at=datetime('now','localtime') WHERE id=?", (oid,))
+            db.execute('UPDATE users SET credits = credits + ? WHERE id=?', (pts, order['user_id']))
+            after = db.execute('SELECT credits FROM users WHERE id=?', (order['user_id'],)).fetchone()['credits']
+            db.execute(
+                "INSERT INTO transactions (user_id,type,amount_credits,credits_after,description,created_at) "
+                "VALUES (?,?,?,?,?,datetime('now','localtime'))",
+                (order['user_id'], 'recharge', pts, after, f'充值 {pts/1000}点'))
+            create_notification(
+                order['user_id'], 'recharge', '充值到账',
+                f'你的充值订单 #{oid}（¥{order["amount_yuan"]}）已确认，到账 {pts/1000:.3f} 点。',
+                {'order_id': oid, 'points': pts/1000}, db=db)
+            actor_id, actor_name = _admin_actor_from_secret(secret)
+            write_audit(actor_id, actor_name, 'batch_confirm_order', 'recharge_order', oid,
+                        {'points': pts/1000}, db=db)
+            db.commit()
+            ok_list.append(oid)
+        except Exception as e:
+            db.rollback()
+            fail_list.append({'id': oid, 'error': str(e)})
+        finally:
+            db.close()
+    return jsonify({'success': True, 'confirmed': ok_list, 'failed': fail_list})
 
 
 # ========== 导出 / 数据分析（轻量） ==========
@@ -1777,61 +2823,68 @@ def export_docx():
         return jsonify({'success': False, 'error': '没有可导出的章节'}), 400
 
     price = get_price('export-docx')
+    charged = 0
     if price > 0:
         ok, err, after = deduct_credits(request.user_id, price, '导出DOCX')
         if not ok:
-            return jsonify({'success': False, 'error': err, 'needed': price}), 402
+            return jsonify({'success': False, 'error': err, 'needed': price, 'needed_points': price/1000}), 402
+        charged = price
 
-    doc = Document()
-    # basic CN font
     try:
-        style = doc.styles['Normal']
-        style.font.name = 'Times New Roman'
-        style.font.size = Pt(12)
-        style._element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
-    except Exception:
-        pass
+        doc = Document()
+        # basic CN font
+        try:
+            style = doc.styles['Normal']
+            style.font.name = 'Times New Roman'
+            style.font.size = Pt(12)
+            style._element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
+        except Exception:
+            pass
 
-    h = doc.add_heading(title, level=0)
-    meta = []
-    if degree: meta.append(degree)
-    if field: meta.append(field)
-    if meta:
-        p = doc.add_paragraph(' / '.join(meta))
-    doc.add_paragraph('')
+        h = doc.add_heading(title, level=0)
+        meta = []
+        if degree: meta.append(degree)
+        if field: meta.append(field)
+        if meta:
+            p = doc.add_paragraph(' / '.join(meta))
+        doc.add_paragraph('')
 
-    for ch in chapters:
-        ctitle = (ch.get('title') or '未命名章节').strip()
-        doc.add_heading(ctitle, level=1)
-        secs = ch.get('sections') or []
-        content = (ch.get('content') or '').strip()
-        if content:
-            for para in content.split('\n'):
-                if para.strip():
-                    doc.add_paragraph(para.strip())
-        else:
-            for s in secs:
-                if str(s).strip():
-                    doc.add_paragraph(str(s).strip(), style=None)
-            doc.add_paragraph('（本章暂无草稿）')
+        for ch in chapters:
+            ctitle = (ch.get('title') or '未命名章节').strip()
+            doc.add_heading(ctitle, level=1)
+            secs = ch.get('sections') or []
+            content = (ch.get('content') or '').strip()
+            if content:
+                for para in content.split('\n'):
+                    if para.strip():
+                        doc.add_paragraph(para.strip())
+            else:
+                for s in secs:
+                    if str(s).strip():
+                        doc.add_paragraph(str(s).strip(), style=None)
+                doc.add_paragraph('（本章暂无草稿）')
 
-    if references:
-        doc.add_heading('参考文献', level=1)
-        for r in references:
-            num = r.get('num') or ''
-            text = (r.get('text') or '').strip()
-            if not text:
-                continue
-            prefix = f'[{num}] ' if num != '' else ''
-            doc.add_paragraph(prefix + text)
+        if references:
+            doc.add_heading('参考文献', level=1)
+            for r in references:
+                num = r.get('num') or ''
+                text = (r.get('text') or '').strip()
+                if not text:
+                    continue
+                prefix = f'[{num}] ' if num != '' else ''
+                doc.add_paragraph(prefix + text)
 
-    import io
-    buf = io.BytesIO()
-    doc.save(buf)
-    buf.seek(0)
-    filename = re.sub(r'[\\/:*?"<>|]+', '_', title)[:80] + '.docx'
-    return send_file(buf, as_attachment=True, download_name=filename,
-                     mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+        import io
+        buf = io.BytesIO()
+        doc.save(buf)
+        buf.seek(0)
+        filename = re.sub(r'[\\/:*?"<>|]+', '_', title)[:80] + '.docx'
+        return send_file(buf, as_attachment=True, download_name=filename,
+                         mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    except Exception as e:
+        if charged > 0:
+            refund_credits(request.user_id, charged, f'导出DOCX失败退款: {str(e)[:80]}')
+        return jsonify({'success': False, 'error': '导出失败: ' + str(e)}), 500
 
 
 
@@ -2129,16 +3182,24 @@ def analyze_ml():
         result['model_compare'] = models
         result['best_model'] = max(models, key=lambda d: d.get('r2') or -1e9)['model']
 
-    # 固定价扣点（本地/服务器计算，非 LLM token）
+    # 固定价扣点（本地/服务器计算，非 LLM token）— 先扣后算失败则退
     price = get_price('data-ml')
+    charged = 0
+    after = None
     if price > 0:
         ok, err, after = deduct_credits(request.user_id, price, '数据分析-特征/模型训练')
         if not ok:
-            return jsonify({'success': False, 'error': err, 'needed': price}), 402
+            return jsonify({'success': False, 'error': err, 'needed': price, 'needed_points': price/1000}), 402
+        charged = price
         result['usage'] = {'cost_credits': price, 'cost_points': round(price/1000,3), 'credits_after': after, 'points_after': round((after or 0)/1000,3)}
     else:
         result['usage'] = {'cost_credits': 0, 'cost_points': 0}
-    return jsonify(result)
+    try:
+        return jsonify(result)
+    except Exception as e:
+        if charged > 0:
+            refund_credits(request.user_id, charged, '数据分析失败退款')
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 
@@ -2720,6 +3781,10 @@ def payment_webhook():
         after = db.execute('SELECT credits FROM users WHERE id=?', (order['user_id'],)).fetchone()['credits']
         db.execute("INSERT INTO transactions (user_id,type,amount_credits,credits_after,description,created_at) VALUES (?,?,?,?,?,datetime('now','localtime'))",
                    (order['user_id'], 'recharge', pts, after, f'支付回调到账 {pts/1000}点'))
+        create_notification(
+            order['user_id'], 'recharge', '充值到账',
+            f'支付渠道已确认订单 #{order_id}，到账 {pts/1000:.3f} 点。当前余额 {after/1000:.3f} 点。',
+            {'order_id': order_id, 'points': pts / 1000}, db=db)
         db.commit()
         return jsonify({'success': True, 'credits': after, 'points': after/1000})
     except Exception as e:
