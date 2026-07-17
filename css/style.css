@@ -1701,3 +1701,43 @@ body.dark .bar, body:not(.light) .bar { background: rgba(2, 6, 23, 0.95); }
 .nav-tools-details .nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
 .nav-tools-details .nav-item.active{background:rgba(99,102,241,.2);color:#c7d2fe}
 .stage-nav{padding:0 8px 8px;max-height:260px;overflow:auto}
+
+
+/* ===== Account / consumption modal (dark readable) ===== */
+.acct-mask{
+  display:none; position:fixed; inset:0; z-index:100010;
+  align-items:center; justify-content:center;
+  background:rgba(2,6,23,.72); backdrop-filter:blur(8px);
+}
+.acct-mask.show, .acct-mask[style*="flex"]{ display:flex !important; }
+.acct-modal{
+  width:min(760px,94vw); max-height:82vh; overflow:auto;
+  background:#0f172a; color:#e2e8f0;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:16px;
+  box-shadow:0 24px 64px rgba(0,0,0,.45);
+  padding:18px 18px 16px;
+}
+.acct-modal-head{
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:12px; position:sticky; top:0; background:#0f172a; z-index:1; padding-bottom:8px;
+}
+.acct-modal-head b{ font-size:.95rem; color:#f8fafc; letter-spacing:-0.01em; }
+.acct-close{
+  border:none; background:rgba(255,255,255,.06); color:#cbd5e1; cursor:pointer;
+  width:32px; height:32px; border-radius:8px; font-size:1rem;
+}
+.acct-close:hover{ background:rgba(255,255,255,.1); color:#fff; }
+.acct-modal-body{ font-size:.75rem; color:#e2e8f0; line-height:1.65; }
+.acct-modal-body table{ color:#e2e8f0; }
+.acct-modal-body th{ color:#f1f5f9 !important; font-weight:600; }
+.acct-modal-body td{ color:#cbd5e1; }
+.acct-modal-body input[type="date"],
+.acct-modal-body button{
+  color:#e2e8f0; background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.12) !important;
+}
+.acct-modal-body button:hover{ background:rgba(255,255,255,.1); }
+
+/* project switcher live rows */
+.project-switch-row{ transition: opacity .15s ease, transform .15s ease, background .15s ease; }
+.project-switch-row.is-removing{ opacity:0; transform:translateX(8px); pointer-events:none; }

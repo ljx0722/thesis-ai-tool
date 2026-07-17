@@ -877,6 +877,7 @@ window.runDataFeatureScore=function(){
     h+='<div style="font-size:.65rem;color:var(--text-muted);margin:4px 0 8px">'+(d.note||'基于树模型特征重要性或相关评分，非完整 SHAP 交互依赖。')+'</div>';
     h+='</div>';
     out.innerHTML=h;
+    if(typeof updateBalanceDisplay==='function') updateBalanceDisplay();
 
     setTimeout(function(){
       // importance bar

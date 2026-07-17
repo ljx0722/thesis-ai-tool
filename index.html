@@ -125,7 +125,7 @@
   </div>
   <div class="bar-right">
     <span id="statusBar" style="font-size:.62rem;color:var(--m)">等待上传...</span>
-    <span id="balanceBar" style="font-size:.65rem;color:rgba(255,255,255,.4);cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.06);padding:3px 10px;border-radius:12px;margin-left:6px" onclick="showRechargeModal()" title="点击充值">✨ <strong id="balanceAmount" style="color:#fff;font-weight:700">0.0</strong> 点 <span style="font-size:.5rem;color:rgba(255,255,255,.3)">+</span></span>
+    <span id="balanceBar" style="font-size:.65rem;color:rgba(255,255,255,.4);cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.06);padding:3px 10px;border-radius:12px;margin-left:6px" onclick="showRechargeModal()" title="点击充值">✨ <strong id="balanceAmount" style="color:#fff;font-weight:700">0.000000</strong> 点 <span style="font-size:.5rem;color:rgba(255,255,255,.3)">+</span></span>
     <button onclick="window.location.href='/admin.html'" style="background:rgba(99,102,241,.15);color:#c7d2fe;border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:4px;display:none" id="adminPanelBtn" title="管理员看板">⚙️</button><button onclick="showConsumptionHistory()" style="background:transparent;color:rgba(255,255,255,.35);border:none;border-radius:12px;padding:4px 8px;cursor:pointer;font-size:.58rem;margin-left:2px" title="消费明细">明细</button><button onclick="showPricingInfo()" style="background:transparent;color:rgba(255,255,255,.35);border:none;border-radius:12px;padding:4px 8px;cursor:pointer;font-size:.58rem;margin-left:2px" title="计费说明">计费</button><button id="changelogLink" onclick="toggleChangelog()" style="background:transparent;color:rgba(255,255,255,.35);border:none;border-radius:12px;padding:4px 8px;cursor:pointer;font-size:.58rem;margin-left:4px" title="更新日志">日志</button><button onclick="doLogout()" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:6px">登出</button>
   </div>
 </div>
@@ -367,23 +367,23 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
 <script defer src="mammoth.browser.min.js"></script>
 <script defer src="jszip.min.js"></script>
-<script src="app.js?v=42"></script>
-<script src="js/modules/optimization.js?v=42"></script>
-<script src="js/modules/format-check.js?v=42"></script>
-<script src="js/modules/terminology.js?v=42"></script>
-<script src="js/modules/paragraph-analysis.js?v=42"></script>
-<script src="js/modules/dashboard.js?v=42"></script>
-<script src="js/modules/thesis-review.js?v=42"></script>
-<script src="js/modules/proposal.js?v=42"></script>
-<script src="js/modules/onboarding.js?v=42"></script>
-<script src="js/modules/cat-game.js?v=42"></script>
-<script src="js/modules/topic-finder.js?v=42"></script>
-<script src="js/modules/proofread.js?v=42"></script>
-<script src="js/modules/de-duplicate.js?v=42"></script>
-<script src="js/modules/defense-ppt.js?v=42"></script>
-<script src="js/modules/en-abstract.js?v=42"></script>
-<script src="js/modules/project.js?v=42"></script>
-<script src="js/app-modules.js?v=42"></script>
+<script src="app.js?v=43"></script>
+<script src="js/modules/optimization.js?v=43"></script>
+<script src="js/modules/format-check.js?v=43"></script>
+<script src="js/modules/terminology.js?v=43"></script>
+<script src="js/modules/paragraph-analysis.js?v=43"></script>
+<script src="js/modules/dashboard.js?v=43"></script>
+<script src="js/modules/thesis-review.js?v=43"></script>
+<script src="js/modules/proposal.js?v=43"></script>
+<script src="js/modules/onboarding.js?v=43"></script>
+<script src="js/modules/cat-game.js?v=43"></script>
+<script src="js/modules/topic-finder.js?v=43"></script>
+<script src="js/modules/proofread.js?v=43"></script>
+<script src="js/modules/de-duplicate.js?v=43"></script>
+<script src="js/modules/defense-ppt.js?v=43"></script>
+<script src="js/modules/en-abstract.js?v=43"></script>
+<script src="js/modules/project.js?v=43"></script>
+<script src="js/app-modules.js?v=43"></script>
 <script>
 (function(){
   var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');
@@ -531,6 +531,12 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
   };
 
   // 余额更新
+  window.formatPoints = function(v){
+    var n = Number(v);
+    if (!isFinite(n)) n = 0;
+    // 用户侧统一按“点”展示，固定 6 位小数；不暴露
+    return n.toFixed(6);
+  };
   window.updateBalanceDisplay = function() {
     // Show admin panel button if admin
     var userData = null;
@@ -547,7 +553,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
     }).then(function(r) { return r.json(); })
       .then(function(d) {
         if (d.success && balEl) {
-          balEl.textContent = (d.points != null ? d.points : (d.credits / 1000)).toFixed(2);
+          balEl.textContent = formatPoints(d.points != null ? d.points : (d.credits / 1000));
           var pts = (d.points != null ? d.points : (d.credits / 1000)); balEl.style.color = pts >= 1 ? '#10b981' : (pts > 0 ? '#f59e0b' : '#f87171');
         }
       }).catch(function() {});
@@ -626,7 +632,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
     fetch('/api/payment/balance', { headers: { 'Authorization': 'Bearer ' + token } })
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        if (d.success) document.getElementById('rechargeBalance').textContent = (d.points != null ? d.points : (d.credits / 1000)).toFixed(2);
+        if (d.success) document.getElementById('rechargeBalance').textContent = formatPoints(d.points != null ? d.points : (d.credits / 1000));
       });
   }
   function loadRechargeHistory() {
@@ -696,7 +702,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
         }
       });
   },1000);
-  setInterval(updateBalanceDisplay, 300000);
+  setInterval(updateBalanceDisplay, 15000);
 })();
 </script>
 
@@ -708,7 +714,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
       <button onclick="hideRechargeModal()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.2rem;font-family:var(--font-sans)">&times;</button>
     </div>
     <p style="font-size:var(--font-size-md);color:var(--text-muted);margin:0 0 8px">当前余额: <strong id="rechargeBalance" style="color:var(--text-primary)">0.00</strong> 点</p>
-    <p style="font-size:.68rem;color:var(--text-muted);margin:0 0 12px;line-height:1.55">充值规则：<b>1 元 = 1 点</b>（1 点 = 1000 厘）。AI 写作按实际 token 扣点；本地功能低价或每日免费额度。</p>
+    <p style="font-size:.68rem;color:var(--text-muted);margin:0 0 12px;line-height:1.55">充值规则：<b>1 元 = 1 点</b>。AI 写作按实际 token 扣点；本地功能低价或每日免费额度。</p>
     <h4 style="font-size:var(--font-size-base);color:var(--text-secondary);margin:0 0 8px;font-weight:var(--font-weight-semibold)">选择充值金额（1元=1点）</h4>
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <button class="recharge-amt-btn" data-amt="1" onclick="selectRechargeAmount(1)">1元<span style="display:block;font-size:.5rem;opacity:.4;margin-top:1px">=1.0点</span></button>
@@ -746,7 +752,7 @@ function showPricingInfo(){
   fetch('/api/pricing').then(function(r){return r.json();}).then(function(d){
     if(!d.success){alert('无法获取计费信息');return;}
     var msg='【计费单位】'+d.unit.ratio+'，充值 '+d.unit.recharge+'\n';
-    msg+='【AI写作】'+d.llm.formula+'，倍率×'+d.llm.markup+'，最低 '+d.llm.min_charge_points+' 点\n';
+    msg+='【AI写作】'+d.llm.formula+'，倍率×'+d.llm.markup+'，最低 '+Number(d.llm.min_charge_points||0).toFixed(6)+' 点\n';
     msg+='【每日免费本地操作】'+d.daily_free_local_ops+' 次\n';
     msg+='【注册赠送】'+d.register_bonus_points+' 点\n\n';
     msg+='说明：\n- '+(d.notes||[]).join('\n- ');
@@ -755,13 +761,13 @@ function showPricingInfo(){
 }
 </script>
 
-<div id="accountModalMask" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:100010;align-items:center;justify-content:center">
-  <div id="accountModal" style="width:min(720px,92vw);max-height:80vh;overflow:auto;background:var(--bg-card,#fff);border-radius:16px;border:1px solid var(--border,#e2e8f0);box-shadow:0 20px 50px rgba(0,0,0,.18);padding:18px 18px 14px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <b id="accountModalTitle" style="font-size:.95rem">消费明细</b>
-      <button onclick="closeAccountModal()" style="border:none;background:transparent;cursor:pointer;font-size:1rem;color:#64748b">✕</button>
+<div id="accountModalMask" class="acct-mask" style="display:none">
+  <div id="accountModal" class="acct-modal" onclick="event.stopPropagation()">
+    <div class="acct-modal-head">
+      <b id="accountModalTitle">消费明细</b>
+      <button class="acct-close" onclick="closeAccountModal()">✕</button>
     </div>
-    <div id="accountModalBody" style="font-size:.75rem;color:#334155;line-height:1.6"></div>
+    <div id="accountModalBody" class="acct-modal-body"></div>
   </div>
 </div>
 <script>
@@ -770,19 +776,20 @@ function openAccountModal(title, html){
   document.getElementById('accountModalTitle').textContent=title||'账户';
   document.getElementById('accountModalBody').innerHTML=html||'';
   m.style.display='flex';
+  m.classList.add('show');
 }
-function closeAccountModal(){ document.getElementById('accountModalMask').style.display='none'; }
+function closeAccountModal(){ var m=document.getElementById('accountModalMask'); m.style.display='none'; m.classList.remove('show'); }
 function showConsumptionHistory(){
   var token=sessionStorage.getItem('thesis_ai_token'); if(!token){alert('请先登录');return;}
-  openAccountModal('消费明细', '<div style="padding:20px;color:#94a3b8">加载中...</div>');
+  openAccountModal('消费明细', '<div style="padding:20px;color:rgba(226,232,240,.55)">加载中…</div>');
   fetch('/api/usage/history?limit=100', {headers:{'Authorization':'Bearer '+token}})
     .then(function(r){return r.json();})
     .then(function(d){
-      if(!d.success){ openAccountModal('消费明细', '<div style="color:#ef4444">'+(d.error||'加载失败')+'</div>'); return; }
+      if(!d.success){ openAccountModal('消费明细', '<div style="color:#fca5a5">'+(d.error||'加载失败')+'</div>'); return; }
       window._usageHistoryCache=d;
       renderConsumptionHistory(d, '', '');
       var ch=document.getElementById('consumptionHistory'); if(ch) ch.textContent=JSON.stringify({n:(d.transactions||[]).length});
-    }).catch(function(){ openAccountModal('消费明细', '<div style="color:#ef4444">网络错误</div>'); });
+    }).catch(function(){ openAccountModal('消费明细', '<div style="color:#fca5a5">网络错误</div>'); });
 }
 function renderConsumptionHistory(d, fromDate, toDate){
   function inRange(ts){
@@ -796,25 +803,25 @@ function renderConsumptionHistory(d, fromDate, toDate){
   var llms=(d.llm_usage||[]).filter(function(t){return inRange(t.created_at);});
   var h='';
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">';
-  h+='<label style="font-size:.68rem;color:#64748b">从</label><input id="histFromDate" type="date" value="'+(fromDate||'')+'" style="font-size:.7rem;padding:4px 6px;border:1px solid #e2e8f0;border-radius:6px">';
-  h+='<label style="font-size:.68rem;color:#64748b">到</label><input id="histToDate" type="date" value="'+(toDate||'')+'" style="font-size:.7rem;padding:4px 6px;border:1px solid #e2e8f0;border-radius:6px">';
-  h+='<button onclick="filterConsumptionHistory()" style="font-size:.68rem;padding:5px 10px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer">筛选</button>';
-  h+='<button onclick="exportConsumptionHistory()" style="font-size:.68rem;padding:5px 10px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer">导出CSV</button>';
+  h+='<label style="font-size:.68rem;color:rgba(226,232,240,.7)">从</label><input id="histFromDate" type="date" value="'+(fromDate||'')+'" style="font-size:.7rem;padding:4px 6px;border:1px solid rgba(255,255,255,.1);border-radius:6px">';
+  h+='<label style="font-size:.68rem;color:rgba(226,232,240,.7)">到</label><input id="histToDate" type="date" value="'+(toDate||'')+'" style="font-size:.7rem;padding:4px 6px;border:1px solid rgba(255,255,255,.1);border-radius:6px">';
+  h+='<button onclick="filterConsumptionHistory()" style="font-size:.68rem;padding:5px 10px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:rgba(255,255,255,.06);cursor:pointer">筛选</button>';
+  h+='<button onclick="exportConsumptionHistory()" style="font-size:.68rem;padding:5px 10px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:rgba(255,255,255,.06);cursor:pointer">导出CSV</button>';
   h+='</div>';
-  h+='<div style="margin-bottom:12px;color:#64748b;font-size:.7rem">当前筛选：交易 '+txs.length+' 条，AI 调用 '+llms.length+' 条。单位：点（1点=1000厘）。</div>';
+  h+='<div style="margin-bottom:12px;color:rgba(226,232,240,.7);font-size:.7rem">当前筛选：交易 '+txs.length+' 条，AI 调用 '+llms.length+' 条。单位：点（1元=1点）。</div>';
   h+='<b>交易记录</b><div style="overflow:auto;margin:6px 0 14px"><table style="width:100%;border-collapse:collapse;font-size:.7rem">';
-  h+='<tr style="background:#f8fafc"><th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">时间</th><th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">类型</th><th style="text-align:right;padding:6px;border-bottom:1px solid #e2e8f0">变动(点)</th><th style="text-align:right;padding:6px;border-bottom:1px solid #e2e8f0">余额(点)</th><th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">说明</th></tr>';
+  h+='<tr style="background:rgba(255,255,255,.04)"><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">时间</th><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">类型</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">变动(点)</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">余额(点)</th><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">说明</th></tr>';
   txs.forEach(function(t){
-    h+='<tr><td style="padding:6px;border-bottom:1px solid #f1f5f9">'+(t.created_at||'')+'</td><td style="padding:6px;border-bottom:1px solid #f1f5f9">'+t.type+'</td><td style="padding:6px;border-bottom:1px solid #f1f5f9;text-align:right;color:'+(t.points>=0?'#059669':'#dc2626')+'">'+(t.points>=0?'+':'')+t.points+'</td><td style="padding:6px;border-bottom:1px solid #f1f5f9;text-align:right">'+t.points_after+'</td><td style="padding:6px;border-bottom:1px solid #f1f5f9">'+(t.description||'')+'</td></tr>';
+    h+='<tr><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06)">'+(t.created_at||'')+'</td><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06)">'+t.type+'</td><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;color:'+(t.points>=0?'#059669':'#dc2626')+'">'+(t.points>=0?'+':'')+formatPoints(Math.abs(t.points))*(t.points<0?-1:1)+'</td><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right">'+Number(t.points_after||0).toFixed(6)+'</td><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06)">'+(t.description||'')+'</td></tr>';
   });
-  if(!txs.length) h+='<tr><td colspan="5" style="padding:10px;color:#94a3b8">暂无交易</td></tr>';
+  if(!txs.length) h+='<tr><td colspan="5" style="padding:10px;color:rgba(226,232,240,.55)">暂无交易</td></tr>';
   h+='</table></div>';
   h+='<b>AI 调用</b><div style="overflow:auto;margin-top:6px"><table style="width:100%;border-collapse:collapse;font-size:.7rem">';
-  h+='<tr style="background:#f8fafc"><th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">时间</th><th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">模块</th><th style="text-align:right;padding:6px;border-bottom:1px solid #e2e8f0">输入</th><th style="text-align:right;padding:6px;border-bottom:1px solid #e2e8f0">输出</th><th style="text-align:right;padding:6px;border-bottom:1px solid #e2e8f0">扣点</th></tr>';
+  h+='<tr style="background:rgba(255,255,255,.04)"><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">时间</th><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">模块</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">输入</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">输出</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">扣点</th></tr>';
   llms.forEach(function(l){
-    h+='<tr><td style="padding:6px;border-bottom:1px solid #f1f5f9">'+(l.created_at||'')+'</td><td style="padding:6px;border-bottom:1px solid #f1f5f9">'+l.module+'</td><td style="padding:6px;border-bottom:1px solid #f1f5f9;text-align:right">'+(l.prompt_tokens||0)+'</td><td style="padding:6px;border-bottom:1px solid #f1f5f9;text-align:right">'+(l.completion_tokens||0)+'</td><td style="padding:6px;border-bottom:1px solid #f1f5f9;text-align:right">'+(l.points_charged||0)+'</td></tr>';
+    h+='<tr><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06)">'+(l.created_at||'')+'</td><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06)">'+l.module+'</td><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right">'+(l.prompt_tokens||0)+'</td><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right">'+(l.completion_tokens||0)+'</td><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right">'+Number(l.points_charged||0).toFixed(6)+'</td></tr>';
   });
-  if(!llms.length) h+='<tr><td colspan="5" style="padding:10px;color:#94a3b8">暂无 AI 调用</td></tr>';
+  if(!llms.length) h+='<tr><td colspan="5" style="padding:10px;color:rgba(226,232,240,.55)">暂无 AI 调用</td></tr>';
   h+='</table></div>';
   openAccountModal('消费明细', h);
 }
@@ -853,7 +860,7 @@ window.showPricingInfo = function(){
     if(!d.success){alert('无法获取计费信息');return;}
     var h='<div style="line-height:1.7">';
     h+='<b>计费单位</b><br>'+d.unit.ratio+'，充值 '+d.unit.recharge+'<br><br>';
-    h+='<b>AI 写作</b><br>'+d.llm.formula+'<br>倍率 ×'+d.llm.markup+'，最低 '+d.llm.min_charge_points+' 点<br><br>';
+    h+='<b>AI 写作</b><br>'+d.llm.formula+'<br>倍率 ×'+d.llm.markup+'，最低 '+Number(d.llm.min_charge_points||0).toFixed(6)+' 点<br><br>';
     h+='<b>每日免费本地操作</b>：'+d.daily_free_local_ops+' 次<br>';
     h+='<b>注册赠送</b>：'+d.register_bonus_points+' 点<br><br>';
     h+='<b>固定价示例</b><br>';

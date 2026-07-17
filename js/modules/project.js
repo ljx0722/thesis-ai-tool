@@ -464,24 +464,51 @@
     return null;
   }
 
+  function refreshOpenProjectUIs() {
+    // Re-render any open project-related overlays so mutations are visible immediately
+    if (document.getElementById('projectSwitcherOverlay')) {
+      openProjectSwitcher();
+    }
+    if (document.getElementById('chapterBoardOverlay') && typeof openChapterBoard === 'function') {
+      try { openChapterBoard(); } catch (e) {}
+    }
+    if (document.getElementById('fullPreviewOverlay') && typeof openFullPaperPreview === 'function') {
+      // keep preview closed on project switch/delete
+    }
+    renderProjectChrome();
+  }
+
   function switchToProject(projectId) {
     if (!projectId) return;
     setCurrentId(projectId);
-    renderProjectChrome();
+    closeProjectSwitcher();
+    refreshOpenProjectUIs();
     if (typeof switchView === 'function') switchView('workspace');
     if (typeof ttp === 'function') ttp('已切换项目');
   }
 
   function deleteProject(projectId) {
+    if (!projectId) return;
+    if (!confirm('确定删除该项目？此操作不可恢复。')) return;
     var list = loadAll().filter(function (p) { return p.id !== projectId; });
     saveAll(list);
     if (getCurrentId() === projectId) {
       setCurrentId(list.length ? list[0].id : '');
     }
+    // Always re-render list immediately (local first)
+    refreshOpenProjectUIs();
     if (cloudEnabled()) {
-      fetch('/api/projects/' + encodeURIComponent(projectId), { method: 'DELETE', headers: authHeaders() }).catch(function(){});
+      fetch('/api/projects/' + encodeURIComponent(projectId), {
+        method: 'DELETE',
+        headers: authHeaders()
+      }).then(function(r){ return r.json().catch(function(){ return {}; }); })
+        .then(function(d){
+          // re-pull cloud list to avoid stale remote items reappearing later
+          try { pullCloudProjects(function(){ refreshOpenProjectUIs(); }); } catch (e) { refreshOpenProjectUIs(); }
+          if (d && d.success === false && typeof ttp === 'function') ttp('云端删除失败，已先从本地移除');
+        })
+        .catch(function(){ try { pullCloudProjects(function(){ refreshOpenProjectUIs(); }); } catch (e) {} });
     }
-    renderProjectChrome();
     if (typeof switchView === 'function') switchView('workspace');
     if (typeof ttp === 'function') ttp('已删除项目');
   }
@@ -493,7 +520,7 @@
     var rows = projects.map(function (p) {
       var prog = calcProgress(p);
       var isCur = current && p.id === current.id;
-      return '<div class="project-switch-row' + (isCur ? ' is-current' : '') + '" onclick="switchToProject(\'' + p.id + '\')">' +
+      return '<div class="project-switch-row' + (isCur ? ' is-current' : '') + '" data-project-id="' + p.id + '" onclick="switchToProject(\'' + p.id + '\')">' +
         '<div><b>' + escapeHtml(p.title) + '</b><span>' + prog.percent + '% · ' + escapeHtml(p.field || p.idea || '') + '</span></div>' +
         '<div class="project-switch-actions" onclick="event.stopPropagation()">' +
           '<button class="ai-btn-clear" onclick="switchToProject(\'' + p.id + '\')">打开</button>' +
@@ -981,6 +1008,7 @@
     logSkillRun({ moduleId: 'outline-editor', title: '保存论文大纲', summary: '共 ' + chapters.length + ' 章' });
     closeOutlineEditor();
     renderProjectChrome();
+    try { refreshOpenProjectUIs(); } catch (e) {}
     if (typeof ttp === 'function') ttp('大纲已保存（' + chapters.length + ' 章）');
   }
 
@@ -1128,6 +1156,7 @@
     saveChapterDraft(key,{title:m.title,sections:m.sections,content:ct,status:w<1?'empty':(w<300?'draft':'ready')});
     logSkillRun({moduleId:'chapter-editor',title:'保存章节草稿',summary:m.title+' · '+w+' 字'});
     closeChapterOverlays();renderProjectChrome();
+    try{refreshOpenProjectUIs();}catch(e){}
     if(typeof ttp==='function')ttp('已保存：'+m.title+'('+w+'字)');
   }
 
@@ -1204,6 +1233,7 @@
   window.closeProjectSwitcher = closeProjectSwitcher;
   window.switchToProject = switchToProject;
   window.deleteProject = deleteProject;
+  window.refreshOpenProjectUIs = refreshOpenProjectUIs;
   window.exportFullPaper = exportFullPaper;
   window.exportFullPaperDocx = exportFullPaperDocx;
   window.buildPaperPayload = buildPaperPayload;

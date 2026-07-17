@@ -1635,6 +1635,16 @@ test('API: usage history + admin pricing exist', function() {
   assert(src.indexOf('/api/admin/pricing') >= 0, 'admin pricing missing');
   assert(src.indexOf('/api/admin/llm_economics') >= 0, 'llm economics missing');
 });
+test('UI: points use 6 decimals helper', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf('formatPoints') >= 0, 'formatPoints helper missing');
+  assert(html.indexOf('toFixed(6)') >= 0, '6 decimal points missing');
+});
+test('PROJECT: delete refreshes open project UIs', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');
+  assert(src.indexOf('function refreshOpenProjectUIs') >= 0, 'refreshOpenProjectUIs missing');
+  assert(src.indexOf('openProjectSwitcher()') >= 0, 'switcher re-open missing');
+});
 test('UI: history filter/export exists', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
   assert(html.indexOf('exportConsumptionHistory') >= 0, 'history export missing');
