@@ -221,12 +221,12 @@ body {
   min-width: 180px;
   max-width: 320px;
   flex-shrink: 0;
-  background: #0b1120;
+  background: var(--bg-sidebar);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
-  border-right: 1px solid rgba(255,255,255,0.06);
+  border-right: 1px solid var(--border-sidebar); color: var(--text-sidebar); /* was white border */ border-color: var(--border-sidebar); background: var(--bg-sidebar); /* keep */0.06);
   color: #e2e8f0;
 }
 .nav-sidebar h3 {
@@ -1460,6 +1460,13 @@ body {
    DARK MODE — tokens via body.dark + system preference
    ============================================================ */
 body.dark {
+  --bg-sidebar: #0b1120;
+  --bg-sidebar-elevated: #0f172a;
+  --border-sidebar: rgba(255,255,255,.08);
+  --text-sidebar: #e2e8f0;
+  --text-sidebar-muted: rgba(255,255,255,.55);
+  --text-sidebar-dim: rgba(255,255,255,.35);
+
   --bg-app: #0f172a;
   --bg-card: #1e293b;
   --bg-card-hover: #273548;
@@ -1774,7 +1781,7 @@ body.dark .bar, body:not(.light) .bar { background: rgba(2, 6, 23, 0.95); }
 .toc-panel{
   width:220px; min-width:160px; max-width:320px; flex-shrink:0;
   display:flex; flex-direction:column; min-height:0; overflow:hidden;
-  background:#0b1220; border-right:1px solid rgba(255,255,255,.06);
+  background:var(--bg-sidebar); border-right:1px solid rgba(255,255,255,.06);
 }
 .toc-panel.collapsed{ width:28px; min-width:28px; }
 .toc-panel.collapsed .nav-tree,
@@ -1927,3 +1934,136 @@ body > .main,
 }
 /* tree click highlight stays local */
 .tree-node.sel{ background:rgba(99,102,241,.18); color:#e0e7ff; }
+
+
+/* ===== release layout lock: independent pane scroll ===== */
+html, body{
+  height:100% !important;
+  max-height:100% !important;
+  overflow:hidden !important;
+}
+#mainLayout, .main{
+  flex:1 1 auto !important;
+  min-height:0 !important;
+  max-height:100% !important;
+  overflow:hidden !important;
+  display:flex !important;
+}
+.nav-sidebar,
+.toc-panel,
+.thesis-panel,
+.ref-panel,
+.tool-panel{
+  min-height:0 !important;
+  max-height:100% !important;
+  overflow:hidden !important;
+  display:flex !important;
+  flex-direction:column !important;
+}
+.nav-sidebar{ background: var(--bg-sidebar) !important; color: var(--text-sidebar); border-right:1px solid var(--border-sidebar) !important; }
+.toc-panel{ background: var(--bg-sidebar) !important; color: var(--text-sidebar); border-right:1px solid var(--border-sidebar) !important; }
+.nav-sidebar .nav-item,
+.toc-panel,
+.toc-panel-head,
+.stage-nav-item,
+.tree-node{
+  color: var(--text-sidebar);
+}
+.nav-sidebar .nav-item{ color: var(--text-sidebar-muted); }
+.tree-node{ color: var(--text-sidebar-muted) !important; }
+.tree-node:hover, .tree-node.sel{ color: var(--text-sidebar) !important; background: rgba(99,102,241,.12); }
+.toc-panel-head, .nav-sidebar h3, .stage-nav-item b{ color: var(--text-sidebar) !important; }
+.toc-panel .nav-tree,
+.nav-tree,
+.nav-tree-wrap .nav-tree{
+  flex:1 1 auto !important;
+  min-height:0 !important;
+  max-height:none !important;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+.thesis-panel{ flex:1 1 auto !important; }
+.thesis-box{
+  flex:1 1 auto !important;
+  min-height:0 !important;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+#paperContentRoot, .paper-content-root{
+  min-height:min-content;
+  overflow:visible;
+}
+.ref-panel #refs,
+#refs,
+.module-area,
+.module-panel,
+.ref-list{
+  flex:1 1 auto !important;
+  min-height:0 !important;
+  overflow-y:auto !important;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+
+/* cite sentence highlight */
+.cite-sentence{
+  background: rgba(250, 204, 21, 0.18);
+  border-radius: 4px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+body.dark .cite-sentence{
+  background: rgba(250, 204, 21, 0.14);
+}
+.cite-marker{
+  background: rgba(99,102,241,.14);
+}
+body.dark .cite-marker{ background: rgba(129,140,248,.22); color:#c7d2fe; }
+
+/* search config / optimize modals */
+.ui-modal-backdrop{
+  position:fixed; inset:0; z-index:100000;
+  background:rgba(15,23,42,.55);
+  display:flex; align-items:center; justify-content:center;
+  padding:16px;
+}
+.ui-modal{
+  width:min(720px,96vw); max-height:86vh; overflow:auto;
+  background:var(--bg-card, #fff); color:var(--text-primary, #0f172a);
+  border:1px solid var(--border, rgba(0,0,0,.08));
+  border-radius:16px; box-shadow:0 24px 80px rgba(0,0,0,.28);
+  padding:20px 22px;
+  font-size:.88rem; line-height:1.6;
+}
+body.dark .ui-modal{ background:#1e293b; color:#f1f5f9; border-color:rgba(255,255,255,.1); }
+.ui-modal h3{ margin:0 0 12px; font-size:1.05rem; font-weight:700; color:inherit; }
+.ui-modal .muted{ color:var(--text-muted,#64748b); font-size:.78rem; }
+.ui-modal label{ display:block; font-size:.78rem; font-weight:600; margin:10px 0 4px; }
+.ui-modal input[type="number"], .ui-modal input[type="text"], .ui-modal textarea{
+  width:100%; box-sizing:border-box; border:1px solid var(--border,#cbd5e1);
+  border-radius:10px; padding:10px 12px; background:var(--bg-input,#fff);
+  color:inherit; font-size:.88rem;
+}
+body.dark .ui-modal input, body.dark .ui-modal textarea{
+  background:#0f172a; border-color:rgba(255,255,255,.12); color:#f1f5f9;
+}
+.ui-modal .row{ display:flex; gap:12px; flex-wrap:wrap; }
+.ui-modal .row > div{ flex:1; min-width:120px; }
+.ui-modal .actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+.ui-modal .btn{
+  border:none; border-radius:10px; padding:9px 16px; cursor:pointer; font-weight:600; font-size:.82rem;
+}
+.ui-modal .btn-primary{ background:#4f46e5; color:#fff; }
+.ui-modal .btn-ghost{ background:rgba(100,116,139,.15); color:inherit; }
+.ui-modal .box{
+  border-radius:12px; padding:12px 14px; margin:10px 0; font-size:.84rem;
+}
+.ui-modal .box-src{ background:rgba(99,102,241,.08); }
+.ui-modal .box-dst{ background:rgba(16,185,129,.10); }
+.ui-modal .box-warn{ background:rgba(245,158,11,.12); }
+body.dark .ui-modal .box-src{ background:rgba(99,102,241,.16); }
+body.dark .ui-modal .box-dst{ background:rgba(16,185,129,.14); }

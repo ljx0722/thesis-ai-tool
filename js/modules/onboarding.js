@@ -15,7 +15,7 @@ function buildTourSteps() {
     },
     {
       title: '📎 上传论文',
-      body: '首先上传你的论文文件（仅支持 .docx 格式）。<br>文件仅在本机解析，不会上传到任何服务器。<br><br>上传完成后会自动弹出<b>标题层级校准弹窗</b>，确认章/节/小节。',
+      body: '首先上传你的论文文件（仅支持 .docx 格式）。<br>文件仅在本机解析，不会上传到任何服务器。<br><br>上传后必须完成<b>标题层级校准</b>（章/节/小节样式），不可跳过。同济模板建议：标题_TJ / 一级标题_TJ / 二级标题_TJ。',
       el: function() { return document.getElementById('uploadOverlay') || document.getElementById('uploadDrop'); },
       pos: 'center', icon: '📎'
     },
@@ -26,7 +26,7 @@ function buildTourSteps() {
     },
     {
       title: '🔍 论文审阅（核心模块）',
-      body: '顶栏 <b>Ctrl+1</b> 进入论文审阅。<br>整合了格式检查、段落分析、术语分析，<br>三列并排展示所有维度的检测结果。<br>另外 <b>Ctrl+2</b> 优化建议给出针对性改进方案。',
+      body: '顶栏可进入「总览 / 参考文献 / 工具台 / 看板」。<br>整合了格式检查、段落分析、术语分析，<br>三列并排展示所有维度的检测结果。<br>另外 <b>Ctrl+2</b> 优化建议给出针对性改进方案。',
       el: function() { return document.getElementById('moduleTabs'); },
       pos: 'bottom', icon: '🔍'
     },
@@ -48,7 +48,7 @@ function buildTourSteps() {
     },
     {
       title: '🔍 交互式文献检索',
-      body: '检索时分为两步确认：<br>1. <b>检索结果确认</b> — 全选/筛选/勾选文献<br>2. <b>分配策略确认</b> — 预览每章分配<br>按 <b>Ctrl+Enter</b> 或点击 🔍检索 启动。',
+      body: '检索时分为两步确认：<br>1. <b>检索结果确认</b> — 全选/筛选/勾选文献<br>2. <b>分配策略确认</b> — 预览每章分配<br>点击「检索」后在弹窗中设置条数与中英文最低占比，确认后开始（0.5点/次）。',
       el: function() { return document.getElementById('baSearch'); },
       pos: 'bottom', icon: '🔍'
     },
@@ -215,17 +215,19 @@ function tourEnd() {
   if (!seen) {
     // 只在登录后启动（不在登录页触发）
     var isLoggedIn = false;
-    try { isLoggedIn = sessionStorage.getItem('thesis_ai_login') === 'true'; } catch (e) {}
+    try { isLoggedIn = sessionStorage.getItem('thesis_ai_login') === 'true' || !!sessionStorage.getItem('thesis_ai_token'); } catch (e) {}
     if (!isLoggedIn) return;
-    // Wait for DOM + libraries
+    var done=false;
+    try { done = localStorage.getItem('thesis_tour_done') === '1'; } catch (e) {}
+    // 首次登录自动打开；已看过也可点 ? 重开
     var checks = 0;
     var timer = setInterval(function() {
       checks++;
-      if (typeof showLoad !== 'undefined') {
+      if (typeof tourStart === 'function' || typeof buildTourSteps === 'function') {
         clearInterval(timer);
-        setTimeout(tourStart, 400);
+        if (!done) setTimeout(function(){ try{ tourStart(); }catch(e){} }, 600);
       }
-      if (checks > 50) clearInterval(timer); // give up after 5s
+      if (checks > 50) clearInterval(timer);
     }, 100);
   }
 })();

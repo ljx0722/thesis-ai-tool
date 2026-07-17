@@ -208,7 +208,7 @@ def init_db():
     except Exception:
         pass
     # Default pricing config (单位：厘，1点=1000厘)
-    for k,v in [('upload_price','0'),('module_price','50'),('search_price','20'),
+    for k,v in [('upload_price','0'),('module_price','50'),('search_price','500'),
                 ('kg_price','50'),('domain_analysis_price','0'),('data-ml_price','500'),('export-docx_price','200'),
                 ('format-check_price','30'),('terminology_price','30'),('paragraph_price','30'),
                 ('dashboard_price','50'),('data-analysis_price','80'),
@@ -327,8 +327,8 @@ TOKEN_YUAN_PER_10M = float(os.environ.get('TOKEN_YUAN_PER_10M', '1.0'))
 DEEPSEEK_INPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_INPUT_PRICE', str(TOKEN_YUAN_PER_10M / 10.0)))
 DEEPSEEK_OUTPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_OUTPUT_PRICE', str(TOKEN_YUAN_PER_10M / 10.0)))
 USER_MARKUP = float(os.environ.get('USER_MARKUP', '3.0'))  # 用户扣点倍率（覆盖 API + 运维），默认 ×3
-SEARCH_DAILY_FREE = int(os.environ.get('SEARCH_DAILY_FREE', '20'))
-KG_DAILY_FREE = int(os.environ.get('KG_DAILY_FREE', '5'))
+SEARCH_DAILY_FREE = int(os.environ.get('SEARCH_DAILY_FREE', '0'))
+KG_DAILY_FREE = int(os.environ.get('KG_DAILY_FREE', '2'))
 CREDIT_PER_YUAN = 1000  # 1元=1000厘=1.0显示点
 LLM_MIN_CHARGE = int(os.environ.get('LLM_MIN_CHARGE', '20'))  # LLM 最低扣 20 厘=0.02点
 DAILY_FREE_OPS = int(os.environ.get('DAILY_FREE_OPS', '5'))  # 每日免费本地模块次数
@@ -1604,7 +1604,7 @@ PRICING_DEFAULTS = {
     # 本地/轻计算（固定价）
     'module': 100,            # 通用本地模块兜底 0.05点
     'upload': 0,             # 上传解析免费（本地）
-    'search': 20,            # 文献检索：0.02点/次（超日免费后）
+    'search': 500,           # 文献检索：0.5点/次（无免费）
     'kg': 50,                # 知识图谱：0.05点/次
     'domain_analysis': 0,    # 兼容键；domain_analyze 按 token 扣
     'format-check': 50,
@@ -3295,7 +3295,7 @@ def pricing_info():
         'items': items,
         'notes': [
             'AI 写作类功能按实际 token 消耗计费，前端不展示固定点数。',
-            '检索每日免费 SEARCH_DAILY_FREE 次后按 search 价扣点；图谱每日免费 KG_DAILY_FREE 次后按 kg 价扣点。',
+            '检索按次扣点（默认 0.5 点/次）；图谱每日免费 KG_DAILY_FREE 次后扣点；图谱每日免费 KG_DAILY_FREE 次后按 kg 价扣点。',
             '多模型训练等服务器计算按固定小额点数计费。'
         ]
     })

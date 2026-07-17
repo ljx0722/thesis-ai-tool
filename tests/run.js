@@ -1760,9 +1760,13 @@ try {
     if (!ks.includes(s)) { console.error('FAIL', label); process.exitCode = 1; }
     else console.log('OK', label);
   }
+  assertIncludes('search price 500', "'search': 500");
   assertIncludes('search daily free env', 'SEARCH_DAILY_FREE');
   assertIncludes('kg daily free env', 'KG_DAILY_FREE');
+  assertIncludes('kg free default 2', "get('KG_DAILY_FREE', '2')");
   assertIncludes('consume daily quota helper', '_consume_daily_quota');
   assertIncludes('ml precharge comment', '先扣后算');
   assertIncludes('webhook hmac', 'compare_digest');
 } catch (e) { console.warn('residual tests skipped', e.message); }
+
+try{ const app=fs.readFileSync(require('path').join(__dirname,'..','app.js'),'utf8'); if(!app.includes('scrollInThesisBox')) {console.error('FAIL scrollInThesisBox'); process.exitCode=1;} else console.log('OK scrollInThesisBox'); if(!app.includes('openSearchConfigModal')) {console.error('FAIL search modal'); process.exitCode=1;} else console.log('OK search modal'); }catch(e){}

@@ -261,7 +261,7 @@
 
     <div class="kw-bar ref-only" id="kwBar" style="display:none"><h4>🔑 论文主题词</h4><div class="kw-tags" id="kwTags"></div></div>
     <div class="dashboard ref-only" id="dashboard" style="display:none"><div class="dash-card"><div class="dv" id="dashTotal">0</div><div class="dl">总文献</div></div><div class="dash-card"><div class="dv" id="dashCN">0</div><div class="dl">中文</div></div><div class="dash-card"><div class="dv" id="dashEN">0</div><div class="dl">英文</div></div><div class="dash-card"><div class="dv" id="dash3Y">0</div><div class="dl">3年内</div></div><div class="dash-card"><div class="dv" id="dash5Y">0</div><div class="dl">5年内</div></div></div>
-    <div class="filters ref-only" style="display:none"><label title="检索文献总数">共</label><input id="fTotal" value="0" min="5" max="200" placeholder="自动"><label>中≤</label><input id="fCN" value="45">%<label>英≥</label><input id="fEN" value="30">%<label>3年≥</label><input id="fY3" value="50">%<label>5年≥</label><input id="fY5" value="75">%<label>分布</label><select id="fDist"><option value="auto">模型自动</option><option value="uniform">按章节平均</option><option value="weighted">按内容多少</option></select></div>
+    <div class="filters ref-only" style="display:none"><label title="检索文献总数">共</label><input id="fTotal" value="0" min="5" max="200" placeholder="自动"><label>中≤</label><input id="fCN" style="display:none" value="45">%<label>英≥</label><input id="fEN" style="display:none" value="30">%<label>3年≥</label><input id="fY3" value="50">%<label>5年≥</label><input id="fY5" value="75">%<label>分布</label><select id="fDist"><option value="auto">模型自动</option><option value="uniform">按章节平均</option><option value="weighted">按内容多少</option></select></div>
     <div class="ref-list ref-only" id="refs" style="display:none"><div class="panel-empty">导入论文或检索后，文献会出现在这里</div></div>
   </div>
 </div>
@@ -403,22 +403,22 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
 <script defer src="mammoth.browser.min.js"></script>
 <script defer src="jszip.min.js"></script>
-<script src="app.js?v=52"></script>
-<script src="js/modules/optimization.js?v=52"></script>
-<script src="js/modules/format-check.js?v=52"></script>
-<script src="js/modules/terminology.js?v=52"></script>
-<script src="js/modules/paragraph-analysis.js?v=52"></script>
-<script src="js/modules/dashboard.js?v=52"></script>
-<script src="js/modules/thesis-review.js?v=52"></script>
-<script src="js/modules/proposal.js?v=52"></script>
-<script src="js/modules/onboarding.js?v=52"></script>
-<script src="js/modules/topic-finder.js?v=52"></script>
-<script src="js/modules/proofread.js?v=52"></script>
-<script src="js/modules/de-duplicate.js?v=52"></script>
-<script src="js/modules/defense-ppt.js?v=52"></script>
-<script src="js/modules/en-abstract.js?v=52"></script>
-<script src="js/modules/project.js?v=52"></script>
-<script src="js/app-modules.js?v=52"></script>
+<script src="app.js?v=53"></script>
+<script src="js/modules/optimization.js?v=53"></script>
+<script src="js/modules/format-check.js?v=53"></script>
+<script src="js/modules/terminology.js?v=53"></script>
+<script src="js/modules/paragraph-analysis.js?v=53"></script>
+<script src="js/modules/dashboard.js?v=53"></script>
+<script src="js/modules/thesis-review.js?v=53"></script>
+<script src="js/modules/proposal.js?v=53"></script>
+<script src="js/modules/onboarding.js?v=53"></script>
+<script src="js/modules/topic-finder.js?v=53"></script>
+<script src="js/modules/proofread.js?v=53"></script>
+<script src="js/modules/de-duplicate.js?v=53"></script>
+<script src="js/modules/defense-ppt.js?v=53"></script>
+<script src="js/modules/en-abstract.js?v=53"></script>
+<script src="js/modules/project.js?v=53"></script>
+<script src="js/app-modules.js?v=53"></script>
 <script>
 (function(){
   var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');

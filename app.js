@@ -98,6 +98,17 @@ function scrollInThesisBox(target, opts){
   return true;
 }
 window.scrollInThesisBox = scrollInThesisBox;
+
+function markCiteSentences(){
+  try{
+    document.querySelectorAll('.cite-sentence').forEach(function(el){ el.classList.remove('cite-sentence'); });
+    document.querySelectorAll('.cite-marker').forEach(function(sp){
+      var p=sp.closest('p,li,td') || sp.parentElement;
+      if(p && p.classList) p.classList.add('cite-sentence');
+    });
+  }catch(e){}
+}
+
 window.getThesisScrollRoot = getThesisScrollRoot;
 function bigramOverlap(a,b){if(!a||!b)return 0;var sa=new Set(),sb=new Set(),ta=norm(a),tb=norm(b);for(var i=0;i<ta.length-1;i++)sa.add(ta.substring(i,i+2));for(var i=0;i<tb.length-1;i++)sb.add(tb.substring(i,i+2));var h=0;sa.forEach(function(g){if(sb.has(g))h++});return Math.max(sa.size,sb.size)>0?h/Math.max(sa.size,sb.size):0}
 
@@ -379,33 +390,79 @@ async function extractRefsFromRawDocx(buf){
   if(!tailParas.length)return [];
 
   var rawRefs=[];
-  var stopWords=/^(致谢|附录|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读|Abstract|Acknowledg|作者简介|在读期间)/;
-  var refNumStart=/^\[?(\d+)\]?[\s\.、．—\[\]]+/;  // [1], 1., 1、, 1— etc
+  // 仅在“整段像章节标题”时停止，避免把含“专利/致谢”字样的文献正文截断
+  var stopWords=/^(致谢|附\s*录|个人简历|作者简历|声明|攻读学位|在读期间|Abstract|Acknowledg|作者简介|学位论文|原创性声明)\s*$/i;
+  var refNumStart=/^\[?(\d{1,3})\]?[\s\.、．—\-–]+/;  // [1] 1. 1、
+  var isRefStyle=function(sid,txt){
+    var s=String(sid||'');
+    if(/18|ref|参考|文献/i.test(s)) return true;
+    // 数字样式 18 常见于同济参考文献_TJ（id 可能映射为 18）
+    if(s==='18') return true;
+    return false;
+  };
 
   for(var ri=0;ri<tailParas.length;ri++){
-    var txt=tailParas[ri].text;
-    if(stopWords.test(txt.replace(/\s+/g,'')))break;
-    if(txt.length<6)continue;
-    // Check if starts a new reference
+    var txt=tailParas[ri].text.replace(/ /g,' ').replace(/\s+/g,' ').trim();
+    var sid=tailParas[ri].styleId||'';
+    if(!txt||txt.length<5) continue;
+    if(stopWords.test(txt.replace(/\s+/g,''))) break;
+    // 明显非文献的短标题
+    if(/^(第[一二三四五六七八九十0-9]+章|目录|Contents)$/i.test(txt)) break;
+
     var nm=txt.match(refNumStart);
-    if(nm){
-      // Strip the leading number and bracket for cleaner display
-      var clean=txt.replace(/^\[?\d+\]?[\s\.、．—\[\]…]+/,'').replace(/^\s+/,'');
-      rawRefs.push(clean);
+    var styled=isRefStyle(sid,txt);
+    if(nm || styled){
+      var clean=txt.replace(/^\[?\d{1,3}\]?[\s\.、．—\-–]+/,'').trim();
+      // 去掉末尾孤立页码
+      clean=clean.replace(/\s+\d{1,3}$/,'').trim();
+      if(clean.length>=8){
+        if(nm || rawRefs.length===0 || styled){
+          // 新条目：有编号，或样式段落，或尚无条目
+          if(nm || rawRefs.length===0) rawRefs.push(clean);
+          else {
+            // 样式段落但无编号：若上一条很短则续接，否则新开
+            if(rawRefs[rawRefs.length-1].length<80) rawRefs[rawRefs.length-1]+=' '+clean;
+            else rawRefs.push(clean);
+          }
+        }
+      }
     }else if(rawRefs.length>0){
-      // Continuation of previous reference
-      rawRefs[rawRefs.length-1]+=' '+txt;
-    }else{
-      // First ref might not have a number prefix
-      rawRefs.push(txt.replace(/^\s*参考文献\s*/,'').replace(/^\s+/,''));
+      // 续行：上一条未以句号结束或本行不像新标题
+      if(!/^第[一二三四五六七八九十0-9]+章/.test(txt)){
+        rawRefs[rawRefs.length-1]+=' '+txt;
+      }
     }
   }
 
-  console.log('[refs] Extracted '+rawRefs.length+' references from '+tailParas.length+' tail paragraphs');
-  return rawRefs.map(function(ci,i){
-    return {num:i+1,ci:ci.replace(/\s+/g,' ').trim()};
+  // 去重（规范化空白后）
+  var seen={};
+  var uniq=[];
+  for(var ui=0;ui<rawRefs.length;ui++){
+    var c=rawRefs[ui].replace(/\s+/g,' ').trim();
+    // 基本清洗：统一标点空格
+    c=c.replace(/\s*([,，;；.。:：])\s*/g,'$1 ').replace(/\s+/g,' ').trim();
+    if(c.length<8) continue;
+    var key=c.substring(0,120).toLowerCase();
+    if(seen[key]) continue;
+    seen[key]=1;
+    uniq.push(c);
+  }
+
+  console.log('[refs] Extracted '+uniq.length+' references from '+tailParas.length+' tail paragraphs');
+  return uniq.map(function(ci,i){
+    var meta=typeof parseRefMeta==='function'?parseRefMeta(ci):{title:'',journal:'',year:'',doi:''};
+    return {
+      num:i+1,
+      ci:ci,
+      title: meta.title||ci.substring(0,80),
+      journal: meta.journal||'',
+      year: meta.year||'',
+      doi: meta.doi||'',
+      subType:'unchanged'
+    };
   });
 }
+
 function parseRefMeta(ci){
   if(!ci)return{title:'',journal:'',year:'',doi:''};
   var t2=ci.replace(/\s+/g,' ').trim(),title='',journal='',year='',doi='';
@@ -586,7 +643,13 @@ function jumpToDomEl(r){
         }
         pp=pp.parentElement;
       }
-      r._domEl.scrollIntoView({behavior:'smooth',block:'center'});
+      if(typeof scrollInThesisBox==='function') scrollInThesisBox(r._domEl,{behavior:'smooth',offset:40});
+      else try{ r._domEl.scrollIntoView({behavior:'smooth',block:'nearest'}); }catch(e0){}
+      // 角标所在段落高亮
+      try{
+        var pSent=r._domEl.closest('p,li,td,div')||r._domEl.parentElement;
+        if(pSent) pSent.classList.add('cite-sentence');
+      }catch(e1){}
       r._domEl.style.transition='background .3s';r._domEl.style.background='#fef3c7';
       setTimeout(function(){r._domEl.style.background=''},2000);
       return true;
@@ -1650,7 +1713,51 @@ function cwGetUnassigned(){return[];}
 // ========== 弹窗④: 检索结果确认 ==========
 async function startSearch(){
   if(!manuscriptText){alert('请先上传论文文件');return}
+  if(searchRunning)return;
+  openSearchConfigModal();
+}
+function openSearchConfigModal(preset){
+  preset=preset||{};
+  var total0=preset.total||parseInt((document.getElementById('fTotal')||{}).value)||Math.max(5, Math.round((manuscriptText||'').length/1200));
+  var cn0=preset.cnMin!=null?preset.cnMin:parseInt((document.getElementById('fCN')||{}).value)||45;
+  var en0=preset.enMin!=null?preset.enMin:parseInt((document.getElementById('fEN')||{}).value)||30;
+  var old=document.getElementById('searchCfgModal'); if(old&&old.parentElement) old.parentElement.removeChild(old);
+  var modal=document.createElement('div');
+  modal.className='ui-modal-backdrop'; modal.id='searchCfgModal';
+  modal.innerHTML='<div class="ui-modal" onclick="event.stopPropagation()">'+
+    '<h3>检索设定</h3>'+
+    '<div class="muted">按设定严格抽样。中文/英文为最低占比（≥）。检索每次消耗 0.5 点。</div>'+
+    '<div class="row">'+
+      '<div><label>目标新增条数</label><input id="scTotal" type="number" min="1" max="200" value="'+total0+'"></div>'+
+      '<div><label>中文占比 ≥ %</label><input id="scCN" type="number" min="0" max="100" value="'+cn0+'"></div>'+
+      '<div><label>英文占比 ≥ %</label><input id="scEN" type="number" min="0" max="100" value="'+en0+'"></div>'+
+    '</div>'+
+    '<div class="actions">'+
+      '<button class="btn btn-ghost" type="button" id="scCancel">取消</button>'+
+      '<button class="btn btn-primary" type="button" id="scGo">开始检索</button>'+
+    '</div></div>';
+  document.body.appendChild(modal);
+  modal.onclick=function(e){ if(e.target===modal) modal.parentElement.removeChild(modal); };
+  document.getElementById('scCancel').onclick=function(){ if(modal.parentElement) modal.parentElement.removeChild(modal); };
+  document.getElementById('scGo').onclick=function(){
+    var total=parseInt(document.getElementById('scTotal').value)||10;
+    var cnMin=parseInt(document.getElementById('scCN').value)||0;
+    var enMin=parseInt(document.getElementById('scEN').value)||0;
+    if(cnMin+enMin>100){ alert('中文≥% 与 英文≥% 之和不能超过 100'); return; }
+    // sync hidden fields for legacy code paths
+    try{
+      var ft=document.getElementById('fTotal'); if(ft) ft.value=total;
+      var fc=document.getElementById('fCN'); if(fc){ fc.value=cnMin; fc.dataset.mode='min'; }
+      var fe=document.getElementById('fEN'); if(fe){ fe.value=enMin; fe.dataset.mode='min'; }
+    }catch(e){}
+    if(modal.parentElement) modal.parentElement.removeChild(modal);
+    startSearchWithConfig({total:total, cnMin:cnMin, enMin:enMin});
+  };
+}
+async function startSearchWithConfig(cfg){
+  if(!manuscriptText){alert('请先上传论文文件');return}
   if(searchRunning)return;searchRunning=true;
+  window._searchCfg=cfg||{};
   showLoad('诊断API连接...',0);/* cat-game disabled for release */
   try{
   // STEP 0: 检测Flask服务连通性（用轻量ping接口）
@@ -1658,10 +1765,11 @@ async function startSearch(){
   try{var tr=await fetch('/ping');if(tr.ok){var tj=await tr.json();connected=tj.ok;}}catch(er){}
   if(!connected){hideLoad();searchRunning=false;alert('无法连接Python服务。\n\n请确认已双击 启动.bat 启动服务。\n如果已启动，请查看Python窗口是否有报错。');return}
 
-  var rawTotal=(parseInt(document.getElementById('fTotal').value)||Math.round(manuscriptText.length/1000)),total=Math.max(1,rawTotal-(existingRefs.length||0));
-  var cnPct=parseInt(document.getElementById('fCN').value)||45;
-  var enPct=parseInt(document.getElementById('fEN').value)||30;
-  // fCN = 中文占比上限提示, fEN = 英文最低占比
+  var rawTotal=(window._searchCfg&&window._searchCfg.total)?window._searchCfg.total:(parseInt((document.getElementById('fTotal')||{}).value)||Math.round(manuscriptText.length/1000));
+  var total=Math.max(1, rawTotal);
+  var cnPct=(window._searchCfg&&window._searchCfg.cnMin!=null)?window._searchCfg.cnMin:(parseInt((document.getElementById('fCN')||{}).value)||45);
+  var enPct=(window._searchCfg&&window._searchCfg.enMin!=null)?window._searchCfg.enMin:(parseInt((document.getElementById('fEN')||{}).value)||30);
+  // cnPct/enPct = 最低占比（≥）
   if(!paperTopics.length)paperTopics=extractTopics(manuscriptText);
 
   // STEP 1: 全层级关键词——章/节/小节/正文段落/泛词
@@ -1789,14 +1897,20 @@ async function startSearch(){
     pool.sort(function(a,b){return(parseInt(b.year)||0)-(parseInt(a.year)||0);});
     for(var pi=0;pi<pool.length;pi++){var pr=pool[pi];if(isDupWithExisting(pr))continue;if(pr.isCN)cnPool.push(pr);else enPool.push(pr);}
     updLoad('中:'+cnPool.length+' 英:'+enPool.length+' → 目标'+total,78);
-    var enWanted=Math.round(total*Math.max(enPct,100-cnPct)/100);
-    var cnWanted=total-enWanted;
+    var cnMin=window._searchCfg&&window._searchCfg.cnMin!=null?window._searchCfg.cnMin:cnPct;
+    var enMin=window._searchCfg&&window._searchCfg.enMin!=null?window._searchCfg.enMin:enPct;
+    var cnWanted=Math.round(total*Math.max(0,Math.min(100,cnMin))/100);
+    var enWanted=total-cnWanted;
+    // 英文最低占比约束：若 enWanted 不足 enMin，则上调英文份额
+    var enFloor=Math.round(total*Math.max(0,Math.min(100,enMin))/100);
+    if(enWanted<enFloor){ enWanted=enFloor; cnWanted=total-enWanted; }
     var cnTake=Math.min(cnWanted,cnPool.length);
     var enTake=Math.min(enWanted,enPool.length);
-    var cnShort=cnWanted-cnTake,enShort=enWanted-enTake;
-    if(cnShort>0){enTake=Math.min(enPool.length,enTake+cnShort);}
-    if(enShort>0){cnTake=Math.min(cnPool.length,cnTake+enShort);}
-    if(cnTake+enTake<total){cnTake=cnPool.length;enTake=enPool.length;}
+    // 严格模式：不跨语种补齐、不倾倒整个池
+    if(cnTake+enTake<total){
+      console.warn('[search] strict shortfall', {cnWanted:cnWanted,enWanted:enWanted,cnTake:cnTake,enTake:enTake,total:total});
+      if(typeof ttp==='function') ttp('严格模式：中/英可用文献不足，仅返回 '+(cnTake+enTake)+'/'+total+' 条');
+    }
     updLoad('中文'+cnTake+'条 + 英文'+enTake+'条',80);
     for(var ci2=0;ci2<cnTake;ci2++)selected.push(cnPool[ci2]);
     for(var ei2=0;ei2<enTake;ei2++)selected.push(enPool[ei2]);
@@ -2131,9 +2245,23 @@ function copyOneExisting(idx){var r=existingRefs[idx];if(!r)return;var txt=r.ci|
 
 function deleteRef(idx){
   if(!mergedRefs.length)return;
-  var r=mergedRefs[idx];if(!r||r.subType==='unchanged'||r.subType==='displaced'){ttp('原文文献不可删除');return}
-  // Remove marker from DOM
-  if(r._domEl&&r._domEl.parentElement)r._domEl.parentElement.removeChild(r._domEl);
+  var r=mergedRefs[idx];if(!r){return}
+  if(!confirm('确定删除该文献？正文中的对应角标将同步删除并重新编号。'))return;
+  // Remove ALL matching cite markers in paper (by displayNum)
+  var delNum=r.displayNum||r.num||(idx+1);
+  try{
+    var marks=document.querySelectorAll('.cite-marker');
+    for(var mi=marks.length-1;mi>=0;mi--){
+      var t=(marks[mi].textContent||'').replace(/\[|\]/g,'');
+      if(String(t)===String(delNum) || marks[mi]===r._domEl){
+        var p=marks[mi].parentElement;
+        marks[mi].parentElement.removeChild(marks[mi]);
+        if(p && p.classList) p.classList.remove('cite-sentence');
+      }
+    }
+  }catch(eDel){}
+  // Remove marker from DOM (legacy single)
+  if(r._domEl&&r._domEl.parentElement){try{r._domEl.parentElement.removeChild(r._domEl);}catch(e2){}}
   // Remove from list
   mergedRefs.splice(idx,1);
   // Renumber all remaining refs in DOM order (stable: no-DOM refs sorted by tempNum)
@@ -2733,7 +2861,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
       }
       window._docxStyleGroups=Object.values(fb).sort(function(a,b){return b.count-a.count;});
     }
-    updLoad('构建章节树...','35');
+    updLoad('构建章节树（样式对齐/标题识别）...','35');
 
 
     // =================================================================
@@ -2931,7 +3059,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
         }
       }
       // ===== 第4.5步: 标题校准（必做，不再提供自动识别兜底） =====
-      updLoad('标题校准...', '37');
+      updLoad('等待标题校准（请选择章/节/小节样式）...','45');
       var calibrated = await startInlineCalibration(box, allHeadings);
       if (calibrated === null) {
         // 用户关闭校准弹窗：中止解析，不建错误目录树
@@ -3964,42 +4092,72 @@ async function batchCompleteDOI(){
 
 // 优化原文句子弹窗
 function showOptimizeSentence(refIdx){
-  var r=mergedRefs[refIdx];if(!r||!r.title){alert('无法获取文献信息');return}
+  var r=mergedRefs[refIdx];if(!r){alert('无法获取文献信息');return}
+  var title=r.title||r.ci||'';
+  var srcSent='', srcEl=null;
+  try{
+    if(r._domEl){
+      srcEl=r._domEl.closest('p,li,td')||r._domEl.parentElement;
+      srcSent=(srcEl&&(srcEl.innerText||srcEl.textContent)||'').replace(/\s+/g,' ').trim();
+    }
+  }catch(e){}
+  if(!srcSent) srcSent=(r.ctx||r.context||'').toString()||'（未定位到原文句子）';
+  var kws=[]; try{kws=extractTitleKws(title).slice(0,6);}catch(e){}
+  var srcKws=[]; try{srcKws=extractTitleKws(srcSent).slice(0,4);}catch(e){}
+  var mix=[]; kws.concat(srcKws).forEach(function(w){if(w&&mix.indexOf(w)<0)mix.push(w);}); mix=mix.slice(0,6);
+  var year=r.year?('（'+r.year+'）'):'';
+  var fused;
+  if(srcSent && srcSent.length>20 && srcSent.indexOf('未定位')<0){
+    var base=srcSent.replace(/\[\d+\]/g,'').replace(/\s+/g,' ').trim();
+    if(base.length>180) base=base.substring(0,180)+'…';
+    fused=base.replace(/[。.!！?？]$/,'')+'，并与'+(mix[0]||'既有研究')+(mix[1]?('、'+mix[1]):'')+'等方向形成呼应'+year+'。';
+  }else{
+    fused='基于'+(mix[0]||'相关研究')+'的视角，围绕「'+mix.slice(0,3).join('、')+'」的讨论表明相关结论具有参考价值'+year+'。';
+  }
+  function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   var modal=document.createElement('div');
-  modal.style='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:99999;display:flex;align-items:center;justify-content:center';
-  modal.innerHTML='<div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:700px;max-height:80vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3)">'+
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'+
-      '<h3 style="margin:0;color:#1e293b">优化原文句子以提高匹配度</h3>'+
-      '<button onclick="this.closest(\'div\').parentElement.remove()" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer">关闭</button>'+
-    '</div>'+
-    '<div style="margin-bottom:16px;padding:12px;background:#eff6ff;border-radius:8px">'+
-      '<div style="font-size:.8rem;color:#64748b;margin-bottom:4px">当前文献</div>'+
-      '<div style="font-weight:600">'+r.title+'</div>'+
-      '<div style="font-size:.75rem;color:#64748b;margin-top:4px">匹配度: '+(r.conf||0)+'% | 重合率: '+(r._dupRate||0)+'%</div>'+
-    '</div>'+
-    '<div style="margin-bottom:12px">'+
-      '<div style="font-size:.85rem;font-weight:600;margin-bottom:8px;color:#1e293b">建议在正文第'+(r.ch||'?')+'章中添加包含以下关键词的句子来引用此文献：</div>'+
-      '<div style="background:#fef3c7;padding:12px;border-radius:8px;font-size:.85rem;line-height:1.6">'+
-        '<div style="margin-top:8px;font-weight:600">'+
-          extractTitleKws(r.title).slice(0,6).map(function(w){return'<span style="background:#dbeafe;padding:2px 6px;border-radius:4px;margin:2px;display:inline-block">'+w+'</span>'}).join('')+
-        '</div>'+
-      '</div>'+
-    '</div>'+
-    '<div style="margin-bottom:12px">'+
-      '<div style="font-size:.85rem;font-weight:600;margin-bottom:8px;color:#1e293b">优化建议</div>'+
-      '<div style="background:#f0fdf4;padding:12px;border-radius:8px;font-size:.82rem;line-height:1.6">'+
-        '<ul style="margin:0;padding-left:20px">'+
-          '<li>在句子中添加文献的方法或结论</li><li>句子中嵌入文献标题中的核心关键词</li><li>确保修改后的句子在目标章节的正文末尾</li>'+
-        '</ul>'+
-      '</div>'+
-    '</div>'+
-    '<div style="text-align:right">'+
-      '<button onclick="this.closest(\'div\').parentElement.remove()" style="background:#64748b;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;margin-right:8px">关闭</button>'+
-      '<button onclick="jumpToCite('+refIdx+');this.closest(\'div\').parentElement.remove()" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer">跳转到原文</button>'+
-    '</div>'+
-  '</div>';
+  modal.className='ui-modal-backdrop'; modal.id='optSentModal';
+  modal.innerHTML='<div class="ui-modal" onclick="event.stopPropagation()"><h3>优化句子并替换原文</h3>'+
+    '<div class="muted">融合原句与文献关键词生成参考句；确认后写回角标所在段落（保留角标）。</div>'+
+    '<div class="box box-src"><div class="muted">文献</div><b>'+esc(title)+'</b></div>'+
+    '<label>原句</label><div class="box box-warn">'+esc(srcSent)+'</div>'+
+    '<label>参考融合句（可编辑）</label><textarea id="optFusedSent" rows="5">'+esc(fused)+'</textarea>'+
+    '<div class="muted">关键词：'+(mix.join('、')||'无')+'</div>'+
+    '<div class="actions"><button class="btn btn-ghost" id="optSentClose">取消</button>'+
+    '<button class="btn btn-primary" id="optSentApply">确认替换到原文</button></div></div>';
   document.body.appendChild(modal);
-  modal.addEventListener('click',function(e){if(e.target===modal)modal.remove()});
+  modal.onclick=function(e){if(e.target===modal&&modal.parentElement)modal.parentElement.removeChild(modal);};
+  document.getElementById('optSentClose').onclick=function(){if(modal.parentElement)modal.parentElement.removeChild(modal);};
+  document.getElementById('optSentApply').onclick=function(){
+    var text=(document.getElementById('optFusedSent').value||'').trim();
+    if(!text){alert('参考句不能为空');return;}
+    try{
+      if(srcEl){
+        var markers=[]; srcEl.querySelectorAll('.cite-marker').forEach(function(sp){markers.push(sp.outerHTML);});
+        srcEl.textContent=text+' ';
+        markers.forEach(function(h){srcEl.insertAdjacentHTML('beforeend', h);});
+        srcEl.classList.add('cite-sentence');
+        if(typeof markCiteSentences==='function') markCiteSentences();
+        if(typeof ttp==='function') ttp('已替换原文句子');
+      } else alert('未找到原文段落，请手动复制参考句');
+    }catch(err){alert('替换失败：'+(err.message||err));}
+    if(modal.parentElement) modal.parentElement.removeChild(modal);
+  };
 }
-// release: disable cat mini-game autostart/entry
-window.startCatGame=function(){/* disabled */};
+
+function toggleDarkMode(){
+  try{
+    var on=document.body.classList.toggle('dark');
+    localStorage.setItem('thesis_ai_dark', on?'1':'0');
+    var btn=document.getElementById('darkToggle');
+    if(btn) btn.title=on?'切换白天模式':'切换暗色模式';
+  }catch(e){}
+}
+function initDarkMode(){
+  try{
+    var pref=localStorage.getItem('thesis_ai_dark');
+    if(pref==='1') document.body.classList.add('dark');
+    if(pref==='0') document.body.classList.remove('dark');
+  }catch(e){}
+}
+try{ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', initDarkMode); else initDarkMode(); }catch(e){}
