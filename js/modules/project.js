@@ -1393,9 +1393,10 @@
     try { syncSectionsToChapterDrafts(false); } catch (e) { console.warn('[import-sync]', e); }
     try { autoSyncStageProgress(getCurrentProject()); } catch (e) {}
     renderProjectChrome();
-    if (typeof switchView === 'function') switchView('workspace');
+    // 导入后显示论文正文（可滚动），不盖住原文
+    if (typeof switchView === 'function') switchView('paper');
     try { ensureUnifiedProjectState(); } catch (e) {}
-    if (typeof ttp === 'function') ttp('论文已导入：请按「导入后 3 步」继续');
+    if (typeof ttp === 'function') ttp('论文已导入：目录树与正文已就绪，可点「工作台」查看主线进度');
   }
 
   // exports

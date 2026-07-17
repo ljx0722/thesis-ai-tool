@@ -1832,3 +1832,61 @@ body.dark .bar, body:not(.light) .bar { background: rgba(2, 6, 23, 0.95); }
   .toc-panel{ width:180px; }
   .tool-panel, .ref-panel{ width:320px; min-width:260px; }
 }
+
+
+/* paper view: ensure original manuscript is visible and all panes scroll */
+.thesis-box{
+  flex:1 1 auto !important;
+  min-height:0 !important;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  -webkit-overflow-scrolling:touch;
+  position:relative;
+}
+.thesis-box > *:not(#workspaceContent){
+  /* paper nodes from mammoth must not be height-collapsed */
+  max-width:100%;
+}
+.thesis-box #workspaceContent[style*="display: none"],
+.thesis-box #workspaceContent[style*="display:none"]{
+  display:none !important;
+  height:0 !important;
+  min-height:0 !important;
+  overflow:hidden !important;
+  padding:0 !important;
+  margin:0 !important;
+}
+/* when showing paper, workspace home must not occupy scroll height */
+.workspace-content{
+  width:100%;
+  box-sizing:border-box;
+}
+.toc-panel .nav-tree,
+.nav-tree{
+  overflow-y:auto !important;
+  min-height:0 !important;
+  -webkit-overflow-scrolling:touch;
+}
+.tool-panel,
+.ref-panel{
+  min-height:0 !important;
+  overflow:hidden !important;
+}
+.tool-panel .module-area,
+.tool-panel .module-panel,
+.ref-panel .module-area,
+.ref-list{
+  overflow-y:auto !important;
+  min-height:0 !important;
+  -webkit-overflow-scrolling:touch;
+}
+.main{
+  min-height:0 !important;
+  overflow:hidden !important;
+}
+.thesis-panel{
+  min-height:0 !important;
+  overflow:hidden !important;
+  display:flex !important;
+  flex-direction:column !important;
+}

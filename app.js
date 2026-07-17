@@ -2163,12 +2163,43 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
       if(dup){ch=dup;if(hd.txt.length>ch.name.length)ch.name=hd.txt;}
       else tree.push(ch);
       stack=[{node:ch,level:0}];
-    }else{
-      if(!stack.length)continue;
-      var parent=stack[stack.length-1].node;
-      var nc={num:nStr,title:hd.txt.replace(/^[\d\.\s、,，]+/,''),el:hd.el,subs:[]};
-      if(hd.level===1){if(!parent.sections)parent.sections=[];parent.sections.push(nc);stack.push({node:nc,level:1});}
-      else if(hd.level===2&&parent.sections&&parent.sections.length){var sec=parent.sections[parent.sections.length-1];if(!sec.subs)sec.subs=[];sec.subs.push(nc);stack.push({node:nc,level:2});}
+    }else if(hd.level===1){
+      // 节：挂到最近的章
+      var chNode=null;
+      for(var si=stack.length-1;si>=0;si--){ if(stack[si].level===0){ chNode=stack[si].node; break; } }
+      if(!chNode && tree.length) chNode=tree[tree.length-1];
+      if(!chNode) continue;
+      var sec={num:nStr,title:hd.txt.replace(/^[\d．.\s、,，]+/,''),el:hd.el,subs:[]};
+      if(!chNode.sections) chNode.sections=[];
+      chNode.sections.push(sec);
+      stack=[{node:chNode,level:0},{node:sec,level:1}];
+    }else if(hd.level===2){
+      // 小节：挂到最近的节（修复原先 parent.sections 判断导致 0 小节）
+      var secNode=null, chNode2=null;
+      for(var sj=stack.length-1;sj>=0;sj--){
+        if(stack[sj].level===1 && !secNode) secNode=stack[sj].node;
+        if(stack[sj].level===0 && !chNode2) chNode2=stack[sj].node;
+      }
+      if(!secNode && chNode2 && chNode2.sections && chNode2.sections.length){
+        secNode=chNode2.sections[chNode2.sections.length-1];
+      }
+      if(!secNode){
+        if(!chNode2 && tree.length) chNode2=tree[tree.length-1];
+        if(!chNode2) continue;
+        var autoNum=(nStr||'').toString().split('.').slice(0,2).join('.') || '0.0';
+        secNode={num:autoNum,title:'(未命名节)',el:hd.el,subs:[],_auto:true};
+        if(!chNode2.sections) chNode2.sections=[];
+        chNode2.sections.push(secNode);
+        stack=[{node:chNode2,level:0},{node:secNode,level:1}];
+      }
+      var sub={num:nStr,title:hd.txt.replace(/^[\d．.\s、,，]+/,''),el:hd.el,subs:[]};
+      if(!secNode.subs) secNode.subs=[];
+      secNode.subs.push(sub);
+      var keep=[];
+      for(var sk=0;sk<stack.length;sk++){ if(stack[sk].level<=1) keep.push(stack[sk]); }
+      if(!keep.length && chNode2) keep=[{node:chNode2,level:0},{node:secNode,level:1}];
+      stack=keep;
+      stack.push({node:sub,level:2});
     }
   }
 

@@ -586,8 +586,21 @@ function onThesisLoaded() {
   if (window.ThesisProject && typeof ThesisProject.onManuscriptReady === 'function') {
     ThesisProject.onManuscriptReady();
   }
-  // 学术主线：导入后留在工作区看阶段清单；用户再主动进参考文献
-  if (typeof switchView === 'function') switchView('workspace');
+  // 导入后优先看论文正文与目录树（可滚动），而不是盖住正文的工作台卡片
+  if (typeof switchView === 'function') {
+    switchView('paper');
+  } else {
+    // 兜底：显示 thesisBox 内论文节点，隐藏 workspace 首页
+    var ws = document.getElementById('workspaceContent');
+    var tb = document.getElementById('thesisBox');
+    if (ws) ws.style.display = 'none';
+    if (tb) {
+      var kids = tb.children;
+      for (var i = 0; i < kids.length; i++) {
+        if (kids[i] !== ws) kids[i].style.display = '';
+      }
+    }
+  }
 }
 
 function switchView(view) {
@@ -605,13 +618,31 @@ function switchView(view) {
       if (typeof renderWorkspaceHero === 'function') renderWorkspaceHero();
       else if (window.ThesisProject && typeof ThesisProject.renderWorkspaceHero === 'function') ThesisProject.renderWorkspaceHero();
     }
-    // Hide paper content
-    var children = tb.children;
-    for (var i = 0; i < children.length; i++) {
-      if (children[i] !== ws) children[i].style.display = 'none';
+    // Hide paper content under workspace home
+    if (tb) {
+      var children = tb.children;
+      for (var i = 0; i < children.length; i++) {
+        if (children[i] !== ws) children[i].style.display = 'none';
+      }
     }
     if (rp) rp.style.display = 'none';
     _activeModule = 'workspace';
+  } else if (view === 'paper' || view === 'thesis') {
+    // 显示论文原文，隐藏工作台项目卡
+    if (ws) ws.style.display = 'none';
+    if (tb) {
+      var kidsP = tb.children;
+      for (var ip = 0; ip < kidsP.length; ip++) {
+        if (kidsP[ip] !== ws) kidsP[ip].style.display = '';
+      }
+      // 确保容器可滚
+      tb.style.overflowY = 'auto';
+      tb.style.minHeight = '0';
+    }
+    if (rp) rp.style.display = 'none';
+    _activeModule = 'paper';
+    // 滚到顶部，避免空白感
+    try { if (tb) tb.scrollTop = 0; } catch (e) {}
   } else if (view === 'references') {
     if (ws) ws.style.display = 'none';
     // Restore hidden thesis content
@@ -620,6 +651,7 @@ function switchView(view) {
       for (var i = 0; i < kids.length; i++) {
         if (kids[i] !== ws) kids[i].style.display = '';
       }
+      tb.style.overflowY = 'auto';
     }
     if (rp) rp.style.display = '';
     var refOnly = rp ? rp.querySelectorAll('.ref-only') : [];
