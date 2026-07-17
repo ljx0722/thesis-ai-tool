@@ -2582,17 +2582,36 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
       .replace(/<p>/g,'<p style="line-height:1.9">')
     manuscriptText=manuscriptHTML.replace(/<[^>]+>/g,'\n').replace(/&nbsp;/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/\n{3,}/g,'\n\n')
     var thesisBoxEl=document.getElementById('thesisBox');
-    // 保存原始工作台内容，解析失败时可恢复
+    // 保留 workspaceContent 节点：只清空论文节点并注入原文，禁止 innerHTML 整锅替换（会删掉工作台壳导致空白/滚不动）
     var _savedWorkspace = null;
     var wsEl = document.getElementById('workspaceContent');
-    if (wsEl) _savedWorkspace = wsEl.outerHTML;
-    thesisBoxEl.innerHTML=manuscriptHTML;
-    var tbs=thesisBoxEl.querySelectorAll('table');for(var ti=0;ti<tbs.length;ti++)tbs[ti].style.display='';
+    if (wsEl) {
+      try { _savedWorkspace = wsEl.outerHTML; } catch (e) {}
+      // 移除 thesisBox 下除 workspace 外的旧论文节点
+      var kidsRm = Array.prototype.slice.call(thesisBoxEl.childNodes);
+      for (var kri=0; kri<kidsRm.length; kri++) {
+        if (kidsRm[kri] !== wsEl) {
+          try { thesisBoxEl.removeChild(kidsRm[kri]); } catch (e2) {}
+        }
+      }
+      wsEl.style.display = 'none';
+    } else {
+      thesisBoxEl.innerHTML = '';
+    }
+    // 把 mammoth HTML 注入为兄弟节点（不覆盖 workspace）
+    var _paperWrap = document.createElement('div');
+    _paperWrap.id = 'paperContentRoot';
+    _paperWrap.className = 'paper-content-root';
+    _paperWrap.innerHTML = manuscriptHTML;
+    thesisBoxEl.appendChild(_paperWrap);
+    var tbs=_paperWrap.querySelectorAll('table');for(var ti=0;ti<tbs.length;ti++)tbs[ti].style.display='';
+    // 后续 DOM 查询以 paper 根为准
+    var thesisBoxElForDom = _paperWrap;
     // 构建 _docxStyleGroups：XML 样式名 + DOM 元素按文档序对齐（不靠文本匹配）
     window._docxStyleGroups=[];
     window._normText=function(s){return(s||'').replace(/[\s　  - ]+/g,' ').replace(/ +/g,' ').trim();};
     if(window._docxParaStyleList&&window._docxParaStyleList.length){
-      var domA=thesisBoxEl.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li');
+      var domA=(document.getElementById("paperContentRoot")||thesisBoxEl).querySelectorAll('p,h1,h2,h3,h4,h5,h6,li');
       var sg2={},xl=window._docxParaStyleList;
       // 策略A: 位置映射 + 宽松文本验证 (窗口=10%)
       var xlClean=[], domClean=[];

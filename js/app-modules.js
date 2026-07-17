@@ -623,6 +623,7 @@ function switchView(view) {
       var children = tb.children;
       for (var i = 0; i < children.length; i++) {
         if (children[i] !== ws) children[i].style.display = 'none';
+        var pcr0=document.getElementById('paperContentRoot'); if(pcr0) pcr0.style.display='none';
       }
     }
     if (rp) rp.style.display = 'none';
@@ -635,6 +636,8 @@ function switchView(view) {
       for (var ip = 0; ip < kidsP.length; ip++) {
         if (kidsP[ip] !== ws) kidsP[ip].style.display = '';
       }
+      var pcr = document.getElementById('paperContentRoot');
+      if (pcr) pcr.style.display = '';
       // 确保容器可滚
       tb.style.overflowY = 'auto';
       tb.style.minHeight = '0';
