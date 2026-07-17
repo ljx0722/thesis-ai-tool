@@ -1890,3 +1890,40 @@ body.dark .bar, body:not(.light) .bar { background: rgba(2, 6, 23, 0.95); }
   display:flex !important;
   flex-direction:column !important;
 }
+
+
+/* isolate paper scrolling: page itself must not scroll */
+html, body{
+  height:100% !important;
+  max-height:100% !important;
+  overflow:hidden !important;
+}
+body > .main,
+#mainLayout{
+  flex:1 1 auto !important;
+  min-height:0 !important;
+  max-height:100% !important;
+  overflow:hidden !important;
+}
+.thesis-panel{
+  display:flex !important;
+  flex-direction:column !important;
+  min-height:0 !important;
+  overflow:hidden !important;
+}
+.thesis-box{
+  flex:1 1 auto !important;
+  min-height:0 !important;
+  max-height:100% !important;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+#paperContentRoot,
+.paper-content-root{
+  min-height:min-content;
+  overflow:visible;
+}
+/* tree click highlight stays local */
+.tree-node.sel{ background:rgba(99,102,241,.18); color:#e0e7ff; }

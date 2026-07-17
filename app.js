@@ -64,6 +64,41 @@ function detectHeadingNum(txt) {
   return (txt || '').substring(0, 8);
 }
 window.detectHeadingLevel=detectHeadingLevel;window.detectChapterNum=detectChapterNum;window.detectHeadingNum=detectHeadingNum;
+
+// 只在论文框内滚动定位，避免带动整个页面
+function getThesisScrollRoot(){
+  return document.getElementById('thesisBox') || document.getElementById('paperContentRoot');
+}
+function scrollInThesisBox(target, opts){
+  opts = opts || {};
+  if(!target) return false;
+  var root = getThesisScrollRoot();
+  if(!root){
+    try{ target.scrollIntoView({behavior: opts.behavior||'smooth', block: opts.block||'start'}); }catch(e){}
+    return true;
+  }
+  // 确保目标在 root 内（否则回退）
+  if(!root.contains(target)){
+    try{ target.scrollIntoView({behavior: opts.behavior||'smooth', block: opts.block||'start'}); }catch(e){}
+    return true;
+  }
+  var rootRect = root.getBoundingClientRect();
+  var tRect = target.getBoundingClientRect();
+  var pad = (opts.offset != null) ? opts.offset : 12;
+  var nextTop = root.scrollTop + (tRect.top - rootRect.top) - pad;
+  if(nextTop < 0) nextTop = 0;
+  var maxTop = Math.max(0, root.scrollHeight - root.clientHeight);
+  if(nextTop > maxTop) nextTop = maxTop;
+  try{
+    if(opts.behavior === 'auto') root.scrollTop = nextTop;
+    else root.scrollTo({ top: nextTop, behavior: 'smooth' });
+  }catch(e){
+    root.scrollTop = nextTop;
+  }
+  return true;
+}
+window.scrollInThesisBox = scrollInThesisBox;
+window.getThesisScrollRoot = getThesisScrollRoot;
 function bigramOverlap(a,b){if(!a||!b)return 0;var sa=new Set(),sb=new Set(),ta=norm(a),tb=norm(b);for(var i=0;i<ta.length-1;i++)sa.add(ta.substring(i,i+2));for(var i=0;i<tb.length-1;i++)sb.add(tb.substring(i,i+2));var h=0;sa.forEach(function(g){if(sb.has(g))h++});return Math.max(sa.size,sb.size)>0?h/Math.max(sa.size,sb.size):0}
 
 // 关键词余弦相似度（替代bigram重叠率，更准确）
@@ -276,7 +311,9 @@ function navClick2(el){
     }
   }
   if(!vis)return;
-  vis.scrollIntoView({behavior:'smooth',block:'start'});
+  // 仅在论文框内滚动，不带动整页
+  if(typeof scrollInThesisBox==='function') scrollInThesisBox(vis,{behavior:'smooth',offset:16});
+  else try{ vis.scrollIntoView({behavior:'smooth',block:'nearest'}); }catch(e){}
   vis.style.transition='background .3s';vis.style.background='#fef3c7';
   setTimeout(function(){vis.style.background=''},1800);
   var ns=document.querySelectorAll('.tree-node');
@@ -3358,7 +3395,11 @@ function highlightRefSentences(){
 // 点击目录/标题跳转到对应区域 + 高亮目录项
 function navClickToSec(id){
   var el3=document.getElementById(id);
-  if(el3){el3.scrollIntoView({behavior:'smooth',block:'start'});el3.style.transition='background .3s';el3.style.background='rgba(175,82,222,0.15)';setTimeout(function(){el3.style.background=''},2200);}
+  if(el3){
+    if(typeof scrollInThesisBox==='function') scrollInThesisBox(el3,{behavior:'smooth',offset:16});
+    else try{ el3.scrollIntoView({behavior:'smooth',block:'nearest'}); }catch(e){}
+    el3.style.transition='background .3s';el3.style.background='rgba(175,82,222,0.15)';setTimeout(function(){el3.style.background=''},2200);
+  }
   var tns=document.querySelectorAll('.tree-node');
   for(var ti=0;ti<tns.length;ti++){tns[ti].classList.remove('sel');if(tns[ti].getAttribute('data-id')===id){tns[ti].classList.add('sel');tns[ti].scrollIntoView({block:'nearest'});}}
 }
