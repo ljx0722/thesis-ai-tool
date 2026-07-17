@@ -120,7 +120,7 @@
   </div>
   <div class="bar-tabs" id="barTabs">
     <button class="bar-tab active" data-view="workspace" onclick="switchView('workspace')">总览</button>
-    <button class="bar-tab" data-view="refs" onclick="switchModule('references')">文献</button>
+    <button class="bar-tab" data-view="refs" onclick="switchModule('references')">📚 参考文献</button>
     <button class="bar-tab" data-view="tools" onclick="openToolHome()">工具台</button>
     <button class="bar-tab" data-view="dashboard" onclick="showDashboard()">看板</button>
   </div>
@@ -227,6 +227,7 @@
         <button class="bar-mini" onclick="zoomThesis(0.1)">+</button>
         <button class="bar-mini" onclick="zoomThesis(0,1)">↺</button>
         <button class="ba-btn ba-search" disabled id="baSearch" onclick="startSearch()">🔍 检索</button>
+        <button class="ba-btn" id="baKG" onclick="showKnowledgeGraph()" title="知识图谱">🕸️ 图谱</button>
         <button class="ba-btn ba-verify" disabled id="baVerify" onclick="batchVerify()">✅ 校验</button>
       </div>
     </div>
@@ -247,7 +248,7 @@
       </div>
       <div class="tool-panel-tabs">
         <button class="tool-tab active" data-tooltab="home" onclick="openToolHome()">功能</button>
-        <button class="tool-tab" data-tooltab="refs" onclick="switchModule('references')">文献</button>
+        <button class="tool-tab" data-tooltab="refs" onclick="switchModule('references')">📚 参考文献</button>
       </div>
     </div>
 
@@ -402,23 +403,23 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
 <script defer src="mammoth.browser.min.js"></script>
 <script defer src="jszip.min.js"></script>
-<script src="app.js?v=50"></script>
-<script src="js/modules/optimization.js?v=50"></script>
-<script src="js/modules/format-check.js?v=50"></script>
-<script src="js/modules/terminology.js?v=50"></script>
-<script src="js/modules/paragraph-analysis.js?v=50"></script>
-<script src="js/modules/dashboard.js?v=50"></script>
-<script src="js/modules/thesis-review.js?v=50"></script>
-<script src="js/modules/proposal.js?v=50"></script>
-<script src="js/modules/onboarding.js?v=50"></script>
-<script src="js/modules/cat-game.js?v=50"></script>
-<script src="js/modules/topic-finder.js?v=50"></script>
-<script src="js/modules/proofread.js?v=50"></script>
-<script src="js/modules/de-duplicate.js?v=50"></script>
-<script src="js/modules/defense-ppt.js?v=50"></script>
-<script src="js/modules/en-abstract.js?v=50"></script>
-<script src="js/modules/project.js?v=50"></script>
-<script src="js/app-modules.js?v=50"></script>
+<script src="app.js?v=51"></script>
+<script src="js/modules/optimization.js?v=51"></script>
+<script src="js/modules/format-check.js?v=51"></script>
+<script src="js/modules/terminology.js?v=51"></script>
+<script src="js/modules/paragraph-analysis.js?v=51"></script>
+<script src="js/modules/dashboard.js?v=51"></script>
+<script src="js/modules/thesis-review.js?v=51"></script>
+<script src="js/modules/proposal.js?v=51"></script>
+<script src="js/modules/onboarding.js?v=51"></script>
+<script src="js/modules/cat-game.js?v=51"></script>
+<script src="js/modules/topic-finder.js?v=51"></script>
+<script src="js/modules/proofread.js?v=51"></script>
+<script src="js/modules/de-duplicate.js?v=51"></script>
+<script src="js/modules/defense-ppt.js?v=51"></script>
+<script src="js/modules/en-abstract.js?v=51"></script>
+<script src="js/modules/project.js?v=51"></script>
+<script src="js/app-modules.js?v=51"></script>
 <script>
 (function(){
   var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');

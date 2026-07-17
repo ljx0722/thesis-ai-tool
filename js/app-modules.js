@@ -393,6 +393,18 @@ function resetSearch() {
 }
 
 // ==================== 模块切换（带 pushState） ====================
+
+function enableLiteratureButtons(){
+  try{
+    var ids=['baSearch','baVerify','baKG'];
+    for(var i=0;i<ids.length;i++){
+      var el=document.getElementById(ids[i]);
+      if(!el) continue;
+      if(typeof _thesisLoaded!=='undefined' && _thesisLoaded){ el.disabled=false; el.removeAttribute('disabled'); }
+      else { el.disabled=true; }
+    }
+  }catch(e){}
+}
 function switchModule(moduleId) {
   if (typeof searchRunning !== 'undefined' && searchRunning) { ttp('检索进行中，请等待完成'); return; }
   _activeModule = moduleId;

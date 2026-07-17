@@ -221,8 +221,16 @@ def init_db():
         salt = secrets.token_bytes(32)
         key = hashlib.pbkdf2_hmac('sha256', admin_pwd.encode(), salt, 100000)
         pwd_hash = salt.hex() + ':' + key.hex()
-        conn.execute('INSERT OR IGNORE INTO users (username, password_hash, credits, is_admin, created_at) VALUES (?, ?, 500000, 1, datetime(\"now\",\"localtime\"))',
-                     ('admin', pwd_hash))
+        conn.execute(
+            "INSERT OR IGNORE INTO users (username, password_hash, credits, is_admin, created_at) "
+            "VALUES (?, ?, 500000, 1, datetime('now','localtime'))",
+            ('admin', pwd_hash))
+        # 确保 admin 永远是管理员
+        conn.execute("UPDATE users SET is_admin = 1 WHERE username = 'admin'")
+        # 若设置了 ADMIN_PASSWORD 环境变量，则每次启动同步密码（用于线上重置）
+        if os.environ.get('ADMIN_PASSWORD'):
+            conn.execute("UPDATE users SET password_hash = ? WHERE username = 'admin'", (pwd_hash,))
+            print('[admin] synced password from ADMIN_PASSWORD')
         conn.execute("UPDATE users SET credits = 500000 WHERE username = 'admin' AND credits < 500")
         conn.commit()
     except: pass

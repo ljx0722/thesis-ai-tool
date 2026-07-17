@@ -3122,6 +3122,8 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     var fTotalEl=document.getElementById('fTotal');
     if(fTotalEl&&(!fTotalEl.value||fTotalEl.value==='0'))fTotalEl.value=autoTotal;
     document.getElementById('statusBar').innerHTML='✅ '+sections.length+'章 | 已有'+existingRefs.length+'条文献';
+    try{var bs=document.getElementById('baSearch'),bv=document.getElementById('baVerify'),bk=document.getElementById('baKG'); if(bs){bs.disabled=false;bs.removeAttribute('disabled');} if(bv){bv.disabled=false;bv.removeAttribute('disabled');} if(bk){bk.disabled=false;bk.removeAttribute('disabled');}}catch(eBtn){}
+
     // 通知模块系统：论文已加载
     if(typeof onThesisLoaded==='function')onThesisLoaded();
     // 会话持久化：备份基础数据防刷新丢失
