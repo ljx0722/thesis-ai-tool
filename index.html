@@ -229,7 +229,7 @@
     <div class="ref-list ref-only" id="refs"><div style="text-align:center;padding:60px;color:#9ca3af;font-size:.82rem">← 请先上传论文</div></div>
   </div>
 </div>
-    <input type="file" id="fileInput" accept=".docx" style="display:none">
+    <input type="file" id="fileInput" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none">
     <script>window._pendingFile=null;window.triggerUpload=function(){document.getElementById('fileInput').click();};</script>
 
 <!-- ====== 上传弹窗 ====== -->
@@ -237,10 +237,10 @@
   <div class="upload-card">
     <div class="upload-icon">📄</div>
     <h2>上传论文</h2>
-    <p>支持 .docx 格式，本地解析，数据不上传服务器</p>
+    <p>支持 <b>.docx</b>（推荐）与 <b>.doc</b>。docx 本地解析可保留样式；doc 会先转换。</p>
     <div class="upload-drop" id="uploadDrop" onclick="document.getElementById('uploadFileInput').click()">
       拖拽文件到此处或点击选择
-      <input type="file" id="uploadFileInput" accept=".docx" onchange="var dt=new DataTransfer();dt.items.add(this.files[0]);document.getElementById('fileInput').files=dt.files;document.getElementById('fileInput').dispatchEvent(new Event('change'));hideUploadOverlay()" style="display:none">
+      <input type="file" id="uploadFileInput" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onchange="var dt=new DataTransfer();dt.items.add(this.files[0]);document.getElementById('fileInput').files=dt.files;document.getElementById('fileInput').dispatchEvent(new Event('change'));hideUploadOverlay()" style="display:none">
     </div>
     <button onclick="hideUploadOverlay()" style="margin-top:16px;padding:8px 20px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface-alt);color:var(--text-muted);cursor:pointer;font-size:var(--font-size-sm);font-family:var(--font-sans)">取消</button>
   </div>
@@ -367,23 +367,23 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
 <script defer src="mammoth.browser.min.js"></script>
 <script defer src="jszip.min.js"></script>
-<script src="app.js?v=43"></script>
-<script src="js/modules/optimization.js?v=43"></script>
-<script src="js/modules/format-check.js?v=43"></script>
-<script src="js/modules/terminology.js?v=43"></script>
-<script src="js/modules/paragraph-analysis.js?v=43"></script>
-<script src="js/modules/dashboard.js?v=43"></script>
-<script src="js/modules/thesis-review.js?v=43"></script>
-<script src="js/modules/proposal.js?v=43"></script>
-<script src="js/modules/onboarding.js?v=43"></script>
-<script src="js/modules/cat-game.js?v=43"></script>
-<script src="js/modules/topic-finder.js?v=43"></script>
-<script src="js/modules/proofread.js?v=43"></script>
-<script src="js/modules/de-duplicate.js?v=43"></script>
-<script src="js/modules/defense-ppt.js?v=43"></script>
-<script src="js/modules/en-abstract.js?v=43"></script>
-<script src="js/modules/project.js?v=43"></script>
-<script src="js/app-modules.js?v=43"></script>
+<script src="app.js?v=44"></script>
+<script src="js/modules/optimization.js?v=44"></script>
+<script src="js/modules/format-check.js?v=44"></script>
+<script src="js/modules/terminology.js?v=44"></script>
+<script src="js/modules/paragraph-analysis.js?v=44"></script>
+<script src="js/modules/dashboard.js?v=44"></script>
+<script src="js/modules/thesis-review.js?v=44"></script>
+<script src="js/modules/proposal.js?v=44"></script>
+<script src="js/modules/onboarding.js?v=44"></script>
+<script src="js/modules/cat-game.js?v=44"></script>
+<script src="js/modules/topic-finder.js?v=44"></script>
+<script src="js/modules/proofread.js?v=44"></script>
+<script src="js/modules/de-duplicate.js?v=44"></script>
+<script src="js/modules/defense-ppt.js?v=44"></script>
+<script src="js/modules/en-abstract.js?v=44"></script>
+<script src="js/modules/project.js?v=44"></script>
+<script src="js/app-modules.js?v=44"></script>
 <script>
 (function(){
   var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');

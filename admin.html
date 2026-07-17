@@ -83,6 +83,8 @@
       <a onclick="document.getElementById('orderSection').scrollIntoView({behavior:'smooth'})">充值订单</a>
       <a onclick="document.getElementById('pricingSection').scrollIntoView({behavior:'smooth'});loadPricing();">计费配置</a>
       <a onclick="document.getElementById('llmEcoSection').scrollIntoView({behavior:'smooth'});loadLlmEconomics();">AI成本看板</a>
+      <a onclick="document.getElementById('opsSection').scrollIntoView({behavior:'smooth'});loadOpsStats();">运营看板</a>
+      <a onclick="document.getElementById('pricingScheduleSection').scrollIntoView({behavior:'smooth'});loadPricingSchedules();">定价排期</a>
       <div class="nav-divider"></div>
       <a href="/" style="font-size:0.65rem;color:rgba(255,255,255,0.25)">← 返回主页</a>
     </div>
@@ -108,6 +110,23 @@
       <div id="orderSection">
         <h2 class="admin-section-title">充值订单</h2>
         <table class="admin-table" id="orderTable"><thead><tr><th>ID</th><th>用户</th><th>金额</th><th>状态</th><th>时间</th><th>操作</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div id="opsSection">
+        <h2 class="admin-section-title">运营看板</h2>
+        <div class="admin-stats" id="opsCards"></div>
+        <p style="font-size:.72rem;color:var(--text-muted)">待确认充值请在下方订单列表处理。支付自动到账可配置 webhook（默认关闭，人工确认更稳妥）。</p>
+      </div>
+      <div id="pricingScheduleSection">
+        <h2 class="admin-section-title">定价排期（全局生效）</h2>
+        <p style="font-size:.72rem;color:var(--text-muted)">设置 config（键值，单位：厘，1点=1000厘）。到 effective_at 后自动生效。LLM 基价可用 token_yuan_per_10m / user_markup 等键。</p>
+        <div class="admin-flex-wrap" style="gap:8px;margin-bottom:8px">
+          <input id="psName" class="admin-input" placeholder="方案名" style="width:140px">
+          <input id="psTime" class="admin-input" type="datetime-local" style="width:210px">
+          <input id="psConfig" class="admin-input" placeholder='{"data-ml":500,"export-docx":200,"user_markup":3}' style="min-width:280px;flex:1">
+          <button class="admin-btn admin-btn-primary" onclick="createPricingSchedule()">创建并预约生效</button>
+          <button class="admin-btn" onclick="loadPricingSchedules()">刷新</button>
+        </div>
+        <table class="admin-table" id="psTable"><thead><tr><th>ID</th><th>名称</th><th>生效时间</th><th>状态</th><th>配置</th></tr></thead><tbody></tbody></table>
       </div>
       <div id="llmEcoSection">
         <h2 class="admin-section-title">AI 成本看板</h2>
@@ -163,7 +182,7 @@ function loadDashboard(){
     s.recent_orders.forEach(function(o){ohtml+='<tr><td>'+o.id+'</td><td>'+o.username+'</td><td>&yen;'+o.amount_yuan+'</td><td>'+(sm[o.status]||o.status)+'</td><td>'+(o.created_at||'').substring(0,16)+'</td><td>'+(o.status==='submitted'?'<button class="admin-btn admin-btn-success" onclick="confirmOrder('+o.id+')">确认到账</button>':'')+'</td></tr>';});
     document.querySelector('#orderTable tbody').innerHTML=ohtml;
     // preload pricing silently
-    try{loadPricing();loadLlmEconomics();}catch(e){}
+    try{loadPricing();loadLlmEconomics();loadOpsStats();loadPricingSchedules();}catch(e){}
   }).catch(function(){alert('网络错误')});
 }
 function adjustCredits(){
@@ -174,6 +193,45 @@ function adjustCredits(){
   fetch('/api/admin/credits',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SECRET},body:JSON.stringify({secret:SECRET,user_id:uid,amount:amt,reason:reason})}).then(r=>r.json()).then(d=>{if(d.success){alert('调整成功');loadDashboard();}else{alert(d.error)}}).catch(function(){alert('网络错误')});
 }
 var _pricingCache=null;
+function loadOpsStats(){
+  if(!SECRET) return;
+  fetch('/api/admin/ops_stats?secret='+encodeURIComponent(SECRET),{headers:{'Authorization':'Bearer '+SECRET}})
+    .then(r=>r.json()).then(d=>{
+      if(!d.success) return;
+      var s=d.stats||{};
+      document.getElementById('opsCards').innerHTML=
+        '<div class="admin-stat"><div class="stat-value">'+(s.users||0)+'</div><div class="stat-label">用户数</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">'+(s.projects||0)+'</div><div class="stat-label">项目数</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">'+(s.orders_pending||0)+'</div><div class="stat-label">待确认充值</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">&yen;'+(s.confirmed_amount_today||0)+'</div><div class="stat-label">今日到账</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">'+(s.llm_calls_today||0)+'</div><div class="stat-label">今日AI调用</div></div>'+
+        '<div class="admin-stat"><div class="stat-value">'+(s.llm_charged_points_today||0)+'</div><div class="stat-label">今日AI扣点</div></div>';
+    }).catch(()=>{});
+}
+function loadPricingSchedules(){
+  if(!SECRET) return;
+  fetch('/api/admin/pricing/schedules?secret='+encodeURIComponent(SECRET),{headers:{'Authorization':'Bearer '+SECRET}})
+    .then(r=>r.json()).then(d=>{
+      if(!d.success){alert(d.error||'失败');return;}
+      var h='';
+      (d.schedules||[]).forEach(function(r){
+        h+='<tr><td>'+r.id+'</td><td>'+(r.name||'')+'</td><td>'+(r.effective_at||'')+'</td><td>'+(r.is_active? '生效中':'预约')+'</td><td style="max-width:360px;word-break:break-all;font-size:.65rem">'+(r.config_json||'')+'</td></tr>';
+      });
+      document.querySelector('#psTable tbody').innerHTML=h||'<tr><td colspan="5">暂无排期</td></tr>';
+    });
+}
+function createPricingSchedule(){
+  if(!SECRET){alert('请先登录');return;}
+  var name=document.getElementById('psName').value||'定价方案';
+  var t=document.getElementById('psTime').value;
+  var cfgRaw=document.getElementById('psConfig').value||'{}';
+  if(!t){alert('请选择生效时间');return;}
+  var effective_at=t.replace('T',' ')+':00';
+  var config={};
+  try{config=JSON.parse(cfgRaw);}catch(e){alert('config 必须是 JSON');return;}
+  fetch('/api/admin/pricing/schedules',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SECRET},body:JSON.stringify({secret:SECRET,name:name,effective_at:effective_at,config:config})})
+    .then(r=>r.json()).then(d=>{ if(d.success){alert('已创建排期'); loadPricingSchedules(); loadPricing();} else alert(d.error||'失败'); });
+}
 function loadLlmEconomics(){
   if(!SECRET){alert('请先登录');return;}
   fetch('/api/admin/llm_economics?secret='+encodeURIComponent(SECRET),{headers:{'Authorization':'Bearer '+SECRET}})

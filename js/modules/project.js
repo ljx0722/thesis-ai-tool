@@ -743,6 +743,7 @@
           '<button class="ai-btn-clear" onclick="runOneClickPipeline()">一键流水线</button>' +
           '<button class="ai-btn-clear" onclick="openDefensePack()">答辩材料包</button>' +
           '<button class="ai-btn-clear" onclick="normalizeRefsGBT7714()">文献规范化</button>' +
+          '<button class="ai-btn-clear" onclick="openMaterialsLibrary()">资料库</button>' +
           '<button class="ai-btn-clear" onclick="openOutlineEditor()">大纲</button>' +
           '<button class="ai-btn-clear" onclick="openChapterBoard()">分章草稿</button>' +
           '<button class="ai-btn-clear" onclick="openFullPaperPreview()">完整预览</button>' +
@@ -2112,4 +2113,94 @@
   window.closeDefensePack = closeDefensePack;
   window.normalizeRefsGBT7714 = normalizeRefsGBT7714;
   window.ensureUnifiedProjectState = ensureUnifiedProjectState;
+
+  function openMaterialsLibrary() {
+    var p = getCurrentProject();
+    if (!p) { alert('请先创建或选择项目'); openIdeaWizard(); return; }
+    if (!cloudEnabled()) { alert('请先登录以使用云端资料库'); return; }
+    var ov = document.createElement('div');
+    ov.id = 'materialsOverlay';
+    ov.className = 'project-overlay';
+    ov.innerHTML = '<div class="project-modal" style="width:min(720px,96vw);max-height:88vh" onclick="event.stopPropagation()">' +
+      '<div class="project-modal-head"><div><h3>项目资料库</h3><p>上传的数据/文档可供数据分析等模块复用</p></div>' +
+      '<button class="project-close" onclick="closeMaterialsLibrary()">×</button></div>' +
+      '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
+      '<input type="file" id="materialFileInput" multiple style="font-size:.7rem;color:var(--text-secondary)">' +
+      '<button class="ai-btn" onclick="uploadMaterials()">上传到资料库</button>' +
+      '<button class="ai-btn-clear" onclick="refreshMaterialsList()">刷新</button>' +
+      '</div>' +
+      '<div id="materialsList" style="max-height:50vh;overflow:auto;font-size:.72rem">加载中…</div>' +
+      '<div class="project-modal-actions"><button class="ai-btn-clear" onclick="closeMaterialsLibrary()">关闭</button></div></div>';
+    ov.onclick = function(e){ if(e.target===ov) closeMaterialsLibrary(); };
+    document.body.appendChild(ov);
+    refreshMaterialsList();
+  }
+  function closeMaterialsLibrary(){
+    var ov=document.getElementById('materialsOverlay'); if(ov&&ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+  function refreshMaterialsList(){
+    var p=getCurrentProject(); if(!p) return;
+    var el=document.getElementById('materialsList'); if(!el) return;
+    el.textContent='加载中…';
+    fetch('/api/projects/'+encodeURIComponent(p.id)+'/materials', {headers: authHeaders()})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(!d.success){ el.innerHTML='<div style="color:#fca5a5">'+(d.error||'加载失败')+'</div>'; return; }
+        var items=d.materials||[];
+        if(!items.length){ el.innerHTML='<div style="color:var(--text-muted);padding:12px">暂无资料。可上传 CSV/TXT/DOCX/PDF 等。</div>'; return; }
+        var h='<table style="width:100%;border-collapse:collapse"><tr style="background:rgba(255,255,255,.04)"><th style="text-align:left;padding:6px">文件</th><th>类型</th><th>大小</th><th>操作</th></tr>';
+        items.forEach(function(m){
+          h+='<tr><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06)">'+escapeHtml(m.filename)+'</td>'+
+            '<td style="text-align:center;border-bottom:1px solid rgba(255,255,255,.06)">'+(m.kind||'')+'</td>'+
+            '<td style="text-align:center;border-bottom:1px solid rgba(255,255,255,.06)">'+Math.round((m.size_bytes||0)/1024)+'KB</td>'+
+            '<td style="text-align:center;border-bottom:1px solid rgba(255,255,255,.06)">'+
+            '<button class="ai-btn-clear" style="padding:2px 8px;font-size:.62rem" onclick="downloadMaterial(\''+m.id+'\')">下载</button> '+
+            '<button class="ai-btn-clear" style="padding:2px 8px;font-size:.62rem" onclick="deleteMaterial(\''+m.id+'\')">删除</button></td></tr>';
+        });
+        h+='</table>';
+        el.innerHTML=h;
+      }).catch(function(){ el.innerHTML='<div style="color:#fca5a5">网络错误</div>'; });
+  }
+  function uploadMaterials(){
+    var p=getCurrentProject(); if(!p) return;
+    var input=document.getElementById('materialFileInput');
+    if(!input||!input.files||!input.files.length){ alert('请选择文件'); return; }
+    var i=0;
+    function next(){
+      if(i>=input.files.length){ refreshMaterialsList(); if(typeof ttp==='function')ttp('资料上传完成'); return; }
+      var f=input.files[i++];
+      var fd=new FormData(); fd.append('file', f); fd.append('kind', (f.name.split('.').pop()||'file'));
+      fetch('/api/projects/'+encodeURIComponent(p.id)+'/materials', {method:'POST', headers:{'Authorization': (authHeaders().Authorization||'')}, body:fd})
+        .then(function(r){return r.json();})
+        .then(function(d){ if(!d.success) alert((f.name+': '+(d.error||'失败'))); next(); })
+        .catch(function(){ alert(f.name+' 上传失败'); next(); });
+    }
+    next();
+  }
+  function downloadMaterial(id){
+    var token=null; try{token=sessionStorage.getItem('thesis_ai_token');}catch(e){}
+    window.open('/api/materials/'+encodeURIComponent(id)+'?access_token='+encodeURIComponent(token||''), '_blank');
+    // fallback fetch blob
+    fetch('/api/materials/'+encodeURIComponent(id), {headers: authHeaders()})
+      .then(function(r){ if(!r.ok) throw new Error('download fail'); return r.blob(); })
+      .then(function(b){ var a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='material'; document.body.appendChild(a); a.click(); a.remove(); });
+  }
+  function deleteMaterial(id){
+    if(!confirm('删除该资料？')) return;
+    fetch('/api/materials/'+encodeURIComponent(id), {method:'DELETE', headers: authHeaders()})
+      .then(function(r){return r.json();})
+      .then(function(d){ if(d.success) refreshMaterialsList(); else alert(d.error||'删除失败'); });
+  }
+  function saveProjectMaterialMeta(meta){
+    // optional: could POST a json material later
+    try{ window._lastStructuredExtract = meta; }catch(e){}
+  }
+
+  window.openMaterialsLibrary=openMaterialsLibrary;
+  window.closeMaterialsLibrary=closeMaterialsLibrary;
+  window.refreshMaterialsList=refreshMaterialsList;
+  window.uploadMaterials=uploadMaterials;
+  window.downloadMaterial=downloadMaterial;
+  window.deleteMaterial=deleteMaterial;
+  window.saveProjectMaterialMeta=saveProjectMaterialMeta;
 }).call(this);

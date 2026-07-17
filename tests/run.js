@@ -745,7 +745,7 @@ test('PAPER: Text-pattern chapter scanning is primary (regex is fallback)', func
 
 test('PAPER: Non-docx files (.doc) show appropriate error', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf("ext!=='docx'") >= 0, 'Missing docx-only file extension check');
+  assert(src.indexOf('isZip') >= 0 || src.indexOf('0x50') >= 0 || src.indexOf("kind==='unknown'") >= 0, 'Missing file type validation');
 });
 
 test('PAPER: sections array built from text-pattern scanning of all paragraph elements', function() {
@@ -1673,6 +1673,20 @@ test('API: export docx + analyze_ml routes exist', function() {
   assert(src.indexOf('model_compare') >= 0, 'model compare missing');
 });
 
+test('API: materials + pricing schedules exist', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  assert(src.indexOf('project_materials') >= 0, 'materials table missing');
+  assert(src.indexOf('/api/projects/') >= 0 && src.indexOf('materials') >= 0, 'materials routes missing');
+  assert(src.indexOf('pricing_schedules') >= 0, 'pricing schedules missing');
+  assert(src.indexOf('/api/admin/ops_stats') >= 0, 'ops stats missing');
+  assert(src.indexOf('payment/webhook') >= 0, 'payment webhook missing');
+});
+test('IMPORT: file accept includes doc and docx', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert(html.indexOf('accept=".doc,.docx') >= 0 || html.indexOf("accept='.doc,.docx") >= 0 || html.indexOf('.doc,.docx') >= 0, 'accept doc/docx missing');
+  var app = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(app.indexOf('isZip') >= 0 || app.indexOf('0x50') >= 0, 'magic-byte detect missing');
+});
 test('API: cloud projects routes exist', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
   assert(src.indexOf('/api/projects') >= 0, 'projects api missing');

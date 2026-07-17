@@ -26,6 +26,8 @@ app = Flask(__name__)
 # ========== 数据库 ==========
 DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'thesis.db'))
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+MATERIALS_DIR = os.environ.get('MATERIALS_DIR', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'materials'))
+os.makedirs(MATERIALS_DIR, exist_ok=True)
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -120,6 +122,29 @@ def init_db():
             created_at TEXT,
             updated_at TEXT,
             FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+        CREATE TABLE IF NOT EXISTS project_materials (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            filename TEXT NOT NULL,
+            kind TEXT,
+            mime TEXT,
+            size_bytes INTEGER DEFAULT 0,
+            storage_path TEXT NOT NULL,
+            meta_json TEXT,
+            created_at TEXT,
+            FOREIGN KEY (project_id) REFERENCES projects(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+        CREATE TABLE IF NOT EXISTS pricing_schedules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            config_json TEXT NOT NULL,
+            effective_at TEXT NOT NULL,
+            created_by INTEGER,
+            created_at TEXT,
+            is_active INTEGER DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS project_artifacts (
             project_id TEXT PRIMARY KEY,
@@ -240,8 +265,10 @@ def generate_token(user_id):
 DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
 DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
 DEEPSEEK_MODEL = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
-DEEPSEEK_INPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_INPUT_PRICE', '1.0'))
-DEEPSEEK_OUTPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_OUTPUT_PRICE', '2.0'))
+# 成本基准：默认按 1000万Token ≈ 1 元 => 每 1M Token 约 0.1 元（可管理端覆盖）
+TOKEN_YUAN_PER_10M = float(os.environ.get('TOKEN_YUAN_PER_10M', '1.0'))
+DEEPSEEK_INPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_INPUT_PRICE', str(TOKEN_YUAN_PER_10M / 10.0)))
+DEEPSEEK_OUTPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_OUTPUT_PRICE', str(TOKEN_YUAN_PER_10M / 10.0)))
 USER_MARKUP = float(os.environ.get('USER_MARKUP', '3.0'))  # 用户扣点倍率（覆盖 API + 运维）
 CREDIT_PER_YUAN = 1000  # 1元=1000厘=1.0显示点
 LLM_MIN_CHARGE = int(os.environ.get('LLM_MIN_CHARGE', '20'))  # LLM 最低扣 20 厘=0.02点
@@ -1290,18 +1317,18 @@ def usage_module():
 PRICING_DEFAULTS = {
     # 单位：厘（1点=1000厘，1元充值=1000厘）
     # 本地/轻计算（固定价）
-    'module': 50,            # 通用本地模块兜底 0.05点
+    'module': 100,            # 通用本地模块兜底 0.05点
     'upload': 0,             # 上传解析免费（本地）
     'search': 0,             # 文献检索免费（外部公开源）
     'kg': 0,                 # 知识图谱免费（本地）
     'domain_analysis': 0,    # 领域分析免费引流
-    'format-check': 30,
-    'terminology': 30,
-    'paragraph': 30,
-    'dashboard': 50,
-    'data-analysis': 80,     # 含本地统计
-    'data-ml': 200,          # 多模型训练/特征评分 0.2点
-    'export-docx': 100,      # 导出 DOCX 0.1点
+    'format-check': 50,
+    'terminology': 50,
+    'paragraph': 50,
+    'dashboard': 100,
+    'data-analysis': 150,     # 含本地统计
+    'data-ml': 500,  # 0.5点/次，约覆盖CPU          # 多模型训练/特征评分 0.2点
+    'export-docx': 200,      # 导出 DOCX 0.1点
     # AI 模块若走 /api/llm/analyze 则按 token 实扣；下列作预估展示/兼容旧 usage_module
     'topic-finder': 0,
     'proposal': 0,
@@ -1314,13 +1341,64 @@ PRICING_DEFAULTS = {
     'en-abstract': 0,
     'llm_analysis': 0,
 }
-def get_price(key):
+
+
+def get_active_pricing_config():
+    """Return active pricing overrides from schedules (effective_at <= now)."""
+    import json as _json
+    db = get_db()
     try:
-        db = get_db()
-        v = db.execute("SELECT value FROM config WHERE key = ?", (key+'_price',)).fetchone()
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        row = db.execute(
+            "SELECT * FROM pricing_schedules WHERE effective_at <= ? ORDER BY effective_at DESC, id DESC LIMIT 1",
+            (now,)
+        ).fetchone()
+        if not row:
+            return {}
+        # mark active
+        try:
+            db.execute("UPDATE pricing_schedules SET is_active=0")
+            db.execute("UPDATE pricing_schedules SET is_active=1 WHERE id=?", (row['id'],))
+            db.commit()
+        except Exception:
+            pass
+        try:
+            return _json.loads(row['config_json'] or '{}') or {}
+        except Exception:
+            return {}
+    finally:
         db.close()
-        return int(v['value']) if v else PRICING_DEFAULTS.get(key, 0)
-    except: return PRICING_DEFAULTS.get(key, 0)
+
+
+def get_price(key):
+    """Price in milli-credits. Supports scheduled global overrides."""
+    # scheduled overrides first
+    cfg = get_active_pricing_config()
+    if key in cfg:
+        try:
+            return int(float(cfg[key]))
+        except Exception:
+            pass
+    k = key if key.endswith('_price') else (key + '_price')
+    if k in cfg:
+        try:
+            return int(float(cfg[k]))
+        except Exception:
+            pass
+    db = get_db()
+    try:
+        v = db.execute('SELECT value FROM config WHERE key=?', (k,)).fetchone()
+        if v:
+            return int(v['value'])
+        # bare key
+        v2 = db.execute('SELECT value FROM config WHERE key=?', (key,)).fetchone()
+        if v2:
+            return int(v2['value'])
+        return int(PRICING_DEFAULTS.get(key, PRICING_DEFAULTS.get('module', 50)))
+    except Exception:
+        return int(PRICING_DEFAULTS.get(key, 50))
+    finally:
+        db.close()
 
 def deduct_credits(user_id, amount, desc):
     db = get_db()
@@ -2406,6 +2484,244 @@ def projects_delete(project_id):
         db.execute('DELETE FROM projects WHERE id=? AND user_id=?', (project_id, request.user_id))
         db.commit()
         return jsonify({'success': True})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+
+
+@app.route('/api/projects/<project_id>/materials', methods=['GET'])
+@require_auth
+def materials_list(project_id):
+    db = get_db()
+    try:
+        own = db.execute('SELECT id FROM projects WHERE id=? AND user_id=?', (project_id, request.user_id)).fetchone()
+        if not own:
+            return jsonify({'success': False, 'error': '项目不存在'}), 404
+        rows = db.execute(
+            'SELECT id, project_id, filename, kind, mime, size_bytes, meta_json, created_at FROM project_materials WHERE project_id=? AND user_id=? ORDER BY created_at DESC',
+            (project_id, request.user_id)
+        ).fetchall()
+        items = []
+        import json as _json
+        for r in rows:
+            d = dict(r)
+            try:
+                d['meta'] = _json.loads(d.pop('meta_json') or '{}')
+            except Exception:
+                d['meta'] = {}
+            items.append(d)
+        return jsonify({'success': True, 'materials': items})
+    finally:
+        db.close()
+
+
+@app.route('/api/projects/<project_id>/materials', methods=['POST'])
+@require_auth
+def materials_upload(project_id):
+    """Upload a file into project materials library (csv/docx/pdf/json/txt...)."""
+    import json as _json
+    db = get_db()
+    try:
+        own = db.execute('SELECT id FROM projects WHERE id=? AND user_id=?', (project_id, request.user_id)).fetchone()
+        if not own:
+            return jsonify({'success': False, 'error': '项目不存在'}), 404
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': '未选择文件'}), 400
+        f = request.files['file']
+        raw = f.read()
+        if not raw:
+            return jsonify({'success': False, 'error': '空文件'}), 400
+        if len(raw) > 30 * 1024 * 1024:
+            return jsonify({'success': False, 'error': '文件过大（上限30MB）'}), 400
+        filename = (f.filename or 'file.bin').replace('\\\\', '/').split('/')[-1]
+        ext = filename.lower().rsplit('.', 1)[-1] if '.' in filename else 'bin'
+        kind = request.form.get('kind') or ext
+        mid = 'm_' + secrets.token_hex(8)
+        user_dir = os.path.join(MATERIALS_DIR, str(request.user_id), project_id)
+        os.makedirs(user_dir, exist_ok=True)
+        storage_name = mid + '_' + re.sub(r'[^A-Za-z0-9._一-鿿-]+', '_', filename)[:80]
+        storage_path = os.path.join(user_dir, storage_name)
+        with open(storage_path, 'wb') as out:
+            out.write(raw)
+        meta = {}
+        try:
+            meta = _json.loads(request.form.get('meta') or '{}')
+        except Exception:
+            meta = {}
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        db.execute(
+            'INSERT INTO project_materials(id, project_id, user_id, filename, kind, mime, size_bytes, storage_path, meta_json, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
+            (mid, project_id, request.user_id, filename, kind, f.mimetype or '', len(raw), storage_path, _json.dumps(meta, ensure_ascii=False), now)
+        )
+        db.commit()
+        return jsonify({'success': True, 'material': {
+            'id': mid, 'project_id': project_id, 'filename': filename, 'kind': kind,
+            'mime': f.mimetype or '', 'size_bytes': len(raw), 'meta': meta, 'created_at': now
+        }})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route('/api/materials/<material_id>', methods=['GET', 'DELETE'])
+@require_auth
+def materials_one(material_id):
+    db = get_db()
+    try:
+        row = db.execute('SELECT * FROM project_materials WHERE id=? AND user_id=?', (material_id, request.user_id)).fetchone()
+        if not row:
+            return jsonify({'success': False, 'error': '资料不存在'}), 404
+        if request.method == 'DELETE':
+            try:
+                if row['storage_path'] and os.path.exists(row['storage_path']):
+                    os.remove(row['storage_path'])
+            except Exception:
+                pass
+            db.execute('DELETE FROM project_materials WHERE id=? AND user_id=?', (material_id, request.user_id))
+            db.commit()
+            return jsonify({'success': True})
+        # GET download
+        return send_file(row['storage_path'], as_attachment=True, download_name=row['filename'])
+    finally:
+        db.close()
+
+
+
+
+@app.route('/api/admin/pricing/schedules', methods=['GET', 'POST'])
+def admin_pricing_schedules():
+    import json as _json
+    s = request.args.get('secret', '') if request.method == 'GET' else (request.get_json() or {}).get('secret', '')
+    auth = request.headers.get('Authorization', '')
+    if not s and auth.startswith('Bearer '):
+        s = auth[7:]
+    if not _check_admin(s):
+        return jsonify({'success': False, 'error': '无权限'}), 403
+
+    if request.method == 'GET':
+        db = get_db()
+        try:
+            rows = [dict(r) for r in db.execute(
+                'SELECT id,name,config_json,effective_at,created_at,is_active FROM pricing_schedules ORDER BY effective_at DESC, id DESC LIMIT 50'
+            ).fetchall()]
+            for r in rows:
+                try:
+                    r['config'] = _json.loads(r.get('config_json') or '{}')
+                except Exception:
+                    r['config'] = {}
+            active = get_active_pricing_config()
+            return jsonify({'success': True, 'schedules': rows, 'active_config': active})
+        finally:
+            db.close()
+
+    data = request.get_json() or {}
+    name = (data.get('name') or '定价方案').strip()[:80]
+    effective_at = (data.get('effective_at') or '').strip()
+    config = data.get('config') or {}
+    if not effective_at:
+        return jsonify({'success': False, 'error': '请提供 effective_at (YYYY-mm-dd HH:MM:SS)'}), 400
+    if not isinstance(config, dict) or not config:
+        return jsonify({'success': False, 'error': 'config 不能为空'}), 400
+    db = get_db()
+    try:
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cur = db.execute(
+            "INSERT INTO pricing_schedules(name, config_json, effective_at, created_by, created_at, is_active) VALUES (?,?,?,?,?,0)",
+            (name, _json.dumps(config, ensure_ascii=False), effective_at, None, now)
+        )
+        db.commit()
+        return jsonify({'success': True, 'id': cur.lastrowid, 'message': '定价方案已创建，将于生效时间后自动启用'})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route('/api/admin/ops_stats', methods=['GET'])
+def admin_ops_stats():
+    s = request.args.get('secret', '')
+    auth = request.headers.get('Authorization', '')
+    if not s and auth.startswith('Bearer '):
+        s = auth[7:]
+    if not _check_admin(s):
+        return jsonify({'success': False, 'error': '无权限'}), 403
+    db = get_db()
+    try:
+        today = date.today().isoformat()
+        users = db.execute('SELECT COUNT(*) as c FROM users').fetchone()['c']
+        orders_pending = db.execute("SELECT COUNT(*) as c FROM recharge_orders WHERE status='pending'").fetchone()['c']
+        orders_today = db.execute("SELECT COUNT(*) as c, SUM(amount_yuan) as s FROM recharge_orders WHERE created_at LIKE ?", (today+'%',)).fetchone()
+        recharged_today = db.execute("SELECT COUNT(*) as c, SUM(amount_yuan) as s FROM recharge_orders WHERE status='confirmed' AND confirmed_at LIKE ?", (today+'%',)).fetchone()
+        llm_today = db.execute("SELECT COUNT(*) as c, SUM(user_charged_credits) as charged, SUM(cost_credits) as api_fen FROM llm_usage WHERE created_at LIKE ?", (today+'%',)).fetchone()
+        projects = 0
+        try:
+            projects = db.execute('SELECT COUNT(*) as c FROM projects').fetchone()['c']
+        except Exception:
+            projects = 0
+        return jsonify({'success': True, 'stats': {
+            'users': users,
+            'projects': projects,
+            'orders_pending': orders_pending,
+            'orders_today': orders_today['c'] or 0,
+            'order_amount_today': float(orders_today['s'] or 0),
+            'confirmed_amount_today': float(recharged_today['s'] or 0),
+            'llm_calls_today': llm_today['c'] or 0,
+            'llm_charged_points_today': round((llm_today['charged'] or 0)/1000.0, 3),
+            'llm_api_cost_yuan_today': round((llm_today['api_fen'] or 0)/100.0, 4),
+        }})
+    finally:
+        db.close()
+
+
+
+
+@app.route('/api/payment/webhook', methods=['POST'])
+def payment_webhook():
+    """支付渠道到账回调占位。
+    真实环境应校验签名（支付宝/微信 notify），根据 out_trade_no 找到订单并确认到账。
+    当前默认关闭自动到账，仅记录请求，避免误入账。
+    """
+    enable = os.environ.get('PAYMENT_WEBHOOK_ENABLE', '0') == '1'
+    data = request.get_json(silent=True) or dict(request.form) or {}
+    # Always log
+    try:
+        print('[payment-webhook]', data)
+    except Exception:
+        pass
+    if not enable:
+        return jsonify({'success': False, 'error': 'webhook disabled; use admin manual confirm', 'received': True}), 200
+    # Minimal auto-confirm contract:
+    # { order_id, trade_status=SUCCESS, amount_yuan, sign }
+    order_id = data.get('order_id') or data.get('out_trade_no')
+    status = str(data.get('trade_status') or data.get('status') or '').upper()
+    if not order_id or status not in ('SUCCESS', 'TRADE_SUCCESS', 'PAID', 'CONFIRMED'):
+        return jsonify({'success': False, 'error': 'invalid payload'}), 400
+    # TODO: verify signature with PAYMENT_WEBHOOK_SECRET
+    secret = os.environ.get('PAYMENT_WEBHOOK_SECRET', '')
+    if secret and data.get('sign') != secret:
+        return jsonify({'success': False, 'error': 'bad sign'}), 403
+    db = get_db()
+    try:
+        order = db.execute('SELECT * FROM recharge_orders WHERE id = ?', (order_id,)).fetchone()
+        if not order:
+            return jsonify({'success': False, 'error': 'order not found'}), 404
+        if order['status'] == 'confirmed':
+            return jsonify({'success': True, 'message': 'already confirmed'})
+        pts = int(order['amount_yuan'] * 1000)
+        db.execute("UPDATE recharge_orders SET status='confirmed', confirmed_at=datetime('now','localtime') WHERE id=?", (order_id,))
+        db.execute('UPDATE users SET credits = credits + ? WHERE id=?', (pts, order['user_id']))
+        after = db.execute('SELECT credits FROM users WHERE id=?', (order['user_id'],)).fetchone()['credits']
+        db.execute("INSERT INTO transactions (user_id,type,amount_credits,credits_after,description,created_at) VALUES (?,?,?,?,?,datetime('now','localtime'))",
+                   (order['user_id'], 'recharge', pts, after, f'支付回调到账 {pts/1000}点'))
+        db.commit()
+        return jsonify({'success': True, 'credits': after, 'points': after/1000})
     except Exception as e:
         db.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500

@@ -301,7 +301,7 @@ body {
 .nav-item.disabled:hover { background: transparent; color: rgba(255, 255, 255, 0.2); }
 
 /* Sidebar tree */
-.nav-tree { flex: 1; overflow-y: auto; overflow-x: hidden; padding: var(--space-1) var(--space-2); min-height: 64px; max-height: 260px; border-top: 1px solid rgba(255,255,255,.04); }
+.nav-tree { flex: 1; overflow-y: auto; overflow-x: hidden; padding: var(--space-1) var(--space-2); min-height: 120px; max-height: none; border-top: none; }
 .tree-node {
   padding: 4px 10px;
   cursor: pointer;
@@ -1741,3 +1741,19 @@ body.dark .bar, body:not(.light) .bar { background: rgba(2, 6, 23, 0.95); }
 /* project switcher live rows */
 .project-switch-row{ transition: opacity .15s ease, transform .15s ease, background .15s ease; }
 .project-switch-row.is-removing{ opacity:0; transform:translateX(8px); pointer-events:none; }
+
+
+/* scroll-chain fix: keep each pane scrollable, avoid nested overflow traps */
+.nav-sidebar{ min-height:0; overflow:hidden; }
+.nav-tree-wrap{ flex:1 1 auto; min-height:160px; max-height:42vh; overflow:hidden; display:flex; flex-direction:column; }
+.nav-tree-wrap .nav-tree{ overflow-y:auto; overflow-x:hidden; min-height:0; max-height:none; flex:1; }
+.nav-tools-details{ flex:0 0 auto; max-height:28vh; overflow:auto; }
+.thesis-panel{ min-height:0; overflow:hidden; }
+.thesis-box{ overflow-y:auto; overflow-x:hidden; min-height:0; -webkit-overflow-scrolling:touch; }
+.workspace-content{ min-height:100%; height:auto; overflow-y:auto; align-items:flex-start; }
+.ref-panel{ min-height:0; overflow:hidden; display:flex; flex-direction:column; }
+.ref-list, .module-area, #moduleOutput, .module-panel{ min-height:0; overflow-y:auto; }
+.project-overlay{ overflow-y:auto; }
+.project-modal{ max-height:90vh; overflow:auto; }
+.acct-modal{ max-height:82vh; overflow:auto; }
+#mergedPaperRoot, .merged-paper{ overflow:visible; }

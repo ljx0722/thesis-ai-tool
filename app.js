@@ -2202,16 +2202,39 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
   var fi=document.getElementById('fileInput');
   if(!fi)return;
   fi.addEventListener('change',async function(e){
-    var f=e.target.files[0];if(!f)return;
-    var ext=(f.name||'').toLowerCase().split('.').pop();
-    if(ext!=='docx'&&ext!=='doc'){alert('不支持 .'+ext+', 请上传 .docx 或 .doc 文件');return}
+    var f=e.target.files[0];if(!f)return; window._uploadFileName=f.name||'document.docx';
+    // 扩展名可能不准（微信/网盘重命名、大小写、双后缀），用文件头魔数识别
+    var name=(f.name||'document').toLowerCase();
+    var ext=name.split('.').pop()||'';
+    showLoad('识别文件类型...', 2, f.name);
+    var headBuf;
+    try{
+      headBuf = await f.slice(0, 8).arrayBuffer();
+    }catch(erHead){
+      hideLoad(); alert('无法读取文件：'+erHead.message); return;
+    }
+    var u8=new Uint8Array(headBuf);
+    var isZip = u8.length>=2 && u8[0]===0x50 && u8[1]===0x4B; // PK => docx/xlsx/zip
+    var isOle = u8.length>=4 && u8[0]===0xD0 && u8[1]===0xCF && u8[2]===0x11 && u8[3]===0xE0; // OLE => doc
+    var kind='unknown';
+    if(isZip || ext==='docx') kind='docx';
+    else if(isOle || ext==='doc') kind='doc';
+    else if(ext==='docx'||ext==='doc') kind=ext; // fallback to name
+    if(kind==='unknown'){
+      hideLoad();
+      alert('无法识别该文件类型（扩展名：.'+ext+'）。\n\n请上传 Word 论文：\n• 推荐 .docx（可保留标题样式/目录）\n• 也支持旧版 .doc\n\n若文件来自网盘/微信，请确认未改坏后缀。');
+      document.getElementById('fileInput').value='';
+      return;
+    }
+    ext = kind; // normalize for downstream branches
+    window._uploadFileKind = kind;
 
-    showLoad('准备解析...', 2, f.name);
+    showLoad('准备解析...', 2, f.name + '  ('+kind+')');
 
     // === .doc 提示：推荐转为 .docx 以获得完整标题样式信息 ===
-    if(ext==='doc'){
+    if(kind==='doc'){
       hideLoad();
-      var docChoice=confirm('⚠ 此文件为旧版 .doc 格式。\n\n建议用 Word 打开后另存为 .docx 再上传，可以保留标题样式信息，校准更准确。\n\n直接上传 .doc 将丢失字体样式数据，只能解析纯文本。\n\n点击"确定"继续上传 .doc，点击"取消"返回。');
+      var docChoice=confirm('检测到旧版 Word（.doc）。\n\n推荐：用 Word 打开后“另存为 .docx”再上传，标题样式与目录识别更准确。\n\n仍可继续上传 .doc（将走服务端转换，样式信息可能丢失）。\n\n确定=继续 .doc，取消=返回。');
       if(!docChoice){document.getElementById('fileInput').value='';return}
       showLoad('准备解析...', 2, f.name);
     }
@@ -2676,14 +2699,14 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
       // 策略：利用已解析的 Word 样式名 + 字体属性推断层级，不再纯靠文本正则
       var styleToLevel={};
       var headingStylePatterns=[
-        // more specific first — avoid 标题_TJ matching 一级标题_TJ as substring
-        {re:/(二级标题|2级标题|节标题|二[级級]标题|^heading\s*2$|^标题\s*2$)/i, lv:1},
-        {re:/(三级标题|3级标题|小节标题|三[级級]标题|^heading\s*3$|^标题\s*3$)/i, lv:2},
-        {re:/(四级标题|4级标题|^heading\s*4$|^标题\s*4$)/i, lv:2},
-        {re:/(一级标题|1级标题|章标题|一[级級]标题|^heading\s*1$|^标题\s*1$|^标题_TJ$|^Title$)/i, lv:0},
-        {re:/(^h1$|heading\s*1)/i, lv:0},
-        {re:/(^h2$|heading\s*2)/i, lv:1},
-        {re:/(^h3$|heading\s*3)/i, lv:2},
+        // 更具体优先；覆盖常见高校自定义样式名
+        {re:/(二级标题|2级标题|节标题|二[级級].*标题|heading\s*2|标题\s*2|Heading\s*2|toc\s*2)/i, lv:1},
+        {re:/(三级标题|3级标题|小节标题|三[级級].*标题|heading\s*3|标题\s*3|Heading\s*3|toc\s*3)/i, lv:2},
+        {re:/(四级标题|4级标题|heading\s*4|Heading\s*4|toc\s*4)/i, lv:2},
+        {re:/(一级标题|1级标题|章标题|一[级級].*标题|^标题_TJ$|^Title$|heading\s*1|标题\s*1|Heading\s*1|toc\s*1)/i, lv:0},
+        {re:/(^h1$)/i, lv:0},
+        {re:/(^h2$)/i, lv:1},
+        {re:/(^h3$)/i, lv:2},
       ];
       (window._docxStyleGroups||[]).forEach(function(g){
         var nm=g.name||''; if(styleToLevel[nm]!==undefined)return;
@@ -3008,6 +3031,19 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     setTimeout(function(){highlightRefSentences();},100);
     // (已移除死代码：_isOriginal对所有已有文献为true，此循环永不会执行)
     paperTopics=extractTopics(manuscriptText);renderNavTree(sections);
+    try{
+      window._lastStructuredExtract={
+        fileName:(window._uploadFileName||''),
+        kind:(window._uploadFileKind||'docx'),
+        extractedAt:new Date().toISOString(),
+        sections: (sections||[]).map(function(s){return {ch:s.ch,name:s.name,sections:(s.sections||[]).map(function(x){return {num:x.num,title:x.title};})};}),
+        styleGroups:(window._docxStyleGroups||[]).map(function(g){return {name:g.name,count:g.count};}),
+        refCount:(typeof existingRefs!=='undefined'&&existingRefs)?existingRefs.length:0,
+        textChars:(manuscriptText||'').length
+      };
+      if(typeof ThesisProject!=='undefined' && ThesisProject.onManuscriptReady){/* already called elsewhere */} 
+      if(typeof saveProjectMaterialMeta==='function'){saveProjectMaterialMeta(window._lastStructuredExtract);}
+    }catch(eMat){console.warn('material meta',eMat);}
     document.getElementById('kwBar').style.display='block';document.getElementById('kwTags').innerHTML=paperTopics.map(function(t){return'<span class="kw-tag">'+t.label+' ('+t.count+')</span>'}).join('');
     renderExistingOnly();
     hideLoad();document.getElementById('upStatus').innerHTML='已加载 ('+Math.round(manuscriptText.length/1000)+'k字)';
