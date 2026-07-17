@@ -227,10 +227,13 @@ def init_db():
             ('admin', pwd_hash))
         # 确保 admin 永远是管理员
         conn.execute("UPDATE users SET is_admin = 1 WHERE username = 'admin'")
-        # 若设置了 ADMIN_PASSWORD 环境变量，则每次启动同步密码（用于线上重置）
-        if os.environ.get('ADMIN_PASSWORD'):
+        # 同步 admin 密码：
+        # - 设置了 ADMIN_PASSWORD：每次启动写入该密码
+        # - 未设置时：默认使用 admin123 并在启动时覆盖写入（可用 ADMIN_SYNC_PASSWORD=0 关闭覆盖）
+        sync_pwd = os.environ.get('ADMIN_SYNC_PASSWORD', '1') != '0'
+        if sync_pwd:
             conn.execute("UPDATE users SET password_hash = ? WHERE username = 'admin'", (pwd_hash,))
-            print('[admin] synced password from ADMIN_PASSWORD')
+            print('[admin] synced admin password (ADMIN_PASSWORD or default admin123)')
         conn.execute("UPDATE users SET credits = 500000 WHERE username = 'admin' AND credits < 500")
         conn.commit()
     except: pass

@@ -330,7 +330,7 @@ function logout(){
 }
 function goSection(id){
   document.querySelectorAll('.admin-sidebar a[data-nav]').forEach(function(a){
-    a.classList.toggle('active', a.getAttribute('data-nav')===id || (id==='overview' && a.getAttribute('data-nav')==='overview'));
+    a.classList.toggle('active', a.getAttribute('data-nav')===id || (id==='overview?' && a.getAttribute('data-nav')==='overview'));
   });
   var el=document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -474,7 +474,7 @@ function renderUsers(users){
     var pts=u.points!=null?u.points:((u.credits||0)/1000);
     uhtml+='<tr>'+
       '<td><span class="user-pick" onclick="pickUser('+u.id+',\''+String(u.username||'').replace(/'/g,"\\'")+'\')">'+u.id+'</span></td>'+
-      '<td>'+u.username+(u.is_admin' <span class="admin-badge admin-badge-submitted">admin</span>':'')+'</td>'+
+      '<td>'+u.username+(u.is_admin?' <span class="admin-badge admin-badge-submitted">admin</span>':'')+'</td>'+
       '<td style="font-family:var(--font-mono)">'+Number(pts).toFixed(3)+'</td>'+
       '<td>'+(u.invite_code||'-')+'</td>'+
       '<td>'+(u.created_at||'').substring(0,16)+'</td>'+
@@ -513,7 +513,7 @@ function giftCredits(){
   var reason=document.getElementById('creditReason').value||'管理员赠送';
   var notify=document.getElementById('giftNotify').checked;
   if(!uid || !isFinite(pts) || pts===0){alert('请输入用户ID和点数（正=赠送，负=扣减）');return}
-  if(!confirm((pts>0'确认赠送 ':'确认扣减 ')+Math.abs(pts)+' 点给用户 #'+uid+'？')) return;
+  if(!confirm((pts>0?'确认赠送 ':'确认扣减 ')+Math.abs(pts)+' 点给用户 #'+uid+'？')) return;
   fetch('/api/admin/credits',{
     method:'POST',
     headers:authHeaders(true),
@@ -546,13 +546,13 @@ function renderOrders(orders, summary){
   var ohtml='';
   (orders||[]).forEach(function(o){
     var ops='';
-    var canAct = (o.status==='submitted' || o.status==='pending');
+    var canAct = (o.status==='submitted?' || o.status==='pending');
     if(canAct){
       ops+='<button class="admin-btn admin-btn-sm admin-btn-success" onclick="confirmOrder('+o.id+')">确认到账</button> ';
       ops+='<button class="admin-btn admin-btn-sm admin-btn-danger" onclick="rejectOrder('+o.id+')">拒绝</button>';
     }
     ohtml+='<tr>'+
-      '<td>'+(canAct'<input type="checkbox" class="order-check" value="'+o.id+'">':'')+'</td>'+
+      '<td>'+(canAct?'<input type="checkbox" class="order-check" value="'+o.id+'">':'')+'</td>'+
       '<td>'+o.id+'</td>'+
       '<td><span class="user-pick" onclick="openUserDrawer('+o.user_id+')">'+o.username+'</span> <span style="color:var(--text-muted);font-size:.65rem">#'+o.user_id+'</span></td>'+
       '<td>&yen;'+o.amount_yuan+'</td>'+
@@ -781,7 +781,7 @@ function loadPricing(){
       document.getElementById('pricingMeta').textContent='LLM倍率×'+(d.llm_markup||3)+'，最低扣费 '+(d.llm_min_charge_points||0.02)+' 点；每日免费本地操作 '+(d.daily_free_ops||5)+' 次';
       var tb=document.querySelector('#pricingTable tbody'); var h='';
       (d.items||[]).forEach(function(it){
-        h+='<tr><td>'+it.key+'</td><td>'+it.billing+'</td><td>'+it.milli_credits+'</td><td>'+it.points+'</td><td><input class="admin-input price-input" data-key="'+it.key+'" type="number" value="'+it.milli_credits+'" style="width:110px" '+(it.billing==='llm-token''title="AI模块实际按token扣费，此值仅兼容旧接口"':'')+'></td></tr>';
+        h+='<tr><td>'+it.key+'</td><td>'+it.billing+'</td><td>'+it.milli_credits+'</td><td>'+it.points+'</td><td><input class="admin-input price-input" data-key="'+it.key+'" type="number" value="'+it.milli_credits+'" style="width:110px" '+(it.billing==='llm-token'?'title="AI模块实际按token扣费，此值仅兼容旧接口"':'')+'></td></tr>';
       });
       tb.innerHTML=h;
       document.getElementById('bonusRegister').value=(d.bonuses&&d.bonuses.register_bonus)||3000;
