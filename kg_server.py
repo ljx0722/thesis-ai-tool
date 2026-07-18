@@ -3308,11 +3308,11 @@ def pricing_info():
             'desc': (PRICING_MODULE_META.get(k) or {}).get('desc') or '',
             'milli_credits': get_price(k) if k not in ('topic-finder','proposal','review','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis','domain_analysis') else 0,
             'points': round((get_price(k) if k not in ('topic-finder','proposal','review','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis','domain_analysis') else 0)/1000, 3),
-            'billing': 'llm-token' if k in ('topic-finder','proposal','review','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis','domain_analysis') else 'fixed'
+            'billing': ('smart' if k in ('topic-finder','proposal','review','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis','domain_analysis') else 'fixed')
         })
     return jsonify({
         'success': True,
-        'unit': {'credit_name': '点', 'storage': 'milli-credit(厘)', 'ratio': '1点=1000厘', 'recharge': '1元=1点=1000厘'},
+        'unit': {'credit_name': '点', 'storage': 'point', 'ratio': '账户余额以点计', 'recharge': '1元=1点'},
         'llm': {
             'formula': '扣点(厘)=max(最低扣点, round(API成本元 × 倍率 × 1000))',
             'markup': USER_MARKUP if 'USER_MARKUP' in globals() else 3.0,
@@ -3326,7 +3326,7 @@ def pricing_info():
         'register_bonus_points': 3.0,
         'items': items,
         'notes': [
-            'AI 写作类功能按实际 token 消耗计费，前端不展示固定点数。',
+            '智能写作与润色类能力按实际使用量计点。',
             '检索按次扣点（默认 0.5 点/次）；图谱每日免费 KG_DAILY_FREE 次后扣点；图谱每日免费 KG_DAILY_FREE 次后按 kg 价扣点。',
             '多模型训练等服务器计算按固定小额点数计费。'
         ]
@@ -3384,7 +3384,7 @@ def admin_pricing():
                     'config_key': key,
                     'milli_credits': val,
                     'points': round(val/1000, 3),
-                    'billing': 'llm-token' if k in ('topic-finder','proposal','review','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis','domain_analysis') else 'fixed'
+                    'billing': ('smart' if k in ('topic-finder','proposal','review','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis','domain_analysis') else 'fixed')
                 })
             # also expose bonus keys
             bonuses = {

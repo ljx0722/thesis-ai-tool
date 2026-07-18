@@ -109,14 +109,14 @@ function renderToolHome(){
   (APP_MODULES||[]).forEach(function(m){ (m.requiresThesis?need:free).push(m); });
   // ensure data-analysis highlighted
   freeHost.innerHTML = free.map(function(m){
-    var billing = m.aiDriven ? 'AI · 按 token 计费' : (m.localCharge ? '本地 · 按次扣点' : (m.serverFixed ? '服务器计算计费' : '本地/随时可用'));
+    var billing = m.aiDriven ? '智能辅助 · 按用量计点' : (m.localCharge ? '分析能力 · 按次计点' : (m.serverFixed ? '分析能力 · 按次计点' : '可用'));
     return '<button class="tool-card" onclick="launchTool(\''+m.id+'\')"><b>'+m.icon+' '+m.name+'</b><span>'+billing+'</span></button>';
   }).join('') +
   '<button class="tool-card" onclick="launchTool(\'materials\')"><b>📁 资料库</b><span>上传 CSV 等，供分析模块复用</span></button>'+
   '<button class="tool-card" onclick="launchTool(\'pipeline\')"><b>⚡ 一键流水线</b><span>大纲+章节骨架</span></button>'+
   '<button class="tool-card" onclick="launchTool(\'defense-pack\')"><b>🎤 答辩材料包</b><span>讲稿/问答/PPT结构</span></button>';
   thesisHost.innerHTML = need.map(function(m){
-    var billing = m.aiDriven ? 'AI 计费' : (m.localCharge ? '按次扣点' : '');
+    var billing = m.aiDriven ? '智能辅助' : (m.localCharge ? '按次计点' : '');
     return '<button class="tool-card" onclick="launchTool(\''+m.id+'\')"><b>'+m.icon+' '+m.name+'</b><span>基于论文内容分析'+(billing?' · '+billing:'')+'</span><div class="need-tag">建议先有论文/草稿</div></button>';
   }).join('');
 }
@@ -1005,7 +1005,7 @@ function analyzeCSV(f,container){
     window._dataAnalysisCache={fileName:f.name,nVar:headers.length,nObs:rows.length,raw:{headers:headers,rows:rows},summary:{numCols:numCols.map(function(c){return {name:c.name,n:c.values.length,mean:c.values.reduce(function(s,v){return s+v;},0)/c.values.length};}),headers:headers.slice(0,30)},sigTop:sigTop.map(function(s){return {a:s.a,b:s.b,method:s.method,stat:+s.stat.toFixed(4),p:+s.p.toFixed(6)};})};
     h+='<div style="margin:16px 0;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-alt)">';
     h+='<div style="font-weight:700;font-size:.78rem;margin-bottom:6px">🤖 AI 结果表述（论文写作辅助）</div>';
-    h+='<div style="font-size:.65rem;color:var(--text-muted);margin-bottom:8px">把统计表转成可放入论文的“结果分析”段落。前端不显示固定点数，按实际 token 消耗计费。</div>';
+    h+='<div style="font-size:.65rem;color:var(--text-muted);margin-bottom:8px">把统计表转成可放入论文的“结果分析”段落。按实际使用量计点，详见「说明」。</div>';
     h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">'+
 '<label style="font-size:.65rem;color:var(--text-muted)">测试集比例</label>'+
 '<select id="mlTestSize" style="font-size:.65rem;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary)"><option value="0.2">20%</option><option value="0.3" selected>30%</option><option value="0.4">40%</option></select>'+

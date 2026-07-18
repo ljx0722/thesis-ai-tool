@@ -1,6 +1,7 @@
 /**
- * 学术论文AI一站式助手 — 交互式操作指南
- * 首次访问自动播放，右上角 ? 按钮可随时重新打开
+ * 学术论文AI一站式助手 — 操作指南
+ * 首次登录自动播放；右下角 ? 可重开
+ * 高亮目标 + 全屏半透明蒙版；说明气泡贴近控件
  */
 var _tourSteps = [];
 var _tourIdx = -1;
@@ -9,156 +10,197 @@ var _tourRunning = false;
 function buildTourSteps() {
   _tourSteps = [
     {
-      title: '欢迎使用 学术论文AI一站式助手',
-      body: '一站式论文写作辅助平台。上传你的 .docx 论文后，即可使用全部功能。<br><br><b>本指南将带你快速了解所有核心功能。</b>',
+      title: '欢迎使用',
+      body: '从想法立项到导入论文、检索文献、打磨审校，一站完成。<br>接下来用几步带你熟悉主界面。',
       el: null, pos: 'center', icon: '👋'
     },
     {
-      title: '📎 上传论文',
-      body: '首先上传你的论文文件（仅支持 .docx 格式）。<br>文件仅在本机解析，不会上传到任何服务器。<br><br>上传后必须完成<b>标题层级校准</b>（章/节/小节样式），不可跳过。同济模板建议：标题_TJ / 一级标题_TJ / 二级标题_TJ。',
-      el: function() { return document.getElementById('uploadOverlay') || document.getElementById('uploadDrop'); },
-      pos: 'center', icon: '📎'
+      title: '导入或新建论文',
+      body: '可「从想法开始」创建项目，或点「导入论文」上传 .docx。<br>上传后会进入标题校准，确认章 / 节 / 小节样式（同济模板可用 标题_TJ、一级标题_TJ、二级标题_TJ）。',
+      el: function () {
+        return document.querySelector('[onclick*="triggerUpload"]')
+          || document.getElementById('uploadDrop')
+          || document.querySelector('.home-choice')
+          || document.querySelector('[onclick*="openIdeaWizard"]');
+      },
+      pos: 'right', icon: '📎'
     },
     {
-      title: '📐 标题层级校准',
-      body: '上传后自动弹出校准弹窗：<br>• 展示文档中所有 Word 样式名及数量<br>• 分三步确认：章 → 节 → 小节<br>• 点击样式行弹出全量勾选确认<br>• 已确认样式自动在后续步骤隐藏',
-      el: null, pos: 'center', icon: '📐'
+      title: '目录树',
+      body: '校准完成后，这里展示章 / 节 / 小节。<br>点击可定位到中间论文区对应位置；目录树在本栏内滚动。',
+      el: function () {
+        return document.getElementById('tocPanel')
+          || document.getElementById('navTree')
+          || document.querySelector('.toc-panel');
+      },
+      pos: 'right', icon: '📑'
     },
     {
-      title: '🔍 论文审阅（核心模块）',
-      body: '顶栏可进入「总览 / 参考文献 / 工具台 / 看板」。<br>整合了格式检查、段落分析、术语分析，<br>三列并排展示所有维度的检测结果。<br>另外 <b>Ctrl+2</b> 优化建议给出针对性改进方案。',
-      el: function() { return document.getElementById('moduleTabs'); },
+      title: '论文正文',
+      body: '中间为论文全貌，仅在本框内滚动。<br>可用「检索 / 图谱 / 校验」处理文献；角标可点击跳转。',
+      el: function () {
+        return document.getElementById('thesisBox')
+          || document.getElementById('thesisPanel');
+      },
+      pos: 'left', icon: '📄'
+    },
+    {
+      title: '参考文献',
+      body: '顶栏「参考文献」或右侧「参考文献」标签，查看已识别文献、检索与校验。<br>删除文献会同步去掉正文角标并重编号。',
+      el: function () {
+        return document.querySelector('[data-view="refs"]')
+          || document.querySelector('[onclick*="references"]')
+          || document.getElementById('baSearch');
+      },
+      pos: 'bottom', icon: '📚'
+    },
+    {
+      title: '检索文献',
+      body: '点「检索」后弹出设定：条数、中文≥%、英文≥%。<br>按设定严格抽样；每次检索将消耗相应点数。',
+      el: function () { return document.getElementById('baSearch'); },
       pos: 'bottom', icon: '🔍'
     },
     {
-      title: '✍️ 论文扩写（新功能）',
-      body: '顶栏 <b>Ctrl+3</b> 进入论文扩写。<br>• 自动检测各章文字量<br>• 标注不足章节并给出扩写方向建议<br>• 通用扩写策略：文献综述/理论框架/方法论',
-      el: null, pos: 'center', icon: '✍️'
+      title: '工具台',
+      body: '右侧可打开选题、开题、查错、降重、格式检查、数据分析、知识图谱等能力。<br>使用智能能力时按用量计点，可在「账户 / 计费」查看说明。',
+      el: function () {
+        return document.getElementById('refPanel')
+          || document.querySelector('.tool-panel')
+          || document.querySelector('[data-view="tools"]');
+      },
+      pos: 'left', icon: '🧰'
     },
     {
-      title: '📈 数据分析（新功能）',
-      body: '顶栏 <b>Ctrl+4</b> 进入数据分析。<br>• 上传 Excel/CSV 数据文件<br>• 自动识别数值型/分类型变量<br>• 输出描述统计与数据规律',
-      el: null, pos: 'center', icon: '📈'
+      title: '主线进度',
+      body: '左侧阶段表示当前论文进度（选题 → 文献 → 写作 → 打磨 → 评审）。<br>按提示完成下一步即可。',
+      el: function () {
+        return document.getElementById('stageNav')
+          || document.querySelector('.stage-nav')
+          || document.querySelector('.nav-sidebar');
+      },
+      pos: 'right', icon: '🧭'
     },
     {
-      title: '📊 论文报告',
-      body: '顶栏右侧蓝色 <b>📊 报告</b> 按钮打开综合看板。<br>雷达图、章节分布、文献分析总览。',
-      el: function() { return document.getElementById('dashboardBtn'); },
-      pos: 'bottom', icon: '📊'
-    },
-    {
-      title: '🔍 交互式文献检索',
-      body: '检索时分为两步确认：<br>1. <b>检索结果确认</b> — 全选/筛选/勾选文献<br>2. <b>分配策略确认</b> — 预览每章分配<br>点击「检索」后在弹窗中设置条数与中英文最低占比，确认后开始（0.5点/次）。',
-      el: function() { return document.getElementById('baSearch'); },
-      pos: 'bottom', icon: '🔍'
-    },
-    {
-      title: '🕸️ 知识图谱',
-      body: '顶栏 <b>Ctrl+5</b> 进入知识图谱。<br>三种视图：☁️词云 🔗网络图 📅时间线<br>支持 PNG 导出。',
-      el: null, pos: 'center', icon: '🕸️'
-    },
-    {
-      title: '📋 参考文献管理',
-      body: '顶栏 <b>Ctrl+6</b> 进入参考文献。<br>自动识别原文引用、文献检索与注入、GB/T 7714 格式。<br>文献卡片显示位置信息与评分维度。',
-      el: null, pos: 'center', icon: '📋'
-    },
-    {
-      title: '💡 小提示',
-      body: '⌨ <b>快捷键</b>：Ctrl+1~6 切换模块 | Ctrl+Enter 检索 | Ctrl+O 换论文<br>📜 <b>右上角更新日志</b> 查看功能变更记录<br>🔄 <b>刷新页面可恢复</b> 上次导入的论文<br>📐 <b>上传后检查标题层级</b>，可大幅提升目录树精度<br>点击右上角 <b>?</b> 重新查看本指南。',
-      el: null, pos: 'center', icon: '💡'
+      title: '账户与帮助',
+      body: '右上角可查看余额、明细与计费说明；充值后可继续使用智能能力。<br>随时点右下角 <b>?</b> 可重新打开本指南。',
+      el: function () {
+        return document.getElementById('darkToggle')
+          || document.querySelector('.help-btn')
+          || document.getElementById('changelogLink');
+      },
+      pos: 'left', icon: '💡'
     }
   ];
 }
 
-function renderTourTooltip(step) {
-  // Remove old
-  var old = document.getElementById('tour-tooltip');
-  if (old) old.parentElement.removeChild(old);
-  var oldBg = document.getElementById('tour-backdrop');
-  if (oldBg) oldBg.parentElement.removeChild(oldBg);
+function _tourClearChrome() {
+  ['tour-tooltip', 'tour-backdrop', 'tour-highlight', 'tour-cutout'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+  });
+}
 
+function renderTourTooltip(step) {
+  _tourClearChrome();
   var s = _tourSteps[step];
   if (!s) return;
 
-  var tt = document.createElement('div');
-  tt.id = 'tour-tooltip';
-  tt.style.cssText = 'position:fixed;z-index:100002;background:#fff;border-radius:18px;padding:24px 28px;box-shadow:0 25px 80px rgba(0,0,0,0.25);max-width:420px;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:.82rem;line-height:1.7;color:#1d1d1f;transition:opacity .3s,transform .3s;opacity:0;transform:translateY(8px)';
-  document.body.appendChild(tt);
-
-  // Backdrop
+  // 全屏灰色蒙版
   var bg = document.createElement('div');
   bg.id = 'tour-backdrop';
-  bg.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.35);z-index:100001;transition:opacity .3s';
+  bg.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(15,23,42,.52);pointer-events:auto;';
+  bg.onclick = function () { /* 点击蒙版不关闭，需点按钮 */ };
   document.body.appendChild(bg);
 
-  // Build content
-  var h = '';
-  h += '<div style="font-size:2rem;margin-bottom:8px">' + (s.icon || '📋') + '</div>';
-  h += '<div style="font-size:1.05rem;font-weight:700;margin-bottom:10px;color:#1d1d1f">' + s.title + '</div>';
-  h += '<div style="color:#555;margin-bottom:20px">' + s.body + '</div>';
+  var tt = document.createElement('div');
+  tt.id = 'tour-tooltip';
+  tt.style.cssText = 'position:fixed;z-index:100003;background:#fff;color:#0f172a;border-radius:16px;padding:18px 20px;box-shadow:0 20px 60px rgba(0,0,0,.28);max-width:min(380px,92vw);font-family:var(--font-sans),system-ui,sans-serif;font-size:.82rem;line-height:1.65;opacity:0;transition:opacity .2s,transform .2s;transform:translateY(6px);border:1px solid rgba(15,23,42,.08);';
+  document.body.appendChild(tt);
 
-  // Progress dots
-  h += '<div style="display:flex;justify-content:center;gap:6px;margin-bottom:16px">';
+  var h = '';
+  h += '<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px">';
+  h += '<div style="font-size:1.6rem;line-height:1">' + (s.icon || '📋') + '</div>';
+  h += '<div><div style="font-size:1rem;font-weight:700;margin-bottom:6px">' + s.title + '</div>';
+  h += '<div style="color:#475569">' + s.body + '</div></div></div>';
+  h += '<div style="display:flex;justify-content:center;gap:5px;margin:12px 0 14px">';
   for (var i = 0; i < _tourSteps.length; i++) {
-    h += '<span style="width:8px;height:8px;border-radius:50%;background:' + (i === step ? '#0071e3' : '#d1d5db') + ';transition:background .3s"></span>';
+    h += '<span style="width:7px;height:7px;border-radius:50%;background:' + (i === step ? '#4f46e5' : '#cbd5e1') + '"></span>';
   }
   h += '</div>';
-
-  // Buttons
   h += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">';
   if (step > 0) {
-    h += '<button onclick="tourPrev()" style="background:rgba(0,0,0,0.05);border:none;padding:8px 16px;border-radius:10px;cursor:pointer;font-size:.75rem;color:#555">← 上一步</button>';
+    h += '<button type="button" onclick="tourPrev()" style="background:#f1f5f9;border:none;padding:8px 14px;border-radius:10px;cursor:pointer;font-size:.75rem;color:#334155">← 上一步</button>';
   } else {
-    h += '<span></span>';
+    h += '<button type="button" onclick="tourEnd()" style="background:transparent;border:none;padding:8px 12px;cursor:pointer;font-size:.72rem;color:#94a3b8">跳过</button>';
   }
-  h += '<span style="font-size:.68rem;color:#86868b">' + (step + 1) + '/' + _tourSteps.length + '</span>';
+  h += '<span style="font-size:.68rem;color:#94a3b8">' + (step + 1) + '/' + _tourSteps.length + '</span>';
   if (step < _tourSteps.length - 1) {
-    h += '<button onclick="tourNext()" style="background:#0071e3;color:#fff;border:none;padding:8px 20px;border-radius:10px;cursor:pointer;font-size:.75rem;font-weight:600">下一步 →</button>';
-    h += '<button onclick="tourEnd()" style="background:transparent;color:#86868b;border:none;padding:8px 12px;cursor:pointer;font-size:.7rem">跳过</button>';
+    h += '<button type="button" onclick="tourNext()" style="background:#4f46e5;color:#fff;border:none;padding:8px 18px;border-radius:10px;cursor:pointer;font-size:.75rem;font-weight:600">下一步 →</button>';
   } else {
-    h += '<button onclick="tourEnd()" style="background:#0071e3;color:#fff;border:none;padding:8px 24px;border-radius:10px;cursor:pointer;font-size:.75rem;font-weight:600">开始使用 🎉</button>';
+    h += '<button type="button" onclick="tourEnd()" style="background:#4f46e5;color:#fff;border:none;padding:8px 18px;border-radius:10px;cursor:pointer;font-size:.75rem;font-weight:600">开始使用</button>';
   }
   h += '</div>';
-
   tt.innerHTML = h;
 
-  // Position
-  requestAnimationFrame(function() {
-    var target = s.el ? (typeof s.el === 'function' ? s.el() : s.el) : null;
+  requestAnimationFrame(function () {
+    var target = null;
+    try { target = s.el ? (typeof s.el === 'function' ? s.el() : s.el) : null; } catch (e) { target = null; }
+    if (target && !(target.offsetWidth || target.offsetHeight || target.getClientRects().length)) target = null;
+
     var ttW = tt.offsetWidth, ttH = tt.offsetHeight;
     var vw = window.innerWidth, vh = window.innerHeight;
     var x, y;
+    var pad = 10;
 
-    if (target && target.offsetParent && s.pos !== 'center') {
+    if (target && s.pos !== 'center') {
       var rect = target.getBoundingClientRect();
-      // Highlight target
+      // 挖洞高亮：亮边 + 蒙版通过巨大 box-shadow
       var hl = document.createElement('div');
-      hl.style.cssText = 'position:fixed;z-index:100001;border-radius:10px;box-shadow:0 0 0 4px #0071e3,0 0 0 9999px rgba(0,0,0,0.35);pointer-events:none;transition:all .3s';
-      hl.style.left = (rect.left - 6) + 'px';
-      hl.style.top = (rect.top - 6) + 'px';
-      hl.style.width = (rect.width + 12) + 'px';
-      hl.style.height = (rect.height + 12) + 'px';
       hl.id = 'tour-highlight';
+      hl.style.cssText = 'position:fixed;z-index:100002;border-radius:12px;pointer-events:none;'
+        + 'box-shadow:0 0 0 3px #6366f1, 0 0 0 9999px rgba(15,23,42,.52);'
+        + 'transition:all .25s ease;';
+      hl.style.left = Math.max(4, rect.left - 6) + 'px';
+      hl.style.top = Math.max(4, rect.top - 6) + 'px';
+      hl.style.width = Math.min(vw - 8, rect.width + 12) + 'px';
+      hl.style.height = Math.min(vh - 8, rect.height + 12) + 'px';
       document.body.appendChild(hl);
+      // 背景蒙版可减弱，避免双层过黑
+      bg.style.background = 'transparent';
 
-      if (s.pos === 'bottom') {
-        x = Math.max(12, Math.min(vw - ttW - 12, rect.left + rect.width / 2 - ttW / 2));
-        y = rect.bottom + 14;
-      } else { // top
-        x = Math.max(12, Math.min(vw - ttW - 12, rect.left + rect.width / 2 - ttW / 2));
-        y = rect.top - ttH - 14;
+      var pos = s.pos || 'bottom';
+      if (pos === 'bottom') {
+        x = rect.left + rect.width / 2 - ttW / 2;
+        y = rect.bottom + pad;
+      } else if (pos === 'top') {
+        x = rect.left + rect.width / 2 - ttW / 2;
+        y = rect.top - ttH - pad;
+      } else if (pos === 'right') {
+        x = rect.right + pad;
+        y = rect.top + rect.height / 2 - ttH / 2;
+      } else if (pos === 'left') {
+        x = rect.left - ttW - pad;
+        y = rect.top + rect.height / 2 - ttH / 2;
+      } else {
+        x = rect.left + rect.width / 2 - ttW / 2;
+        y = rect.bottom + pad;
       }
+      // 贴边修正
+      if (x < 12) x = 12;
+      if (x + ttW > vw - 12) x = vw - ttW - 12;
+      if (y < 12) y = 12;
+      if (y + ttH > vh - 12) y = Math.max(12, rect.top - ttH - pad);
+      if (y < 12) y = Math.min(vh - ttH - 12, rect.bottom + pad);
     } else {
-      // Center
       x = (vw - ttW) / 2;
       y = (vh - ttH) / 2;
+      bg.style.background = 'rgba(15,23,42,.52)';
     }
 
-    tt.style.left = x + 'px';
-    tt.style.top = Math.max(20, Math.min(vh - ttH - 20, y)) + 'px';
+    tt.style.left = Math.max(12, Math.min(vw - ttW - 12, x)) + 'px';
+    tt.style.top = Math.max(12, Math.min(vh - ttH - 12, y)) + 'px';
     tt.style.opacity = '1';
     tt.style.transform = 'translateY(0)';
-    bg.style.opacity = '1';
   });
 }
 
@@ -168,66 +210,51 @@ function tourStart() {
   _tourRunning = true;
   renderTourTooltip(0);
 }
-
 function tourNext() {
-  var oldHl = document.getElementById('tour-highlight');
-  if (oldHl) oldHl.parentElement.removeChild(oldHl);
   if (_tourIdx < _tourSteps.length - 1) {
     _tourIdx++;
     renderTourTooltip(_tourIdx);
-  } else {
-    tourEnd();
-  }
+  } else tourEnd();
 }
-
 function tourPrev() {
-  var oldHl = document.getElementById('tour-highlight');
-  if (oldHl) oldHl.parentElement.removeChild(oldHl);
   if (_tourIdx > 0) {
     _tourIdx--;
     renderTourTooltip(_tourIdx);
   }
 }
-
 function tourEnd() {
   _tourRunning = false;
-  var tt = document.getElementById('tour-tooltip');
-  if (tt) tt.parentElement.removeChild(tt);
-  var bg = document.getElementById('tour-backdrop');
-  if (bg) bg.parentElement.removeChild(bg);
-  var hl = document.getElementById('tour-highlight');
-  if (hl) hl.parentElement.removeChild(hl);
-
-  // Mark as seen
-  try { sessionStorage.setItem('thesis_ai_tour_seen', '1'); } catch (e) {}
-
-  // If thesis not loaded, show upload overlay
-  if (!(typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100)) {
-    if (typeof showUploadOverlay === 'function') showUploadOverlay();
-  }
+  _tourClearChrome();
+  try {
+    sessionStorage.setItem('thesis_ai_tour_seen', '1');
+    localStorage.setItem('thesis_tour_done', '1');
+  } catch (e) {}
 }
 
-// ========== Init ==========
-(function() {
-  var seen = false;
-  try { seen = sessionStorage.getItem('thesis_ai_tour_seen'); } catch (e) {}
+// 暴露
+window.tourStart = tourStart;
+window.tourNext = tourNext;
+window.tourPrev = tourPrev;
+window.tourEnd = tourEnd;
+window.buildTourSteps = buildTourSteps;
 
-  if (!seen) {
-    // 只在登录后启动（不在登录页触发）
-    var isLoggedIn = false;
-    try { isLoggedIn = sessionStorage.getItem('thesis_ai_login') === 'true' || !!sessionStorage.getItem('thesis_ai_token'); } catch (e) {}
-    if (!isLoggedIn) return;
-    var done=false;
-    try { done = localStorage.getItem('thesis_tour_done') === '1'; } catch (e) {}
-    // 首次登录自动打开；已看过也可点 ? 重开
-    var checks = 0;
-    var timer = setInterval(function() {
-      checks++;
-      if (typeof tourStart === 'function' || typeof buildTourSteps === 'function') {
-        clearInterval(timer);
-        if (!done) setTimeout(function(){ try{ tourStart(); }catch(e){} }, 600);
-      }
-      if (checks > 50) clearInterval(timer);
-    }, 100);
-  }
+// 首次登录自动打开
+(function () {
+  var seen = false;
+  try { seen = sessionStorage.getItem('thesis_ai_tour_seen') === '1' || localStorage.getItem('thesis_tour_done') === '1'; } catch (e) {}
+  if (seen) return;
+  var isLoggedIn = false;
+  try {
+    isLoggedIn = sessionStorage.getItem('thesis_ai_login') === 'true' || !!sessionStorage.getItem('thesis_ai_token');
+  } catch (e) {}
+  if (!isLoggedIn) return;
+  var checks = 0;
+  var timer = setInterval(function () {
+    checks++;
+    if (typeof tourStart === 'function') {
+      clearInterval(timer);
+      setTimeout(function () { try { tourStart(); } catch (e) {} }, 700);
+    }
+    if (checks > 60) clearInterval(timer);
+  }, 100);
 })();
