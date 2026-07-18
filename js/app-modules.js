@@ -150,7 +150,7 @@ var APP_MODULES = [
   { id: 'proposal',        name: '开题大纲',   icon: '📝', requiresThesis: false, aiDriven: true },
   // 撰写阶段
   { id: 'references',      name: '参考文献',   icon: '📋', requiresThesis: true,  aiDriven: false },
-  { id: 'expand',          name: '论文扩写',   icon: '✍️', requiresThesis: true,  aiDriven: true },
+  { id: 'expand',          name: '论文扩写',   icon: '✍️', requiresThesis: false, aiDriven: true },
   { id: 'data-analysis',   name: '数据分析',   icon: '📈', requiresThesis: false, aiDriven: false, serverFixed: true },
   { id: 'knowledge-graph', name: '知识图谱',   icon: '🕸️', requiresThesis: true,  aiDriven: false, serverFixed: true },
   // 打磨阶段

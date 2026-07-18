@@ -981,10 +981,30 @@
     '</div>';
   }
 
+  function isProjectEmpty(project) {
+    if (!project) return true;
+    try {
+      var live = (typeof manuscriptText !== 'undefined' && manuscriptText && String(manuscriptText).replace(/\s+/g, '').length > 100);
+      if (live) return false;
+      var idea = (project.idea || '').trim();
+      var title = (project.title || '').trim();
+      var hasIdea = idea.length >= 8;
+      var hasTitle = title && title !== '未命名论文项目' && title !== '导入论文项目';
+      var words = 0;
+      try { words = (chapterStats(project).words || 0); } catch (e) {}
+      var outline = null;
+      try { outline = getOutline(); } catch (e2) {}
+      var hasOutline = !!(outline && outline.chapters && outline.chapters.length);
+      if (!hasIdea && !hasTitle && !hasOutline && words < 50 && !project.hasManuscript) return true;
+      return false;
+    } catch (e3) {
+      return !project;
+    }
+  }
   function renderProjectOverviewHTML(project) {
     var prog = calcProgress(project);
     var next = nextAction(project);
-    if (!project) {
+    if (!project || isProjectEmpty(project)) {
       return '' +
         '<div class="project-overview home-simple">' +
           '<div class="project-overview-head">' +
@@ -1516,11 +1536,19 @@
       '<div class="project-modal-head"><div><h3>分章草稿看板</h3><p>按大纲拆成章节卡片</p></div><button class="project-close" onclick="closeChapterOverlays()">×</button></div>' +
       '<div class="project-progress-sub" style="margin-bottom:10px">完整 ' + stats.ready + '/' + stats.total + ' · ' + stats.words + ' 字</div>' +
       '<div class="chapter-card-grid">' + cards + '</div>' +
-      '<div class="project-modal-actions"><button class="ai-btn-clear" onclick="openOutlineEditor()">调整大纲</button><button class="ai-btn-clear" onclick="closeChapterOverlays()">关闭</button><button class="ai-btn" onclick="closeChapterOverlays();switchModule("expand")">去论文扩写</button></div></div>';
+      '<div class="project-modal-actions"><button class="ai-btn-clear" onclick="openOutlineEditor()">调整大纲</button><button class="ai-btn-clear" onclick="closeChapterOverlays()">关闭</button><button class="ai-btn" onclick="goThesisExpand()">去论文扩写</button></div></div>';
     ov.onclick = function () { closeChapterOverlays(); };
     document.body.appendChild(ov);
   }
-  function closeChapterOverlays() {
+  
+  function goThesisExpand() {
+    try { closeChapterOverlays(); } catch (e) {}
+    if (typeof switchModule === 'function') switchModule('expand');
+    else if (window.switchModule) window.switchModule('expand');
+  }
+  window.goThesisExpand = goThesisExpand;
+
+function closeChapterOverlays() {
     ['chapterBoardOverlay','chapterEditorOverlay'].forEach(function(id){ var el=document.getElementById(id); if(el&&el.parentNode)el.parentNode.removeChild(el); });
   }
   function findChapterMeta(key) {
