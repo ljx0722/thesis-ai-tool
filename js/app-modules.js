@@ -102,12 +102,26 @@ function saveToolboxPicker(){
 function openFeatureCatalog(){ openToolHome(); }
 function openToolHome(){
   var home=document.getElementById('toolHome');
-  if(home) home.style.display='';
+  if(home){
+    home.style.display='';
+    home.style.flex='1 1 auto';
+    home.style.minHeight='0';
+    home.style.overflowY='auto';
+    home.style.height='';
+    home.style.padding='';
+  }
   // hide ref-only and module area content view conceptually by showing home on top
   var panel=document.getElementById('refPanel');
   if(panel){
     panel.querySelectorAll('.ref-only').forEach(function(el){ el.style.display='none'; });
-    var ma=panel.querySelector('.module-area'); if(ma) ma.style.display='none';
+    var ma=panel.querySelector('.module-area');
+    if(ma){
+      ma.style.display='none';
+      ma.style.flex='0 0 0';
+      ma.style.minHeight='0';
+      ma.style.height='0';
+      ma.style.overflow='hidden';
+    }
   }
   document.querySelectorAll('.tool-tab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-tooltab')==='home'); });
   var title=document.getElementById('toolPanelTitle'); if(title) title.textContent='工具台';
@@ -492,15 +506,25 @@ function switchPanel(moduleId) {
   }
 
   // Non-reference modules
-  var home=document.getElementById('toolHome'); if(home) home.style.display='none';
+  var home=document.getElementById('toolHome');
+  if(home){
+    home.style.display='none';
+    home.style.flex='0 0 0';
+    home.style.minHeight='0';
+    home.style.height='0';
+    home.style.overflow='hidden';
+    home.style.padding='0';
+    home.style.margin='0';
+  }
   for (var i = 0; i < refOnlyEls.length; i++) refOnlyEls[i].style.display = 'none';
   if (!moduleArea) {
     moduleArea = document.createElement('div');
     moduleArea.className = 'module-area';
+    moduleArea.id = 'moduleAreaScroll';
     panel.appendChild(moduleArea);
   }
-  // 单一滚动宿主：只在 module-area 上滚
-  moduleArea.style.cssText = 'flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;display:block;';
+  // 单一滚动宿主：module-area 占满 toolHome 腾出的高度
+  moduleArea.style.cssText = 'flex:1 1 auto;min-height:0;height:auto;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;display:block;';
   moduleArea.style.display = '';
   moduleArea.scrollTop = 0;
 
@@ -657,10 +681,24 @@ function switchView(view) {
   var ws = document.getElementById('workspaceContent');
   var tb = document.getElementById('thesisBox');
   var rp = document.getElementById('refPanel');
+  // 四栏布局：右侧工具台始终可见，不随视图隐藏
+  if (rp) rp.style.display = '';
+
+  // 中间栏唯一滚动宿主
+  if (tb) {
+    tb.style.flex = '1 1 auto';
+    tb.style.minHeight = '0';
+    tb.style.overflowX = 'hidden';
+    tb.style.overflowY = 'auto';
+    tb.style.overscrollBehavior = 'contain';
+  }
 
   if (view === 'workspace') {
     if (ws) {
       ws.style.display = '';
+      ws.style.overflow = 'visible';
+      ws.style.height = 'auto';
+      ws.style.minHeight = '0';
       if (typeof renderWorkspaceHero === 'function') renderWorkspaceHero();
       else if (window.ThesisProject && typeof ThesisProject.renderWorkspaceHero === 'function') ThesisProject.renderWorkspaceHero();
     }
@@ -669,14 +707,18 @@ function switchView(view) {
       var children = tb.children;
       for (var i = 0; i < children.length; i++) {
         if (children[i] !== ws) children[i].style.display = 'none';
-        var pcr0=document.getElementById('paperContentRoot'); if(pcr0) pcr0.style.display='none';
       }
+      var pcr0=document.getElementById('paperContentRoot'); if(pcr0) pcr0.style.display='none';
+      try { tb.scrollTop = 0; } catch (e0) {}
     }
-    if (rp) rp.style.display = 'none';
     _activeModule = 'workspace';
   } else if (view === 'paper' || view === 'thesis') {
     // 显示论文原文，隐藏工作台项目卡
-    if (ws) ws.style.display = 'none';
+    if (ws) {
+      ws.style.display = 'none';
+      ws.style.height = '0';
+      ws.style.overflow = 'hidden';
+    }
     if (tb) {
       var kidsP = tb.children;
       for (var ip = 0; ip < kidsP.length; ip++) {
@@ -684,14 +726,11 @@ function switchView(view) {
       }
       var pcr = document.getElementById('paperContentRoot');
       if (pcr) pcr.style.display = '';
-      // 确保容器可滚
       tb.style.overflowY = 'auto';
       tb.style.minHeight = '0';
+      try { tb.scrollTop = 0; } catch (e) {}
     }
-    if (rp) rp.style.display = 'none';
     _activeModule = 'paper';
-    // 滚到顶部，避免空白感
-    try { if (tb) tb.scrollTop = 0; } catch (e) {}
   } else if (view === 'references') {
     if (ws) ws.style.display = 'none';
     // Restore hidden thesis content
@@ -703,8 +742,13 @@ function switchView(view) {
       tb.style.overflowY = 'auto';
     }
     if (rp) rp.style.display = '';
+    var homeR=document.getElementById('toolHome');
+    if(homeR){ homeR.style.display='none'; homeR.style.flex='0 0 0'; }
     var refOnly = rp ? rp.querySelectorAll('.ref-only') : [];
-    for (var i = 0; i < refOnly.length; i++) refOnly[i].style.display = '';
+    for (var i = 0; i < refOnly.length; i++) {
+      if (refOnly[i].classList && refOnly[i].classList.contains('filters')) { refOnly[i].style.display='none'; continue; }
+      refOnly[i].style.display = '';
+    }
     var ma = rp ? rp.querySelector('.module-area') : null;
     if (ma) ma.style.display = 'none';
     _activeModule = 'references';
