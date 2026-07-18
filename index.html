@@ -402,22 +402,22 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
 <script defer src="mammoth.browser.min.js"></script>
 <script defer src="jszip.min.js"></script>
-<script src="app.js?v=60"></script>
-<script src="js/modules/optimization.js?v=60"></script>
-<script src="js/modules/format-check.js?v=60"></script>
-<script src="js/modules/terminology.js?v=60"></script>
-<script src="js/modules/paragraph-analysis.js?v=60"></script>
-<script src="js/modules/dashboard.js?v=60"></script>
-<script src="js/modules/thesis-review.js?v=60"></script>
-<script src="js/modules/proposal.js?v=60"></script>
-<script src="js/modules/onboarding.js?v=60"></script>
-<script src="js/modules/topic-finder.js?v=60"></script>
-<script src="js/modules/proofread.js?v=60"></script>
-<script src="js/modules/de-duplicate.js?v=60"></script>
-<script src="js/modules/defense-ppt.js?v=60"></script>
-<script src="js/modules/en-abstract.js?v=60"></script>
-<script src="js/modules/project.js?v=60"></script>
-<script src="js/app-modules.js?v=60"></script>
+<script src="app.js?v=61"></script>
+<script src="js/modules/optimization.js?v=61"></script>
+<script src="js/modules/format-check.js?v=61"></script>
+<script src="js/modules/terminology.js?v=61"></script>
+<script src="js/modules/paragraph-analysis.js?v=61"></script>
+<script src="js/modules/dashboard.js?v=61"></script>
+<script src="js/modules/thesis-review.js?v=61"></script>
+<script src="js/modules/proposal.js?v=61"></script>
+<script src="js/modules/onboarding.js?v=61"></script>
+<script src="js/modules/topic-finder.js?v=61"></script>
+<script src="js/modules/proofread.js?v=61"></script>
+<script src="js/modules/de-duplicate.js?v=61"></script>
+<script src="js/modules/defense-ppt.js?v=61"></script>
+<script src="js/modules/en-abstract.js?v=61"></script>
+<script src="js/modules/project.js?v=61"></script>
+<script src="js/app-modules.js?v=61"></script>
 <script>
 (function(){
   var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');
@@ -572,7 +572,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
     // 用户侧统一按“点”展示，固定 6 位小数；不暴露
     return n.toFixed(3);
   };
-  window.function formatPoints(p){ p=Number(p||0); if(!isFinite(p)) p=0; return p.toFixed(3); }
+  window.formatPoints=function(p){ p=Number(p||0); if(!isFinite(p)) p=0; return p.toFixed(3); }
   updateBalanceDisplay = function() {
     // Show admin panel button if admin
     var userData = null;
@@ -591,7 +591,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
         if (d.success && balEl) {
           balEl.textContent=Number(d.points!=null?d.points:(d.credits!=null?d.credits/1000:0)).toFixed(3);
           var pts = (d.points != null ? d.points : (d.credits / 1000)); balEl.style.color = pts >= 1 ? '#10b981' : (pts > 0 ? '#f59e0b' : '#f87171');
-          var fq = document.;
+          var fq = document.getElementById('freeQuotaChip');
           if (fq) {
             if (d.free_remaining_today != null && d.free_limit_today != null) {
               fq.style.display='none'; fq.textContent='';
@@ -707,7 +707,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
     fetch('/api/payment/balance', { headers: { 'Authorization': 'Bearer ' + token } })
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        if (d.success) document. (function(v){return Number(v||0).toFixed(3);})( /*keep*/!=null?/*keep*/:0 ) );
+        if (d.success) { var el=document.getElementById('rechargeBalance'); if(el) el.textContent=Number(d.points!=null?d.points:((d.credits||0)/1000)).toFixed(3); }
       });
   }
   function loadRechargeHistory() {
@@ -1073,8 +1073,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 </script>
 
 <script>
-function showPricingInfo(){ if(window.showPricingInfo&&window.showPricingInfo!==showPricingInfo){/*noop*/} }).catch(function(){alert('网络错误');});
-}
+function showPricingInfo(){ /* real impl assigned to window.showPricingInfo below */ }
 </script>
 
 <div id="accountModalMask" class="acct-mask" style="display:none">
