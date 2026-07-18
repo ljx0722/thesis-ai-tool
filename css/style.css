@@ -165,7 +165,7 @@ body.admin-page {
   background: var(--bg-topbar);
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
-  color: #f1f5f9;
+  color: var(--text-primary);
   padding: 0 var(--space-4);
   display: flex;
   align-items: center;
@@ -195,7 +195,7 @@ body.admin-page {
   cursor: pointer;
   font-size: var(--font-size-md);
   border-radius: var(--radius-sm);
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-secondary);
   transition: all var(--duration-fast) var(--easing-default);
   border: none;
   background: transparent;
@@ -203,8 +203,8 @@ body.admin-page {
   white-space: nowrap;
   font-family: var(--font-sans);
 }
-.bar-tab:hover { color: #f1f5f9; background: var(--bg-sidebar-hover); }
-.bar-tab.active { background: var(--bg-sidebar-active); color: var(--accent-light); font-weight: var(--font-weight-semibold); }
+.bar-tab:hover { color: var(--text-primary); background: var(--bg-sidebar-hover); }
+.bar-tab.active { background: var(--bg-sidebar-active); color: var(--accent); font-weight: var(--font-weight-semibold); }
 
 /* Bar action buttons */
 .ba-btn {
@@ -261,7 +261,7 @@ body.admin-page {
   border: 1.5px dashed rgba(255, 255, 255, 0.12);
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
@@ -329,7 +329,7 @@ body.admin-page {
   transition: all var(--duration-instant) var(--easing-default);
   position: relative;
   user-select: none;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-secondary);
 }
 .tree-node:hover { background: rgba(255, 255, 255, 0.06); color: rgba(255, 255, 255, 0.9); }
 .tree-node.sel { background: var(--accent); color: #fff; font-weight: var(--font-weight-semibold); box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4); }
@@ -995,7 +995,7 @@ body.admin-page {
   left: 50%;
   transform: translateX(-50%);
   background: var(--bg-sidebar);
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-secondary);
   font-size: var(--font-size-xs);
   padding: 5px 16px;
   border-radius: var(--radius-full);
@@ -1551,7 +1551,7 @@ body.dark .ref-actions, body:not(.light) .ref-actions { background: var(--surfac
 body.dark .ref-actions a, body.dark .ref-actions button,
 body:not(.light) .ref-actions a, body:not(.light) .ref-actions button { background: var(--bg-card); }
 body.dark #changelogPanel, body:not(.light) #changelogPanel { background: var(--bg-card); border-color: var(--border); }
-body.dark .bar, body:not(.light) .bar { background: rgba(2, 6, 23, 0.95); }
+body.dark /* bar uses --bg-topbar */
 
 /* ============================================================
    RESPONSIVE
@@ -2152,3 +2152,42 @@ body.dark .toc-panel{
   background: var(--bg-sidebar, #0b1120) !important;
   color: var(--text-sidebar, #e2e8f0) !important;
 }
+
+
+/* day topbar contrast */
+body:not(.dark) .bar{
+  background: rgba(248,250,252,.97) !important;
+  color: #0f172a !important;
+  border-bottom: 1px solid rgba(15,23,42,.08) !important;
+}
+body:not(.dark) .bar-left h1,
+body:not(.dark) .bar-right,
+body:not(.dark) .bar-right button,
+body:not(.dark) .bar-right a,
+body:not(.dark) .project-chip,
+body:not(.dark) .project-progress-chip,
+body:not(.dark) .bar-left{
+  color: #0f172a !important;
+}
+body:not(.dark) .bar-tab{ color: #64748b !important; }
+body:not(.dark) .bar-tab:hover{
+  color: #0f172a !important;
+  background: rgba(15,23,42,.05) !important;
+}
+body:not(.dark) .bar-tab.active{
+  color: #4f46e5 !important;
+  background: rgba(99,102,241,.12) !important;
+}
+body:not(.dark) .ba-btn,
+body:not(.dark) .bar-mini{
+  color: #334155 !important;
+  border-color: rgba(15,23,42,.12) !important;
+  background: #fff !important;
+}
+body.dark .bar{
+  background: rgba(2,6,23,.95) !important;
+  color: #f1f5f9 !important;
+}
+body.dark .bar-left h1{ color:#f8fafc !important; }
+body.dark .bar-tab{ color: rgba(255,255,255,.55) !important; }
+body.dark .bar-tab.active{ color: var(--accent-light) !important; }

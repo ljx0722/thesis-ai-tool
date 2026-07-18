@@ -447,8 +447,52 @@
     return p;
   }
 
+
+  function sanitizeProjectPaperFlags() {
+    try {
+      var live = (typeof manuscriptText !== 'undefined' && manuscriptText && String(manuscriptText).replace(/\s+/g, '').length > 100);
+      if (live) return;
+      var all = loadAll() || [];
+      var changed = false;
+      all.forEach(function (p) {
+        if (!p) return;
+        var words = 0;
+        try { words = (chapterStats(p).words || 0); } catch (e) {}
+        if (p.hasManuscript && words < 300) {
+          p.hasManuscript = false;
+          p.stageStatus = p.stageStatus || {};
+          ['polish', 'review', 'defense'].forEach(function (sid) {
+            if (p.stageStatus[sid] === 'done') p.stageStatus[sid] = 'todo';
+          });
+          if (p.currentStage === 'polish' || p.currentStage === 'review' || p.currentStage === 'defense') {
+            p.currentStage = (p.stageStatus.writing === 'done') ? 'writing' : ((p.stageStatus.literature === 'done') ? 'literature' : 'ideation');
+            if (p.stageStatus[p.currentStage] !== 'done') p.stageStatus[p.currentStage] = 'active';
+          }
+          changed = true;
+        }
+      });
+      if (changed) {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(all)); } catch (e) {}
+      }
+    } catch (e) {}
+  }
+
   function paperSignals(project) {
-    var hasPaper = !!(project && (project.hasManuscript || (typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100)));
+    // 以当前内存正文/分章草稿为准，避免陈旧 hasManuscript 造成「有论文」假进度
+    var liveText = (typeof manuscriptText !== 'undefined' && manuscriptText) ? String(manuscriptText) : '';
+    var livePaper = liveText.replace(/\s+/g, '').length > 100;
+    var draftWords = 0;
+    try {
+      if (project) {
+        var st0 = chapterStats(project);
+        draftWords = (st0 && st0.words) || 0;
+      }
+    } catch (e0) {}
+    var hasPaper = !!(livePaper || draftWords >= 300);
+    try {
+      if (project && project.hasManuscript && !hasPaper) project.hasManuscript = false;
+      else if (project && hasPaper && !project.hasManuscript) project.hasManuscript = true;
+    } catch (e1) {}
     var chCount = (typeof sections !== 'undefined' && sections && sections.length) ? sections.length : 0;
     var refCount = 0;
     if (typeof mergedRefs !== 'undefined' && mergedRefs && mergedRefs.length) refCount = mergedRefs.length;
@@ -528,7 +572,7 @@
       ];
     } else if (stageId === 'polish') {
       checks = [
-        { ok: s.hasPaper || s.stats.words >= 1000, label: '有可审校正文' },
+        { ok: s.hasPaper, label: '有可审校正文（已导入或草稿≥300字）' },
         { ok: s.hasPolish, label: '已跑查错/格式/降重等' }
       ];
     } else if (stageId === 'review') {
