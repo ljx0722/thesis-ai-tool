@@ -1,7 +1,8 @@
 <!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>管理员看板 — 学术论文AI一站式助手</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=54">
 <style>
-  body { background: var(--bg-app); font-family: var(--font-sans); color: var(--text-primary); padding: 0; min-height: 100vh; overflow: auto; }
+  html, body.admin-page { height: auto !important; max-height: none !important; overflow-x: hidden !important; overflow-y: auto !important; }
+  body.admin-page { background: var(--bg-app); font-family: var(--font-sans); color: var(--text-primary); padding: 0; min-height: 100vh; }
   .admin-layout { display: flex; min-height: 100vh; }
   .admin-sidebar { width: 220px; flex-shrink: 0; background: var(--bg-sidebar); border-right: 1px solid var(--border-sidebar); display: flex; flex-direction: column; gap: 2px; padding: 20px 12px; position: fixed; top: 0; left: 0; bottom: 0; z-index: 10; overflow-y: auto; }
   .admin-sidebar h2 { font-size: var(--font-size-lg); font-weight: var(--font-weight-bold); padding: 8px 12px 16px; color: #f1f5f9; letter-spacing: -0.01em; }
@@ -9,7 +10,7 @@
   .admin-sidebar a:hover, .admin-sidebar a.active { background: var(--bg-sidebar-hover); color: #f1f5f9; }
   .admin-sidebar a.active { background: var(--bg-sidebar-active); color: var(--accent-light); font-weight: var(--font-weight-semibold); }
   .admin-sidebar .nav-divider { height: 1px; background: var(--border-sidebar); margin: 8px 0; }
-  .admin-main { margin-left: 220px; flex: 1; padding: 24px 32px; min-width: 0; }
+  .admin-main { margin-left: 220px; flex: 1; padding: 24px 32px 48px; min-width: 0; min-height: 100vh; overflow: visible; }
   .admin-topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; gap: 12px; flex-wrap: wrap; }
   .admin-topbar h1 { font-size: var(--font-size-2xl); font-weight: var(--font-weight-bold); color: var(--text-primary); letter-spacing: -0.02em; margin: 0; }
   .admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
@@ -80,7 +81,7 @@
     .admin-sidebar { display: none; }
     .admin-main { margin-left: 0; padding: 16px; }
   }
-</style></head><body>
+</style></head><body class="admin-page">
 <div class="admin-layout">
   <div id="loginBox" class="admin-login">
     <h1>管理员登录</h1>

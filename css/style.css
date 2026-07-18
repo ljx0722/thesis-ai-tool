@@ -1899,14 +1899,14 @@ body.dark .bar, body:not(.light) .bar { background: rgba(2, 6, 23, 0.95); }
 }
 
 
-/* isolate paper scrolling: page itself must not scroll */
-html, body{
+/* isolate paper scrolling: ONLY main app shell (not admin) */
+html, body.app-shell{
   height:100% !important;
   max-height:100% !important;
   overflow:hidden !important;
 }
-body > .main,
-#mainLayout{
+body.app-shell > .main,
+body.app-shell #mainLayout{
   flex:1 1 auto !important;
   min-height:0 !important;
   max-height:100% !important;
@@ -1936,13 +1936,13 @@ body > .main,
 .tree-node.sel{ background:rgba(99,102,241,.18); color:#e0e7ff; }
 
 
-/* ===== release layout lock: independent pane scroll ===== */
-html, body{
+/* ===== release layout lock: independent pane scroll (main app only) ===== */
+html, body.app-shell{
   height:100% !important;
   max-height:100% !important;
   overflow:hidden !important;
 }
-#mainLayout, .main{
+body.app-shell #mainLayout, body.app-shell .main{
   flex:1 1 auto !important;
   min-height:0 !important;
   max-height:100% !important;
@@ -2067,3 +2067,32 @@ body.dark .ui-modal input, body.dark .ui-modal textarea{
 .ui-modal .box-warn{ background:rgba(245,158,11,.12); }
 body.dark .ui-modal .box-src{ background:rgba(99,102,241,.16); }
 body.dark .ui-modal .box-dst{ background:rgba(16,185,129,.14); }
+
+
+/* admin / standalone pages: never inherit app-shell page lock */
+body:not(.app-shell){
+  height:auto !important;
+  max-height:none !important;
+  overflow-x:hidden !important;
+  overflow-y:auto !important;
+}
+body.admin-page{
+  height:auto !important;
+  max-height:none !important;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+}
+body.admin-page .admin-layout{
+  min-height:100vh;
+  display:flex;
+  align-items:flex-start;
+}
+body.admin-page .admin-main{
+  min-height:100vh;
+  overflow:visible;
+  padding-bottom:48px;
+}
+body.admin-page .admin-sidebar{
+  overflow-y:auto;
+  overscroll-behavior:contain;
+}
