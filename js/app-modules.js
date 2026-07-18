@@ -459,9 +459,13 @@ function switchPanel(moduleId) {
 
   if (moduleId === 'references') {
     var home2=document.getElementById('toolHome'); if(home2) home2.style.display='none';
-    for (var i = 0; i < refOnlyEls.length; i++) refOnlyEls[i].style.display = '';
+    for (var i = 0; i < refOnlyEls.length; i++) {
+      if (refOnlyEls[i].classList && refOnlyEls[i].classList.contains('filters')) { refOnlyEls[i].style.display = 'none'; continue; }
+      refOnlyEls[i].style.display = '';
+    }
+    try { panel.querySelectorAll('.filters').forEach(function(el){ el.style.display='none'; }); } catch (eF) {}
     if (moduleArea) moduleArea.style.display = 'none';
-    setToolPanelHeader('📋 参考文献', '检索、筛选、校验与引用');
+    setToolPanelHeader('📋 参考文献', '检索、校验与引用');
     document.querySelectorAll('.tool-tab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-tooltab')==='refs'); });
     if (typeof mergedRefs !== 'undefined' && mergedRefs.length) renderRefs();
     else if (typeof existingRefs !== 'undefined' && existingRefs.length) renderExistingOnly();

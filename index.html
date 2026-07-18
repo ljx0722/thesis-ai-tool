@@ -130,16 +130,7 @@
     <button id="notifyBellBtn" onclick="toggleNotifyPanel()" style="position:relative;background:rgba(255,255,255,.06);color:rgba(255,255,255,.55);border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.62rem;margin-left:4px" title="消息中心">🔔<span id="notifyBadge" style="display:none;position:absolute;top:-3px;right:-2px;min-width:14px;height:14px;padding:0 3px;border-radius:8px;background:#ef4444;color:#fff;font-size:.5rem;line-height:14px;font-weight:700">0</span></button>
     <button onclick="openAccountCenter()" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.55);border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:4px" title="账户中心">账户</button>
     <button onclick="window.location.href='/admin.html'" style="background:rgba(99,102,241,.15);color:#c7d2fe;border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:4px;display:none" id="adminPanelBtn" title="管理员看板">⚙️</button><button onclick="showConsumptionHistory()" style="background:transparent;color:rgba(255,255,255,.35);border:none;border-radius:12px;padding:4px 8px;cursor:pointer;font-size:.58rem;margin-left:2px" title="消费明细">明细</button><button onclick="showPricingInfo()" style="background:transparent;color:rgba(255,255,255,.35);border:none;border-radius:12px;padding:4px 8px;cursor:pointer;font-size:.58rem;margin-left:2px" title="使用说明">说明</button><button id="changelogLink" onclick="toggleChangelog()" style="background:transparent;color:rgba(255,255,255,.35);border:none;border-radius:12px;padding:4px 8px;cursor:pointer;font-size:.58rem;margin-left:4px" title="更新日志">日志</button><button onclick="doLogout()" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:6px">登出</button>
-    <div id="notifyPanel" style="display:none;position:absolute;top:44px;right:12px;width:360px;max-width:92vw;max-height:70vh;overflow:hidden;background:var(--bg-card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.18);z-index:100010">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border,#e5e7eb)">
-        <b style="font-size:.85rem;color:var(--text-primary,#111)">消息中心</b>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button onclick="markAllNotificationsRead()" style="background:none;border:none;color:var(--accent,#0071e3);font-size:.68rem;cursor:pointer;font-weight:600">全部已读</button>
-          <button onclick="toggleNotifyPanel(false)" style="background:none;border:none;color:var(--text-muted,#999);cursor:pointer;font-size:.9rem">✕</button>
-        </div>
-      </div>
-      <div id="notifyList" style="max-height:56vh;overflow-y:auto;padding:6px 0"></div>
-    </div>
+    
   </div>
 </div>
 <!-- ====== 更新日志按钮 ====== -->
@@ -261,7 +252,15 @@
 
     <div class="kw-bar ref-only" id="kwBar" style="display:none"><h4>🔑 论文主题词</h4><div class="kw-tags" id="kwTags"></div></div>
     <div class="dashboard ref-only" id="dashboard" style="display:none"><div class="dash-card"><div class="dv" id="dashTotal">0</div><div class="dl">总文献</div></div><div class="dash-card"><div class="dv" id="dashCN">0</div><div class="dl">中文</div></div><div class="dash-card"><div class="dv" id="dashEN">0</div><div class="dl">英文</div></div><div class="dash-card"><div class="dv" id="dash3Y">0</div><div class="dl">3年内</div></div><div class="dash-card"><div class="dv" id="dash5Y">0</div><div class="dl">5年内</div></div></div>
-    <div class="filters ref-only" style="display:none"><label title="检索文献总数">共</label><input id="fTotal" value="0" min="5" max="200" placeholder="自动"><label>中≤</label><input id="fCN" style="display:none" value="45">%<label>英≥</label><input id="fEN" style="display:none" value="30">%<label>3年≥</label><input id="fY3" value="50">%<label>5年≥</label><input id="fY5" value="75">%<label>分布</label><select id="fDist"><option value="auto">模型自动</option><option value="uniform">按章节平均</option><option value="weighted">按内容多少</option></select></div>
+    <!-- 检索参数仅弹窗配置；隐藏字段供脚本读写 -->
+    <div id="searchParamStore" style="display:none!important" aria-hidden="true">
+      <input type="hidden" id="fTotal" value="20">
+      <input type="hidden" id="fCN" value="45">
+      <input type="hidden" id="fEN" value="30">
+      <input type="hidden" id="fY3" value="50">
+      <input type="hidden" id="fY5" value="75">
+      <input type="hidden" id="fDist" value="auto">
+    </div>
     <div class="ref-list ref-only" id="refs" style="display:none"><div class="panel-empty">导入论文或检索后，文献会出现在这里</div></div>
   </div>
 </div>
@@ -403,22 +402,22 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
 <script defer src="mammoth.browser.min.js"></script>
 <script defer src="jszip.min.js"></script>
-<script src="app.js?v=58"></script>
-<script src="js/modules/optimization.js?v=58"></script>
-<script src="js/modules/format-check.js?v=58"></script>
-<script src="js/modules/terminology.js?v=58"></script>
-<script src="js/modules/paragraph-analysis.js?v=58"></script>
-<script src="js/modules/dashboard.js?v=58"></script>
-<script src="js/modules/thesis-review.js?v=58"></script>
-<script src="js/modules/proposal.js?v=58"></script>
-<script src="js/modules/onboarding.js?v=58"></script>
-<script src="js/modules/topic-finder.js?v=58"></script>
-<script src="js/modules/proofread.js?v=58"></script>
-<script src="js/modules/de-duplicate.js?v=58"></script>
-<script src="js/modules/defense-ppt.js?v=58"></script>
-<script src="js/modules/en-abstract.js?v=58"></script>
-<script src="js/modules/project.js?v=58"></script>
-<script src="js/app-modules.js?v=58"></script>
+<script src="app.js?v=59"></script>
+<script src="js/modules/optimization.js?v=59"></script>
+<script src="js/modules/format-check.js?v=59"></script>
+<script src="js/modules/terminology.js?v=59"></script>
+<script src="js/modules/paragraph-analysis.js?v=59"></script>
+<script src="js/modules/dashboard.js?v=59"></script>
+<script src="js/modules/thesis-review.js?v=59"></script>
+<script src="js/modules/proposal.js?v=59"></script>
+<script src="js/modules/onboarding.js?v=59"></script>
+<script src="js/modules/topic-finder.js?v=59"></script>
+<script src="js/modules/proofread.js?v=59"></script>
+<script src="js/modules/de-duplicate.js?v=59"></script>
+<script src="js/modules/defense-ppt.js?v=59"></script>
+<script src="js/modules/en-abstract.js?v=59"></script>
+<script src="js/modules/project.js?v=59"></script>
+<script src="js/app-modules.js?v=59"></script>
 <script>
 (function(){
   var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');
@@ -869,7 +868,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 </script>
 
 <!-- ====== 充值弹窗 ====== -->
-<div id="rechargeModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg-overlay);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:100005;align-items:center;justify-content:center" onclick="hideRechargeModal()">
+<div id="rechargeModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg-overlay);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:100070;align-items:center;justify-content:center" onclick="hideRechargeModal()">
   <div style="background:var(--bg-card);border-radius:var(--radius-xl);padding:24px;width:520px;max-width:96%;max-height:85vh;overflow-y:auto;border:1px solid var(--border);box-shadow:var(--shadow-lg)" onclick="event.stopPropagation()">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <h3 style="font-size:var(--font-size-xl);color:var(--text-primary);margin:0;font-weight:var(--font-weight-bold)">充值</h3>
@@ -916,7 +915,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 </div>
 
 <!-- ====== 账户中心 ====== -->
-<div id="accountCenterMask" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(6px);z-index:100020;align-items:center;justify-content:center" onclick="closeAccountCenter()">
+<div id="accountCenterMask" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(6px);z-index:100065;align-items:center;justify-content:center" onclick="closeAccountCenter()">
   <div id="accountCenter" style="background:var(--bg-card,#fff);border-radius:16px;width:min(920px,96vw);max-height:88vh;overflow:hidden;border:1px solid var(--border,#e5e7eb);box-shadow:0 24px 64px rgba(0,0,0,.22);display:flex;flex-direction:column" onclick="event.stopPropagation()">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border,#e5e7eb)">
       <div>
@@ -1115,29 +1114,45 @@ function renderConsumptionHistory(d, fromDate, toDate){
     if(toDate && day > toDate) return false;
     return true;
   }
+  function typeLabel(t){
+    var m={usage:'功能消耗',recharge:'充值',gift:'赠送',refund:'退款',admin:'管理员调整',free:'体验额度'};
+    return m[t]||t||'其他';
+  }
+  function modLabel(m){
+    var map={
+      'topic-finder':'选题推荐','proposal':'开题大纲','proofread':'论文查错','de-duplicate':'查重降重',
+      'review':'论文审阅','expand':'论文扩写','defense-ppt':'答辩PPT','en-abstract':'英文摘要',
+      'format-check':'格式检查','terminology':'术语分析','paragraph':'段落分析','dashboard':'论文看板',
+      'data-analysis':'数据分析','data-ml':'数据分析','search':'文献检索','kg':'知识图谱','export-docx':'导出文档'
+    };
+    return map[m]||m||'智能能力';
+  }
   var txs=(d.transactions||[]).filter(function(t){return inRange(t.created_at);});
   var llms=(d.llm_usage||[]).filter(function(t){return inRange(t.created_at);});
   var h='';
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">';
-  h+='<label style="font-size:.68rem;color:rgba(226,232,240,.7)">从</label><input id="histFromDate" type="date" value="'+(fromDate||'')+'" style="font-size:.7rem;padding:4px 6px;border:1px solid rgba(255,255,255,.1);border-radius:6px">';
-  h+='<label style="font-size:.68rem;color:rgba(226,232,240,.7)">到</label><input id="histToDate" type="date" value="'+(toDate||'')+'" style="font-size:.7rem;padding:4px 6px;border:1px solid rgba(255,255,255,.1);border-radius:6px">';
-  h+='<button onclick="filterConsumptionHistory()" style="font-size:.68rem;padding:5px 10px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:rgba(255,255,255,.06);cursor:pointer">筛选</button>';
-  h+='<button onclick="exportConsumptionHistory()" style="font-size:.68rem;padding:5px 10px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:rgba(255,255,255,.06);cursor:pointer">导出CSV</button>';
+  h+='<label style="font-size:.68rem;opacity:.75">从</label><input id="histFromDate" type="date" value="'+(fromDate||'')+'" style="font-size:.7rem;padding:4px 6px;border-radius:6px;border:1px solid rgba(128,128,128,.25)">';
+  h+='<label style="font-size:.68rem;opacity:.75">到</label><input id="histToDate" type="date" value="'+(toDate||'')+'" style="font-size:.7rem;padding:4px 6px;border-radius:6px;border:1px solid rgba(128,128,128,.25)">';
+  h+='<button type="button" onclick="filterConsumptionHistory()" style="font-size:.68rem;padding:5px 10px;border-radius:8px;border:1px solid rgba(128,128,128,.25);cursor:pointer;background:transparent">筛选</button>';
+  h+='<button type="button" onclick="exportConsumptionHistory()" style="font-size:.68rem;padding:5px 10px;border-radius:8px;border:1px solid rgba(128,128,128,.25);cursor:pointer;background:transparent">导出</button>';
   h+='</div>';
-  h+='<div style="margin-bottom:12px;color:rgba(226,232,240,.7);font-size:.7rem">当前筛选：交易 '+txs.length+' 条，AI 调用 '+llms.length+' 条。单位：点（1元=1点）。</div>';
-  h+='<b>交易记录</b><div style="overflow:auto;margin:6px 0 14px"><table style="width:100%;border-collapse:collapse;font-size:.7rem">';
-  h+='<tr style="background:rgba(255,255,255,.04)"><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">时间</th><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">类型</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">变动(点)</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">余额(点)</th><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">说明</th></tr>';
+  h+='<div style="margin-bottom:12px;opacity:.75;font-size:.72rem">共 '+txs.length+' 笔交易，智能调用 '+llms.length+' 次。单位：点。</div>';
+  h+='<b>交易记录</b><div style="overflow:auto;margin:6px 0 14px"><table style="width:100%;border-collapse:collapse;font-size:.72rem">';
+  h+='<tr style="opacity:.85"><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">时间</th><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">类型</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">变动(点)</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">余额(点)</th><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">说明</th></tr>';
   txs.forEach(function(t){
-    h+='<tr><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06)">'+(t.created_at||'')+'</td><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06)">'+t.type+'</td><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;color:'+(t.points>=0?'#059669':'#dc2626')+'">'+(t.points>=0?'+':'')+formatPoints(Math.abs(t.points))*(t.points<0?-1:1)+'</td><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right">'+Number(t.points_after||0).toFixed(6)+'</td><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06)">'+(t.description||'')+'</td></tr>';
+    var pts=Number(t.points||0);
+    var desc=String(t.description||'').replace(/API|api_cost|上游|倍率|厘/gi,'');
+    h+='<tr><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12)">'+(t.created_at||'')+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12)">'+typeLabel(t.type)+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12);text-align:right">'+(pts>=0?'+':'')+Number(pts).toFixed(3)+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12);text-align:right">'+Number(t.points_after||0).toFixed(3)+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12)">'+desc+'</td></tr>';
   });
-  if(!txs.length) h+='<tr><td colspan="5" style="padding:10px;color:rgba(226,232,240,.55)">暂无交易</td></tr>';
+  if(!txs.length) h+='<tr><td colspan="5" style="padding:10px;opacity:.6">暂无交易</td></tr>';
   h+='</table></div>';
-  h+='<b>AI 调用</b><div style="overflow:auto;margin-top:6px"><table style="width:100%;border-collapse:collapse;font-size:.7rem">';
-  h+='<tr style="background:rgba(255,255,255,.04)"><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">时间</th><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">模块</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">输入</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">输出</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(255,255,255,.08)">扣点</th></tr>';
+  h+='<b>智能调用</b><div style="overflow:auto;margin-top:6px"><table style="width:100%;border-collapse:collapse;font-size:.72rem">';
+  h+='<tr style="opacity:.85"><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">时间</th><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">功能</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">Token</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">扣点</th></tr>';
   llms.forEach(function(l){
-    h+='<tr><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06)">'+(l.created_at||'')+'</td><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06)">'+l.module+'</td><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right">'+(l.prompt_tokens||0)+'</td><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right">'+(l.completion_tokens||0)+'</td><td style="padding:6px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right">'+Number(l.points_charged||0).toFixed(6)+'</td></tr>';
+    var tok=(Number(l.prompt_tokens||0)+Number(l.completion_tokens||0));
+    h+='<tr><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12)">'+(l.created_at||'')+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12)">'+modLabel(l.module)+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12);text-align:right">'+tok+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12);text-align:right">'+Number(l.points_charged||0).toFixed(3)+'</td></tr>';
   });
-  if(!llms.length) h+='<tr><td colspan="5" style="padding:10px;color:rgba(226,232,240,.55)">暂无 AI 调用</td></tr>';
+  if(!llms.length) h+='<tr><td colspan="4" style="padding:10px;opacity:.6">暂无智能调用</td></tr>';
   h+='</table></div>';
   openAccountModal('消费明细', h);
 }
@@ -1157,12 +1172,12 @@ function exportConsumptionHistory(){
     if(toDate && day > toDate) return false;
     return true;
   }
-  var rows=['kind,time,module_or_type,delta_points,balance_points,tokens_in,tokens_out,description'];
+  var rows=['类型,时间,功能或类别,变动点,余额点,Token,说明'];
   (d.transactions||[]).filter(function(t){return inRange(t.created_at);}).forEach(function(t){
-    rows.push(['tx', t.created_at||'', t.type||'', t.points, t.points_after, '', '', JSON.stringify(t.description||'')].join(','));
+    rows.push(['交易', t.created_at||'', t.type||'', t.points, t.points_after, '', String(t.description||'').replace(/API|api_cost|厘/gi,'')].join(','));
   });
   (d.llm_usage||[]).filter(function(t){return inRange(t.created_at);}).forEach(function(l){
-    rows.push(['llm', l.created_at||'', l.module||'', l.points_charged||0, '', l.prompt_tokens||0, l.completion_tokens||0, ''].join(','));
+    rows.push(['智能调用', l.created_at||'', l.module||'', l.points_charged||0, '', (Number(l.prompt_tokens||0)+Number(l.completion_tokens||0)), ''].join(','));
   });
   var blob=new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8;'});
   var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='usage_history.csv';
@@ -1194,5 +1209,18 @@ window.showPricingInfo = function(){
 
 document.getElementById('accountModalMask').addEventListener('click', function(e){ if(e.target.id==='accountModalMask') closeAccountModal(); });
 </script>
+
+
+<!-- 消息中心：body 级 fixed，避免被 .bar 层叠上下文挡住 -->
+<div id="notifyPanel" style="display:none;position:fixed;top:52px;right:12px;width:360px;max-width:92vw;max-height:70vh;overflow:hidden;background:var(--bg-card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.22);z-index:100060">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border,#e5e7eb)">
+    <b style="font-size:.85rem;color:var(--text-primary,#111)">消息中心</b>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button type="button" onclick="markAllNotificationsRead()" style="background:none;border:none;color:var(--accent,#4f46e5);font-size:.68rem;cursor:pointer;font-weight:600">全部已读</button>
+      <button type="button" onclick="toggleNotifyPanel(false)" style="background:none;border:none;color:var(--text-muted,#999);cursor:pointer;font-size:.9rem">✕</button>
+    </div>
+  </div>
+  <div id="notifyList" style="max-height:56vh;overflow-y:auto;padding:6px 0"></div>
+</div>
 
 </body></html>

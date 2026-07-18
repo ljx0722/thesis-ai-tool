@@ -2197,3 +2197,13 @@ body.dark .bar-tab.active{ color: var(--accent-light) !important; }
 .recharge-qr-card{ transition: border-color .15s, box-shadow .15s; }
 .recharge-qr-card:hover{ border-color: rgba(99,102,241,.45) !important; }
 .recharge-amt-btn.active{ outline:2px solid var(--accent); }
+
+
+/* hide legacy search filters strip (params only in search modal) */
+.filters, .filters-hidden, #searchParamStore { display: none !important; height:0 !important; overflow:hidden !important; }
+
+/* notify panel always on top of tool/ref panes */
+#notifyPanel {
+  z-index: 100060 !important;
+  position: fixed !important;
+}
