@@ -81,6 +81,60 @@
     .admin-sidebar { display: none; }
     .admin-main { margin-left: 0; padding: 16px; }
   }
+
+  /* admin theme tokens */
+  body.admin-page {
+    --admin-side-bg: #0f172a;
+    --admin-side-text: #f1f5f9;
+    --admin-side-muted: rgba(255,255,255,0.55);
+    --admin-side-hover: rgba(255,255,255,0.08);
+    --admin-side-active: rgba(99,102,241,0.2);
+  }
+  body.admin-page.light {
+    --admin-side-bg: #f8fafc;
+    --admin-side-text: #0f172a;
+    --admin-side-muted: #64748b;
+    --admin-side-hover: rgba(15,23,42,0.06);
+    --admin-side-active: rgba(99,102,241,0.12);
+    --bg-app: #f1f5f9;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f8fafc;
+    --text-primary: #0f172a;
+    --text-secondary: #334155;
+    --text-muted: #64748b;
+    --border: #e2e8f0;
+    --border-light: #f1f5f9;
+    --surface-alt: #f8fafc;
+  }
+  body.admin-page .admin-sidebar {
+    background: var(--admin-side-bg) !important;
+    border-right: 1px solid rgba(128,128,128,0.2) !important;
+  }
+  body.admin-page .admin-sidebar h2 {
+    color: var(--admin-side-text) !important;
+  }
+  body.admin-page .admin-sidebar a {
+    color: var(--admin-side-muted) !important;
+  }
+  body.admin-page .admin-sidebar a:hover,
+  body.admin-page .admin-sidebar a.active {
+    background: var(--admin-side-hover) !important;
+    color: var(--admin-side-text) !important;
+  }
+  body.admin-page .admin-sidebar a.active {
+    background: var(--admin-side-active) !important;
+  }
+  body.admin-page .admin-sidebar .nav-divider {
+    background: rgba(128,128,128,0.25) !important;
+  }
+  body.admin-page.light .admin-sidebar a[href="/"] {
+    color: #94a3b8 !important;
+  }
+  .admin-theme-btn {
+    padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg-card); color: var(--text-secondary); cursor: pointer;
+    font-size: .75rem; font-weight: 600;
+  }
 </style></head><body class="admin-page">
 <div class="admin-layout">
   <div id="loginBox" class="admin-login">
@@ -114,6 +168,7 @@
       <div class="admin-topbar">
         <h1>管理员看板</h1>
         <div class="admin-flex-wrap">
+          <button type="button" class="admin-btn admin-theme-btn" id="adminThemeBtn" onclick="toggleAdminTheme()">切换夜间</button>
           <button class="admin-btn" onclick="refreshAll()">刷新全部</button>
           <button class="admin-btn admin-btn-danger" onclick="logout()">退出</button>
         </div>
@@ -290,6 +345,32 @@
 </div>
 
 <script>
+
+function toggleAdminTheme(){
+  document.body.classList.toggle('light');
+  var on = document.body.classList.contains('light');
+  try { localStorage.setItem('admin_theme_light', on ? '1' : '0'); } catch(e) {}
+  var b = document.getElementById('adminThemeBtn');
+  if (b) b.textContent = on ? '切换夜间' : '切换白天';
+}
+function initAdminTheme(){
+  var pref = '1';
+  try { var v = localStorage.getItem('admin_theme_light'); if (v !== null) pref = v; } catch(e) {}
+  if (pref === '1') {
+    document.body.classList.add('light');
+    var b = document.getElementById('adminThemeBtn');
+    if (b) b.textContent = '切换夜间';
+  } else {
+    document.body.classList.remove('light');
+    var b2 = document.getElementById('adminThemeBtn');
+    if (b2) b2.textContent = '切换白天';
+  }
+}
+try {
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initAdminTheme);
+  else initAdminTheme();
+} catch(e) {}
+
 var SECRET = '';
 var orderFilter = '';
 var _usersCache = [];
@@ -547,7 +628,7 @@ function renderOrders(orders, summary){
   var ohtml='';
   (orders||[]).forEach(function(o){
     var ops='';
-    var canAct = (o.status==='submitted?' || o.status==='pending');
+    var canAct = (o.status==='submitted' || o.status==='pending' || o.status==='paid');
     if(canAct){
       ops+='<button class="admin-btn admin-btn-sm admin-btn-success" onclick="confirmOrder('+o.id+')">确认到账</button> ';
       ops+='<button class="admin-btn admin-btn-sm admin-btn-danger" onclick="rejectOrder('+o.id+')">拒绝</button>';
@@ -602,8 +683,9 @@ function rejectOrder(oid){
 }
 
 function toggleOrderChecks(on){
-  document.querySelectorAll('.order-check').forEach(function(c){ c.checked=!!on; });
+  document.querySelectorAll('.order-check').forEach(function(c){ c.checked = !!on; });
 }
+
 function batchConfirmSelected(){
   var ids=[];
   document.querySelectorAll('.order-check:checked').forEach(function(c){ ids.push(parseInt(c.value,10)); });
