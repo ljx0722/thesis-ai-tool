@@ -497,10 +497,12 @@ function switchPanel(moduleId) {
   if (!moduleArea) {
     moduleArea = document.createElement('div');
     moduleArea.className = 'module-area';
-    moduleArea.style.cssText = 'flex:1;overflow-y:auto;';
     panel.appendChild(moduleArea);
   }
+  // 单一滚动宿主：只在 module-area 上滚
+  moduleArea.style.cssText = 'flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;display:block;';
   moduleArea.style.display = '';
+  moduleArea.scrollTop = 0;
 
   if (moduleId === 'knowledge-graph') {
     if (_thesisLoaded) {
@@ -551,16 +553,19 @@ function switchPanel(moduleId) {
 
   function invokeRunner(){
     setTimeout(function() {
-      var mc = moduleArea.querySelector('.module-panel');
+      // 单一内容壳：不在 module-area 内再包可滚的 .module-panel，避免双滚动
+      var mc = moduleArea.querySelector(':scope > .module-panel');
       if(!mc){
-        moduleArea.innerHTML = '<div class="module-panel"></div>';
+        moduleArea.innerHTML = '<div class="module-panel module-panel-content"></div>';
         mc = moduleArea.querySelector('.module-panel');
+      } else {
+        mc.className = 'module-panel module-panel-content';
+        mc.innerHTML = '';
       }
       try {
         var fn = window[runnerName];
         if (typeof fn === 'function') {
           fn(mc);
-          // 本地/工具模块打开时记入学术主线产物（AI 模块在各自 success 回调里记）
           try {
             if (window.ThesisProject && ThesisProject.logSkillRun && modDef && !modDef.aiDriven) {
               ThesisProject.logSkillRun({ moduleId: moduleId, title: modDef.name || moduleId, summary: '打开模块' });
@@ -820,37 +825,45 @@ function runExpandModule(container) {
 }
 
 function runDataAnalysis(container) {
+  // 不再嵌套第二层 .module-panel，避免双滚动宿主；内容直接写入 switchPanel 提供的 panel
+  var chapterBanner = '';
   try{
     if(window.ThesisProject && typeof ThesisProject.listChapterCards==='function'){
-      var p=ThesisProject.getCurrentProject && ThesisProject.getCurrentProject();
-      if(p){
-        var cards=ThesisProject.listChapterCards(p)||[];
+      var p0=ThesisProject.getCurrentProject && ThesisProject.getCurrentProject();
+      if(p0){
+        var cards=ThesisProject.listChapterCards(p0)||[];
         if(cards.length){
           var sum=cards.map(function(c){return c.title+'('+c.words+'字)';}).join(' · ');
-          setTimeout(function(){
-            var banner=document.createElement('div');
-            banner.className='ai-desc';
-            banner.innerHTML='当前项目分章草稿：'+sum+' <button class="ai-btn-clear" style="margin-left:8px" onclick="openChapterBoard()">打开分章看板</button>';
-            if(container && container.firstChild) container.insertBefore(banner, container.firstChild);
-          },0);
+          chapterBanner='<div class="ai-desc" style="margin-bottom:10px">当前项目分章草稿：'+sum+' <button type="button" class="ai-btn-clear" style="margin-left:8px" onclick="openChapterBoard()">打开分章看板</button></div>';
         }
       }
     }
   }catch(e){}
-  container.innerHTML = '<div class="module-panel">'+
-    '<h4>数据分析</h4>'+'<div class="materials-pick" id="daMaterialsPick">'+'<div style="font-size:.72rem;font-weight:600;margin-bottom:4px">📁 从项目资料库选择 CSV/TSV</div>'+'<div style="font-size:.62rem;color:var(--text-muted);margin-bottom:6px">不用重复上传：先在资料库上传，再这里一键分析</div>'+'<select id="daMaterialSelect"><option value="">加载资料列表…</option></select>'+'<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">'+'<button class="ai-btn" style="flex:0 0 auto;padding:8px 12px" onclick="analyzeSelectedMaterial()">用所选资料分析</button>'+'<button class="ai-btn-clear" style="padding:8px 12px" onclick="openMaterialsLibrary()">打开资料库</button>'+'</div></div>'+
-    '<div class="ai-desc" style="padding:10px 14px;font-size:.72rem">参考无代码分析工具流程：导入 → 自动预处理 → 统计检验 → 可视化 → AI 论文表述。<br>'+
-    '<b>本地计算：</b>变量概览 · 缺失率 · 描述统计 · Pearson相关 · t检验 · 直方图/箱线图/散点图<br>'+
-    '<b>AI 辅助：</b>一键生成「结果描述 + 论文段落建议」（按实际 用量计点）</div>'+
-    '<div style="padding:20px;border:2px dashed var(--border);border-radius:var(--radius-lg);text-align:center">'+
-    '<div style="font-size:2.2rem;margin-bottom:8px">📊</div>'+
-    '<div style="font-size:.85rem;font-weight:700;margin-bottom:4px;color:var(--text-primary)">1. 导入数据，自动进行数据预处理</div>'+
-    '<div style="font-size:.7rem;color:var(--text-muted);margin-bottom:12px">支持 .csv / .tsv · 自动识别数值/分类 · 缺失统计 · 无需写代码</div>'+
-    '<input type="file" id="dataFileInput" accept=".csv,.tsv,.txt" style="display:none" onchange="handleDataFile(this)">'+
-    '<button class="ai-btn" style="max-width:240px;margin:0 auto" onclick="document.getElementById(\'dataFileInput\').click()">📁 选择数据文件</button>'+
+  container.innerHTML =
+    chapterBanner+
+    '<h4 style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">数据分析 <span id="daMatCountBadge" class="da-mat-count" style="font-size:.68rem;font-weight:600;color:var(--text-muted);background:var(--surface-alt);border:1px solid var(--border);padding:3px 10px;border-radius:999px">资料库 · …</span></h4>'+
+    '<div class="materials-pick" id="daMaterialsPick" style="padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-alt);margin-bottom:12px">'+
+      '<div style="font-size:.72rem;font-weight:700;margin-bottom:4px">📁 从项目资料库选择</div>'+
+      '<div style="font-size:.62rem;color:var(--text-muted);margin-bottom:8px">已上传的 CSV/TSV 会出现在下方；也可点「打开资料库」管理文件</div>'+
+      '<select id="daMaterialSelect" style="width:100%;max-width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input,#fff);color:var(--text-primary);font-size:.78rem"><option value="">加载资料列表…</option></select>'+
+      '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">'+
+        '<button type="button" class="ai-btn" style="flex:0 0 auto;padding:8px 12px" onclick="analyzeSelectedMaterial()">用所选资料分析</button>'+
+        '<button type="button" class="ai-btn-clear" style="padding:8px 12px" onclick="openMaterialsLibrary()">打开资料库</button>'+
+        '<button type="button" class="ai-btn-clear" style="padding:8px 12px" onclick="loadDataAnalysisMaterials()">刷新列表</button>'+
+      '</div>'+
     '</div>'+
-    '<div id="dataAnalysisResult" style="margin-top:16px"></div>'+
-    '</div>';
+    '<div class="ai-desc" style="padding:10px 14px;font-size:.72rem;margin-bottom:12px">流程：选择/上传数据 → 自动预处理与统计检验 → 图表 → 可选生成论文表述。<br>'+
+    '<b>本地：</b>变量概览 · 缺失率 · 描述统计 · 相关/t 检验 · 直方图/箱线/散点<br>'+
+    '<b>智能辅助：</b>结果描述与论文段落建议（按用量计点）</div>'+
+    '<div style="padding:16px;border:2px dashed var(--border);border-radius:var(--radius-lg);text-align:center;margin-bottom:12px">'+
+      '<div style="font-size:.85rem;font-weight:700;margin-bottom:4px;color:var(--text-primary)">或从本机上传 CSV / TSV</div>'+
+      '<div style="font-size:.7rem;color:var(--text-muted);margin-bottom:12px">自动识别数值/分类 · 缺失统计 · 无需写代码</div>'+
+      '<input type="file" id="dataFileInput" accept=".csv,.tsv,.txt" style="display:none" onchange="handleDataFile(this)">'+
+      '<button type="button" class="ai-btn" style="max-width:240px;margin:0 auto" onclick="document.getElementById(\'dataFileInput\').click()">📁 选择数据文件</button>'+
+    '</div>'+
+    '<div id="dataAnalysisResult" class="module-scroll-body" style="margin-top:8px"></div>';
+  // 关键：渲染后立刻拉资料列表（此前未调用导致下拉一直「加载中」）
+  setTimeout(function(){ try{ loadDataAnalysisMaterials(); }catch(e){} }, 0);
 }
 
 function handleDataFile(input){
@@ -1507,34 +1520,79 @@ window.exportMlFeatures=function(){
 
 try{ renderToolboxFavorites(); openToolHome(); }catch(e){}
 
+function updateDaMatCountBadge(n, total){
+  var badge=document.getElementById('daMatCountBadge');
+  if(!badge) return;
+  if(n==null){ badge.textContent='资料库 · …'; return; }
+  if(total!=null && total!==n) badge.textContent='资料库 · '+n+' 个数据文件 / 共 '+total+' 个';
+  else badge.textContent='资料库 · '+n+' 个数据文件';
+}
 function loadDataAnalysisMaterials(){
   var sel=document.getElementById('daMaterialSelect'); if(!sel) return;
   var p = window.ThesisProject && ThesisProject.getCurrentProject && ThesisProject.getCurrentProject();
-  if(!p || !p.id){ sel.innerHTML='<option value="">请先创建/选择项目</option>'; return; }
+  if(!p || !p.id){
+    sel.innerHTML='<option value="">请先创建/选择项目</option>';
+    updateDaMatCountBadge(0);
+    return;
+  }
   var token=null; try{token=sessionStorage.getItem('thesis_ai_token');}catch(e){}
-  if(!token){ sel.innerHTML='<option value="">请先登录后使用资料库</option>'; return; }
+  if(!token){
+    sel.innerHTML='<option value="">请先登录后使用资料库</option>';
+    updateDaMatCountBadge(0);
+    return;
+  }
+  sel.innerHTML='<option value="">加载资料列表…</option>';
   fetch('/api/projects/'+encodeURIComponent(p.id)+'/materials', {headers:{'Authorization':'Bearer '+token}})
-    .then(function(r){return r.json();})
+    .then(function(r){
+      if(r.status===401){ throw new Error('login'); }
+      return r.json();
+    })
     .then(function(d){
-      if(!d.success){ sel.innerHTML='<option value="">资料库加载失败</option>'; return; }
-      var items=(d.materials||[]).filter(function(m){
+      if(!d.success){
+        sel.innerHTML='<option value="">资料库加载失败'+(d.error?('：'+d.error):'')+'</option>';
+        updateDaMatCountBadge(0);
+        return;
+      }
+      var all=d.materials||[];
+      var items=all.filter(function(m){
         var n=(m.filename||'').toLowerCase();
-        return /csv|tsv|txt$/.test(n) || (m.kind||'').toLowerCase().indexOf('csv')>=0;
+        return /\.(csv|tsv|txt)$/i.test(n) || /(csv|tsv|txt)/i.test(m.kind||'');
       });
-      if(!items.length){ sel.innerHTML='<option value="">资料库暂无 CSV/TSV，请先上传</option>'; return; }
-      sel.innerHTML='<option value="">选择一个数据文件…</option>'+items.map(function(m){
-        return '<option value="'+m.id+'">'+m.filename+' ('+Math.round((m.size_bytes||0)/1024)+'KB)</option>';
+      updateDaMatCountBadge(items.length, all.length);
+      if(!items.length){
+        sel.innerHTML='<option value="">暂无 CSV/TSV，请先在资料库上传</option>';
+        return;
+      }
+      sel.innerHTML='<option value="">选择一个数据文件（'+items.length+'）…</option>'+items.map(function(m){
+        var kb=Math.round((m.size_bytes||0)/1024);
+        return '<option value="'+m.id+'">'+String(m.filename||'file').replace(/</g,'&lt;')+' ('+kb+'KB)</option>';
       }).join('');
-    }).catch(function(){ sel.innerHTML='<option value="">网络错误</option>'; });
+    }).catch(function(err){
+      if(err && err.message==='login'){
+        sel.innerHTML='<option value="">请先登录后使用资料库</option>';
+      } else {
+        sel.innerHTML='<option value="">网络错误，可点「刷新列表」重试</option>';
+      }
+      updateDaMatCountBadge(0);
+    });
 }
+window.loadDataAnalysisMaterials=loadDataAnalysisMaterials;
+window.updateDaMatCountBadge=updateDaMatCountBadge;
 window.analyzeSelectedMaterial=function(){
   var sel=document.getElementById('daMaterialSelect');
   if(!sel||!sel.value){ alert('请先选择资料库中的 CSV/TSV'); return; }
   var token=null; try{token=sessionStorage.getItem('thesis_ai_token');}catch(e){}
+  if(!token){ alert('请先登录'); return; }
   var container=document.getElementById('dataAnalysisResult'); if(!container) return;
   container.innerHTML='<div class="ai-loading">⏳ 正在从资料库读取并分析…</div>';
+  // 结果区滚入视野
+  try{ var area=document.querySelector('#refPanel .module-area'); if(area) area.scrollTop=area.scrollHeight; }catch(eS){}
   fetch('/api/materials/'+encodeURIComponent(sel.value), {headers:{'Authorization':'Bearer '+token}})
-    .then(function(r){ if(!r.ok) throw new Error('读取失败'); return r.blob(); })
+    .then(function(r){
+      if(r.status===401) throw new Error('请先登录');
+      if(!r.ok) throw new Error('读取失败（'+r.status+'）');
+      return r.blob();
+    })
     .then(function(blob){
       var name=(sel.options[sel.selectedIndex].text||'data.csv').split(' (')[0];
       var file=new File([blob], name, {type: blob.type||'text/csv'});

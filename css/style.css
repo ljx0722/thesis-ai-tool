@@ -715,7 +715,7 @@ body.admin-page {
 .kg-tab.active { background: var(--bg-card); color: var(--text-primary); box-shadow: var(--shadow-xs); }
 
 /* ====== Module Panel ====== */
-.module-panel { padding: var(--space-4); overflow-y: auto; font-size: var(--font-size-md); line-height: var(--line-height-relaxed); flex: 1; min-height: 0; }
+.module-panel { padding: var(--space-4); overflow: visible; font-size: var(--font-size-md); line-height: var(--line-height-relaxed); min-height: 0; height: auto; flex: none; }
 .module-panel h4 { font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); color: var(--text-primary); margin: 16px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); letter-spacing: -0.01em; }
 .module-panel .finding {
   padding: 12px 16px;
@@ -1895,8 +1895,23 @@ body.dark /* bar uses --bg-topbar */
   overflow:hidden !important;
 }
 .tool-panel .module-area,
+.ref-panel .module-area{
+  flex:1 1 auto !important;
+  min-height:0 !important;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  overscroll-behavior:contain !important;
+  -webkit-overflow-scrolling:touch;
+}
 .tool-panel .module-panel,
-.ref-panel .module-area,
+.ref-panel .module-panel,
+.module-panel.module-panel-content{
+  overflow:visible !important;
+  flex:none !important;
+  height:auto !important;
+  max-height:none !important;
+  min-height:0 !important;
+}
 .ref-list{
   overflow-y:auto !important;
   min-height:0 !important;
@@ -2015,13 +2030,21 @@ body.app-shell #mainLayout, body.app-shell .main{
 .ref-panel #refs,
 #refs,
 .module-area,
-.module-panel,
 .ref-list{
   flex:1 1 auto !important;
   min-height:0 !important;
   overflow-y:auto !important;
+  overflow-x:hidden !important;
   overscroll-behavior:contain;
   -webkit-overflow-scrolling:touch;
+}
+/* 内容壳不抢滚动，只由 .module-area 滚 */
+.module-panel,
+.module-panel.module-panel-content{
+  overflow:visible !important;
+  flex:none !important;
+  height:auto !important;
+  max-height:none !important;
 }
 
 /* cite sentence highlight */
