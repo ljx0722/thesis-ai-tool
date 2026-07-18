@@ -1,3 +1,17 @@
+
+function ensureLoggedIn(msg){
+  try{
+    var t=sessionStorage.getItem('thesis_ai_token');
+    if(t) return true;
+  }catch(e){}
+  if(typeof ttp==='function') ttp(msg||'请先登录');
+  else alert(msg||'请先登录后再使用');
+  try{
+    var lb=document.getElementById('loginBox')||document.getElementById('authOverlay');
+    if(lb) lb.style.display='';
+  }catch(e2){}
+  return false;
+}
 /**
  * 学术论文AI一站式助手 — 模块系统
  * 模块标签顶栏 / 操作按钮顶栏 / 键盘快捷键 / 换论文 / 悬浮上传
@@ -406,6 +420,10 @@ function enableLiteratureButtons(){
   }catch(e){}
 }
 function switchModule(moduleId) {
+  var _mod0 = APP_MODULES.find(function(x){return x.id===moduleId;});
+  if (_mod0 && (_mod0.aiDriven || _mod0.localCharge || _mod0.serverFixed)) {
+    if (!ensureLoggedIn('登录后即可使用该功能')) return;
+  }
   if (typeof searchRunning !== 'undefined' && searchRunning) { ttp('检索进行中，请等待完成'); return; }
   _activeModule = moduleId;
   var home=document.getElementById('toolHome'); if(home) home.style.display='none';
@@ -823,7 +841,7 @@ function runDataAnalysis(container) {
     '<h4>数据分析</h4>'+'<div class="materials-pick" id="daMaterialsPick">'+'<div style="font-size:.72rem;font-weight:600;margin-bottom:4px">📁 从项目资料库选择 CSV/TSV</div>'+'<div style="font-size:.62rem;color:var(--text-muted);margin-bottom:6px">不用重复上传：先在资料库上传，再这里一键分析</div>'+'<select id="daMaterialSelect"><option value="">加载资料列表…</option></select>'+'<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">'+'<button class="ai-btn" style="flex:0 0 auto;padding:8px 12px" onclick="analyzeSelectedMaterial()">用所选资料分析</button>'+'<button class="ai-btn-clear" style="padding:8px 12px" onclick="openMaterialsLibrary()">打开资料库</button>'+'</div></div>'+
     '<div class="ai-desc" style="padding:10px 14px;font-size:.72rem">参考无代码分析工具流程：导入 → 自动预处理 → 统计检验 → 可视化 → AI 论文表述。<br>'+
     '<b>本地计算：</b>变量概览 · 缺失率 · 描述统计 · Pearson相关 · t检验 · 直方图/箱线图/散点图<br>'+
-    '<b>AI 辅助：</b>一键生成「结果描述 + 论文段落建议」（按实际 token 扣点）</div>'+
+    '<b>AI 辅助：</b>一键生成「结果描述 + 论文段落建议」（按实际 用量计点）</div>'+
     '<div style="padding:20px;border:2px dashed var(--border);border-radius:var(--radius-lg);text-align:center">'+
     '<div style="font-size:2.2rem;margin-bottom:8px">📊</div>'+
     '<div style="font-size:.85rem;font-weight:700;margin-bottom:4px;color:var(--text-primary)">1. 导入数据，自动进行数据预处理</div>'+

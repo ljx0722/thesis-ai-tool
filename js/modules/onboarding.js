@@ -146,6 +146,8 @@ function renderTourTooltip(step) {
     var target = null;
     try { target = s.el ? (typeof s.el === 'function' ? s.el() : s.el) : null; } catch (e) { target = null; }
     if (target && !(target.offsetWidth || target.offsetHeight || target.getClientRects().length)) target = null;
+    // autoSkipMissing: 无目标时改为居中说明，避免指空
+    if (!target && s.pos && s.pos !== 'center') { s = Object.assign({}, s, { pos: 'center' }); }
 
     var ttW = tt.offsetWidth, ttH = tt.offsetHeight;
     var vw = window.innerWidth, vh = window.innerHeight;

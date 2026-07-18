@@ -458,7 +458,7 @@
         if (!p) return;
         var words = 0;
         try { words = (chapterStats(p).words || 0); } catch (e) {}
-        if (p.hasManuscript && words < 300) {
+        if (p.hasManuscript && !live) {
           p.hasManuscript = false;
           p.stageStatus = p.stageStatus || {};
           ['polish', 'review', 'defense'].forEach(function (sid) {
@@ -488,7 +488,10 @@
         draftWords = (st0 && st0.words) || 0;
       }
     } catch (e0) {}
-    var hasPaper = !!(livePaper || draftWords >= 300);
+    var hasDraft = draftWords >= 300;
+    // 仅真实导入正文算「有论文」；骨架草稿不算审校通过条件
+    var hasPaper = !!livePaper;
+    var hasWritable = !!(livePaper || hasDraft);
     try {
       if (project && project.hasManuscript && !hasPaper) project.hasManuscript = false;
       else if (project && hasPaper && !project.hasManuscript) project.hasManuscript = true;
@@ -514,6 +517,8 @@
     }
     return {
       hasPaper: hasPaper,
+      hasWritable: typeof hasWritable!=='undefined'?hasWritable:hasPaper,
+      hasDraft: typeof hasDraft!=='undefined'?hasDraft:false,
       chCount: chCount,
       refCount: refCount,
       outline: outline,
@@ -541,9 +546,9 @@
       ];
     } else if (stageId === 'literature') {
       checks = [
-        { ok: s.refCount >= 5, label: '文献 ≥5 条（当前 ' + s.refCount + '）' },
-        { ok: s.chCount > 0 || s.hasOutline, label: '有章节/大纲结构' },
-        { ok: s.refCount >= 8 || s.hasPaper, label: '导入正文或文献≥8' }
+        { ok: s.refCount >= 3 || s.hasOutline || s.hasPaper, label: s.hasPaper ? ('文献 ≥3 条（当前 ' + s.refCount + '）') : ('已建大纲/题目，或文献≥3（当前 ' + s.refCount + '）') },
+        { ok: s.chCount > 0 || s.hasOutline || s.hasIdea, label: '有章节、大纲或研究想法' },
+        { ok: s.refCount >= 5 || s.hasOutline || s.hasPaper, label: '文献≥5 或已具备写作结构' }
       ];
     } else if (stageId === 'writing') {
       // 流水线骨架通常 <300 字/章，不能只看 ready；有 pipeline/template 骨架时放宽
@@ -572,18 +577,18 @@
       ];
     } else if (stageId === 'polish') {
       checks = [
-        { ok: s.hasPaper, label: '有可审校正文（已导入或草稿≥300字）' },
+        { ok: s.hasPaper, label: '有可审校正文（需导入论文正文）' },
         { ok: s.hasPolish, label: '已跑查错/格式/降重等' }
       ];
     } else if (stageId === 'review') {
       checks = [
         { ok: s.hasReview, label: '已跑论文审阅或看板' },
-        { ok: s.stats.words >= 3000 || s.hasPaper || s.stats.ready >= 2, label: '有足够正文可评' }
+        { ok: s.hasPaper, label: '有导入正文可评' }
       ];
     } else if (stageId === 'defense') {
       checks = [
         { ok: s.hasDefense || s.hasExport, label: '答辩材料或已导出' + (s.exportCount ? '（' + s.exportCount + ' 次）' : '') },
-        { ok: s.stats.ready >= 2 || s.hasPaper || s.stats.words >= 2000, label: '主体内容就绪' }
+        { ok: s.hasPaper || s.stats.words >= 800, label: '主体内容就绪（正文或较多草稿）' }
       ];
     }
     var passed = 0;
@@ -676,6 +681,9 @@
     }
     if (sig.hasPaper && sig.refCount < 1) {
       return { title: '去确认参考文献', desc: '正文结构已有。下一步检查文末文献是否提取成功。', primary: { label: '打开参考文献', action: 'open-stage', stageId: 'literature', moduleId: 'references' }, secondary: { label: '打开论文看板', action: 'open-stage', stageId: 'review', moduleId: 'dashboard' } };
+    }
+    if (!sig.hasPaper && sig.hasIdea && sig.refCount < 3 && (project.currentStage==='literature' || project.currentStage==='ideation')) {
+      return { title: '用想法检索文献', desc: '可先不导入全文，用题目/想法检索相关文献；或先写大纲再检索。', primary: { label: '检索文献', action: 'open-stage', stageId: 'literature', moduleId: 'references' }, secondary: { label: '编辑大纲', action: 'open-outline' } };
     }
     var stage = null;
     for (var i = 0; i < STAGES.length; i++) if (STAGES[i].id === project.currentStage) stage = STAGES[i];
@@ -2087,7 +2095,7 @@
     if (!payload) { alert('请先创建项目'); return; }
     if (!payload.chapters.length) { alert('请先编辑大纲/分章草稿'); return; }
     var token = sessionStorage.getItem('thesis_ai_token');
-    if (!token) { alert('请先登录'); return; }
+    if (!token) { alert('请先登录后再导出'); return; }
     if (typeof showLoad === 'function') showLoad('正在导出 DOCX...', 20, payload.title);
     fetch('/api/export/docx', {
       method: 'POST',
@@ -2348,7 +2356,7 @@
   function runOneClickPipeline() {
     var p = ensureUnifiedProjectState() || getCurrentProject();
     if (!p) { openIdeaWizard(); return; }
-    if (!confirm('一键流水线将：\n1) 确认/生成大纲\n2) 为每章生成骨架草稿\n3) 进入写作阶段并刷新完成度\n\n不会自动调用收费 LLM（可随后手动点 AI 扩写）。继续？')) return;
+    if (!confirm('一键流水线将：\n1) 确认/生成大纲\n2) 为每章生成骨架草稿\n3) 进入写作阶段并刷新完成度\n\n仅生成本地章节骨架，不会自动智能扩写（扩写等智能能力请在工具台单独使用（按用量计点））。继续？')) return;
 
     // 1 outline
     var outline = getOutline();

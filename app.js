@@ -1711,14 +1711,61 @@ function cwGetUnassigned(){return[];}
 
 
 // ========== 弹窗④: 检索结果确认 ==========
-async function startSearch(){
-  if(!manuscriptText){alert('请先上传论文文件');return}
+async 
+function getSearchSeedText(){
+  var t = (typeof manuscriptText !== 'undefined' && manuscriptText) ? String(manuscriptText) : '';
+  if (t && t.replace(/\s+/g, '').length > 80) return t;
+  // 想法路径：用项目题目/想法/关键词拼检索种子
+  try {
+    var p = (window.ThesisProject && ThesisProject.getCurrentProject) ? ThesisProject.getCurrentProject() : null;
+    if (p) {
+      var parts = [p.title || '', p.idea || '', p.field || '', p.keywords || ''];
+      var seed = parts.filter(Boolean).join('\n');
+      if (seed.replace(/\s+/g, '').length >= 8) return seed;
+    }
+  } catch (e) {}
+  return t || '';
+}
+function ensureSearchTopics(){
+  var seed = getSearchSeedText();
+  if (!seed) return false;
+  try {
+    if (typeof extractTopics === 'function') {
+      var tp = extractTopics(seed);
+      if (tp && tp.length) {
+        if (typeof paperTopics !== 'undefined') paperTopics = tp;
+        return true;
+      }
+    }
+  } catch (e) {}
+  // fallback: split keywords
+  try {
+    var p = (window.ThesisProject && ThesisProject.getCurrentProject) ? ThesisProject.getCurrentProject() : null;
+    var kws = [];
+    if (p && p.keywords) kws = String(p.keywords).split(/[,，、\s]+/).filter(Boolean);
+    if (p && p.title) kws.unshift(p.title.substring(0, 20));
+    if (p && p.idea) kws.push(p.idea.substring(0, 16));
+    kws = kws.filter(Boolean).slice(0, 8);
+    if (kws.length) {
+      paperTopics = kws.map(function(w){ return { label: w, weight: 1 }; });
+      return true;
+    }
+  } catch (e2) {}
+  return !!(seed && seed.length >= 8);
+}
+
+function startSearch(){
+  try{ if(!sessionStorage.getItem('thesis_ai_token')){ alert('请先登录后再检索'); return; } }catch(eL){}
+  if(!getSearchSeedText() || !String(getSearchSeedText()).replace(/\s+/g,'').length){
+    alert('请先填写研究想法/题目，或导入论文，再检索文献');
+    return;
+  }
   if(searchRunning)return;
   openSearchConfigModal();
 }
 function openSearchConfigModal(preset){
   preset=preset||{};
-  var total0=preset.total||parseInt((document.getElementById('fTotal')||{}).value)||Math.max(5, Math.round((manuscriptText||'').length/1200));
+  var total0=preset.total||parseInt((document.getElementById('fTotal')||{}).value)||Math.max(5, Math.round(((getSearchSeedText&&getSearchSeedText())||manuscriptText||'').length/1200)||10);
   var cn0=preset.cnMin!=null?preset.cnMin:parseInt((document.getElementById('fCN')||{}).value)||45;
   var en0=preset.enMin!=null?preset.enMin:parseInt((document.getElementById('fEN')||{}).value)||30;
   var old=document.getElementById('searchCfgModal'); if(old&&old.parentElement) old.parentElement.removeChild(old);
@@ -1755,7 +1802,7 @@ function openSearchConfigModal(preset){
   };
 }
 async function startSearchWithConfig(cfg){
-  if(!manuscriptText){alert('请先上传论文文件');return}
+  if(!getSearchSeedText()){alert('请先填写研究想法/题目，或导入论文，再检索文献');return}
   if(searchRunning)return;searchRunning=true;
   window._searchCfg=cfg||{};
   showLoad('诊断API连接...',0);/* cat-game disabled for release */
@@ -1763,14 +1810,14 @@ async function startSearchWithConfig(cfg){
   // STEP 0: 检测Flask服务连通性（用轻量ping接口）
   var connected=false;
   try{var tr=await fetch('/ping');if(tr.ok){var tj=await tr.json();connected=tj.ok;}}catch(er){}
-  if(!connected){hideLoad();searchRunning=false;alert('无法连接Python服务。\n\n请确认已双击 启动.bat 启动服务。\n如果已启动，请查看Python窗口是否有报错。');return}
+  if(!connected){hideLoad();searchRunning=false;alert('暂时无法连接服务，请稍后重试或刷新页面。');return}
 
   var rawTotal=(window._searchCfg&&window._searchCfg.total)?window._searchCfg.total:(parseInt((document.getElementById('fTotal')||{}).value)||Math.round(manuscriptText.length/1000));
   var total=Math.max(1, rawTotal);
   var cnPct=(window._searchCfg&&window._searchCfg.cnMin!=null)?window._searchCfg.cnMin:(parseInt((document.getElementById('fCN')||{}).value)||45);
   var enPct=(window._searchCfg&&window._searchCfg.enMin!=null)?window._searchCfg.enMin:(parseInt((document.getElementById('fEN')||{}).value)||30);
   // cnPct/enPct = 最低占比（≥）
-  if(!paperTopics.length)paperTopics=extractTopics(manuscriptText);
+  if(!paperTopics.length){ try{ ensureSearchTopics(); }catch(eT){} if(!paperTopics.length && typeof extractTopics==='function') paperTopics=extractTopics(getSearchSeedText()||manuscriptText||''); }
 
   // STEP 1: 全层级关键词——章/节/小节/正文段落/泛词
   updLoad('提取全层级关键词...',3);
