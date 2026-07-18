@@ -334,7 +334,7 @@ SEARCH_DAILY_FREE = int(os.environ.get('SEARCH_DAILY_FREE', '0'))
 KG_DAILY_FREE = int(os.environ.get('KG_DAILY_FREE', '2'))
 CREDIT_PER_YUAN = 1000  # 1元=1000厘=1.0显示点
 LLM_MIN_CHARGE = int(os.environ.get('LLM_MIN_CHARGE', '20'))  # LLM 最低扣 20 厘=0.02点
-DAILY_FREE_OPS = int(os.environ.get('DAILY_FREE_OPS', '5'))  # 每日免费本地模块次数
+DAILY_FREE_OPS = int(os.environ.get('DAILY_FREE_OPS', '0'))  # 本地模块每日免费次数，默认 0（全扣点）
 QUICK_RECHARGE_AMOUNTS = [1, 5, 10, 20, 50]  # 快充金额（1元=1点）
 INVITE_DAILY_LIMIT = int(os.environ.get('INVITE_DAILY_LIMIT', '20'))  # 每邀请人每日最多成功邀请数
 MAX_OPEN_RECHARGE_ORDERS = int(os.environ.get('MAX_OPEN_RECHARGE_ORDERS', '3'))  # 每用户未完结充值单上限
@@ -1602,6 +1602,33 @@ def usage_module():
                     'points_after': round((after or 0)/1000, 3)})
 
 # 模块扣点定价（从 config 表读取，默认值兜底）
+
+# 计费键中文名与说明（管理后台展示）
+PRICING_MODULE_META = {
+    'module': {'name': '通用本地模块', 'desc': '未单独定价时的兜底固定价'},
+    'upload': {'name': '上传解析', 'desc': 'DOCX 上传与本地解析（通常免费）'},
+    'search': {'name': '文献检索', 'desc': '多源学术检索，按次扣点'},
+    'kg': {'name': '知识图谱', 'desc': '生成论文知识图谱；可配置每日免费次数'},
+    'domain_analysis': {'name': '领域分析', 'desc': '兼容键；实际走 LLM 时按 token 扣'},
+    'format-check': {'name': '格式检查', 'desc': '论文格式规范检查（本地）'},
+    'terminology': {'name': '术语分析', 'desc': '术语一致性分析（本地）'},
+    'paragraph': {'name': '段落分析', 'desc': '段落结构分析（本地）'},
+    'dashboard': {'name': '论文看板', 'desc': '十维评分看板（本地）'},
+    'data-analysis': {'name': '数据分析（统计）', 'desc': '本地统计分析'},
+    'data-ml': {'name': '数据分析（机器学习）', 'desc': '特征/模型训练，服务器计算'},
+    'export-docx': {'name': '导出 DOCX', 'desc': '导出论文草稿为 Word'},
+    'topic-finder': {'name': '选题推荐', 'desc': 'AI 选题（按 token 实扣）'},
+    'proposal': {'name': '开题大纲', 'desc': 'AI 开题（按 token 实扣）'},
+    'review': {'name': '论文审阅', 'desc': 'AI 审阅（按 token 实扣）'},
+    'optimization': {'name': '优化建议', 'desc': '本地优化建议'},
+    'expand': {'name': '论文扩写', 'desc': 'AI 扩写（按 token 实扣）'},
+    'proofread': {'name': '论文查错', 'desc': 'AI 查错（按 token 实扣）'},
+    'de-duplicate': {'name': '查重降重', 'desc': 'AI 降重（按 token 实扣）'},
+    'defense-ppt': {'name': '答辩 PPT', 'desc': 'AI 答辩大纲（按 token 实扣）'},
+    'en-abstract': {'name': '英文摘要', 'desc': 'AI 英文摘要（按 token 实扣）'},
+    'llm_analysis': {'name': '通用 LLM 分析', 'desc': '通用 AI 分析（按 token 实扣）'},
+}
+
 PRICING_DEFAULTS = {
     # 单位：厘（1点=1000厘，1元充值=1000厘）
     # 本地/轻计算（固定价）
@@ -1621,7 +1648,7 @@ PRICING_DEFAULTS = {
     'topic-finder': 0,
     'proposal': 0,
     'review': 0,
-    'optimization': 0,
+    'optimization': 50,  # 本地优化建议
     'expand': 0,
     'proofread': 0,
     'de-duplicate': 0,
@@ -3277,6 +3304,8 @@ def pricing_info():
     for k, v in PRICING_DEFAULTS.items():
         items.append({
             'key': k,
+            'name': (PRICING_MODULE_META.get(k) or {}).get('name') or k,
+            'desc': (PRICING_MODULE_META.get(k) or {}).get('desc') or '',
             'milli_credits': get_price(k) if k not in ('topic-finder','proposal','review','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis','domain_analysis') else 0,
             'points': round((get_price(k) if k not in ('topic-finder','proposal','review','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis','domain_analysis') else 0)/1000, 3),
             'billing': 'llm-token' if k in ('topic-finder','proposal','review','expand','proofread','de-duplicate','defense-ppt','en-abstract','llm_analysis','domain_analysis') else 'fixed'
@@ -3350,6 +3379,8 @@ def admin_pricing():
                 val = int(rows.get(key, default))
                 items.append({
                     'key': k,
+                    'name': (PRICING_MODULE_META.get(k) or {}).get('name') or k,
+                    'desc': (PRICING_MODULE_META.get(k) or {}).get('desc') or '',
                     'config_key': key,
                     'milli_credits': val,
                     'points': round(val/1000, 3),

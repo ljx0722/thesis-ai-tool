@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>管理员看板 — 学术论文AI一站式助手</title>
-<link rel="stylesheet" href="css/style.css?v=54">
+<link rel="stylesheet" href="css/style.css?v=55">
 <style>
   html, body.admin-page { height: auto !important; max-height: none !important; overflow-x: hidden !important; overflow-y: auto !important; }
   body.admin-page { background: var(--bg-app); font-family: var(--font-sans); color: var(--text-primary); padding: 0; min-height: 100vh; }
@@ -270,7 +270,7 @@
           <button class="admin-btn" onclick="loadPricing()">刷新</button>
           <button class="admin-btn admin-btn-primary" onclick="savePricing()">保存修改</button>
         </div>
-        <table class="admin-table" id="pricingTable"><thead><tr><th>项目</th><th>计费方式</th><th>当前(厘)</th><th>当前(点)</th><th>新值(厘)</th></tr></thead><tbody></tbody></table>
+        <table class="admin-table" id="pricingTable"><thead><tr><th>模块（中文名/说明）</th><th>计费方式</th><th>当前(厘)</th><th>当前(点)</th><th>新值(厘)</th></tr></thead><tbody></tbody></table>
         <div style="margin-top:12px" class="admin-flex-wrap">
           <label style="font-size:.72rem">注册赠送(厘)</label><input id="bonusRegister" class="admin-input" type="number" style="width:120px">
           <label style="font-size:.72rem">邀请奖励(厘)</label><input id="bonusInvite" class="admin-input" type="number" style="width:120px">
@@ -779,10 +779,10 @@ function loadPricing(){
     .then(r=>r.json()).then(d=>{
       if(!d.success) return;
       _pricingCache=d;
-      document.getElementById('pricingMeta').textContent='LLM倍率×'+(d.llm_markup||3)+'，最低扣费 '+(d.llm_min_charge_points||0.02)+' 点；每日免费本地操作 '+(d.daily_free_ops||5)+' 次';
+      document.getElementById('pricingMeta').textContent='LLM倍率×'+(d.llm_markup||3)+'，最低扣费 '+(d.llm_min_charge_points||0.02)+' 点；每日免费本地操作 '+(d.daily_free_ops!=null?d.daily_free_ops:0)+' 次（0表示本地模块也扣点）';
       var tb=document.querySelector('#pricingTable tbody'); var h='';
       (d.items||[]).forEach(function(it){
-        h+='<tr><td>'+it.key+'</td><td>'+it.billing+'</td><td>'+it.milli_credits+'</td><td>'+it.points+'</td><td><input class="admin-input price-input" data-key="'+it.key+'" type="number" value="'+it.milli_credits+'" style="width:110px" '+(it.billing==='llm-token'?'title="AI模块实际按token扣费，此值仅兼容旧接口"':'')+'></td></tr>';
+        h+='<tr><td><b>'+(it.name||it.key)+'</b><div style="font-size:.65rem;color:var(--text-muted);margin-top:2px">'+it.key+(it.desc?(' · '+it.desc):'')+'</div></td><td>'+it.billing+'</td><td>'+it.milli_credits+'</td><td>'+it.points+'</td><td><input class="admin-input price-input" data-key="'+it.key+'" type="number" value="'+it.milli_credits+'" style="width:110px" '+(it.billing==='llm-token'?'title="AI模块实际按token扣费，此值仅兼容旧接口"':'')+'></td></tr>';
       });
       tb.innerHTML=h;
       document.getElementById('bonusRegister').value=(d.bonuses&&d.bonuses.register_bonus)||3000;

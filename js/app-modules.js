@@ -109,14 +109,14 @@ function renderToolHome(){
   (APP_MODULES||[]).forEach(function(m){ (m.requiresThesis?need:free).push(m); });
   // ensure data-analysis highlighted
   freeHost.innerHTML = free.map(function(m){
-    var billing = m.aiDriven ? 'AI · 按 token 计费' : (m.localCharge ? '本地 · 低价/每日免费' : (m.serverFixed ? '服务器计算计费' : '本地/随时可用'));
+    var billing = m.aiDriven ? 'AI · 按 token 计费' : (m.localCharge ? '本地 · 按次扣点' : (m.serverFixed ? '服务器计算计费' : '本地/随时可用'));
     return '<button class="tool-card" onclick="launchTool(\''+m.id+'\')"><b>'+m.icon+' '+m.name+'</b><span>'+billing+'</span></button>';
   }).join('') +
   '<button class="tool-card" onclick="launchTool(\'materials\')"><b>📁 资料库</b><span>上传 CSV 等，供分析模块复用</span></button>'+
   '<button class="tool-card" onclick="launchTool(\'pipeline\')"><b>⚡ 一键流水线</b><span>大纲+章节骨架</span></button>'+
   '<button class="tool-card" onclick="launchTool(\'defense-pack\')"><b>🎤 答辩材料包</b><span>讲稿/问答/PPT结构</span></button>';
   thesisHost.innerHTML = need.map(function(m){
-    var billing = m.aiDriven ? 'AI 计费' : (m.localCharge ? '本地低价' : '');
+    var billing = m.aiDriven ? 'AI 计费' : (m.localCharge ? '按次扣点' : '');
     return '<button class="tool-card" onclick="launchTool(\''+m.id+'\')"><b>'+m.icon+' '+m.name+'</b><span>基于论文内容分析'+(billing?' · '+billing:'')+'</span><div class="need-tag">建议先有论文/草稿</div></button>';
   }).join('');
 }
@@ -555,6 +555,13 @@ function switchPanel(moduleId) {
   // 本地固定价模块：先扣点/走每日免费，再运行
   if (modDef && modDef.localCharge) {
     chargeModule(moduleId).then(function(res){
+      if(res.ok){
+        try{
+          if(typeof updateBalanceDisplay==='function') updateBalanceDisplay();
+          if(!res.free && res.cost_points && typeof ttp==='function') ttp('已扣 '+res.cost_points+' 点');
+          if(res.free && typeof ttp==='function') ttp('今日免费额度');
+        }catch(e0){}
+      }
       if(!res.ok){
         if(needsThesis) hideLoad();
         var msg = res.error || '无法启动模块';
