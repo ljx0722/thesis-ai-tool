@@ -2191,3 +2191,9 @@ body.dark .bar{
 body.dark .bar-left h1{ color:#f8fafc !important; }
 body.dark .bar-tab{ color: rgba(255,255,255,.55) !important; }
 body.dark .bar-tab.active{ color: var(--accent-light) !important; }
+
+
+/* recharge dual QR */
+.recharge-qr-card{ transition: border-color .15s, box-shadow .15s; }
+.recharge-qr-card:hover{ border-color: rgba(99,102,241,.45) !important; }
+.recharge-amt-btn.active{ outline:2px solid var(--accent); }

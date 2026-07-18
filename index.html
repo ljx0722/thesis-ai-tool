@@ -403,22 +403,22 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
 <script defer src="mammoth.browser.min.js"></script>
 <script defer src="jszip.min.js"></script>
-<script src="app.js?v=57"></script>
-<script src="js/modules/optimization.js?v=57"></script>
-<script src="js/modules/format-check.js?v=57"></script>
-<script src="js/modules/terminology.js?v=57"></script>
-<script src="js/modules/paragraph-analysis.js?v=57"></script>
-<script src="js/modules/dashboard.js?v=57"></script>
-<script src="js/modules/thesis-review.js?v=57"></script>
-<script src="js/modules/proposal.js?v=57"></script>
-<script src="js/modules/onboarding.js?v=57"></script>
-<script src="js/modules/topic-finder.js?v=57"></script>
-<script src="js/modules/proofread.js?v=57"></script>
-<script src="js/modules/de-duplicate.js?v=57"></script>
-<script src="js/modules/defense-ppt.js?v=57"></script>
-<script src="js/modules/en-abstract.js?v=57"></script>
-<script src="js/modules/project.js?v=57"></script>
-<script src="js/app-modules.js?v=57"></script>
+<script src="app.js?v=58"></script>
+<script src="js/modules/optimization.js?v=58"></script>
+<script src="js/modules/format-check.js?v=58"></script>
+<script src="js/modules/terminology.js?v=58"></script>
+<script src="js/modules/paragraph-analysis.js?v=58"></script>
+<script src="js/modules/dashboard.js?v=58"></script>
+<script src="js/modules/thesis-review.js?v=58"></script>
+<script src="js/modules/proposal.js?v=58"></script>
+<script src="js/modules/onboarding.js?v=58"></script>
+<script src="js/modules/topic-finder.js?v=58"></script>
+<script src="js/modules/proofread.js?v=58"></script>
+<script src="js/modules/de-duplicate.js?v=58"></script>
+<script src="js/modules/defense-ppt.js?v=58"></script>
+<script src="js/modules/en-abstract.js?v=58"></script>
+<script src="js/modules/project.js?v=58"></script>
+<script src="js/app-modules.js?v=58"></script>
 <script>
 (function(){
   var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');
@@ -613,9 +613,11 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
     var el = document.getElementById('rechargeModal');
     if (el) el.style.display = 'flex';
     window._pendingOrderId = null;
+    if (!window._selectedPayment) window._selectedPayment = 'alipay';
     updateRechargeBalance();
     loadRechargeHistory();
-    var btn = document.querySelector('#rechargePayment button');
+    try { switchQR(window._selectedPayment || 'alipay'); } catch (e) {}
+    var btn = (document.getElementById('rechargeSubmitBtn')||document.querySelector('#rechargePayment button'));
     if (btn) { btn.textContent = '我已支付，提交申请'; btn.disabled = false; btn.onclick = submitRecharge; }
   };
   window.hideRechargeModal = function() {
@@ -631,15 +633,22 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
     document.getElementById('rechargePayment').style.display = '';
     var btns = document.querySelectorAll('.recharge-amt-btn');
     for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('active', parseInt(btns[i].getAttribute('data-amt')) === amount);
-    var btn = document.querySelector('#rechargePayment button');
+    try { switchQR(window._selectedPayment || 'alipay'); } catch (e) {}
+    var btn = (document.getElementById('rechargeSubmitBtn')||document.querySelector('#rechargePayment button'));
     if (btn) { btn.textContent = '我已支付，提交申请'; btn.disabled = false; btn.onclick = submitRecharge; }
   };
   window.switchQR = function(method) {
-    window._selectedPayment = method;
+    window._selectedPayment = method || 'alipay';
+    var cards = document.querySelectorAll('.recharge-qr-card');
+    for (var i = 0; i < cards.length; i++) {
+      var active = cards[i].getAttribute('data-method') === window._selectedPayment;
+      cards[i].style.borderColor = active ? 'var(--accent)' : 'transparent';
+      cards[i].style.boxShadow = active ? '0 0 0 1px var(--accent)' : 'none';
+    }
+    var lab = document.getElementById('rechargePayMethodLabel');
+    if (lab) lab.textContent = window._selectedPayment === 'wechat' ? '微信' : '支付宝';
     var img = document.getElementById('qrImage');
-    img.src = 'static/qr-' + method + '.png';
-    var tabs = document.querySelectorAll('.qr-tab-btn');
-    for (var i = 0; i < tabs.length; i++) tabs[i].classList.toggle('active', tabs[i].getAttribute('data-method') === method);
+    if (img) img.src = 'static/qr-' + window._selectedPayment + '.png';
   };
   window.submitRecharge = function() {
     if (!window._selectedAmount) { alert('请选择充值金额'); return; }
@@ -653,7 +662,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
         if (d.success) {
           window._pendingOrderId = d.order_id || null;
           alert('请扫码支付 ¥'+window._selectedAmount+(d.order_id?'（订单#'+d.order_id+'，转账备注请填订单号）':'')+'，支付完成后回来点击"确认已支付"');
-          var btn = document.querySelector('#rechargePayment button');
+          var btn = (document.getElementById('rechargeSubmitBtn')||document.querySelector('#rechargePayment button'));
           if (btn) { btn.textContent = '✅ 确认已支付，提交审核'; btn.onclick = confirmPaid; btn.disabled = false; }
           loadRechargeHistory();
         } else { alert(d.error); }
@@ -672,7 +681,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
             alert(d2.message || '已提交审核，请等待管理员确认到账');
             loadRechargeHistory();
             if (window.pollNotifications) window.pollNotifications();
-            var btn = document.querySelector('#rechargePayment button');
+            var btn = (document.getElementById('rechargeSubmitBtn')||document.querySelector('#rechargePayment button'));
             if (btn) { btn.textContent = '已提交，等待确认'; btn.disabled = true; }
             window._pendingOrderId = null;
           } else { alert(d2.error); }
@@ -861,13 +870,13 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 
 <!-- ====== 充值弹窗 ====== -->
 <div id="rechargeModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg-overlay);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:100005;align-items:center;justify-content:center" onclick="hideRechargeModal()">
-  <div style="background:var(--bg-card);border-radius:var(--radius-xl);padding:24px;width:440px;max-width:92%;max-height:80vh;overflow-y:auto;border:1px solid var(--border);box-shadow:var(--shadow-lg)" onclick="event.stopPropagation()">
+  <div style="background:var(--bg-card);border-radius:var(--radius-xl);padding:24px;width:520px;max-width:96%;max-height:85vh;overflow-y:auto;border:1px solid var(--border);box-shadow:var(--shadow-lg)" onclick="event.stopPropagation()">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <h3 style="font-size:var(--font-size-xl);color:var(--text-primary);margin:0;font-weight:var(--font-weight-bold)">充值</h3>
       <button onclick="hideRechargeModal()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.2rem;font-family:var(--font-sans)">&times;</button>
     </div>
     <p style="font-size:var(--font-size-md);color:var(--text-muted);margin:0 0 8px">当前余额: <strong id="rechargeBalance" style="color:var(--text-primary)">0.00</strong> 点</p>
-    <p style="font-size:.68rem;color:var(--text-muted);margin:0 0 12px;line-height:1.55">充值规则：<b>1 元 = 1 点</b>。AI 写作按实际 token 扣点；本地功能低价或每日免费额度。</p>
+    <p style="font-size:.68rem;color:var(--text-muted);margin:0 0 12px;line-height:1.55">充值规则：<b>1 元 = 1 点</b>。智能与分析能力按用量/次数计点。</p>
     <h4 style="font-size:var(--font-size-base);color:var(--text-secondary);margin:0 0 8px;font-weight:var(--font-weight-semibold)">选择充值金额（1元=1点）</h4>
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <button class="recharge-amt-btn" data-amt="1" onclick="selectRechargeAmount(1)">1元<span style="display:block;font-size:.5rem;opacity:.4;margin-top:1px">=1.0点</span></button>
@@ -877,16 +886,22 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
       <button class="recharge-amt-btn" data-amt="50" onclick="selectRechargeAmount(50)">50元<span style="display:block;font-size:.5rem;opacity:.4;margin-top:1px">=50.0点</span></button>
     </div>
     <div id="rechargePayment" style="display:none;padding:14px;background:var(--surface-alt);border-radius:var(--radius-lg);border:1px solid var(--border);margin-bottom:12px">
-      <h4 style="font-size:var(--font-size-md);color:var(--text-muted);margin:0 0 8px;font-weight:var(--font-weight-semibold)">扫码支付</h4>
-      <div style="display:flex;gap:8px;margin-bottom:10px">
-        <button class="qr-tab-btn active" data-method="alipay" onclick="switchQR('alipay')">支付宝</button>
-        <button class="qr-tab-btn" data-method="wechat" onclick="switchQR('wechat')">微信</button>
+      <h4 style="font-size:var(--font-size-md);color:var(--text-muted);margin:0 0 10px;font-weight:var(--font-weight-semibold)">扫码支付</h4>
+      <div class="recharge-qr-pair" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:12px">
+        <div class="recharge-qr-card" data-method="alipay" onclick="switchQR('alipay')" style="flex:1;min-width:150px;max-width:200px;text-align:center;padding:10px;border-radius:12px;border:2px solid var(--accent);background:var(--bg-card);cursor:pointer">
+          <div style="font-size:.78rem;font-weight:700;margin-bottom:6px;color:var(--text-primary)">支付宝</div>
+          <img id="qrImageAlipay" src="static/qr-alipay.png" alt="支付宝收款码" style="width:148px;height:148px;border-radius:10px;background:#fff;object-fit:contain;display:block;margin:0 auto">
+          <div style="font-size:.62rem;color:var(--text-muted);margin-top:6px">扫码向商家付款</div>
+        </div>
+        <div class="recharge-qr-card" data-method="wechat" onclick="switchQR('wechat')" style="flex:1;min-width:150px;max-width:200px;text-align:center;padding:10px;border-radius:12px;border:2px solid transparent;background:var(--bg-card);cursor:pointer">
+          <div style="font-size:.78rem;font-weight:700;margin-bottom:6px;color:var(--text-primary)">微信</div>
+          <img id="qrImageWechat" src="static/qr-wechat.png" alt="微信收款码" style="width:148px;height:148px;border-radius:10px;background:#fff;object-fit:contain;display:block;margin:0 auto">
+          <div style="font-size:.62rem;color:var(--text-muted);margin-top:6px">扫码向商家付款</div>
+        </div>
       </div>
-      <div style="text-align:center;margin-bottom:8px">
-        <img id="qrImage" src="static/qr-alipay.png" alt="收款码" style="width:180px;height:180px;border-radius:var(--radius-md);background:var(--surface-alt);object-fit:contain">
-      </div>
-      <button onclick="submitRecharge()" style="width:100%;padding:10px;border-radius:var(--radius-md);border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:var(--font-weight-bold);font-size:var(--font-size-base);font-family:var(--font-sans);transition:all var(--duration-fast)">我已支付，提交申请</button>
-      <p style="font-size:var(--font-size-xs);color:var(--text-muted);text-align:center;margin:6px 0 0">支付后点击下方按钮提交审核，管理员确认后到账；到账会通过消息中心通知你</p>
+      <p id="rechargePayHint" style="font-size:var(--font-size-xs);color:var(--text-muted);text-align:center;margin:0 0 10px">请使用<strong id="rechargePayMethodLabel">支付宝</strong>扫码支付所选金额，转账备注可填订单号</p>
+      <button id="rechargeSubmitBtn" onclick="submitRecharge()" style="width:100%;padding:12px;border-radius:var(--radius-md);border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:var(--font-weight-bold);font-size:var(--font-size-base);font-family:var(--font-sans)">我已支付，提交申请</button>
+      <p style="font-size:var(--font-size-xs);color:var(--text-muted);text-align:center;margin:8px 0 0">支付完成后点下方按钮提交审核；管理员确认后到账，并通过消息中心通知你</p>
     </div>
     <h4 style="font-size:var(--font-size-md);color:var(--text-secondary);margin:12px 0 6px;font-weight:var(--font-weight-semibold)">修改密码</h4>
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
