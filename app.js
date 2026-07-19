@@ -156,18 +156,80 @@ function zoomThesis(d,r){
 }
 
 (function(){
-  var a=document.getElementById('navResizer'),b=document.getElementById('navSidebar'),d=false;
-  if(a&&b){
-    a.addEventListener('mousedown',function(e){if(window.innerWidth<1024)return;d=true;e.preventDefault()});
-    document.addEventListener('mousemove',function(e){if(!d)return;var w=Math.max(140,Math.min(400,e.clientX));b.style.setProperty('--nav-panel-width',w+'px');b.style.width=w+'px'});
-    document.addEventListener('mouseup',function(){d=false});
+  var layout=document.getElementById('mainLayout');
+  if(!layout)return;
+  var storageKey='thesisbuddy_workspace_widths_v1';
+  var manuscriptMin=320;
+  var panes={
+    nav:{handle:'navResizer',panel:'navSidebar',prop:'--nav-panel-width',min:150,max:260,side:'left',fallback:200},
+    toc:{handle:'tocResizer',panel:'tocPanel',prop:'--toc-panel-width',min:150,max:320,side:'left',fallback:220},
+    tool:{handle:'refResizer',panel:'refPanel',prop:'--tool-panel-width',min:280,max:520,side:'right',fallback:380}
+  };
+  function validWidth(v){return Number.isFinite(v)&&v>0;}
+  function readWidths(){
+    try{
+      var saved=JSON.parse(localStorage.getItem(storageKey)||'{}');
+      return {nav:validWidth(saved.nav)?saved.nav:null,toc:validWidth(saved.toc)?saved.toc:null,tool:validWidth(saved.tool)?saved.tool:null};
+    }catch(e){return {nav:null,toc:null,tool:null};}
   }
-  var c=document.getElementById('refResizer'),p=document.getElementById('refPanel'),dragging=false;
-  if(c&&p){
-    c.addEventListener('mousedown',function(ev){if(window.innerWidth<1024)return;dragging=true;ev.preventDefault()});
-    document.addEventListener('mousemove',function(ev){if(!dragging)return;var w=Math.max(280,Math.min(Math.floor(window.innerWidth*.42),window.innerWidth-ev.clientX));p.style.setProperty('--tool-panel-width',w+'px');p.style.width=w+'px'});
-    document.addEventListener('mouseup',function(){dragging=false});
+  function currentWidth(key){
+    var p=panes[key],el=document.getElementById(p.panel);
+    return el?el.getBoundingClientRect().width:p.fallback;
   }
+  function clampWidth(key,value,others){
+    var p=panes[key],width=Math.max(p.min,Math.min(p.max,value));
+    var available=layout.clientWidth-manuscriptMin-15;
+    Object.keys(panes).forEach(function(other){if(other!==key)available-=others[other];});
+    return Math.max(p.min,Math.min(width,Math.max(p.min,available)));
+  }
+  function applyWidths(values){
+    var others={nav:values.nav||panes.nav.fallback,toc:values.toc||panes.toc.fallback,tool:values.tool||panes.tool.fallback};
+    Object.keys(panes).forEach(function(key){
+      var p=panes[key],value=clampWidth(key,others[key],others);
+      layout.style.setProperty(p.prop,Math.round(value)+'px');
+      others[key]=value;
+    });
+    return others;
+  }
+  function saveWidths(values){
+    try{localStorage.setItem(storageKey,JSON.stringify({nav:Math.round(values.nav),toc:Math.round(values.toc),tool:Math.round(values.tool)}));}catch(e){}
+  }
+  function restoreWidths(){
+    if(window.innerWidth<1024||layout.clientWidth<=0)return;
+    var saved=readWidths(),values={nav:saved.nav||panes.nav.fallback,toc:saved.toc||panes.toc.fallback,tool:saved.tool||panes.tool.fallback};
+    values=applyWidths(values);saveWidths(values);
+  }
+  function resizeValue(key,event){
+    var p=panes[key],panel=document.getElementById(p.panel),rect=panel.getBoundingClientRect(),value=p.side==='left'?event.clientX-rect.left:layout.getBoundingClientRect().right-event.clientX;
+    var values={nav:currentWidth('nav'),toc:currentWidth('toc'),tool:currentWidth('tool')};
+    values[key]=value;
+    values=applyWidths(values);
+    return values;
+  }
+  Object.keys(panes).forEach(function(key){
+    var p=panes[key],handle=document.getElementById(p.handle);
+    if(!handle)return;
+    var dragging=false,activePointer=null,latest;
+    function end(){
+      if(!dragging)return;
+      dragging=false;activePointer=null;document.body.classList.remove('is-resizing');
+      if(latest)saveWidths(latest);
+    }
+    handle.addEventListener('pointerdown',function(e){
+      if(window.innerWidth<1024||!e.isPrimary)return;
+      dragging=true;activePointer=e.pointerId;latest=resizeValue(key,e);handle.setPointerCapture(e.pointerId);document.body.classList.add('is-resizing');e.preventDefault();
+    });
+    handle.addEventListener('pointermove',function(e){
+      if(!dragging||e.pointerId!==activePointer)return;
+      latest=resizeValue(key,e);e.preventDefault();
+    });
+    handle.addEventListener('pointerup',end);
+    handle.addEventListener('pointercancel',end);
+  });
+  restoreWidths();
+  window.addEventListener('resize',function(){
+    if(window.innerWidth>=1024)restoreWidths();
+  });
 })();
 
 async function parseDocxStructure(buf){var zip=await JSZip.loadAsync(buf),xml=await zip.file('word/document.xml').async('string'),all=[],pm,pr=/<w:p[ >][\s\S]*?<\/w:p>/g;while((pm=pr.exec(xml))!==null){var p=pm[0],sm=p.match(/<w:pStyle[^>]*w:val="(\d+)"/),style=sm?sm[1]:'',tx=[],tm,tr=/<w:t[^>]*>([^<]*)<\/w:t>/g;while((tm=tr.exec(p))!==null)tx.push(tm[1]);all.push({style:style,text:tx.join(''),idx:all.length})}var tree=[],curCh=null,curSec=null;for(var i=0;i<all.length;i++){var a=all[i];if(a.text&&(a.style==='14'||(/^第[一-龥\d]+章/.test(a.text)&&a.style!=='5'&&a.style!=='8'&&a.style!=='9'&&a.style!=='3'))){var m=a.text.match(/^第([一-龥\d]+)章\s*(.*)/),c=m?cnDigit(m[1]):(tree.length+1);curCh={ch:c,name:a.text,paraIdx:a.idx,sections:[]};tree.push(curCh);curSec=null}else if(a.style==='15'&&curCh&&a.text){var sm=a.text.match(/^(\d+\.\d+)\s*(.*)/);curSec={num:sm?sm[1]:a.text.substring(0,5),title:sm?sm[2]:a.text,paraIdx:a.idx,subs:[]};curCh.sections.push(curSec)}else if(a.style==='16'&&curSec&&a.text){var sm2=a.text.match(/^(\d+\.\d+\.\d+)\s*(.*)/);curSec.subs.push({num:sm2?sm2[1]:a.text.substring(0,7),title:sm2?sm2[2]:a.text,paraIdx:a.idx})}}if(!tree.length){var chSet={};for(var i2=0;i2<all.length;i2++){var a2=all[i2];var chM2=a2.text.match(/^第([一-龥\d]+)章\s*(.*)/);if(chM2&&!chSet[cnDigit(chM2[1])]){var c2=cnDigit(chM2[1]);chSet[c2]=true;tree.push({ch:c2,name:a2.text,paraIdx:a2.idx,sections:[]});}}}return tree}
@@ -186,7 +248,11 @@ function bodyBoundaryEl(){
   }
   return null;
 }
-function beforeRefList(el){var b=bodyBoundaryEl();if(!b)return true;return !(el.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING)||el===b}
+function isAfterRefBoundary(el,boundary){
+  if(!el||!boundary||el===boundary)return false;
+  return !!(el.compareDocumentPosition(boundary)&Node.DOCUMENT_POSITION_PRECEDING);
+}
+function beforeRefList(el){var b=bodyBoundaryEl();return !b||!isAfterRefBoundary(el,b)}
 function firstBodyChEl(){return document.getElementById('ch-1')}
 
 function wrapExistingMarkers(refs){
@@ -1328,9 +1394,14 @@ function asSkip(){
 // ========== 内联标题校准：点击原文段落指定层级（支持任意深度） ==========
 
 // ========== 弹窗③: 标题层级校准（分步向导） ==========
-var _cwCandidates=[],_cwCallback=null,_cwPhase=0;
+var _cwCandidates=[],_cwCallback=null,_cwPhase=0,_cwSession=0,_cwSettled=true;
 
-function startInlineCalibration(box,autoDetected){_cwCandidates=autoDetected;_cwPhase=0;window._cwAllParaTexts=null;window._cwCheckedEls=null;_cwConfirmed={'0':new Set(),'1':new Set(),'2':new Set()};return new Promise(function(resolve){_cwCallback=resolve;showCalibrationWizard();});}
+function settleCalibration(value){
+  if(_cwSettled)return;
+  _cwSettled=true;var callback=_cwCallback;_cwCallback=null;
+  if(callback)callback(value);
+}
+function startInlineCalibration(box,autoDetected){_cwCandidates=autoDetected;_cwPhase=0;_cwSession++;_cwSettled=false;window._cwAllParaTexts=null;window._cwCheckedEls=null;_cwConfirmed={'0':new Set(),'1':new Set(),'2':new Set()};return new Promise(function(resolve){_cwCallback=resolve;showCalibrationWizard();});}
 function showCalibrationWizard(){_cwPhase=0;renderCalibrationModal();hideLoad();}
 
 
@@ -1389,7 +1460,7 @@ function cwGetStyleParagraphs(sname){
   var refBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
   var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
   for(var j=0;j<els.length;j++){
-    if(refBound&&(els[j].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
+    if(refBound&&isAfterRefBoundary(els[j],refBound))continue;
     var t=(els[j].textContent||'').trim();if(!t||t.length<2)continue;
     result.push({el:els[j],txt:t});
   }
@@ -1436,7 +1507,7 @@ function cwShowConfirmPopup(sname){
       var refBound=typeof bodyBoundaryEl==='function'?bodyBoundaryEl():null;
       var els=box.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
       for(var j=0;j<els.length;j++){
-        if(refBound&&(els[j].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
+        if(refBound&&isAfterRefBoundary(els[j],refBound))continue;
         var et=(els[j].textContent||'').trim();if(!et||et.length<2)continue;
         items.push({txt:et,checked:true,idx:items.length});
       }
@@ -1548,7 +1619,10 @@ function cwConfirmClose(){
   window._cwConfirmItems=null;window._cwConfirmStyle=null;
 }
 
-function cwNextPhase(){if(_cwPhase<2){_cwPhase++;renderCalibrationModal();}else{cwFinish();}}
+function cwNextPhase(){
+  if(_cwPhase===0&&(!window._cwCheckedEls||!(window._cwCheckedEls[0]||[]).length)){alert('请先选择并确认至少一个章标题样式。');return;}
+  if(_cwPhase<2){_cwPhase++;renderCalibrationModal();}else{cwFinish();}
+}
 function cwPrevPhase(){if(_cwPhase>0){_cwPhase--;renderCalibrationModal();}}
 
 // 从预解析 docx 数据中收集所有正文范围的段落内容
@@ -1650,10 +1724,10 @@ function cwFinish(){
   _cwConfirmed={'0':new Set(),'1':new Set(),'2':new Set()};
   window._cwCheckedEls=null;
   window._cwAllParaTexts=null;
-  if(_cwCallback)_cwCallback(_cwCandidates);
+  settleCalibration(_cwCandidates);
 }
 
-function mcClose(){var ov=document.getElementById('cwOverlay');if(ov)ov.parentElement.removeChild(ov);_cwSelections={'0':new Set(),'1':new Set(),'2':new Set()};_cwConfirmed={'0':new Set(),'1':new Set(),'2':new Set()};window._cwCheckedEls=null;if(_cwCallback)_cwCallback(null);}
+function mcClose(){var ov=document.getElementById('cwOverlay');if(ov)ov.parentElement.removeChild(ov);_cwSelections={'0':new Set(),'1':new Set(),'2':new Set()};_cwConfirmed={'0':new Set(),'1':new Set(),'2':new Set()};window._cwCheckedEls=null;settleCalibration(null);}
 function mcAcceptAll(){cwFinish();}
 function showCalibrationModal(){showCalibrationWizard();}
 
@@ -1757,7 +1831,6 @@ function cwGetUnassigned(){return[];}
 
 
 // ========== 弹窗④: 检索结果确认 ==========
-async 
 function getSearchSeedText(){
   var t = (typeof manuscriptText !== 'undefined' && manuscriptText) ? String(manuscriptText) : '';
   if (t && t.replace(/\s+/g, '').length > 80) return t;
@@ -2483,7 +2556,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     // 找下一个标题的位置作为边界
     var endPos=allBodyEls.length;
     for(var ei=startPos+1;ei<allBodyEls.length;ei++){
-      if(refBound&&(allBodyEls[ei].compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING)){endPos=ei;break;}
+      if(refBound&&isAfterRefBoundary(allBodyEls[ei],refBound)){endPos=ei;break;}
       if(hdMap.has(allBodyEls[ei])){endPos=ei;break;}
     }
     // 收集该区间内的非标题段落
@@ -2545,18 +2618,31 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
 (function(){
   var fi=document.getElementById('fileInput');
   if(!fi)return;
+  var importRunning=false,importSequence=0;
   async function beginImportFile(file,intent){
-    if(!file)return;
-    showLoad('准备导入...', 1, file.name||'');
-    window._importIntent=intent||window._importIntent||'new';
-    hideUploadOverlay();
-    if(window._importIntent==='replace'&&_thesisLoaded&&!confirm('将把新文件保存为当前项目的新版本，旧版本仍可恢复。继续？')){hideLoad();return;}
-    window._pendingImportFile=file;
-    await parseImportedFile(file);
+    if(!file||importRunning)return;
+    importRunning=true;var importId=++importSequence;
+    try{
+      if(typeof showLoad!=='function')throw new Error('导入界面尚未加载完成，请刷新页面后重试。');
+      showLoad('准备导入...', 1, file.name||'');
+      window._importIntent=intent||window._importIntent||'new';
+      if(typeof hideUploadOverlay==='function')hideUploadOverlay();
+      else {var uploadOverlay=document.getElementById('uploadOverlay');if(uploadOverlay)uploadOverlay.classList.remove('show');}
+      if(window._importIntent==='replace'&&_thesisLoaded&&!confirm('将把新文件保存为当前项目的新版本，旧版本仍可恢复。继续？'))return;
+      window._pendingImportFile=file;
+      await parseImportedFile(file,importId);
+    }catch(importError){
+      console.error('[import]',importError);
+      if(typeof hideLoad==='function')hideLoad();
+      alert(importError&&importError.message?importError.message:'论文导入失败，请重试。');
+    }finally{
+      if(importId===importSequence){importRunning=false;window._pendingImportFile=null;}
+      fi.value='';
+    }
   }
   window.beginImportFile=beginImportFile;
-  fi.addEventListener('change',async function(e){var file=e.target.files[0];e.target.value='';await beginImportFile(file,window._importIntent||'new');});
-  async function parseImportedFile(f){
+  fi.addEventListener('change',function(e){var file=e.target.files[0];e.target.value='';beginImportFile(file,window._importIntent||'new').catch(function(err){console.error('[import change]',err);});});
+  async function parseImportedFile(f,importId){
     if(!f)return;
     var importSnapshot={
       thesisLoaded:_thesisLoaded,
@@ -2570,6 +2656,8 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
       thesisBoxHTML:(document.getElementById('thesisBox')||{}).innerHTML||''
     };
     window._uploadFileName=f.name||'document.docx';window._uploadFileSize=f.size||0;
+    if(!f.size)throw new Error('文件为空，请重新选择有效的 Word 文档。');
+    if(f.size>80*1024*1024)throw new Error('文件超过 80MB，请压缩图片或拆分文档后重试。');
     // 扩展名可能不准（微信/网盘重命名、大小写、双后缀），用文件头魔数识别
     var name=(f.name||'document').toLowerCase();
     var ext=name.split('.').pop()||'';
@@ -2615,11 +2703,11 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
         updLoad('等待 '+missing.join(' / ')+' 加载...',Math.min(8,retry*0.5+3));
       }
       var missingFinal=[];if(typeof mammoth==='undefined')missingFinal.push('Mammoth');if(typeof JSZip==='undefined')missingFinal.push('JSZip');
-      if(missingFinal.length){hideLoad();alert(missingFinal.join(' / ')+' 加载超时。请刷新页面后重试。');return}
+      if(missingFinal.length){throw new Error(missingFinal.join(' / ')+' 加载超时。请刷新页面后重试。');}
     }
 
     updLoad('读取文件...',10);var buf;
-    try{buf=await f.arrayBuffer()}catch(er2){hideLoad();alert('文件读取失败: '+er2.message);return}
+    try{buf=await f.arrayBuffer()}catch(er2){throw new Error('文件读取失败: '+er2.message);}
     } // end if docx
 
     try{
@@ -2648,8 +2736,12 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     var mammothOptions={includeDefaultStyleMap:true,transformDocument:function(doc){return doc;}};
     try{
       var docxZip=await JSZip.loadAsync(buf);
-      var stylesXml=await docxZip.file('word/styles.xml').async('string');
-      var docXml=await docxZip.file('word/document.xml').async('string');
+      var contentTypesFile=docxZip.file('[Content_Types].xml'),documentFile=docxZip.file('word/document.xml');
+      if(!contentTypesFile||!documentFile)throw new Error('该文件不是有效的 DOCX 文档，请用 Word 另存为 .docx 后重试。');
+      var docXml=await documentFile.async('string');
+      if(!docXml.trim())throw new Error('DOCX 文档内容为空，请选择包含正文的文件。');
+      var stylesFile=docxZip.file('word/styles.xml');
+      var stylesXml=stylesFile?await stylesFile.async('string'):'';
       if(stylesXml&&docXml){
         // ----- 步骤A: 从 styles.xml 提取 styleId → 名称 + 默认字体属性 -----
         var styleNameById={}, styleTypeById={}, styleRprById={};
@@ -3015,7 +3107,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
       for (var bi = Math.max(0, tocIdx); bi < allEls.length; bi++) {
         var bt = (allEls[bi].textContent || '').trim();
         if (!bt || bt.length < 2 || bt.length > 60) continue;
-        if (refBound && (allEls[bi].compareDocumentPosition(refBound) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+        if (refBound && isAfterRefBoundary(allEls[bi],refBound)) break;
         // 用 detectHeadingLevel 判定
         var hdLv = detectHeadingLevel(bt);
         var isFirstCh = hdLv === 0 ||
@@ -3030,14 +3122,15 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
       // 诊断日志
       console.log('[detect] bodyStartIdx='+bodyStartIdx+' tocIdx='+tocIdx+' allEls.length='+allEls.length+' refBound='+!!refBound);
       // 统计标签分布
-      var tagStats={};for(var ti=tocIdx;ti<Math.min(tocIdx+30,allEls.length);ti++){var tn=(allEls[ti].tagName||'').toUpperCase();tagStats[tn]=(tagStats[tn]||0)+1;}
+      var scanStart=Math.max(0,tocIdx);
+      var tagStats={};for(var ti=scanStart;ti<Math.min(scanStart+30,allEls.length);ti++){var tn=(allEls[ti].tagName||'').toUpperCase();tagStats[tn]=(tagStats[tn]||0)+1;}
       console.log('[detect] first 30 tags after tocIdx:',JSON.stringify(tagStats));
       // ===== 第3步：收集标题候选（HTML 标签 + 样式数据 + 文本模式）=====
       var allHeadings = [];
       for (var ei = bodyStartIdx; ei < allEls.length; ei++) {
         var el2 = allEls[ei], txt2 = (el2.textContent || '').trim();
         if (!txt2 || txt2.length < 2) continue;
-        if (refBound && (el2.compareDocumentPosition(refBound) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+        if (refBound && isAfterRefBoundary(el2,refBound)) break;
         if (/^\d{1,3}$/.test(txt2) || /^[ivxlcdmIVXLCDM]+$/.test(txt2)) continue;
         if (/\t\d{1,3}$/.test(txt2) || /[\s\.]{2,}\d{1,3}$/.test(txt2) || /[\s]+\d{1,3}$/.test(txt2)) continue;
         var tagName = (el2.tagName || '').toUpperCase();
@@ -3081,7 +3174,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
       for(var ei5=bodyStartIdx;ei5<allEls.length;ei5++){
         var ef5=allEls[ei5],tf5=(ef5.textContent||'').trim();
         if(!tf5||tf5.length<2)continue;
-        if(refBound&&(ef5.compareDocumentPosition(refBound)&Node.DOCUMENT_POSITION_FOLLOWING))break;
+        if(refBound&&isAfterRefBoundary(ef5,refBound))break;
         var dupH=false;
         for(var dh=0;dh<allHeadings.length;dh++){if(allHeadings[dh].el===ef5){dupH=true;break;}}
         if(dupH)continue;
@@ -3094,7 +3187,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
       for (var ei2 = bodyStartIdx; ei2 < allEls.length; ei2++) {
         var ef = allEls[ei2], tf = (ef.textContent || '').trim();
         if (!tf || tf.length < 2) continue;
-        if (refBound && (ef.compareDocumentPosition(refBound) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+        if (refBound && isAfterRefBoundary(ef,refBound)) break;
         var dup2 = false;
         for (var di = 0; di < allHeadings.length; di++) { if (allHeadings[di].el === ef) { dup2 = true; break; } }
         if (dup2) continue;
@@ -3108,7 +3201,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
         for (var ei3 = bodyStartIdx; ei3 < allEls.length; ei3++) {
           var ef2 = allEls[ei3], tf2 = (ef2.textContent || '').trim();
           if (!tf2 || tf2.length < 2 || tf2.length > 200) continue;
-          if (refBound && (ef2.compareDocumentPosition(refBound) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+          if (refBound && isAfterRefBoundary(ef2,refBound)) break;
           if (/^\d{1,3}$/.test(tf2)) continue;
           var dup3 = false;
           for (var dj = 0; dj < allHeadings.length; dj++) { if (allHeadings[dj].el === ef2) { dup3 = true; break; } }
@@ -3124,6 +3217,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
         console.log('[detect] first 5 headings:',allHeadings.slice(0,5).map(function(h){return'<'+((h.el.tagName||'').toUpperCase())+'> lv='+h.level+' '+h.txt.substring(0,60);}));
       }
 
+  if(!allHeadings.length)throw new Error('未检测到可用标题样式，请检查 DOCX 内容后重试。');
       // ===== 第3.5步：统一解析 level（tagLevel / 文本 / 样式）=====
       for(var ni=0;ni<allHeadings.length;ni++){
         var hh=allHeadings[ni];
@@ -3309,7 +3403,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
       while(elAll){
         var tagE=(elAll.tagName||'').toLowerCase();
         if(/^(p|li|h[1-6]|div|td)$/.test(tagE)){
-          if(!refBoundary||!(elAll.compareDocumentPosition(refBoundary)&Node.DOCUMENT_POSITION_FOLLOWING)){
+          if(!refBoundary||!isAfterRefBoundary(elAll,refBoundary)){
             var elTxt=elAll.textContent||'';
             // 找这个元素中所有的 [N] 标记
             var rm=/\[(\d+)\]/g,rmM;

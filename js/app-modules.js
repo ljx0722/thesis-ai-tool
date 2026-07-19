@@ -965,6 +965,8 @@ function openFigureAdvisor(){
   if(typeof openAccountModal==='function')openAccountModal('科研图表顾问',html);else alert('请先打开资料库选择 CSV/TSV 数据');
 }
 function runFigureAdvisor(materialId){
+  var sel=document.getElementById('daMaterialSelect');
+  var materialName=sel&&sel.options&&sel.options[sel.selectedIndex]?sel.options[sel.selectedIndex].text:materialId;
   var claim=(document.getElementById('figureClaim').value||'').trim();var result=document.getElementById('figureAdvisorResult');if(!claim){result.innerHTML='<div class="finding warn">请先写明这张图要论证的观点。</div>';return;}if(!materialId){result.innerHTML='<div class="finding warn">请先在数据分析页选择 CSV/TSV 资料。</div>';return;}
   result.innerHTML='<div class="finding info">正在读取数据画像…</div>';
   fetch('/api/materials/'+encodeURIComponent(materialId),{headers:authJsonHeaders()}).then(function(r){if(!r.ok)throw new Error('资料读取失败');return r.text();}).then(function(text){

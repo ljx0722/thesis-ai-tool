@@ -245,7 +245,7 @@ test('EDGE: chapterForElement defaults to chapter 1', function() {
 
 test('EDGE: beforeRefList returns true when no ref boundary found', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('if(!b)return true') >= 0, 'beforeRefList missing null boundary guard');
+  assert(src.indexOf('!b||') >= 0 || src.indexOf('if(!b)return true') >= 0, 'beforeRefList missing null boundary guard');
 });
 
 test('EDGE: searchCache cleared on new file upload', function() {
@@ -1796,6 +1796,68 @@ test('UI: simplified sidebar has TOC wrap', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
   assert(html.indexOf('tocPanel') >= 0 || html.indexOf('nav-tree') >= 0, 'toc area missing');
   assert(html.indexOf('toolboxFavorites') >= 0 || html.indexOf('toolHome') >= 0, 'toolbox/tool home missing');
+});
+
+test('REGRESSION: app runtime declarations do not abort upload initialization', function() {
+  var src=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8');
+  assert(!/\n\s*async\s*\n\s*function\s+getSearchSeedText/.test(src),'standalone async before getSearchSeedText aborts browser execution');
+  assert(src.indexOf('function getSearchSeedText')>=0,'getSearchSeedText declaration missing');
+  assert(src.indexOf('window.beginImportFile=beginImportFile')>=0,'upload initializer missing');
+  assert(src.indexOf('function startInlineCalibration')>=0,'calibration initializer missing');
+});
+
+test('REGRESSION: DOCX import protects package and scan indexes', function() {
+  var src=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8');
+  assert(src.indexOf("docxZip.file('[Content_Types].xml')")>=0,'DOCX content types validation missing');
+  assert(src.indexOf("docxZip.file('word/document.xml')")>=0,'DOCX document XML validation missing');
+  assert(src.indexOf('var scanStart=Math.max(0,tocIdx)')>=0,'negative TOC scan guard missing');
+  assert(!/for\s*\(var\s+ti\s*=\s*tocIdx\s*;/.test(src),'unsafe negative TOC index loop remains');
+  assert(src.indexOf('function isAfterRefBoundary')>=0,'reference boundary helper missing');
+});
+
+test('REGRESSION: import and calibration settle safely', function() {
+  var src=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8');
+  assert(src.indexOf('var importRunning=false')>=0&&src.indexOf('finally{')>=0,'import lock/finally cleanup missing');
+  assert(src.indexOf('function settleCalibration')>=0,'calibration settle-once helper missing');
+  assert(src.indexOf("alert('请先选择并确认至少一个章标题样式。')")>=0,'chapter calibration guard missing');
+});
+
+test('REGRESSION: assets use refreshed cache version', function() {
+  var html=fs.readFileSync(path.join(projectRoot,'index.html'),'utf8');
+  assert(html.indexOf('app.js?v=65')>=0,'application asset cache version was not refreshed');
+  assert(html.indexOf('app.js?v=64')<0,'stale v64 application asset remains');
+});
+
+test('REGRESSION: figure advisor keeps selected material name in scope', function() {
+  var src=fs.readFileSync(path.join(projectRoot,'js/app-modules.js'),'utf8');
+  var start=src.indexOf('function runFigureAdvisor('), end=src.indexOf('function saveFigureArtifact',start);
+  assert(start>=0&&end>start,'figure advisor runner missing');
+  var runner=src.slice(start,end);
+  assert(runner.indexOf('getElementById(\'daMaterialSelect\')')>=0,'advisor runner does not read selected material');
+  assert(runner.indexOf('materialName=')>=0&&runner.indexOf('options[sel.selectedIndex].text')>=0,'selected material name is not captured in runner');
+  assert(runner.indexOf('materialName:materialName')>=0,'figure artifact material name missing');
+});
+
+test('REGRESSION: workspace resizers support all desktop columns', function() {
+  var html=fs.readFileSync(path.join(projectRoot,'index.html'),'utf8');
+  var app=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8');
+  var css=fs.readFileSync(path.join(projectRoot,'css/style.css'),'utf8');
+  var resizerBlock=app.slice(app.indexOf("var panes={"),app.indexOf('restoreWidths();',app.indexOf("var panes={")));
+  ['navResizer','tocResizer','refResizer'].forEach(function(id){assert(html.indexOf('id="'+id+'"')>=0,id+' missing');assert(resizerBlock.indexOf(id)>=0,id+' is not wired');});
+  assert(app.indexOf('pointerdown')>=0&&app.indexOf('pointermove')>=0&&app.indexOf('pointerup')>=0,'pointer resize events missing');
+  assert(app.indexOf('thesisbuddy_workspace_widths_v1')>=0&&app.indexOf('localStorage.getItem')>=0&&app.indexOf('localStorage.setItem')>=0,'workspace width persistence missing');
+  ['--nav-panel-width','--toc-panel-width','--tool-panel-width'].forEach(function(token){assert(css.indexOf(token)>=0,token+' is not consumed by layout CSS');});
+  assert(/#navResizer,\s*#tocResizer,\s*#refResizer\s*\{\s*display:\s*none;\s*\}/.test(css),'all resizers are not hidden in drawer mode');
+  assert(css.indexOf('.toc-panel.collapsed + #tocResizer')>=0,'collapsed TOC resizer state missing');
+});
+
+test('REGRESSION: ThesisBuddy FABs follow theme contrast tokens', function() {
+  var css=fs.readFileSync(path.join(projectRoot,'css/style.css'),'utf8');
+  var start=css.indexOf('.buddy-tool-fab {'),end=css.indexOf('.buddy-backdrop',start);
+  var fab=css.slice(start,end);
+  assert(fab.indexOf('color: var(--text-sidebar)')>=0,'FAB foreground does not follow sidebar theme token');
+  assert(fab.indexOf('background: var(--bg-sidebar-active)')>=0,'FAB hover does not follow active sidebar token');
+  assert(fab.indexOf('#f1f5f9')<0&&fab.indexOf('var(--color-primary-light)')<0,'FAB retains fixed contrast-breaking colors');
 });
 test('PROJECT: merge/preview/cloud helpers exist', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');

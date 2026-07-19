@@ -624,10 +624,11 @@ body.admin-page {
 .tag.core { background: var(--success-bg); color: #065f46; }
 
 /* ====== Resizer ====== */
-.resizer { cursor: col-resize; width: 5px; background: transparent; flex-shrink: 0; transition: background var(--duration-fast) var(--easing-default); position: relative; }
+.resizer { cursor: col-resize; width: 5px; background: transparent; flex-shrink: 0; touch-action: none; transition: background var(--duration-fast) var(--easing-default); position: relative; }
 .resizer::after { content: ''; position: absolute; left: 2px; top: 0; bottom: 0; width: 1px; background: var(--border); }
 .resizer:hover { background: var(--accent-glow); }
 .resizer:hover::after { background: var(--accent); }
+body.is-resizing, body.is-resizing * { cursor: col-resize !important; user-select: none !important; }
 
 /* ====== Overlay / Loading ====== */
 .overlay {
@@ -1833,13 +1834,19 @@ body.dark /* bar uses --bg-topbar */
 
 /* four-column workspace */
 .main{ display:flex; flex:1; min-height:0; overflow:hidden; }
-.nav-sidebar{ width:200px; min-width:160px; max-width:260px; }
+#mainLayout{
+  --nav-panel-width: 200px;
+  --toc-panel-width: 220px;
+  --tool-panel-width: 380px;
+}
+.nav-sidebar{ width:var(--nav-panel-width); min-width:160px; max-width:260px; flex:0 0 var(--nav-panel-width); }
 .toc-panel{
-  width:220px; min-width:160px; max-width:320px; flex-shrink:0;
+  width:var(--toc-panel-width); min-width:160px; max-width:320px; flex:0 0 var(--toc-panel-width);
   display:flex; flex-direction:column; min-height:0; overflow:hidden;
   background:var(--bg-sidebar); border-right:1px solid rgba(255,255,255,.06);
 }
-.toc-panel.collapsed{ width:28px; min-width:28px; }
+.toc-panel.collapsed{ width:28px; min-width:28px; flex-basis:28px; }
+.toc-panel.collapsed + #tocResizer{ display:none; }
 .toc-panel.collapsed .nav-tree,
 .toc-panel.collapsed .toc-panel-sub,
 .toc-panel.collapsed .toc-panel-title{ display:none; }
@@ -1850,7 +1857,7 @@ body.dark /* bar uses --bg-topbar */
 .toc-panel .nav-tree{ flex:1; min-height:0; max-height:none; overflow-y:auto; border:none; padding:8px; }
 .thesis-panel{ flex:1 1 auto; min-width:280px; }
 .tool-panel, .ref-panel{
-  width:380px; min-width:0; max-width:520px; flex:0 1 380px;
+  width:var(--tool-panel-width); min-width:280px; max-width:520px; flex:0 0 var(--tool-panel-width);
   display:flex; flex-direction:column; min-height:0; overflow:hidden;
   background:var(--bg-card); border-left:1px solid var(--border);
 }
@@ -2506,12 +2513,13 @@ body.app-shell > #appShell > #mainLayout {
 }
 
 @media (max-width: 1279px) {
-  .nav-sidebar { width: 176px; min-width: 150px; }
-  .toc-panel { width: 180px; min-width: 150px; }
-  .tool-panel, .ref-panel {
-    width: clamp(280px, 31vw, 340px) !important;
-    min-width: 260px;
+  #mainLayout {
+    --nav-panel-width: 176px;
+    --toc-panel-width: 180px;
+    --tool-panel-width: clamp(280px, 31vw, 340px);
   }
+  .nav-sidebar { min-width: 150px; }
+  .toc-panel { min-width: 150px; }
 }
 
 @media (max-width: 1023px) {
@@ -2543,6 +2551,7 @@ body.app-shell > #appShell > #mainLayout {
     box-shadow: var(--shadow-lg);
   }
   body.tool-drawer-open #refPanel { transform: translateX(0); }
+  #navResizer,
   #tocResizer,
   #refResizer { display: none; }
   .thesis-panel { min-width: 0; }
@@ -2583,7 +2592,7 @@ body.app-shell > #appShell > #mainLayout {
   border: 1px solid var(--border-sidebar);
   border-radius: 50%;
   background: var(--bg-sidebar);
-  color: #f1f5f9;
+  color: var(--text-sidebar);
   font: inherit;
   font-size: var(--font-size-xs);
   line-height: 1;
@@ -2594,7 +2603,7 @@ body.app-shell > #appShell > #mainLayout {
   box-shadow: var(--shadow-md);
   transition: transform var(--duration-fast) var(--easing-default), background var(--duration-fast) var(--easing-default), box-shadow var(--duration-fast) var(--easing-default);
 }
-.buddy-tool-fab:hover { transform: scale(1.1); background: var(--color-primary-light); box-shadow: var(--shadow-lg); }
+.buddy-tool-fab:hover { transform: scale(1.1); background: var(--bg-sidebar-active); box-shadow: var(--shadow-lg); }
 .buddy-tool-fab:active { transform: scale(.95); }
 .buddy-tool-fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .buddy-backdrop, .theme-studio-backdrop { position: fixed; inset: 0; z-index: 440; background: rgba(15,23,42,.35); opacity: 0; pointer-events: none; transition: opacity 180ms cubic-bezier(.22,1,.36,1); }

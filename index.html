@@ -401,26 +401,26 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 </script>
 
 <!-- 右下角快捷入口统一由 buddyTools 提供 -->
-<script defer src="mammoth.browser.min.js"></script>
-<script defer src="jszip.min.js"></script>
-<script src="app.js?v=64"></script>
-<script src="js/modules/optimization.js?v=64"></script>
-<script src="js/modules/format-check.js?v=64"></script>
-<script src="js/modules/terminology.js?v=64"></script>
-<script src="js/modules/paragraph-analysis.js?v=64"></script>
-<script src="js/modules/dashboard.js?v=64"></script>
-<script src="js/modules/thesis-review.js?v=64"></script>
-<script src="js/modules/proposal.js?v=64"></script>
-<script src="js/modules/onboarding.js?v=64"></script>
-<script src="js/modules/topic-finder.js?v=64"></script>
-<script src="js/modules/proofread.js?v=64"></script>
-<script src="js/modules/de-duplicate.js?v=64"></script>
-<script src="js/modules/defense-ppt.js?v=64"></script>
-<script src="js/modules/en-abstract.js?v=64"></script>
-<script src="js/modules/project.js?v=64"></script>
-<script src="js/app-modules.js?v=64"></script>
+<script defer src="mammoth.browser.min.js?v=65"></script>
+<script defer src="jszip.min.js?v=65"></script>
+<script defer src="app.js?v=65"></script>
+<script defer src="js/modules/optimization.js?v=65"></script>
+<script defer src="js/modules/format-check.js?v=65"></script>
+<script defer src="js/modules/terminology.js?v=65"></script>
+<script defer src="js/modules/paragraph-analysis.js?v=65"></script>
+<script defer src="js/modules/dashboard.js?v=65"></script>
+<script defer src="js/modules/thesis-review.js?v=65"></script>
+<script defer src="js/modules/proposal.js?v=65"></script>
+<script defer src="js/modules/onboarding.js?v=65"></script>
+<script defer src="js/modules/topic-finder.js?v=65"></script>
+<script defer src="js/modules/proofread.js?v=65"></script>
+<script defer src="js/modules/de-duplicate.js?v=65"></script>
+<script defer src="js/modules/defense-ppt.js?v=65"></script>
+<script defer src="js/modules/en-abstract.js?v=65"></script>
+<script defer src="js/modules/project.js?v=65"></script>
+<script defer src="js/app-modules.js?v=65"></script>
 <script>
-(function(){
+window.addEventListener('DOMContentLoaded',function(){
   var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');
   if(!ov||!tips)return;var timer=null,spawned=[];
   function clearAll(){spawned.forEach(function(t){t.remove()});spawned=[];clearInterval(timer);timer=null}
@@ -441,8 +441,8 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
   };
   var _origHide=hideLoad;hideLoad=function(){clearAll();if(typeof stopCatGame==='function')stopCatGame();_origHide();};
   // 拖拽上传：仅投放区接收文件，所有入口走统一 fileInput
-  var drop=document.getElementById('uploadDrop');if(drop){['dragenter','dragover'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();drop.classList.add('dragover');},false);});['dragleave','drop'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();drop.classList.remove('dragover');},false);});drop.addEventListener('drop',function(e){var files=e.dataTransfer.files;if(files.length&&typeof beginImportFile==='function')beginImportFile(files[0],window._importIntent||'new');});}
-})();
+  var drop=document.getElementById('uploadDrop');if(drop){['dragenter','dragover'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();drop.classList.add('dragover');},false);});['dragleave','drop'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();drop.classList.remove('dragover');},false);});drop.addEventListener('drop',function(e){var files=e.dataTransfer.files;if(files.length&&typeof beginImportFile==='function')beginImportFile(files[0],window._importIntent||'new').catch(function(err){console.error('[import drop]',err);});});}
+});
 </script>
 </div>
 <!-- 主题由账号级外观设置统一管理。 -->
@@ -544,6 +544,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
       setTimeout(function() { loginOverlay.style.display = 'none'; }, 400);
     }
     if (appShell) appShell.style.display = '';
+    window.dispatchEvent(new Event('resize'));
   }
 
   window.doLogout = function() {
