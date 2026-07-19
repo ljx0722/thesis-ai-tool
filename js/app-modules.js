@@ -473,7 +473,13 @@ function resetSearch() {
     existingRefs.forEach(function(er) { er.displayNum = er.num; er.subType = 'unchanged'; });
     if (typeof wrapExistingMarkers === 'function') {
       var allM = document.querySelectorAll('.cite-marker');
-      for (var i = 0; i < allM.length; i++) allM[i].parentElement.removeChild(allM[i]);
+      for (var i = allM.length - 1; i >= 0; i--) {
+        if (allM[i].classList.contains('generated')) {
+          if (allM[i].parentElement) allM[i].parentElement.removeChild(allM[i]);
+        } else {
+          allM[i].replaceWith(document.createTextNode(allM[i].textContent || ''));
+        }
+      }
       wrapExistingMarkers(existingRefs.filter(function(r) { return r.num; }));
     }
   }
@@ -565,10 +571,11 @@ function switchPanel(moduleId) {
     }
     try { panel.querySelectorAll('.filters').forEach(function(el){ el.style.display='none'; }); } catch (eF) {}
     if (moduleArea) moduleArea.style.display = 'none';
-    setToolPanelHeader('📋 参考文献', '检索、校验与引用');
+    setToolPanelHeader('📚 文献工作台', '按论点反查、审核证据、确认后引用');
     document.querySelectorAll('.tool-tab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-tooltab')==='refs'); });
-    if (typeof mergedRefs !== 'undefined' && mergedRefs.length) renderRefs();
-    else if (typeof existingRefs !== 'undefined' && existingRefs.length) renderExistingOnly();
+    var lw=document.getElementById('literatureWorkbench');if(lw)lw.style.display='flex';
+    var refsEl=document.getElementById('refs');if(refsEl)refsEl.style.display='none';
+    if(window.LiteratureWorkbench&&typeof LiteratureWorkbench.render==='function')LiteratureWorkbench.render();
     updateStatusBar2();
     return;
   }

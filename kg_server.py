@@ -5,7 +5,7 @@ Flask 后端：项目、论文版本、研究资料、AI 能力、知识图谱�
 from flask import Flask, request, jsonify, send_file
 import math, random, json, re, os, html, time, threading, sqlite3, hashlib, secrets
 import xml.etree.ElementTree as ET
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
 from datetime import datetime, date
 from decimal import Decimal, InvalidOperation
 
@@ -176,6 +176,8 @@ def init_db():
             exports_json TEXT,
             data_profiles_json TEXT,
             model_runs_json TEXT,
+            literature_json TEXT,
+            literature_version INTEGER DEFAULT 1,
             updated_at TEXT,
             FOREIGN KEY (project_id) REFERENCES projects(id)
         );
@@ -384,9 +386,11 @@ def init_db():
         conn.execute("UPDATE llm_usage SET cost_precision='legacy_unrecoverable' WHERE cost_precision IS NULL AND cost_credits=0")
         conn.execute("UPDATE llm_usage SET total_tokens=COALESCE(prompt_tokens,0)+COALESCE(completion_tokens,0) WHERE total_tokens=0")
         artifact_cols = [r[1] for r in conn.execute('PRAGMA table_info(project_artifacts)').fetchall()]
-        for col in ('figures_json','figure_plans_json','exports_json','data_profiles_json','model_runs_json'):
+        for col in ('figures_json','figure_plans_json','exports_json','data_profiles_json','model_runs_json','literature_json'):
             if col not in artifact_cols:
                 conn.execute(f'ALTER TABLE project_artifacts ADD COLUMN {col} TEXT')
+        if 'literature_version' not in artifact_cols:
+            conn.execute('ALTER TABLE project_artifacts ADD COLUMN literature_version INTEGER DEFAULT 1')
         conn.execute("INSERT OR IGNORE INTO service_runtime_state(id,mode,message,updated_at) VALUES(1,'normal','',datetime('now','localtime'))")
         conn.commit()
     except Exception as e:
@@ -558,11 +562,12 @@ if not ADMIN_SECRET:
 def index():
     return send_file('index.html', mimetype='text/html; charset=utf-8')
 
-@app.route('/<path:filename>')
-def serve_static(filename):
+@app.route('/<path:stem>.<string:ext>')
+def serve_static(stem, ext):
+    ext = ext.lower()
     allowed = {'js','css','html','json','png','jpg','jpeg','svg','ico','woff','woff2','ttf','eot','map'}
-    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
     if ext not in allowed: return "Not Found", 404
+    filename = stem + '.' + ext
     try: return send_file(filename)
     except FileNotFoundError: return "Not Found", 404
 
@@ -4182,7 +4187,7 @@ def _project_row_to_dict(row, artifacts=None):
         'notes': d.get('notes') or '', 'createdAt': d.get('created_at'), 'updatedAt': d.get('updated_at'),
         'activeRevisionId': d.get('active_revision_id'), 'lastView': d.get('last_view') or 'workspace',
         'rowVersion': d.get('row_version') or 1, 'stageStatus': {},
-        'artifacts': {'outline': None, 'chapters': {}, 'skillLogs': [], '_versions': {}, 'figures': [], 'figurePlans': [], 'exports': [], 'dataProfiles': [], 'modelRuns': []}
+        'artifacts': {'outline': None, 'chapters': {}, 'skillLogs': [], '_versions': {}, 'figures': [], 'figurePlans': [], 'exports': [], 'dataProfiles': [], 'modelRuns': [], 'literature': None}
     }
     try: out['stageStatus'] = _json.loads(d.get('stage_status') or '{}') or {}
     except Exception: out['stageStatus'] = {}
@@ -4192,11 +4197,190 @@ def _project_row_to_dict(row, artifacts=None):
             ('outline','outline_json',None),('chapters','chapters_json',{}),('_versions','versions_json',{}),
             ('skillLogs','skill_logs_json',[]),('manuscriptMeta','manuscript_meta_json',None),
             ('figures','figures_json',[]),('figurePlans','figure_plans_json',[]),('exports','exports_json',[]),
-            ('dataProfiles','data_profiles_json',[]),('modelRuns','model_runs_json',[])
+            ('dataProfiles','data_profiles_json',[]),('modelRuns','model_runs_json',[]),('literature','literature_json',None)
         ]:
             try: out['artifacts'][target] = _json.loads(a.get(source) or ('null' if default is None else ('[]' if isinstance(default,list) else '{}')))
             except Exception: out['artifacts'][target] = default
+        out['literatureVersion'] = int(a.get('literature_version') or 1)
     return out
+
+
+
+_LITERATURE_SEARCH_CACHE = {}
+_LITERATURE_SEARCH_LOCK = threading.Lock()
+
+def _literature_normalize_doi(value):
+    return re.sub(r'[\s.,;]+$', '', re.sub(r'^(?:https?://(?:dx\.)?doi\.org/|doi\s*:\s*)', '', str(value or '').strip(), flags=re.I)).lower()
+
+def _literature_paper_key(paper):
+    doi = _literature_normalize_doi(paper.get('doi'))
+    if doi:
+        return 'doi:' + doi
+    title = re.sub(r'[^a-z0-9一-鿿]', '', str(paper.get('title') or '').lower())
+    first_author = re.sub(r'\W', '', str(paper.get('authors') or '').split(',')[0].lower())
+    return 'meta:' + title + ':' + first_author + ':' + str(paper.get('year') or '')
+
+def _literature_sources_for_plan(plan):
+    discipline = ' '.join(plan.get('discipline') or []).lower()
+    roles = set(plan.get('roles') or [])
+    sources = [('openalex', search_openalex), ('crossref', search_crossref)]
+    if re.search(r'医学|医药|临床|生命|生物|health|medical|biology', discipline):
+        sources = [('pubmed', search_pubmed), ('europe-pmc', search_europepmc), ('openalex', search_openalex)]
+    elif re.search(r'计算机|软件|人工智能|数学|物理|computer|software|artificial|mathematics|physics', discipline):
+        sources = [('semantic-scholar', search_semantic_scholar), ('openalex', search_openalex), ('arxiv', search_arxiv)]
+    if 'definition' in roles or 'counterargument' in roles:
+        sources.append(('crossref', search_crossref))
+    seen, routed = set(), []
+    for name, fn in sources:
+        if name not in seen:
+            seen.add(name); routed.append((name, fn))
+    return routed[:3]
+
+def _literature_merge_results(source_batches):
+    papers = {}
+    for batch in source_batches:
+        for record in batch.get('results') or []:
+            if not record.get('title'):
+                continue
+            key = _literature_paper_key(record)
+            item = papers.get(key)
+            if not item:
+                item = dict(record)
+                item['paperId'] = key
+                item['doi'] = _literature_normalize_doi(item.get('doi'))
+                item['provenance'] = []
+                item['sourceRecords'] = []
+                papers[key] = item
+            for field in ('journal', 'year', 'authors', 'doi'):
+                if not item.get(field) and record.get(field):
+                    item[field] = record[field]
+            item['provenance'].append({'source': batch['source'], 'query': batch['query']})
+            item['sourceRecords'].append({'source': batch['source'], 'record': record})
+    return list(papers.values())
+
+@app.route('/api/projects/<project_id>/literature/searches', methods=['POST'])
+@require_auth
+def project_literature_searches(project_id):
+    db = get_db()
+    try:
+        if not _owned_project(db, project_id, request.user_id):
+            return jsonify({'success': False, 'error': '项目不存在'}), 404
+    finally:
+        db.close()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'success': False, 'error': '请求必须为 JSON 对象'}), 400
+    plans = data.get('queryPlans')
+    if not isinstance(plans, list) or not 1 <= len(plans) <= 10:
+        return jsonify({'success': False, 'error': 'queryPlans 数量必须为 1–10'}), 400
+    tasks = []
+    normalized_plans = []
+    for raw_plan in plans:
+        if not isinstance(raw_plan, dict) or not str(raw_plan.get('claim') or '').strip():
+            return jsonify({'success': False, 'error': '每个 Query Plan 必须包含 claim'}), 400
+        variants = [str(v).strip()[:240] for v in (raw_plan.get('queryVariants') or []) if str(v).strip()]
+        variants = list(dict.fromkeys(variants))[:5]
+        if not variants:
+            return jsonify({'success': False, 'error': '每个 Query Plan 至少需要一个查询变体'}), 400
+        plan = dict(raw_plan); plan['queryVariants'] = variants
+        normalized_plans.append(plan)
+        for query in variants:
+            for source_name, source_fn in _literature_sources_for_plan(plan):
+                tasks.append((source_name, source_fn, query))
+    if len(tasks) > 30:
+        return jsonify({'success': False, 'error': '来源调用预算超限'}), 400
+    max_results = max(1, min(int(data.get('maxResults') or 40), 100))
+    idempotency_key = str(data.get('idempotencyKey') or '').strip()[:120]
+    cache_key = (request.user_id, project_id, idempotency_key) if idempotency_key else None
+    if cache_key:
+        with _LITERATURE_SEARCH_LOCK:
+            cached = _LITERATURE_SEARCH_CACHE.get(cache_key)
+        if cached:
+            replay = dict(cached); replay['cached'] = True
+            return jsonify(replay)
+    uid = getattr(request, 'user_id', None) or request.remote_addr or 'unknown'
+    if not _check_rate('literature-search:'+str(uid), max_calls=12, window_sec=60):
+        return jsonify({'success': False, 'error': '检索过于频繁，请稍后再试'}), 429
+    free_limit = SEARCH_DAILY_FREE if 'SEARCH_DAILY_FREE' in globals() else 20
+    ok_c, err_c, usage, status = _consume_daily_quota(request.user_id, free_limit, 'search', '文献工作台检索')
+    if not ok_c:
+        return jsonify({'success': False, 'error': err_c or '点数不足', 'needed_points': (usage or {}).get('needed_points')}), (status or 402)
+    started = time.time()
+    batches, futures = [], {}
+    executor = ThreadPoolExecutor(max_workers=min(6, len(tasks)))
+    try:
+        for source_name, source_fn, query in tasks:
+            future = executor.submit(_run_source, source_fn, query, 30)
+            futures[future] = (source_name, query)
+        try:
+            for future in as_completed(futures, timeout=35):
+                source_name, query = futures[future]
+                try:
+                    rows = future.result() or []
+                    batches.append({'source': source_name, 'query': query, 'status': 'ok', 'results': rows[:30]})
+                except Exception as exc:
+                    batches.append({'source': source_name, 'query': query, 'status': 'error', 'error': str(exc), 'results': []})
+        except FuturesTimeoutError:
+            pass
+        completed = {(b['source'], b['query']) for b in batches}
+        for source_name, _, query in tasks:
+            if (source_name, query) not in completed:
+                batches.append({'source': source_name, 'query': query, 'status': 'timeout', 'error': '来源请求超时', 'results': []})
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+    papers = _literature_merge_results(batches)
+    papers.sort(key=lambda p: (1 if p.get('doi') else 0, int(p.get('year') or 0)), reverse=True)
+    papers = papers[:max_results]
+    run_id = 'run-' + secrets.token_hex(8)
+    partial = [{'source': b['source'], 'query': b['query'], 'status': b['status'], 'error': b.get('error', '')} for b in batches if b['status'] != 'ok']
+    payload = {'success': True, 'papers': papers, 'partial': partial, 'usage': usage, 'cached': False,
+               'searchRun': {'id': run_id, 'queryPlans': normalized_plans, 'sourceCalls': len(tasks), 'resultCount': len(papers),
+                             'partial': partial, 'durationMs': int((time.time()-started)*1000), 'createdAt': datetime.utcnow().isoformat(timespec='seconds')+'Z'}}
+    if cache_key:
+        with _LITERATURE_SEARCH_LOCK:
+            _LITERATURE_SEARCH_CACHE[cache_key] = payload
+            if len(_LITERATURE_SEARCH_CACHE) > 500:
+                _LITERATURE_SEARCH_CACHE.pop(next(iter(_LITERATURE_SEARCH_CACHE)))
+    return jsonify(payload)
+
+
+@app.route('/api/projects/<project_id>/literature', methods=['GET', 'PUT'])
+@require_auth
+def project_literature(project_id):
+    db = get_db()
+    try:
+        if not _owned_project(db, project_id, request.user_id):
+            return jsonify({'success': False, 'error': '项目不存在'}), 404
+        row = db.execute('SELECT literature_json,literature_version FROM project_artifacts WHERE project_id=?', (project_id,)).fetchone()
+        if request.method == 'GET':
+            literature = {}
+            if row and row['literature_json']:
+                try: literature = json.loads(row['literature_json']) or {}
+                except Exception: literature = {}
+            return jsonify({'success': True, 'literature': literature, 'version': int((row and row['literature_version']) or 1)})
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict) or not isinstance(data.get('literature'), dict):
+            return jsonify({'success': False, 'error': 'literature 必须是对象'}), 400
+        literature = data['literature']
+        submitted = int(data.get('version') or literature.get('version') or 1)
+        current = int((row and row['literature_version']) or 1)
+        if row and submitted != current:
+            return jsonify({'success': False, 'code': 'LITERATURE_VERSION_CONFLICT', 'error': '文献工作台已被其他会话更新', 'currentVersion': current}), 409
+        next_version = current + 1
+        literature['version'] = next_version
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        db.execute(
+            "INSERT INTO project_artifacts(project_id,literature_json,literature_version,updated_at) VALUES(?,?,?,?) "
+            "ON CONFLICT(project_id) DO UPDATE SET literature_json=excluded.literature_json,literature_version=excluded.literature_version,updated_at=excluded.updated_at",
+            (project_id, json.dumps(literature, ensure_ascii=False), next_version, now)
+        )
+        db.commit()
+        return jsonify({'success': True, 'literature': literature, 'version': next_version})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
 
 
 @app.route('/api/projects', methods=['GET'])
@@ -4285,10 +4469,17 @@ def projects_upsert():
                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 payload + (p.get('createdAt') or now,)
             )
-        # artifacts upsert
+        # artifacts upsert; literature is owned by the dedicated versioned endpoint on updates.
+        existing_art = db.execute('SELECT literature_json,literature_version FROM project_artifacts WHERE project_id=?', (pid,)).fetchone()
+        incoming_literature = artifacts.get('literature')
+        literature_json = (existing_art['literature_json'] if existing_art else None)
+        literature_version = int((existing_art['literature_version'] if existing_art else 0) or 1)
+        if not exists and incoming_literature is not None:
+            literature_json = _json.dumps(incoming_literature, ensure_ascii=False)
+            literature_version = int((incoming_literature or {}).get('version') or p.get('literatureVersion') or 1)
         db.execute(
-            "INSERT INTO project_artifacts(project_id, outline_json, chapters_json, versions_json, skill_logs_json, manuscript_meta_json, figures_json, figure_plans_json, exports_json, data_profiles_json, model_runs_json, updated_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?) "
+            "INSERT INTO project_artifacts(project_id, outline_json, chapters_json, versions_json, skill_logs_json, manuscript_meta_json, figures_json, figure_plans_json, exports_json, data_profiles_json, model_runs_json, literature_json, literature_version, updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
             "ON CONFLICT(project_id) DO UPDATE SET "
             "outline_json=excluded.outline_json, "
             "chapters_json=excluded.chapters_json, "
@@ -4310,6 +4501,8 @@ def projects_upsert():
                 _json.dumps(artifacts.get('exports') or [], ensure_ascii=False),
                 _json.dumps(artifacts.get('dataProfiles') or [], ensure_ascii=False),
                 _json.dumps(artifacts.get('modelRuns') or [], ensure_ascii=False),
+                literature_json,
+                literature_version,
                 now,
             )
         )

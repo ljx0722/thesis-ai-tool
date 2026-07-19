@@ -260,6 +260,37 @@
     return upsertProject(p);
   }
 
+  function createLiteratureArtifact() {
+    return {
+      schemaVersion: 1,
+      version: 1,
+      revisionId: '',
+      manuscriptFingerprint: '',
+      settings: { citationStyle: 'gbt7714-numeric', sourcePolicy: {}, defaultFilters: {} },
+      claims: {}, papers: {}, evidenceLinks: {}, occurrences: {}, audits: {}, searchRuns: {},
+      cart: { paperIds: [], selections: {} },
+      bibliography: { includedPaperIds: [], manualOrder: [], lastExport: null },
+      migration: { legacyImportedAt: null, warnings: [] }
+    };
+  }
+
+  function ensureLiteratureShape(value) {
+    var lit = value && typeof value === 'object' ? value : createLiteratureArtifact();
+    if (!lit.schemaVersion) lit.schemaVersion = 1;
+    if (!lit.version) lit.version = 1;
+    ['claims','papers','evidenceLinks','occurrences','audits','searchRuns'].forEach(function(k){ if(!lit[k]||typeof lit[k]!=='object')lit[k]={}; });
+    if(!lit.settings)lit.settings={citationStyle:'gbt7714-numeric',sourcePolicy:{},defaultFilters:{}};
+    if(!lit.settings.citationStyle)lit.settings.citationStyle='gbt7714-numeric';
+    if(!lit.cart)lit.cart={paperIds:[],selections:{}};
+    if(!Array.isArray(lit.cart.paperIds))lit.cart.paperIds=[];
+    if(!lit.cart.selections)lit.cart.selections={};
+    if(!lit.bibliography)lit.bibliography={includedPaperIds:[],manualOrder:[],lastExport:null};
+    if(!Array.isArray(lit.bibliography.includedPaperIds))lit.bibliography.includedPaperIds=[];
+    if(!Array.isArray(lit.bibliography.manualOrder))lit.bibliography.manualOrder=[];
+    if(!lit.migration)lit.migration={legacyImportedAt:null,warnings:[]};
+    return lit;
+  }
+
   function ensureArtifacts(p) {
     if (!p.artifacts) p.artifacts = { outline: null, chapters: {}, skillLogs: [], exports: [], figures: [], dataProfiles: [], modelRuns: [] };
     if (!p.artifacts.chapters) p.artifacts.chapters = {};
@@ -269,7 +300,48 @@
     if (!p.artifacts.figurePlans) p.artifacts.figurePlans = [];
     if (!p.artifacts.dataProfiles) p.artifacts.dataProfiles = [];
     if (!p.artifacts.modelRuns) p.artifacts.modelRuns = [];
+    p.artifacts.literature = ensureLiteratureShape(p.artifacts.literature);
     return p.artifacts;
+  }
+
+  function getLiteratureArtifact() {
+    var p=getCurrentProject();if(!p)return createLiteratureArtifact();
+    return ensureArtifacts(p).literature;
+  }
+
+  function saveLiteratureArtifact(next, options) {
+    var p=getCurrentProject();if(!p)return Promise.reject(new Error('请先创建或打开项目'));
+    var arts=ensureArtifacts(p),current=arts.literature;
+    var incoming=ensureLiteratureShape(next),submittedVersion=(current&&current.version)||1;
+    incoming.version=submittedVersion;
+    incoming.revisionId=incoming.revisionId||p.activeRevisionId||'';
+    arts.literature=incoming;p.updatedAt=nowISO();
+    upsertLocal(p);
+    try{window.dispatchEvent(new CustomEvent('literature-artifact-changed',{detail:{projectId:p.id,version:incoming.version}}));}catch(e2){}
+    if((options&&options.localOnly)||!cloudEnabled())return Promise.resolve(incoming);
+    var key='literature:'+p.id,previous=cloudSyncState.inFlight[key]||Promise.resolve();
+    cloudSyncState.dirty[key]=true;
+    var request=previous.catch(function(){}).then(function(){
+      return fetch('/api/projects/'+encodeURIComponent(p.id)+'/literature',{
+        method:'PUT',headers:authHeaders(),body:JSON.stringify({literature:incoming,version:submittedVersion})
+      }).then(function(r){return r.json().catch(function(){return{};}).then(function(d){
+        if(r.status===409){var conflict=new Error(d.error||'文献工作台版本冲突');conflict.code='LITERATURE_VERSION_CONFLICT';conflict.data=d;throw conflict;}
+        if(!r.ok||!d.success||!d.literature)throw new Error(d.error||('文献工作台同步失败 '+r.status));
+        var latest=getCurrentProject();if(latest){ensureArtifacts(latest).literature=ensureLiteratureShape(d.literature);latest.updatedAt=nowISO();upsertLocal(latest);}
+        cloudSyncState.dirty[key]=false;cloudSyncState.lastSavedAt[key]=new Date().toISOString();cloudSyncState.lastError[key]=null;
+        try{window.dispatchEvent(new CustomEvent('literature-artifact-changed',{detail:{projectId:p.id,version:d.version}}));}catch(e3){}
+        return d.literature;
+      });});
+    }).catch(function(err){cloudSyncState.lastError[key]=err.data||{error:err.message};throw err;});
+    cloudSyncState.inFlight[key]=request.finally(function(){delete cloudSyncState.inFlight[key];});
+    return cloudSyncState.inFlight[key];
+  }
+
+  function updateLiteratureArtifact(mutator, options) {
+    var current=getLiteratureArtifact();
+    var copy=JSON.parse(JSON.stringify(current));
+    var result=typeof mutator==='function'?mutator(copy):mutator;
+    return saveLiteratureArtifact(result||copy,options);
   }
 
   function recordExport(meta) {
@@ -1597,6 +1669,10 @@
     bootstrapAuthenticatedUser: bootstrapAuthenticatedUser,
     flushAllDirty: flushAllDirty,
     getSaveState: getSaveState,
+    getLiteratureArtifact: getLiteratureArtifact,
+    saveLiteratureArtifact: saveLiteratureArtifact,
+    updateLiteratureArtifact: updateLiteratureArtifact,
+    ensureLiteratureShape: ensureLiteratureShape,
     syncProjectToCloud: syncProjectToCloud,
   };
   window.openExportHistory = openExportHistory;

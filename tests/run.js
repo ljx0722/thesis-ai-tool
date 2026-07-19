@@ -121,25 +121,25 @@ test('HTML has all required ' + '<script>' + ' tags in correct order', function(
 // ============================================================
 console.log('\n=== Section 2: Historical Bug Fixes ===');
 
-test('BUG-FIX: injectNewMarkers uses tree-based sentence matching (>=2 threshold)', function() {
+test('LITERATURE: inferred placement is metadata-only and cannot mutate the manuscript', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('sc>=2') >= 0, 'Missing keyword threshold >= 2 in new injectNewMarkers');
-  assert(src.indexOf('_treeIndex') >= 0, 'injectNewMarkers must use _treeIndex');
+  assert(src.indexOf('function injectNewMarkers') < 0, 'Legacy automatic marker injection must be removed');
+  assert(src.indexOf("function legacyMarkerSuggestion") >= 0, 'Metadata-only legacy suggestion helper is required');
+  assert(src.indexOf("cite-marker generated confirmed") >= 0, 'Confirmed insertion path must remain available');
 });
 
-test('BUG-FIX: Step 2b/2c uses tree-index sentence matching (not DOM walk)', function() {
+test('LITERATURE: legacy batch flow has no inferred placement fallback', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('bestSent') >= 0, 'Missing sentence-level matching (bestSent)');
-  assert(src.indexOf('_treeIndex.chapters') >= 0, 'Step 2b must use _treeIndex.chapters for chapter lookup');
-  assert(src.indexOf('lastChild&&lastChild.nodeType===3') < 0, 'OLD paragraph-end appending still present');
+  var legacy = src.substring(src.indexOf('async function startSearchWithConfig'), src.indexOf('async function verifyRef'));
+  assert(legacy.indexOf('bestSent') < 0, 'Sentence inference fallback must be removed');
+  assert(legacy.indexOf("createElement('span')") < 0, 'Legacy flow must not create markers');
 });
 
-test('BUG-FIX: Paragraph collection excludes ref-list area (bodyBoundaryEl)', function() {
+test('BUG-FIX: Body boundary helper remains available for citation scanning and deletion', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('bodyBoundaryEl') >= 0, 'bodyBoundaryEl not used in injectNewMarkers');
-  // Should have 2+ uses: injectNewMarkers + bodyBoundaryEl definition + deleteRef
+  assert(src.indexOf('bodyBoundaryEl') >= 0, 'bodyBoundaryEl helper is missing');
   var count = (src.match(/bodyBoundaryEl/g) || []).length;
-  assert(count >= 3, 'bodyBoundaryEl used only ' + count + ' times, expected >= 3');
+  assert(count >= 2, 'bodyBoundaryEl used only ' + count + ' times, expected >= 2');
 });
 
 test('BUG-FIX: No-DOM refs sorted by tempNum for stable numbering', function() {
@@ -148,9 +148,9 @@ test('BUG-FIX: No-DOM refs sorted by tempNum for stable numbering', function() {
   assert(src.indexOf('noDom2.sort') >= 0, 'Missing stable sort in deleteRef');
 });
 
-test('BUG-FIX: DOM renumbering uses _domEl identity (not displayNum)', function() {
+test('BUG-FIX: DOM renumbering uses marker identity (not displayNum)', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('_domEl===sp') >= 0, 'Missing _domEl identity matching in reorder step');
+  assert(src.indexOf('function refForMarker') >= 0 && src.indexOf('occurrenceForMarker') >= 0, 'Missing occurrence marker identity matching in reorder step');
   assert(src.indexOf('r.displayNum===tn||r.tempNum===tn') < 0, 'OLD displayNum collision matching still present');
 });
 
@@ -233,15 +233,17 @@ test('EDGE: assignChapters has body-chapters-empty guard', function() {
   assert(src.indexOf('if(!n2){') >= 0 || src.indexOf('if(!n2){console') >= 0, 'Missing empty body chapters guard');
 });
 
-test('EDGE: ref.ch falls back to 1 when undefined', function() {
+test('EDGE: unlocated references never fabricate chapter 1', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('r.ch||1') >= 0 || src.indexOf('r.ch|| 1') >= 0, 'Missing ref.ch fallback');
+  var fnBody=src.substring(src.indexOf('function lookupRefPosition'),src.indexOf('function jumpToDomEl'));
+  assert(fnBody.indexOf("r.ch||1") < 0, 'lookupRefPosition must not fabricate chapter 1');
+  assert(fnBody.indexOf("ch:''") >= 0, 'Unlocated position must be empty');
 });
 
 test('EDGE: chapterForElement returns unknown instead of fabricating chapter 1', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  var start=src.indexOf('function chapterForElement');var body=src.substring(start,start+900);
-  assert(body.indexOf('return lc') >= 0 && body.indexOf('lc=0') >= 0, 'chapterForElement must preserve unknown chapter');
+  var start=src.indexOf('function chapterForElement');var body=src.substring(start,start+1800);
+  assert(body.indexOf('return 0') >= 0 && body.indexOf('lc=0') >= 0, 'chapterForElement must preserve unknown chapter');
 });
 
 test('EDGE: beforeRefList returns true when no ref boundary found', function() {
@@ -259,12 +261,12 @@ test('EDGE: mergedRefs reset on new file upload', function() {
   assert(src.indexOf('mergedRefs=[]') >= 0, 'mergedRefs not reset on upload');
 });
 
-test('EDGE: startSearch returns early if no manuscriptText', function() {
+test('EDGE: startSearch opens audit without text and local search only with a selection', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  var idx = src.indexOf('function startSearch');
-  if(idx<0) idx=src.indexOf('async function startSearch');
-  var body = src.substring(idx, idx + 350);
-  assert(body.indexOf('getSearchSeedText') >= 0 || body.indexOf('!manuscriptText') >= 0, 'startSearch missing seed/manuscript guard');
+  var idx = src.indexOf('function startSearch()');
+  var body = src.substring(idx, src.indexOf('function openSearchConfigModal', idx));
+  assert(body.indexOf("hasSelection?'local':'audit'") >= 0, 'startSearch must route no-selection entry to audit');
+  assert(body.indexOf('LiteratureWorkbench.open') >= 0, 'startSearch must open the literature workbench');
 });
 
 test('EDGE: onThesisLoaded calls switchPanel(\\\'references\\\')', function() {
@@ -316,6 +318,12 @@ test('Upload overlay / file input is present', function() {
 // SECTION 5: Security & Cross-cutting Concerns
 // ============================================================
 console.log('\n=== Section 5: Security & Robustness ===');
+
+test('SECURITY: Static file route cannot shadow extensionless API routes', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  assert(src.indexOf("@app.route('/<path:stem>.<string:ext>')") >= 0, 'Static route must require a file extension');
+  assert(src.indexOf("@app.route('/<path:filename>')") < 0, 'Catch-all static route shadows API endpoints');
+});
 
 test('SECURITY: No eval() in production code', function() {
   var files = ['app.js', 'js/app-modules.js'];
@@ -799,17 +807,18 @@ test('UI: navClickToSec function exists', function() {
   assert(src.indexOf('function navClickToSec') >= 0, 'Missing navClickToSec function');
 });
 
-test('BUG: wrapExistingMarkers scans the full body and preserves all occurrences', function() {
+test('BUG: existing citation scan covers the full body and preserves all occurrences', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  var wrap = src.substring(src.indexOf('function wrapExistingMarkers'), src.indexOf('function injectNewMarkers'));
+  var wrap = src.substring(src.indexOf('function collectCitationOccurrences'), src.indexOf('function legacyMarkerSuggestion'));
   assert(wrap.indexOf('occurrences') >= 0, 'Existing citations must preserve occurrences');
   assert(wrap.indexOf("getElementById('ch-1')") < 0, 'Existing citation scan must not stop after chapter 1');
 });
 
-test('BUG: injectNewMarkers uses structured body sentences instead of DOM pre-body guesses', function() {
+test('LITERATURE: automatic marker insertion is absent from legacy search', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  var inject = src.substring(src.indexOf('function injectNewMarkers'), src.indexOf('function scrollToRef'));
-  assert(inject.indexOf('_treeIndex.sentences') >= 0 && inject.indexOf('sent._paragraph.el') >= 0, 'Generated marker insertion must use structured body sentences');
+  var legacy = src.substring(src.indexOf('async function startSearchWithConfig'), src.indexOf('async function verifyRef'));
+  assert(legacy.indexOf("createElement('span')") < 0, 'Legacy search must not create citation markers');
+  assert(legacy.indexOf('appendChild(mrk') < 0, 'Legacy search must not append citation markers');
 });
 
 test('BUG: chapter location preserves unknown state', function() {
@@ -888,16 +897,17 @@ test('REGRESSION: Four scoring dimensions all have tooltips', function() {
   assert(src.indexOf("_scoreInfo.conf") >= 0 || src.indexOf('_scoreInfo["conf"]') >= 0, 'Must reference _scoreInfo in rendering');
 });
 
-test('REGRESSION: injectNewMarkers uses tree index for sentence access', function() {
+test('REGRESSION: literature search entry always opens the workbench', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  var injectFunc = src.substring(src.indexOf("function injectNewMarkers"), src.indexOf("function scrollToRef"));
-  assert(injectFunc.indexOf("_treeIndex") >= 0, 'injectNewMarkers must use _treeIndex for sentence-level matching');
+  var entry = src.substring(src.indexOf('function startSearch()'), src.indexOf('function openSearchConfigModal'));
+  assert(entry.indexOf('LiteratureWorkbench.open') >= 0, 'Search entry must open the literature workbench');
+  assert(entry.indexOf('openSearchConfigModal()') < 0, 'Search entry must not open the legacy batch modal');
 });
 
-test('REGRESSION: WrapExistingMarkers locates citations across all chapters', function() {
+test('REGRESSION: Existing marker scan preserves cross-chapter occurrences', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  var wrapFunc = src.substring(src.indexOf("function wrapExistingMarkers"), src.indexOf("function injectNewMarkers"));
-  assert(wrapFunc.indexOf('chapterSet') >= 0 && wrapFunc.indexOf('occurrences') >= 0, 'wrapExistingMarkers must retain cross-chapter occurrences');
+  var wrapFunc = src.substring(src.indexOf('function collectCitationOccurrences'), src.indexOf('function legacyMarkerSuggestion'));
+  assert(wrapFunc.indexOf('chapterSet') >= 0 && wrapFunc.indexOf('occurrences') >= 0, 'Existing marker scan must retain cross-chapter occurrences');
 });
 
 test('REGRESSION: Batch verify sends catGame start in same event loop', function() {
@@ -1501,23 +1511,24 @@ test('AUDIT: bodyStartIdx uses detectHeadingLevel', function() {
   assert(bsBlock.indexOf('detectHeadingLevel') >= 0, 'bodyStartIdx must use detectHeadingLevel');
 });
 
-test('AUDIT: wrapExistingMarkers writes sent.refs', function() {
+test('AUDIT: occurrence collection writes sentence refs', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  var wfBlock = src.substring(src.indexOf('function wrapExistingMarkers'), src.indexOf('function injectNewMarkers'));
-  assert(wfBlock.indexOf('sent.refs') >= 0, 'wrapExistingMarkers must write sent.refs');
+  var wfBlock = src.substring(src.indexOf('function collectCitationOccurrences'), src.indexOf('function wrapExistingMarkers'));
+  assert(wfBlock.indexOf('treeSentence.refs') >= 0, 'Occurrence collection must write sentence refs');
 });
 
-test('AUDIT: injectNewMarkers sets sent.refs', function() {
+test('AUDIT: only confirmed citation commits create generated markers', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  var fnBody = src.substring(src.indexOf('function injectNewMarkers(refs)'), src.indexOf('function scrollToRef'));
-  assert(fnBody.indexOf('sent.refs') >= 0, 'injectNewMarkers must set sent.refs');
+  var occurrences = (src.match(/cite-marker generated/g) || []).length;
+  assert(occurrences === 1, 'Generated markers must exist only in the confirmed commit path');
+  assert(src.indexOf('if(!draft||!draft.confirmed)') >= 0, 'Commit path must require explicit confirmation');
 });
 
-test('AUDIT: lookupRefPosition scans _treeIndex.sentences', function() {
+test('AUDIT: lookupRefPosition reads occurrence summary', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
   assert(src.indexOf('function lookupRefPosition') >= 0, 'lookupRefPosition must exist');
-  var fnBody = src.substring(src.indexOf('function lookupRefPosition'), src.indexOf('function jumpToDomEl'));
-  assert(fnBody.indexOf('_treeIndex.sentences') >= 0, 'Must scan _treeIndex.sentences');
+  var fnBody = src.substring(src.indexOf('function lookupRefPosition'), src.indexOf('function jumpToOccurrenceById'));
+  assert(fnBody.indexOf('getRefLocationSummary') >= 0, 'Must read the occurrence summary');
 });
 
 test('AUDIT: sectionPathFor function removed', function() {
@@ -1535,6 +1546,67 @@ test('AUDIT: renderExistingOnly uses lookupRefPosition', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
   var reBlock = src.substring(src.indexOf('function renderExistingOnly'), src.indexOf('function copyOneExisting'));
   assert(reBlock.indexOf('lookupRefPosition') >= 0, 'renderExistingOnly must use lookupRefPosition');
+});
+
+test('CITATION: unified parser handles bracket, full-width, comma and range markers', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var start=src.indexOf('function parseCitationMarkers'),end=src.indexOf('function splitCitationSentences');
+  assert(start>=0&&end>start, 'parseCitationMarkers missing');
+  var parser=new Function(src.substring(start,end)+';return parseCitationMarkers;')();
+  var hits=parser('甲[1]乙［2，3］丙（4-6）丁[20]');
+  assert(hits.map(function(x){return x.rawNumber;}).join(',')==='1,2,3,4,5,6,20','Unexpected marker expansion');
+  assert(parser('年份为2024，样本量为20').length===0,'Plain body numbers must not be citations');
+  assert(parser('[2]').length===1&&parser('[20]').length===1,'[2] and [20] must parse independently');
+});
+
+test('CITATION: occurrence scan is leaf-only and excludes bibliography tail', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var block=src.substring(src.indexOf('function leafCitationBlocks'),src.indexOf('function wrapExistingMarkers'));
+  assert(block.indexOf("tag==='div'&&el.querySelector")>=0,'Outer div containers must be skipped');
+  assert(block.indexOf('bodyBoundaryEl')>=0&&block.indexOf('isAfterRefBoundary')>=0,'Bibliography boundary must be excluded');
+  var sentenceBlock=src.substring(src.indexOf('function splitCitationSentences'),src.indexOf('function leafCitationBlocks'));
+  assert(sentenceBlock.indexOf("'。！？.!?'.indexOf(text.charAt(i))")>=0,'Sentence split must not use semicolons');
+});
+
+test('CITATION: tree index preserves full parent and location chain', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var block=src.substring(src.indexOf('function buildFullTree'),src.indexOf('// INIT'));
+  assert(block.indexOf('node.parent=parent')>=0,'Tree nodes need parent links');
+  assert(block.indexOf('_parentNode:parent')>=0,'Flat entries need parent node links');
+  assert(block.indexOf('_chapter:currentChapter')>=0&&block.indexOf('_section:currentSection')>=0,'Flat entries need chapter/section links');
+  assert(block.indexOf('window._citationNodeByElement.set(p.el')>=0,'Leaf paragraphs must bind to tree locations');
+});
+
+test('CITATION: import uses occurrence scan without raw DOM pre-location', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('function locateRefInRawDOM')<0,'Raw DOM pre-location must be removed');
+  var importStart=src.indexOf("updLoad('提取参考文献"),importEnd=src.indexOf('paperTopics=extractTopics',importStart);
+  var importBlock=src.substring(importStart,importEnd);
+  assert(importBlock.indexOf('wrapExistingMarkers(rawRefs.filter(function(r){return r.num}))')>=0,'Import must collect occurrences after tree/anchors exist');
+  assert(importBlock.indexOf('_chName=')<0&&importBlock.indexOf('mr.ch=')<0,'Import must not write legacy location facts');
+});
+
+test('CITATION: rendering exposes detected inferred and unlocated states', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf("label:'真实角标'")>=0,'Detected label missing');
+  assert(src.indexOf("label:'推断建议'")>=0,'Inferred label missing');
+  assert(src.indexOf("label:'正文未检测到角标'")>=0,'Unlocated label missing');
+  assert(src.indexOf('引用句（原文）')>=0&&src.indexOf('建议句（关键词）')>=0,'Sentence provenance labels missing');
+});
+
+test('CITATION: reset preserves original marker text before rebuilding', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/app-modules.js'), 'utf8');
+  var block=src.substring(src.indexOf('function resetSearch'),src.indexOf('function enableLiteratureButtons'));
+  assert(block.indexOf("replaceWith(document.createTextNode(allM[i].textContent || ''))")>=0,'Reset must unwrap existing markers instead of deleting citation text');
+});
+
+test('CITATION: renumber and delete update every occurrence marker', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('function updateRefMarkerNumber')>=0,'Shared multi-occurrence renumber helper missing');
+  assert(src.indexOf('function refForMarker')>=0,'Marker-to-reference identity helper missing');
+  var delStart=src.indexOf('function deleteRef'),delEnd=src.indexOf('function copyOne',delStart);
+  var del=src.substring(delStart,delEnd);
+  assert(del.indexOf("var markers=(r.occurrences||[]).map")>=0,'Delete must remove all occurrence marker identities');
 });
 
 // ============================================================
