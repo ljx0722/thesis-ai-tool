@@ -2,7 +2,7 @@
 function runDefensePPT(container) {
   var c = container || document.querySelector('.module-panel');
   if (!c) return;
-  c.innerHTML = '<div class="module-panel" style="max-width:800px;margin:0 auto">' +
+  c.innerHTML = '<div class="module-panel module-panel-content">' +
     '<h4>📊 答辩PPT大纲</h4>' +
     '<div class="ai-desc">从论文内容自动提取核心论点，生成 <b>15-20 页答辩PPT大纲</b><br>每页包含：标题 + 3-5 个要点 + 建议展示方式</div>' +
     '<textarea id="defenseInput" class="ai-textarea" placeholder="在此粘贴论文摘要或全文（越长效果越好）..." style="height:200px;margin-bottom:0"></textarea>' +

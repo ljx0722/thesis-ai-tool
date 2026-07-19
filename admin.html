@@ -329,6 +329,7 @@
         <div style="margin-top:12px" class="admin-flex-wrap">
           <label style="font-size:.72rem">注册赠送(厘)</label><input id="bonusRegister" class="admin-input" type="number" style="width:120px">
           <label style="font-size:.72rem">邀请奖励(厘)</label><input id="bonusInvite" class="admin-input" type="number" style="width:120px">
+          <label style="font-size:.72rem">余额刷新间隔(秒)</label><input id="balanceRefreshSeconds" class="admin-input" type="number" min="2" max="60" step="1" style="width:120px" title="只影响用户端余额显示刷新，不影响实际扣费">
         </div>
       </div>
     </div>
@@ -884,6 +885,7 @@ function loadPricing(){
       tb.innerHTML=h;
       document.getElementById('bonusRegister').value=(d.bonuses&&d.bonuses.register_bonus)||3000;
       document.getElementById('bonusInvite').value=(d.bonuses&&d.bonuses.invite_bonus)||1000;
+      document.getElementById('balanceRefreshSeconds').value=d.balance_refresh_seconds||5;
     }).catch(function(){});
 }
 function savePricing(){
@@ -892,6 +894,7 @@ function savePricing(){
   document.querySelectorAll('.price-input').forEach(function(inp){ updates[inp.getAttribute('data-key')]=inp.value; });
   updates['register_bonus']=document.getElementById('bonusRegister').value;
   updates['invite_bonus']=document.getElementById('bonusInvite').value;
+  updates['balance_refresh_seconds']=document.getElementById('balanceRefreshSeconds').value;
   fetch('/api/admin/pricing',{method:'POST',headers:authHeaders(true),body:JSON.stringify({secret:SECRET,updates:updates})})
     .then(r=>r.json()).then(d=>{ if(d.success){toast('已保存 '+((d.changed||[]).length)+' 项'); loadPricing(); } else alert(d.error||'保存失败'); })
     .catch(function(){alert('网络错误')});

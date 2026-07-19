@@ -301,9 +301,9 @@ test('CSS class .ref-only used for panel switching', function() {
   assert(html.indexOf('ref-only') >= 0, 'Missing ref-only CSS class on reference panel elements');
 });
 
-test('Help button (?) exists in HTML', function() {
+test('Help button (?) exists in unified tools', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(html.indexOf('help-btn') >= 0, 'Missing help button element');
+  assert(html.indexOf('buddyHelpBtn') >= 0, 'Missing unified help button element');
 });
 
 test('Upload overlay / file input is present', function() {
@@ -568,15 +568,18 @@ test('CSS: Unified animation timing variables', function() {
   assert(css.indexOf('--t-spring') >= 0, 'Missing spring easing');
 });
 
-test('HTML: Dark mode toggle button exists', function() {
+test('HTML: Unified theme control exists', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(html.indexOf('darkToggle') >= 0, 'Missing dark mode toggle');
-  assert(html.indexOf('toggleDarkMode') >= 0, 'Missing toggle function');
+  assert(html.indexOf('buddyThemeBtn') >= 0, 'Missing unified theme control');
+  assert(html.indexOf('id="darkToggle"') < 0, 'Legacy dark toggle still rendered');
+  assert(html.indexOf('buddyHelpBtn') >= 0, 'Missing unified help control');
 });
 
-test('HTML: localStorage persists dark mode preference', function() {
-  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(html.indexOf('localStorage') >= 0, 'Missing localStorage for dark mode');
+test('Theme: account preferences support automatic time mode', function() {
+  var modules = fs.readFileSync(path.join(projectRoot, 'js/app-modules.js'), 'utf8');
+  assert(modules.indexOf("colorMode:'auto'") >= 0, 'Automatic time mode is not the default');
+  assert(modules.indexOf("hour<6||hour>=18") >= 0, 'Time boundary resolver missing');
+  assert(modules.indexOf('migrateLegacyPreferences') >= 0, 'Legacy theme migration missing');
 });
 
 test('HTML: OG meta tags for social sharing', function() {
@@ -1814,6 +1817,22 @@ test('UX: two-path home exists', function() {
   assert(src.indexOf('你想先做什么') >= 0 || src.indexOf('home-choice') >= 0, 'two-path home missing');
   assert(src.indexOf('从想法开始') >= 0, 'idea path missing');
   assert(src.indexOf('上传') >= 0, 'upload path missing');
+});
+
+test('Billing: configurable balance refresh is present', function() {
+  var py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
+  var html=fs.readFileSync(path.join(projectRoot,'index.html'),'utf8');
+  var admin=fs.readFileSync(path.join(projectRoot,'admin.html'),'utf8');
+  assert(py.indexOf('balance_refresh_seconds')>=0&&py.indexOf("refresh_interval_seconds")>=0,'balance refresh backend config missing');
+  assert(html.indexOf('_balanceRefreshMs=5000')>=0&&html.indexOf('requestBalanceRefreshSoon')>=0,'5 second balance scheduler missing');
+  assert(admin.indexOf('balanceRefreshSeconds')>=0,'admin balance refresh setting missing');
+});
+
+test('Upload: DOCX recovery and style mapping contracts', function() {
+  var src=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8');
+  assert(src.indexOf("[['标题_TJ','h1'],['一级标题_TJ','h2'],['二级标题_TJ','h3'],['三级标题_TJ','h4']]")>=0,'Tongji style mapping is not a nested array');
+  assert(src.indexOf('importSnapshot')>=0&&src.indexOf('rehydrateManuscriptRuntime')>=0,'upload recovery path missing');
+  assert(src.indexOf('keep manuscript unstructured')>=0,'unstructured import fallback missing');
 });
 
 test('RELEASE: ThesisBuddy platform contracts are present', function() {

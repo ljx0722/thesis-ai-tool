@@ -400,8 +400,7 @@ window.domReady=true;window.hasMammoth=typeof mammoth!=='undefined';window.hasJS
 window._ambientTips=['参考文献最好近3年的占一半以上','英文文献不能太少，至少30%','摘要部分一般不需要引用','绪论里的文献综述要覆盖这个领域主要流派','每个章节至少引用1-2条文献支撑','数据和方法的描述通常需要引文献佐证','图表如果引用了别人的要标注来源','结语和展望里可以少放一些引用','期刊论文比学位论文更适合做参考文献','别在目录和附录附近插引用标记','GB/T 7714 不要漏了DOI','文献标题大小写要保持一致','引用年份越近说明研究越前沿','大数据加小样本，贝叶斯方法很有用'];
 </script>
 
-<button class="help-btn" id="darkToggle" onclick="toggleDarkMode()" title="切换暗色模式" style="bottom:72px">🌓</button>
-<button class="help-btn" id="helpBtn" onclick="tourStart()" title="查看操作指南">?</button>
+<!-- 右下角快捷入口统一由 buddyTools 提供 -->
 <script defer src="mammoth.browser.min.js"></script>
 <script defer src="jszip.min.js"></script>
 <script src="app.js?v=64"></script>
@@ -446,27 +445,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 })();
 </script>
 </div>
-<script>
-// Dark mode toggle
-(function(){
-  var mq=window.matchMedia('(prefers-color-scheme:dark)');
-  var saved=null;try{var legacyA=localStorage.getItem('thesis-ai-dark');var legacyB=localStorage.getItem('thesis_ai_dark');saved=legacyA!==null?legacyA:legacyB;}catch(e){}
-  function setDark(on){
-    document.body.classList.toggle('dark',on);
-    document.body.classList.toggle('light',!on);
-    var btn=document.getElementById('darkToggle');
-    if(btn)btn.textContent=on?'☀️':'🌓';
-  }
-  if(saved!==null)setDark(saved==='1');
-  else if(mq.matches)setDark(true);
-  mq.addEventListener('change',function(e){setDark(e.matches)});
-  window.toggleDarkMode=function(){
-    var isDark=document.body.classList.contains('dark');
-    setDark(!isDark);
-    try{localStorage.setItem('thesis-ai-dark',isDark?'0':'1');localStorage.removeItem('thesis_ai_dark')}catch(e){}
-  };
-})();
-</script>
+<!-- 主题由账号级外观设置统一管理。 -->
 
 <script>
 // ====== 登录/注册逻辑 ======
@@ -479,7 +458,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 
   function finishAuthenticatedBootstrap(user) {
     if(user)sessionStorage.setItem(USER_KEY,JSON.stringify(user));
-    hideLogin();updateBalanceDisplay();if(window.pollNotifications)window.pollNotifications();
+    hideLogin();updateBalanceDisplay();if(window.reloadBuddyPreferences)window.reloadBuddyPreferences();if(window.pollNotifications)window.pollNotifications();
     if(window.ThesisProject&&ThesisProject.bootstrapAuthenticatedUser){ThesisProject.bootstrapAuthenticatedUser().catch(function(e){console.warn('[bootstrap]',e);});}
     else if(window.restoreScopedSession)window.restoreScopedSession();
   }
@@ -583,8 +562,19 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
     return n.toFixed(3);
   };
   window.formatPoints=function(p){ p=Number(p||0); if(!isFinite(p)) p=0; return p.toFixed(3); }
+  var _balanceRefreshTimer=null,_balanceRefreshInFlight=false,_balanceRefreshMs=5000;
+  window.setBalanceDisplay=function(points){
+    var balEl=document.getElementById('balanceAmount');if(!balEl)return;
+    var pts=Number(points||0);if(!isFinite(pts))pts=0;
+    balEl.textContent=pts.toFixed(3);balEl.style.color=pts>=1?'#10b981':(pts>0?'#f59e0b':'#f87171');
+  };
+  function scheduleBalanceRefresh(delay){
+    if(_balanceRefreshTimer)clearTimeout(_balanceRefreshTimer);
+    if(!sessionStorage.getItem(TOKEN_KEY))return;
+    _balanceRefreshTimer=setTimeout(function(){updateBalanceDisplay();},delay==null?_balanceRefreshMs:delay);
+  }
+  window.requestBalanceRefreshSoon=function(){scheduleBalanceRefresh(400);};
   updateBalanceDisplay = function() {
-    // Show admin panel button if admin
     var userData = null;
     try { userData = JSON.parse(sessionStorage.getItem('thesis_ai_user')||'{}'); } catch(e) {}
     if (userData && userData.is_admin) {
@@ -592,15 +582,15 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
       if (adminBtn) adminBtn.style.display = '';
     }
     var token = sessionStorage.getItem(TOKEN_KEY);
-    if (!token) return;
-    var balEl = document.getElementById('balanceAmount');
-    fetch('/api/payment/balance', {
+    if (!token || _balanceRefreshInFlight) return Promise.resolve();
+    _balanceRefreshInFlight=true;
+    return fetch('/api/payment/balance', {
       headers: { 'Authorization': 'Bearer ' + token }
     }).then(function(r) { return r.json(); })
       .then(function(d) {
-        if (d.success && balEl) {
-          balEl.textContent=Number(d.points!=null?d.points:(d.credits!=null?d.credits/1000:0)).toFixed(3);
-          var pts = (d.points != null ? d.points : (d.credits / 1000)); balEl.style.color = pts >= 1 ? '#10b981' : (pts > 0 ? '#f59e0b' : '#f87171');
+        if (d.success) {
+          setBalanceDisplay(d.points!=null?d.points:(d.credits!=null?d.credits/1000:0));
+          if(d.refresh_interval_seconds!=null){var seconds=Number(d.refresh_interval_seconds);if(isFinite(seconds))_balanceRefreshMs=Math.max(2000,Math.min(60000,seconds*1000));}
           var fq = document.getElementById('freeQuotaChip');
           if (fq) {
             if (d.free_remaining_today != null && d.free_limit_today != null) {
@@ -612,7 +602,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
             }
           }
         }
-      }).catch(function() {});
+      }).catch(function() {}).finally(function(){_balanceRefreshInFlight=false;scheduleBalanceRefresh();});
   };
 
   // 充值弹窗
@@ -855,7 +845,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
         }
       });
   },1000);
-  setInterval(updateBalanceDisplay, 15000);
+  scheduleBalanceRefresh();
 
   // ====== 站内消息（管理员赠送/充值到账等） ======
   var _notifyOpen = false;
@@ -1301,9 +1291,9 @@ document.getElementById('accountModalMask').addEventListener('click', function(e
 
 
 <div class="buddy-tools" id="buddyTools" aria-label="论文搭子快捷工具">
-  <button type="button" onclick="openBuddyAssistant()" title="打开论文搭子助手">搭子</button>
-  <button type="button" onclick="openThemeStudio()" title="外观与阅读设置">主题</button>
-  <button type="button" onclick="openContextHelp()" title="查看当前页面帮助">帮助</button>
+  <button type="button" class="buddy-tool-fab" id="buddyAssistantBtn" onclick="openBuddyAssistant()" title="打开论文搭子助手" aria-label="打开论文搭子助手"><span aria-hidden="true">搭子</span></button>
+  <button type="button" class="buddy-tool-fab" id="buddyThemeBtn" onclick="openThemeStudio()" title="外观与阅读设置" aria-label="外观与阅读设置"><span aria-hidden="true">主题</span></button>
+  <button type="button" class="buddy-tool-fab" id="buddyHelpBtn" onclick="openContextHelp()" title="查看操作指南" aria-label="查看操作指南"><span aria-hidden="true">?</span></button>
 </div>
 <div class="buddy-backdrop" id="buddyBackdrop" onclick="closeBuddyAssistant()"></div>
 <aside class="buddy-drawer" id="buddyDrawer" aria-hidden="true" aria-label="论文搭子助手">
@@ -1316,7 +1306,7 @@ document.getElementById('accountModalMask').addEventListener('click', function(e
 <section class="theme-studio" id="themeStudio" aria-hidden="true">
   <header><div><strong>外观与阅读</strong><span>即时预览，设置按账号保存</span></div><button type="button" onclick="closeThemeStudio()">关闭</button></header>
   <div class="theme-studio-body">
-    <label>颜色模式<select id="prefColorMode" onchange="previewPreferences()"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
+    <label>颜色模式<select id="prefColorMode" onchange="previewPreferences()"><option value="auto">自动（日间 06:00–18:00）</option><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
     <label>强调色<select id="prefAccent" onchange="previewPreferences()"><option value="indigo">靛蓝</option><option value="ocean">海洋</option><option value="forest">森林</option><option value="rose">玫红</option><option value="sunset">日落</option></select></label>
     <label>界面密度<select id="prefDensity" onchange="previewPreferences()"><option value="compact">紧凑</option><option value="default">标准</option><option value="relaxed">宽松</option></select></label>
     <label>正文字体<select id="prefFont" onchange="previewPreferences()"><option value="auto">系统</option><option value="sans">无衬线</option><option value="serif">衬线</option></select></label>

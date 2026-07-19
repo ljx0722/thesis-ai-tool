@@ -84,8 +84,8 @@ function buildTourSteps() {
       title: '账户与帮助',
       body: '右上角可查看余额、明细与计费说明；充值后可继续使用智能能力。<br>随时点右下角 <b>?</b> 可重新打开本指南。',
       el: function () {
-        return document.getElementById('darkToggle')
-          || document.querySelector('.help-btn')
+        return document.getElementById('buddyHelpBtn')
+          || document.getElementById('buddyTools')
           || document.getElementById('changelogLink');
       },
       pos: 'left', icon: '💡'

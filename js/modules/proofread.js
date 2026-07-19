@@ -2,7 +2,7 @@
 function runProofread(container) {
   var c = container || document.querySelector('.module-panel');
   if (!c) return;
-  c.innerHTML = '<div class="module-panel" style="max-width:800px;margin:0 auto">' +
+  c.innerHTML = '<div class="module-panel module-panel-content">' +
     '<h4>✏️ 论文查错</h4>' +
     '<div class="ai-desc">AI 逐句扫描：<b>语病 · 标点错误 · 重复句 · 口语化表达 · 长句拆分建议</b></div>' +
     '<textarea id="proofreadInput" class="ai-textarea" placeholder="在此粘贴需要检查的论文段落..." style="margin-bottom:0"></textarea>' +

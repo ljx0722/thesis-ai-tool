@@ -2,7 +2,7 @@
 function runEnAbstract(container) {
   var c = container || document.querySelector('.module-panel');
   if (!c) return;
-  c.innerHTML = '<div class="module-panel" style="max-width:800px;margin:0 auto">' +
+  c.innerHTML = '<div class="module-panel module-panel-content">' +
     '<h4>🌐 英文摘要润色</h4>' +
     '<div class="ai-desc">支持两种模式：<br><b>翻译模式：</b>中文摘要 → 学术英文摘要<br><b>润色模式：</b>已有英文 → AI润色优化（语法/用词/流畅度）</div>' +
     '<div style="display:flex;gap:8px;margin-bottom:12px">' +

@@ -1482,7 +1482,8 @@
     var p=getCurrentProject();
     if(!p||!cloudEnabled())return Promise.resolve(null);
     var snapshot={
-      schemaVersion:1,
+      schemaVersion:2,
+      structured:(typeof window._thesisStructured==='boolean'?window._thesisStructured:((typeof sections!=='undefined'?sections:[]).length>0)),
       text:(typeof manuscriptText!=='undefined'?manuscriptText:''),
       html:(typeof manuscriptHTML!=='undefined'?manuscriptHTML:''),
       sections:(typeof sections!=='undefined'?sections:[]).map(function(ch){return{ch:ch.ch,name:ch.name,text:ch.text||'',sections:(ch.sections||[]).map(function(s){return{num:s.num,title:s.title,text:s.text||'',subs:(s.subs||[]).map(function(u){return{num:u.num,title:u.title,text:u.text||''};})};})};}),
@@ -1503,7 +1504,7 @@
       unloadProjectRuntime();var s=d.snapshot||{};
       manuscriptText=s.text||'';manuscriptHTML=s.html||'';sections=s.sections||[];existingRefs=s.references||[];mergedRefs=[];paperTopics=s.topics||[];
       var tb=document.getElementById('thesisBox'),ws=document.getElementById('workspaceContent');if(tb){Array.prototype.slice.call(tb.childNodes).forEach(function(n){if(n!==ws)tb.removeChild(n);});if(ws)ws.style.display='none';var root=document.createElement('div');root.id='paperContentRoot';root.className='paper-content-root';root.innerHTML=manuscriptHTML;tb.appendChild(root);}
-      if(typeof renderNavTree==='function')renderNavTree(sections);if(typeof renderExistingOnly==='function')renderExistingOnly();if(typeof onThesisLoaded==='function')onThesisLoaded();return true;
+      if(typeof rehydrateManuscriptRuntime==='function')rehydrateManuscriptRuntime();else if(typeof renderNavTree==='function')renderNavTree(sections);window._thesisStructured=sections.length>0;if(typeof renderExistingOnly==='function')renderExistingOnly();if(typeof onThesisLoaded==='function')onThesisLoaded({skipRevisionSave:true});return true;
     });
   }
 

@@ -101,21 +101,20 @@ function openToolboxPicker(){
   var favs=loadToolboxFavs();
   var all = (APP_MODULES||[]).map(function(m){return m.id;}).concat(['materials','pipeline','defense-pack','ref-norm','preview']);
   var seen={}; all=all.filter(function(id){ if(seen[id])return false; seen[id]=1; return true; });
-  var html='<div style="display:flex;flex-direction:column;gap:6px;max-height:55vh;overflow:auto">';
+  var html='<div class="toolbox-picker-list">';
   all.forEach(function(id){
     var m=toolMeta(id);
     var checked = favs.indexOf(id)>=0 ? 'checked' : '';
-    html += '<label style="display:flex;gap:8px;align-items:flex-start;padding:8px;border:1px solid var(--border);border-radius:10px;cursor:pointer">'+
+    html += '<label class="toolbox-picker-item">'+
       '<input type="checkbox" data-tool-id="'+id+'" '+checked+'>'+
-      '<span><b>'+ (m.icon||'') + ' ' + m.name + '</b><br><span style="font-size:.65rem;color:var(--text-muted)">'+ (m.desc|| (m.requiresThesis?'需要论文':'可随时使用')) +'</span></span></label>';
+      '<span class="toolbox-picker-copy"><b>'+ (m.icon||'') + ' ' + m.name + '</b><small>'+ (m.desc|| (m.requiresThesis?'需要论文':'可随时使用')) +'</small></span></label>';
   });
   html+='</div>';
   if(typeof openAccountModal==='function'){
-    openAccountModal('自定义百宝箱', html + '<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="ai-btn" onclick="saveToolboxPicker()">保存快捷入口</button></div>');
+    openAccountModal('自定义百宝箱', html + '<div class="toolbox-picker-actions"><button type="button" class="ai-btn" onclick="saveToolboxPicker()">保存快捷入口</button></div>');
   } else {
-    // fallback modal
     var ov=document.createElement('div'); ov.className='project-overlay'; ov.id='toolboxPickerOv';
-    ov.innerHTML='<div class="project-modal" onclick="event.stopPropagation()"><div class="project-modal-head"><h3>自定义百宝箱</h3><button class="project-close" onclick="this.closest(\'.project-overlay\').remove()">×</button></div>'+html+'<div class="project-modal-actions"><button class="ai-btn" onclick="saveToolboxPicker()">保存</button></div></div>';
+    ov.innerHTML='<div class="project-modal" onclick="event.stopPropagation()"><div class="project-modal-head"><h3>自定义百宝箱</h3><button class="project-close" onclick="this.closest(\'.project-overlay\').remove()">×</button></div>'+html+'<div class="project-modal-actions"><button type="button" class="ai-btn" onclick="saveToolboxPicker()">保存</button></div></div>';
     document.body.appendChild(ov);
   }
 }
@@ -566,7 +565,7 @@ function switchPanel(moduleId) {
     panel.appendChild(moduleArea);
   }
   // 单一滚动宿主：module-area 占满 toolHome 腾出的高度
-  moduleArea.style.cssText = 'flex:1 1 auto;min-height:0;height:auto;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;display:block;';
+  moduleArea.style.cssText = 'flex:1 1 auto;min-height:0;height:auto;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;display:block;width:100%;max-width:100%;box-sizing:border-box;';
   moduleArea.style.display = '';
   moduleArea.scrollTop = 0;
 
@@ -692,10 +691,11 @@ function updateStatusBar2() {
   updateNavStates();
 }
 
-function onThesisLoaded() {
+function onThesisLoaded(options) {
+  options=options||{};
   _thesisLoaded = true; _analysisCache = {}; kgCurrentData = null;
   updateBarActions(); updateStatusBar2(); updateNavStates();
-  if (window.ThesisProject && typeof ThesisProject.onManuscriptReady === 'function') {
+  if (!options.skipRevisionSave && window.ThesisProject && typeof ThesisProject.onManuscriptReady === 'function') {
     ThesisProject.onManuscriptReady();
   }
   // 导入后优先看论文正文与目录树（可滚动），而不是盖住正文的工作台卡片
@@ -1247,12 +1247,14 @@ window.runDataFeatureScore=function(){
   window._mlTopK=tkEl?parseInt(tkEl.value)||12:12;
   var token=sessionStorage.getItem('thesis_ai_token'); if(!token){alert('请先登录');return;}
   var out=document.getElementById('dataAIOutput'); if(out) out.innerHTML='<div class="ai-loading">⏳ 正在进行特征评分与多模型训练...</div>';
+  if(typeof requestBalanceRefreshSoon==='function')requestBalanceRefreshSoon();
   fetch('/api/data/analyze_ml',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
     body:JSON.stringify({headers:cache.raw.headers, rows:cache.raw.rows, target:target, task:'auto', test_size:window._mlTestSize||0.3, top_k:window._mlTopK||12})})
   .then(function(r){return r.json();}).then(function(d){
     if(!out) return;
     if(!d.success){ out.innerHTML='<div class="ai-output-error">❌ '+(d.error||'失败')+'</div>'; return; }
     window._mlResult=d;
+    if(d.points_after!=null&&typeof setBalanceDisplay==='function')setBalanceDisplay(d.points_after);
     var h='';
     h+='<div class="ml-steps">';
     h+='<div class="ml-step">3 特征评分</div><div class="ml-step">4 模型训练</div><div class="ml-step">5 结果对比</div><div class="ml-step">6 可解释性</div>';
@@ -1327,7 +1329,7 @@ window.runDataFeatureScore=function(){
         try{ drawROCCurve(c2, d.roc.fpr, d.roc.tpr, d.roc.auc); }catch(e){ console.warn(e); }
       }
     }, 40);
-  }).catch(function(err){ if(out) out.innerHTML='<div class="ai-output-error">网络错误</div>'; });
+  }).catch(function(err){ if(out) out.innerHTML='<div class="ai-output-error">网络错误</div>'; }).finally(function(){if(typeof updateBalanceDisplay==='function')updateBalanceDisplay();});
 };
 window.runDataAISummary=function(){
   var cache=window._dataAnalysisCache; if(!cache){alert('请先上传并完成数据分析');return;}
@@ -1336,13 +1338,14 @@ window.runDataAISummary=function(){
   out.innerHTML='<div class="ai-loading">⏳ AI 正在根据统计结果撰写论文表述...</div>';
   var summary=JSON.stringify(cache.summary).substring(0,3500);
   var sig=JSON.stringify(cache.sigTop||[]).substring(0,2000);
+  if(typeof requestBalanceRefreshSoon==='function')requestBalanceRefreshSoon();
   fetch('/api/llm/analyze',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
     body:JSON.stringify({module:'data-analysis',system_prompt:'你是学术论文数据分析写作助手。请用中文、规范学术语气，根据统计摘要撰写：1)结果描述 2)可放入论文的段落 3)图表标题建议。不要编造未给出的数据。',
       user_prompt:'文件：'+cache.fileName+'\n变量数：'+cache.nVar+' 观测：'+cache.nObs+'\n统计摘要：'+summary+'\n显著性结果(Top)：'+sig+'\n请输出结构化中文结果。',max_tokens:1800})})
   .then(function(r){return r.json();}).then(function(d){
-    if(d.success){ out.innerHTML='<div class="ai-output">'+d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>'; if(typeof updateBalanceDisplay==='function')updateBalanceDisplay(); }
+    if(d.success){ out.innerHTML='<div class="ai-output">'+d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>'; if(d.points_after!=null&&typeof setBalanceDisplay==='function')setBalanceDisplay(d.points_after); }
     else out.innerHTML='<div class="ai-output-error">❌ '+(d.error||'失败')+'</div>';
-  }).catch(function(){out.innerHTML='<div class="ai-output-error">网络错误</div>';});
+  }).catch(function(){out.innerHTML='<div class="ai-output-error">网络错误</div>';}).finally(function(){if(typeof updateBalanceDisplay==='function')updateBalanceDisplay();});
 };
 
 
@@ -1616,24 +1619,62 @@ function drawBarChart(canvas, items) {
 
 
 
-var BUDDY_PREF_DEFAULTS={colorMode:'system',accentPreset:'indigo',fontFamily:'auto',density:'default',fontScale:1,reduceMotion:false};
+var BUDDY_PREF_DEFAULTS={colorMode:'auto',accentPreset:'indigo',fontFamily:'auto',density:'default',fontScale:1,reduceMotion:false};
 var BUDDY_ACCENTS={indigo:['#6366f1','#4f46e5','#818cf8'],ocean:['#0284c7','#0369a1','#38bdf8'],forest:['#059669','#047857','#34d399'],rose:['#e11d48','#be123c','#fb7185'],sunset:['#ea580c','#c2410c','#fb923c']};
+var _buddyThemeTimer=null,_buddyThemeMedia=null,_buddyThemeMediaHandler=null,_buddyThemePreviewBaseline=null,_buddyThemeSaving=false;
 function buddyUserKey(base){try{var u=JSON.parse(sessionStorage.getItem('thesis_ai_user')||'{}');return base+'_u'+(u.id!=null?u.id:'guest');}catch(e){return base+'_guest';}}
-function loadPreferences(){try{return Object.assign({},BUDDY_PREF_DEFAULTS,JSON.parse(localStorage.getItem(buddyUserKey('thesisbuddy_preferences_v1'))||'{}'));}catch(e){return Object.assign({},BUDDY_PREF_DEFAULTS);}}
+function migrateLegacyPreferences(){
+  try{
+    var user=JSON.parse(sessionStorage.getItem('thesis_ai_user')||'{}');
+    if(user.id==null)return;
+    var key=buddyUserKey('thesisbuddy_preferences_v1');
+    if(localStorage.getItem(key)!==null)return;
+    var legacy=localStorage.getItem('thesis-ai-dark');
+    if(legacy===null)legacy=localStorage.getItem('thesis_ai_dark');
+    if(legacy!==null){var p=Object.assign({},BUDDY_PREF_DEFAULTS,{colorMode:legacy==='1'?'dark':'light'});localStorage.setItem(key,JSON.stringify(p));}
+    localStorage.removeItem('thesis-ai-dark');localStorage.removeItem('thesis_ai_dark');
+  }catch(e){}
+}
+function loadPreferences(){try{migrateLegacyPreferences();return Object.assign({},BUDDY_PREF_DEFAULTS,JSON.parse(localStorage.getItem(buddyUserKey('thesisbuddy_preferences_v1'))||'{}'));}catch(e){return Object.assign({},BUDDY_PREF_DEFAULTS);}}
+function clearBuddyThemeSchedule(){
+  if(_buddyThemeTimer){clearTimeout(_buddyThemeTimer);_buddyThemeTimer=null;}
+  if(_buddyThemeMedia&&_buddyThemeMediaHandler){if(_buddyThemeMedia.removeEventListener)_buddyThemeMedia.removeEventListener('change',_buddyThemeMediaHandler);else if(_buddyThemeMedia.removeListener)_buddyThemeMedia.removeListener(_buddyThemeMediaHandler);}
+  _buddyThemeMedia=null;_buddyThemeMediaHandler=null;
+}
+function resolveBuddyDarkMode(p,now){
+  if(p.colorMode==='dark')return true;
+  if(p.colorMode==='light')return false;
+  if(p.colorMode==='system')return window.matchMedia('(prefers-color-scheme:dark)').matches;
+  var hour=(now||new Date()).getHours();return hour<6||hour>=18;
+}
+function scheduleBuddyTheme(p){
+  clearBuddyThemeSchedule();
+  if(p.colorMode==='system'){
+    _buddyThemeMedia=window.matchMedia('(prefers-color-scheme:dark)');
+    _buddyThemeMediaHandler=function(){applyPreferences(loadPreferences());};
+    if(_buddyThemeMedia.addEventListener)_buddyThemeMedia.addEventListener('change',_buddyThemeMediaHandler);else if(_buddyThemeMedia.addListener)_buddyThemeMedia.addListener(_buddyThemeMediaHandler);
+  }else if(p.colorMode==='auto'){
+    var now=new Date(),next=new Date(now);
+    if(now.getHours()<6)next.setHours(6,0,0,0);else if(now.getHours()<18)next.setHours(18,0,0,0);else{next.setDate(next.getDate()+1);next.setHours(6,0,0,0);}
+    _buddyThemeTimer=setTimeout(function(){applyPreferences(loadPreferences());},Math.max(1000,next.getTime()-now.getTime()));
+  }
+}
 function applyPreferences(p){
-  p=Object.assign({},BUDDY_PREF_DEFAULTS,p||{});var b=document.body;
-  var dark=p.colorMode==='dark'||(p.colorMode==='system'&&window.matchMedia('(prefers-color-scheme:dark)').matches);
-  b.classList.toggle('dark',dark);b.classList.toggle('light',!dark);b.dataset.density=p.density;b.dataset.font=p.fontFamily;b.dataset.reduceMotion=String(!!p.reduceMotion);
+  p=Object.assign({},BUDDY_PREF_DEFAULTS,p||{});var b=document.body,dark=resolveBuddyDarkMode(p);
+  b.classList.toggle('dark',dark);b.classList.toggle('light',!dark);b.dataset.density=p.density;b.dataset.font=p.fontFamily;b.dataset.reduceMotion=String(!!p.reduceMotion);b.dataset.colorMode=p.colorMode;
   document.documentElement.style.fontSize=(15*Number(p.fontScale||1))+'px';
   var ac=BUDDY_ACCENTS[p.accentPreset]||BUDDY_ACCENTS.indigo;
-  document.documentElement.style.setProperty('--accent',ac[0]);document.documentElement.style.setProperty('--accent-dark',ac[1]);document.documentElement.style.setProperty('--accent-light',ac[2]);
+  document.documentElement.style.setProperty('--accent',ac[0]);document.documentElement.style.setProperty('--accent-dark',ac[1]);document.documentElement.style.setProperty('--accent-light',ac[2]);scheduleBuddyTheme(p);
 }
-function openThemeStudio(){var p=loadPreferences();document.getElementById('prefColorMode').value=p.colorMode;document.getElementById('prefAccent').value=p.accentPreset;document.getElementById('prefDensity').value=p.density;document.getElementById('prefFont').value=p.fontFamily;document.getElementById('prefScale').value=String(p.fontScale);document.getElementById('prefReduceMotion').checked=!!p.reduceMotion;document.getElementById('themeStudio').classList.add('open');document.getElementById('themeStudioBackdrop').classList.add('open');}
-function closeThemeStudio(){document.getElementById('themeStudio').classList.remove('open');document.getElementById('themeStudioBackdrop').classList.remove('open');}
+function fillPreferenceForm(p){document.getElementById('prefColorMode').value=p.colorMode;document.getElementById('prefAccent').value=p.accentPreset;document.getElementById('prefDensity').value=p.density;document.getElementById('prefFont').value=p.fontFamily;document.getElementById('prefScale').value=String(p.fontScale);document.getElementById('prefReduceMotion').checked=!!p.reduceMotion;}
+function openThemeStudio(){var p=loadPreferences();_buddyThemePreviewBaseline=Object.assign({},p);_buddyThemeSaving=false;fillPreferenceForm(p);document.getElementById('themeStudio').classList.add('open');document.getElementById('themeStudio').setAttribute('aria-hidden','false');document.getElementById('themeStudioBackdrop').classList.add('open');}
+function closeThemeStudio(){if(!_buddyThemeSaving&&_buddyThemePreviewBaseline)applyPreferences(_buddyThemePreviewBaseline);document.getElementById('themeStudio').classList.remove('open');document.getElementById('themeStudio').setAttribute('aria-hidden','true');document.getElementById('themeStudioBackdrop').classList.remove('open');_buddyThemePreviewBaseline=null;_buddyThemeSaving=false;}
 function readPreferenceForm(){return{colorMode:document.getElementById('prefColorMode').value,accentPreset:document.getElementById('prefAccent').value,density:document.getElementById('prefDensity').value,fontFamily:document.getElementById('prefFont').value,fontScale:Number(document.getElementById('prefScale').value),reduceMotion:document.getElementById('prefReduceMotion').checked};}
 function previewPreferences(){applyPreferences(readPreferenceForm());}
-function savePreferences(){var p=readPreferenceForm();localStorage.setItem(buddyUserKey('thesisbuddy_preferences_v1'),JSON.stringify(p));applyPreferences(p);closeThemeStudio();if(typeof ttp==='function')ttp('外观设置已保存');}
-function resetPreferences(){applyPreferences(BUDDY_PREF_DEFAULTS);localStorage.removeItem(buddyUserKey('thesisbuddy_preferences_v1'));openThemeStudio();}
+function savePreferences(){var p=readPreferenceForm();localStorage.setItem(buddyUserKey('thesisbuddy_preferences_v1'),JSON.stringify(p));_buddyThemePreviewBaseline=Object.assign({},p);_buddyThemeSaving=true;applyPreferences(p);closeThemeStudio();if(typeof ttp==='function')ttp('外观设置已保存');}
+function resetPreferences(){fillPreferenceForm(BUDDY_PREF_DEFAULTS);previewPreferences();}
+function reloadBuddyPreferences(){applyPreferences(loadPreferences());}
+document.addEventListener('visibilitychange',function(){if(!document.hidden){var p=loadPreferences();if(p.colorMode==='auto'||p.colorMode==='system')applyPreferences(p);}});
 function openContextHelp(){if(typeof tourStart==='function')tourStart();else openAccountModal('当前页面帮助','<p>从左侧故事线选择阶段，中间查看论文，右侧运行能力。论文搭子助手会优先引用当前项目资料。</p>');}
 function openBuddyAssistant(){var d=document.getElementById('buddyDrawer');d.classList.add('open');d.setAttribute('aria-hidden','false');document.getElementById('buddyBackdrop').classList.add('open');var p=window.ThesisProject&&ThesisProject.getCurrentProject?ThesisProject.getCurrentProject():null;var ctx=document.getElementById('buddyContext');if(ctx)ctx.textContent=p?(p.title+' · '+(p.currentStage||'进行中')):'尚未选择项目';setTimeout(function(){document.getElementById('buddyInput').focus();},100);}
 function closeBuddyAssistant(){var d=document.getElementById('buddyDrawer');d.classList.remove('open');d.setAttribute('aria-hidden','true');document.getElementById('buddyBackdrop').classList.remove('open');}
@@ -1643,7 +1684,7 @@ function askBuddyAssistant(){
   var projectContext=p?('项目：'+p.title+'\n阶段：'+(p.currentStage||'')+'\n想法：'+(p.idea||'')+'\n'):'';
   fetch('/api/assistant/query',{method:'POST',headers:authJsonHeaders(),body:JSON.stringify({project_id:p&&p.id,question:q,context:projectContext,idempotency_key:'buddy_'+Date.now()})}).then(function(r){return r.json().then(function(d){return{status:r.status,data:d};});}).then(function(x){var d=x.data||{};if(!d.success)throw new Error(d.error||'回答失败');pending.textContent=d.answer||d.content||'没有找到可用回答';if(d.sources&&d.sources.length)pending.textContent+='\n\n来源：\n'+d.sources.map(function(s){return'• '+s.filename+' · '+(s.heading||('片段'+(s.ordinal+1)));}).join('\n');if(d.usage&&d.usage.cost_points!=null)document.getElementById('buddyCostHint').textContent='本次 '+Number(d.usage.cost_points).toFixed(3)+' 点';if(typeof updateBalanceDisplay==='function')updateBalanceDisplay();}).catch(function(e){pending.textContent='暂时无法回答：'+e.message;});
 }
-window.openBuddyAssistant=openBuddyAssistant;window.closeBuddyAssistant=closeBuddyAssistant;window.askBuddyAssistant=askBuddyAssistant;window.openThemeStudio=openThemeStudio;window.closeThemeStudio=closeThemeStudio;window.previewPreferences=previewPreferences;window.savePreferences=savePreferences;window.resetPreferences=resetPreferences;window.openContextHelp=openContextHelp;
+window.openBuddyAssistant=openBuddyAssistant;window.closeBuddyAssistant=closeBuddyAssistant;window.askBuddyAssistant=askBuddyAssistant;window.openThemeStudio=openThemeStudio;window.closeThemeStudio=closeThemeStudio;window.previewPreferences=previewPreferences;window.savePreferences=savePreferences;window.resetPreferences=resetPreferences;window.reloadBuddyPreferences=reloadBuddyPreferences;window.openContextHelp=openContextHelp;
 try{applyPreferences(loadPreferences());}catch(e){}
 
 function downloadText(filename, text){

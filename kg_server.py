@@ -356,7 +356,7 @@ def init_db():
                 ('kg_price','50'),('domain_analysis_price','0'),('data-ml_price','500'),('export-docx_price','200'),
                 ('format-check_price','30'),('terminology_price','30'),('paragraph_price','30'),
                 ('dashboard_price','50'),('data-analysis_price','80'),
-                ('register_bonus','3000'),('invite_bonus','1000')]:  # 注册送3.0点, 邀请送1.0点
+                ('register_bonus','3000'),('invite_bonus','1000'),('balance_refresh_seconds','5')]:  # 注册送3.0点, 邀请送1.0点
         # 仅初始化缺失键，避免每次启动覆盖管理员已改价格
         conn.execute('INSERT OR IGNORE INTO config (key,value) VALUES (?,?)', (k, v))
     # Seed admin only when an explicit password is configured.
@@ -1756,6 +1756,12 @@ def payment_balance():
                               (request.user_id, today)).fetchone()
         used = free_row['used'] if free_row else 0
         free_limit = DAILY_FREE_OPS if 'DAILY_FREE_OPS' in globals() else 5
+        refresh_row = db.execute("SELECT value FROM config WHERE key='balance_refresh_seconds'").fetchone()
+        try:
+            refresh_seconds = int(refresh_row['value']) if refresh_row else 5
+        except (TypeError, ValueError):
+            refresh_seconds = 5
+        refresh_seconds = max(2, min(60, refresh_seconds))
         return jsonify({
             'success': True,
             'credits': u['credits'],
@@ -1763,7 +1769,8 @@ def payment_balance():
             'free_used_today': used,
             'free_limit_today': free_limit,
             'free_remaining_today': max(0, free_limit - used),
-            'free_available': used < free_limit
+            'free_available': used < free_limit,
+            'refresh_interval_seconds': refresh_seconds
         })
     finally:
         db.close()
@@ -3717,7 +3724,8 @@ def admin_pricing():
                             'unit': {'ratio': '1点=1000厘', 'recharge': '1元=1点'},
                             'llm_markup': USER_MARKUP if 'USER_MARKUP' in globals() else 3.0,
                             'llm_min_charge_points': (LLM_MIN_CHARGE if 'LLM_MIN_CHARGE' in globals() else 20)/1000,
-                            'daily_free_ops': DAILY_FREE_OPS if 'DAILY_FREE_OPS' in globals() else 5})
+                            'daily_free_ops': DAILY_FREE_OPS if 'DAILY_FREE_OPS' in globals() else 5,
+                            'balance_refresh_seconds': max(2, min(60, int(rows.get('balance_refresh_seconds', 5) or 5)))})
         finally:
             db.close()
 
@@ -3728,17 +3736,28 @@ def admin_pricing():
         return jsonify({'success': False, 'error': 'updates 不能为空'}), 400
     db = get_db()
     try:
-        allowed = set([k+'_price' for k in PRICING_DEFAULTS.keys()] + ['register_bonus', 'invite_bonus'])
+        allowed = set([k+'_price' for k in PRICING_DEFAULTS.keys()] + ['register_bonus', 'invite_bonus', 'balance_refresh_seconds'])
         changed = []
         for k, v in updates.items():
-            key = k if k.endswith('_price') or k in ('register_bonus','invite_bonus') else (k + '_price')
-            if key not in allowed and k not in ('register_bonus','invite_bonus'):
-                continue
-            try:
-                iv = int(float(v))
-            except Exception:
-                continue
-            if iv < 0: iv = 0
+            if k == 'balance_refresh_seconds':
+                try:
+                    iv = int(v)
+                except (TypeError, ValueError):
+                    db.rollback()
+                    return jsonify({'success': False, 'error': '余额刷新间隔必须是 2–60 秒的整数'}), 400
+                if iv < 2 or iv > 60:
+                    db.rollback()
+                    return jsonify({'success': False, 'error': '余额刷新间隔必须在 2–60 秒之间'}), 400
+                key = k
+            else:
+                key = k if k.endswith('_price') or k in ('register_bonus','invite_bonus') else (k + '_price')
+                if key not in allowed and k not in ('register_bonus','invite_bonus'):
+                    continue
+                try:
+                    iv = int(float(v))
+                except Exception:
+                    continue
+                if iv < 0: iv = 0
             db.execute('INSERT INTO config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', (key, str(iv)))
             changed.append({key: iv})
         db.commit()

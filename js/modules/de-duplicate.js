@@ -2,7 +2,7 @@
 function runDeduplicate(container) {
   var c = container || document.querySelector('.module-panel');
   if (!c) return;
-  c.innerHTML = '<div class="module-panel" style="max-width:800px;margin:0 auto">' +
+  c.innerHTML = '<div class="module-panel module-panel-content">' +
     '<h4>📋 论文查重降重</h4>' +
     '<div class="ai-desc">粘贴你的论文段落，AI 会：<br><b>1. 检测可能重复的内容</b>（词汇、句式层面）<br><b>2. 给出改写建议</b>（保持原意的替代表达）<br>' +
     '⚠ 本功能用于辅助降重，不能替代正式查重软件</div>' +

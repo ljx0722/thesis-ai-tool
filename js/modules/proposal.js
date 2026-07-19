@@ -5,7 +5,7 @@
 function runProposalModule(container) {
   var c = container || document.querySelector('.module-panel');
   if (!c) return;
-  c.innerHTML = '<div style="max-width:800px;margin:0 auto;width:100%">' +
+  c.innerHTML = '<div class="module-panel-content">' +
     '<h4>📝 开题报告 → 论文大纲建议</h4>' +
     '<div class="ai-desc">将你的开题报告内容粘贴到下方，AI 会分析并输出：<br>' +
     '<b>· 论文大纲结构</b>（章/节/小节）<br>' +

@@ -329,6 +329,31 @@ function renderNavTree(tree){
 }
 
 
+function rehydrateManuscriptRuntime(){
+  var root=document.getElementById('paperContentRoot');
+  if(!root)return false;
+  var saved=Array.isArray(sections)?sections:[],els=root.querySelectorAll('h1,h2,h3,h4,h5,h6,p'),used=[];
+  function norm(s){return String(s||'').replace(/\s+/g,'').replace(/[：:。．]/g,'').trim();}
+  function findEl(labels){
+    for(var li=0;li<labels.length;li++){var wanted=norm(labels[li]);if(!wanted)continue;
+      for(var i=0;i<els.length;i++){if(used.indexOf(i)>=0)continue;var actual=norm(els[i].textContent||'');if(actual===wanted||actual.indexOf(wanted)===0){used.push(i);return els[i];}}
+    }return null;
+  }
+  var headings=[];
+  saved.forEach(function(ch){
+    var chEl=findEl([ch.name,'第'+ch.ch+'章 '+(ch.name||''),'第'+ch.ch+'章']);if(chEl)headings.push({el:chEl,txt:(chEl.textContent||ch.name||'').trim(),level:0,style:'revision'});
+    (ch.sections||[]).forEach(function(sec){var secEl=findEl([(sec.num||'')+' '+(sec.title||''),sec.title]);if(secEl)headings.push({el:secEl,txt:(secEl.textContent||'').trim(),level:1,style:'revision'});
+      (sec.subs||[]).forEach(function(sub){var subEl=findEl([(sub.num||'')+' '+(sub.title||''),sub.title]);if(subEl)headings.push({el:subEl,txt:(subEl.textContent||'').trim(),level:2,style:'revision'});});
+    });
+  });
+  headings.sort(function(a,b){return a.el===b.el?0:(a.el.compareDocumentPosition(b.el)&Node.DOCUMENT_POSITION_FOLLOWING?-1:1);});
+  if(headings.some(function(h){return h.level===0;}))sections=buildFullTree(root,headings,0,els.length);
+  else{sections=[];_treeIndex={chapters:[],sections:[],subs:[],paragraphs:[],sentences:[]};}
+  sections.forEach(function(ch){if(ch.el){ch.el.id='ch-'+ch.ch;ch.el.classList.add('ch-head');}function bind(nodes,level){(nodes||[]).forEach(function(n){if(n.el)n.el.id=(level===1?'sec-':'sub-')+String(n.num||'').replace(/\./g,'-');bind(n.subs||n.sections,level+1);});}bind(ch.sections,1);});
+  renderNavTree(sections);return sections.length>0;
+}
+window.rehydrateManuscriptRuntime=rehydrateManuscriptRuntime;
+
 function navClick2(el){
   var id=el.getAttribute('data-id'),target=document.getElementById(id);
   if(!target)return;
@@ -2532,7 +2557,19 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
   window.beginImportFile=beginImportFile;
   fi.addEventListener('change',async function(e){var file=e.target.files[0];e.target.value='';await beginImportFile(file,window._importIntent||'new');});
   async function parseImportedFile(f){
-    if(!f)return; window._uploadFileName=f.name||'document.docx';window._uploadFileSize=f.size||0;
+    if(!f)return;
+    var importSnapshot={
+      thesisLoaded:_thesisLoaded,
+      manuscriptText:manuscriptText,
+      manuscriptHTML:manuscriptHTML,
+      existingRefs:existingRefs,
+      mergedRefs:mergedRefs,
+      paperTopics:paperTopics,
+      sections:sections,
+      treeIndex:window._treeIndex,
+      thesisBoxHTML:(document.getElementById('thesisBox')||{}).innerHTML||''
+    };
+    window._uploadFileName=f.name||'document.docx';window._uploadFileSize=f.size||0;
     // 扩展名可能不准（微信/网盘重命名、大小写、双后缀），用文件头魔数识别
     var name=(f.name||'document').toLowerCase();
     var ext=name.split('.').pop()||'';
@@ -2570,15 +2607,16 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     }
 
     if(ext==='docx'){
-    if(typeof mammoth==='undefined'){
+    if(typeof mammoth==='undefined'||typeof JSZip==='undefined'){
       updLoad('等待Word解析库加载...',3);
-      for(var retry=0;retry<15&&typeof mammoth==='undefined';retry++){
+      for(var retry=0;retry<15&&(typeof mammoth==='undefined'||typeof JSZip==='undefined');retry++){
         await new Promise(function(rr){setTimeout(rr,200)});
-        updLoad('等待库加载...',Math.min(8,retry*0.5+3));
+        var missing=[];if(typeof mammoth==='undefined')missing.push('Mammoth');if(typeof JSZip==='undefined')missing.push('JSZip');
+        updLoad('等待 '+missing.join(' / ')+' 加载...',Math.min(8,retry*0.5+3));
       }
-      if(typeof mammoth==='undefined'){hideLoad();alert('mammoth.browser.min.js 加载超时。请刷新页面后重试，或检查该文件是否在相同目录。');return}
+      var missingFinal=[];if(typeof mammoth==='undefined')missingFinal.push('Mammoth');if(typeof JSZip==='undefined')missingFinal.push('JSZip');
+      if(missingFinal.length){hideLoad();alert(missingFinal.join(' / ')+' 加载超时。请刷新页面后重试。');return}
     }
-    if(typeof JSZip==='undefined'){hideLoad();alert('jszip.min.js 未加载。请检查文件是否在相同目录。');return}
 
     updLoad('读取文件...',10);var buf;
     try{buf=await f.arrayBuffer()}catch(er2){hideLoad();alert('文件读取失败: '+er2.message);return}
@@ -2719,7 +2757,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
         styleMap.push('p[style-name=\'Subtitle\'] => h2:fresh');
         styleMap.push('p[style-name=\'副标题\'] => h2:fresh');
         // 同济模板硬编码兜底（样式名驱动）
-        ['标题_TJ','h1'],['一级标题_TJ','h2'],['二级标题_TJ','h3'],['三级标题_TJ','h4'].forEach(function(pair){
+        [['标题_TJ','h1'],['一级标题_TJ','h2'],['二级标题_TJ','h3'],['三级标题_TJ','h4']].forEach(function(pair){
           var exists=false;
           for(var si=0;si<styleMap.length;si++){if(styleMap[si].indexOf("style-name='"+pair[0]+"'")>=0){exists=true;break;}}
           if(!exists) styleMap.push("p[style-name='"+pair[0]+"'] => "+pair[1]+":fresh");
@@ -3144,16 +3182,17 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
         // 用户关闭校准弹窗：中止解析，不建错误目录树
         throw new Error('已取消标题校准。请重新上传并完成章/节/小节样式确认。');
       }
-      if (!calibrated.length) {
-        throw new Error('未确认任何标题样式。请至少为「章」选择一种 Word 样式（如 标题_TJ）。');
+      if (!calibrated.length || !calibrated.some(function(h){return h.level===0;})) {
+        allHeadings=[];sections=[];window._thesisStructured=false;
+      } else {
+        allHeadings = calibrated;window._thesisStructured=true;
+        console.log('[cal] using calibrated headings only:', allHeadings.length,
+          'L0=', allHeadings.filter(function(h){return h.level===0;}).length,
+          'L1=', allHeadings.filter(function(h){return h.level===1;}).length,
+          'L2=', allHeadings.filter(function(h){return h.level===2;}).length);
+        sections = buildFullTree(box, allHeadings, bodyStartIdx, refBound);
+        if(!sections.length)window._thesisStructured=false;
       }
-      allHeadings = calibrated;
-      console.log('[cal] using calibrated headings only:', allHeadings.length,
-        'L0=', allHeadings.filter(function(h){return h.level===0;}).length,
-        'L1=', allHeadings.filter(function(h){return h.level===1;}).length,
-        'L2=', allHeadings.filter(function(h){return h.level===2;}).length);
-      // ===== 第5步：构建完整 5 层树 + 全局索引 =====
-      sections = buildFullTree(box, allHeadings, bodyStartIdx, refBound);
       }
     // ===== 第6步：调试日志 =====
     console.log('[chapters] Parsed', sections.length, 'chapters:');
@@ -3166,12 +3205,12 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
         });
       });
     });
-    // ===== 第7步：校准后无章节时不再用全文正则乱建树（避免错误目录） =====
+    // 无可信章标题时保留正文，但不伪造目录
     if (!sections.length) {
-      console.warn('[chapters] no chapters after calibration — refuse text fallback');
-      throw new Error('未能根据已确认样式构建目录树。请重新上传，并确认章样式（如 标题_TJ）对应正文中的「第X章」标题。');
+      window._thesisStructured=false;window._treeIndex=[];
+      console.warn('[chapters] no trusted chapters after calibration — keep manuscript unstructured');
     }
-    // ===== 第8步：给章节打 DOM 锚点 =====
+    // 给章节打 DOM 锚点
     sections.forEach(function (cs) {
       var el3 = cs.el;
       if (!el3) {
@@ -3342,26 +3381,26 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     }catch(e2){}
     }catch(err){
       // recovery path (do not force onThesisLoaded when parse failed)
-      if(false && typeof onThesisLoaded==='function'){onThesisLoaded();}
-
       console.error('Parse error:',err);
       hideLoad();
-      // 恢复原始工作台界面（滚轮依赖 workspace-content div）
-      if (_savedWorkspace) {
-        var tb = document.getElementById('thesisBox');
-        if (tb) tb.innerHTML = _savedWorkspace;
+      var tb=document.getElementById('thesisBox');
+      if(importSnapshot.thesisLoaded){
+        manuscriptText=importSnapshot.manuscriptText;manuscriptHTML=importSnapshot.manuscriptHTML;
+        existingRefs=importSnapshot.existingRefs;mergedRefs=importSnapshot.mergedRefs;paperTopics=importSnapshot.paperTopics;sections=importSnapshot.sections;window._treeIndex=importSnapshot.treeIndex;_thesisLoaded=true;
+        if(tb)tb.innerHTML=importSnapshot.thesisBoxHTML;
+        if(typeof rehydrateManuscriptRuntime==='function')rehydrateManuscriptRuntime();else if(typeof renderNavTree==='function')renderNavTree(sections);
+        if(typeof renderExistingOnly==='function')renderExistingOnly();
+      }else{
+        _thesisLoaded=false;existingRefs=[];mergedRefs=[];manuscriptText='';manuscriptHTML='';paperTopics=[];sections=[];window._treeIndex=[];
+        if(tb&&_savedWorkspace)tb.innerHTML=_savedWorkspace;
+        document.getElementById('navTree').innerHTML='<div class="tree-empty"><div class="tree-empty-title">目录还是空的</div><div class="tree-empty-desc">导入成功后，这里会显示全文结构。</div></div>';
+        var nm=document.getElementById('navTreeMeta');if(nm)nm.style.display='none';
+        document.getElementById('refs').innerHTML='<div style="text-align:center;padding:60px;color:#9ca3af;font-size:.82rem">← 请先上传论文</div>';
+        document.getElementById('kwBar').style.display='none';document.getElementById('upStatus').innerHTML='等待上传';
       }
-      // 重置论文状态 — 不要把半成品标记为已加载
-      _thesisLoaded = false;
-      existingRefs = []; mergedRefs = []; manuscriptText = ''; manuscriptHTML = ''; paperTopics = []; sections = [];
-      document.getElementById('navTree').innerHTML = '<i style="color:rgba(255,255,255,.25);font-size:.65rem;padding:8px;display:block">请先上传论文</i>';
-      var nm=document.getElementById('navTreeMeta');if(nm)nm.style.display='none';
-      document.getElementById('refs').innerHTML = '<div style="text-align:center;padding:60px;color:#9ca3af;font-size:.82rem">← 请先上传论文</div>';
-      document.getElementById('kwBar').style.display = 'none';
-      document.getElementById('upStatus').innerHTML = '等待上传';
-      if (typeof updateDashboard === 'function') updateDashboard([]);
-      if (typeof updateNavStates === 'function') updateNavStates();
-      alert('解析失败: '+err.message+'\n\n建议用Word另存为新的.docx后重试');
+      if(typeof updateDashboard==='function')updateDashboard([]);if(typeof updateNavStates==='function')updateNavStates();
+      var cancelled=err&&err.message&&err.message.indexOf('已取消标题校准')===0;
+      alert((cancelled?'已取消导入，原论文保持不变。':'解析失败：'+err.message)+(cancelled?'':'\n\n原论文已恢复。建议用 Word 另存为新的 .docx 后重试。'));
     }
 
     // 结构化面板放在try外面，出错不影响正文展示
@@ -4232,18 +4271,10 @@ function showOptimizeSentence(refIdx){
 }
 
 function toggleDarkMode(){
-  try{
-    var on=document.body.classList.toggle('dark');
-    localStorage.setItem('thesis_ai_dark', on?'1':'0');
-    var btn=document.getElementById('darkToggle');
-    if(btn) btn.title=on?'切换白天模式':'切换暗色模式';
-  }catch(e){}
+  if(typeof openThemeStudio==='function'){
+    openThemeStudio();
+    return;
+  }
+  document.body.classList.toggle('dark', !document.body.classList.contains('dark'));
+  document.body.classList.toggle('light', !document.body.classList.contains('dark'));
 }
-function initDarkMode(){
-  try{
-    var pref=localStorage.getItem('thesis_ai_dark');
-    if(pref==='1') document.body.classList.add('dark');
-    if(pref==='0') document.body.classList.remove('dark');
-  }catch(e){}
-}
-try{ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', initDarkMode); else initDarkMode(); }catch(e){}
