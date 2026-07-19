@@ -114,9 +114,15 @@ jobs:
         continue-on-error: true
         run: |
           kubectl wait -n ns-mzyybqj8 --for=condition=available deployment/thesis-ai-tool --timeout=120s
-          POD=$(kubectl get pods -n ns-mzyybqj8 --field-selector=status.phase=Running -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | awk '$1 ~ /^thesis-ai-tool-/ {print $1; exit}')
+          kubectl get pods -n ns-mzyybqj8 -o wide
+          RS=$(kubectl get rs -n ns-mzyybqj8 -o json | python -c "import json,sys; data=json.load(sys.stdin); owned=[r for r in data['items'] if any(o.get('kind')=='Deployment' and o.get('name')=='thesis-ai-tool' for o in r['metadata'].get('ownerReferences',[]))]; print(max(owned,key=lambda r:r['metadata'].get('creationTimestamp',''))['metadata']['name'])")
+          export RS
+          POD=$(kubectl get pods -n ns-mzyybqj8 --field-selector=status.phase=Running -o json | python -c "import json,sys,os; rs=os.environ['RS']; data=json.load(sys.stdin); pods=[p for p in data['items'] if any(o.get('kind')=='ReplicaSet' and o.get('name')==rs for o in p['metadata'].get('ownerReferences',[]))]; print(pods[0]['metadata']['name'] if pods else '')")
           test -n "$POD"
-          kubectl exec -n ns-mzyybqj8 "$POD" -- python - <<'PY'
+          kubectl describe pod -n ns-mzyybqj8 "$POD"
+          kubectl logs -n ns-mzyybqj8 "$POD" --tail=200 || true
+          kubectl logs -n ns-mzyybqj8 "$POD" --previous --tail=200 || true
+          kubectl exec -i -n ns-mzyybqj8 "$POD" -- python - <<'PY'
           import json, urllib.request
           with urllib.request.urlopen('http://127.0.0.1:5000/health/ready', timeout=5) as response:
               data = json.load(response)
