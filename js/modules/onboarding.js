@@ -55,8 +55,8 @@ function buildTourSteps() {
       pos: 'bottom', icon: '📚'
     },
     {
-      title: '检索文献',
-      body: '点「检索」后弹出设定：条数、中文≥%、英文≥%。<br>按设定严格抽样；每次检索将消耗相应点数。',
+      title: '检索与科研图表',
+      body: '文献检索可同时设置条数、中文、英文、近3年和近5年最低比例；条件不足时会明确提示。<br>数据分析中的「科研图表顾问」会按论证目标、数据画像和目标期刊推荐图型，并保存 Figure Artifact。',
       el: function () { return document.getElementById('baSearch'); },
       pos: 'bottom', icon: '🔍'
     },
@@ -206,7 +206,7 @@ function renderTourTooltip(step) {
   });
 }
 
-var TOUR_VERSION = '2';
+var TOUR_VERSION = '3';
 function tourStorageKey(){try{var u=JSON.parse(sessionStorage.getItem('thesis_ai_user')||'{}');return 'thesisbuddy_tour_v'+TOUR_VERSION+'_u'+(u.id!=null?u.id:'guest');}catch(e){return 'thesisbuddy_tour_v'+TOUR_VERSION+'_guest';}}
 
 function tourStart() {

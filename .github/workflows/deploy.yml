@@ -9,7 +9,7 @@ on:
 
 concurrency:
   group: thesisbuddy-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   IMAGE: ghcr.io/ljx0722/thesis-ai-tool
@@ -67,11 +67,12 @@ jobs:
           context: .
           push: true
           build-args: |
-            APP_VERSION=0.9.0
+            APP_VERSION=0.10.0
             BUILD_SHA=${{ github.sha }}
+            BUILD_TIME=${{ github.event.head_commit.timestamp }}
           tags: |
             ${{ env.IMAGE }}:sha-${{ github.sha }}
-            ${{ env.IMAGE }}:release-0.9.0
+            ${{ env.IMAGE }}:release-0.10.0
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -99,15 +100,16 @@ jobs:
         run: |
           kubectl set env deployment/thesis-ai-tool -n ns-mzyybqj8 \
             ENV=production \
-            APP_VERSION=0.9.0 \
+            APP_VERSION=0.10.0 \
             BUILD_SHA=${{ github.sha }} \
+            BUILD_TIME=${{ github.event.head_commit.timestamp }} \
             JWT_SECRET="${{ secrets.JWT_SECRET }}" \
             ADMIN_SECRET="${{ secrets.ADMIN_SECRET }}" \
             ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
             DEEPSEEK_API_KEY="${{ secrets.DEEPSEEK_API_KEY }}" \
             DB_PATH=/app/data/thesis.db \
             MATERIALS_DIR=/app/data/materials \
-            SNAPSHOTS_DIR=/tmp/thesisbuddy-snapshots
+            SNAPSHOTS_DIR=/app/data/snapshots
           kubectl patch deployment/thesis-ai-tool -n ns-mzyybqj8 --type='strategic' -p '{"spec":{"template":{"spec":{"securityContext":{"fsGroup":999},"containers":[{"name":"thesis-ai-tool","securityContext":{"runAsUser":999,"runAsGroup":999,"runAsNonRoot":true,"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}}}'
           kubectl set image deployment/thesis-ai-tool -n ns-mzyybqj8 thesis-ai-tool=${{ env.IMAGE }}@${{ needs.build.outputs.digest }}
           kubectl rollout status deployment/thesis-ai-tool -n ns-mzyybqj8 --timeout=240s

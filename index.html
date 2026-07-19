@@ -8,6 +8,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>">
 <link rel="stylesheet" href="css/style.css"></head><body class="app-shell">
+<div id="serviceUpgradeBanner" class="service-upgrade-banner" role="status" aria-live="assertive" hidden>
+  <div><strong id="serviceUpgradeTitle">服务即将升级</strong><span id="serviceUpgradeMessage">请尽快保存当前内容</span></div>
+  <div class="service-upgrade-actions"><span id="serviceUpgradeCountdown">--:--</span><button type="button" id="serviceUpgradeSave">立即保存</button></div>
+</div>
 <!-- ====== 登录页 ====== -->
 <div id="loginOverlay">
   <div class="login-bg">

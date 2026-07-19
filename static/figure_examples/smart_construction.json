@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "smart-construction-dynamic-grading",
+  "name": "机器学习综合评价与动态预测论文案例",
+  "domain": "construction-management",
+  "source": "论文图库说明.html",
+  "isDefault": false,
+  "description": "由智慧工地论文成图结果抽取的案例包，仅用于展示图表组合和元数据组织方式，不作为其他项目的默认章节或固定图数。",
+  "chapterBlueprint": [
+    {"sourceChapter":2,"role":"theory-and-methods","count":4,"templateFamilies":["clustering","multi-criteria","anomaly-detection"]},
+    {"sourceChapter":3,"role":"context-and-problem","count":2,"templateFamilies":["composition","data-quality"]},
+    {"sourceChapter":4,"role":"data-and-preprocessing","count":8,"templateFamilies":["distribution","outliers","matrix","robustness"]},
+    {"sourceChapter":5,"role":"model-development","count":17,"templateFamilies":["model-selection","model-evaluation","explainability","clustering","robustness"]},
+    {"sourceChapter":6,"role":"results-and-validation","count":8,"templateFamilies":["ranking","matrix","dimensionality-reduction","time-series","robustness"]},
+    {"sourceChapter":7,"role":"forecasting-and-application","count":14,"templateFamilies":["time-series","forecasting","uncertainty","model-comparison"]}
+  ],
+  "lessons": [
+    "每张图明确关联一个论证目标和论文位置",
+    "同时记录真实数据来源、模型产物或合成示意数据",
+    "成图必须提供彩色与灰度检查版本",
+    "核心结论用互补图而非在一张图中堆叠多个论点",
+    "章节与图号来自当前论文结构，不复制案例编号"
+  ],
+  "originalFigureCount": 53
+}

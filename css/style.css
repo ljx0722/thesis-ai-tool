@@ -170,6 +170,28 @@ body.admin-page {
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: var(--radius-full); }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
+/* Service maintenance */
+.service-upgrade-banner {
+  min-height: 48px;
+  padding: 8px 16px;
+  background: var(--warning-bg);
+  color: var(--text-primary);
+  border-bottom: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: var(--font-size-base);
+  flex-shrink: 0;
+}
+.service-upgrade-banner[hidden] { display: none; }
+.service-upgrade-banner strong { display: block; color: var(--warning); }
+.service-upgrade-banner span { color: var(--text-secondary); }
+.service-upgrade-actions { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+#serviceUpgradeCountdown { font-family: var(--font-mono); font-weight: var(--font-weight-bold); color: var(--text-primary); }
+#serviceUpgradeSave { border: 1px solid var(--warning); background: var(--bg-card); color: var(--text-primary); border-radius: var(--radius-md); padding: 6px 12px; cursor: pointer; }
+@media (max-width: 600px) { .service-upgrade-banner { align-items: flex-start; flex-direction: column; gap: 6px; } .service-upgrade-actions { width: 100%; justify-content: space-between; } }
+
 /* ====== Top Bar (dashboard-layout: dark bg-gray-900) ====== */
 .bar {
   background: var(--bg-topbar);

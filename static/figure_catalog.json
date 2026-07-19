@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 2,
+  "deprecated": true,
+  "replacement": {
+    "templates": "/static/chart_templates.json",
+    "projectPlans": "project.artifacts.figurePlans",
+    "example": "/static/figure_examples/smart_construction.json"
+  },
+  "message": "固定章节和固定图数已移出通用产品契约。系统现在依据每个项目的论文结构、数据画像、模型结果和论证目标动态生成绘图计划。"
+}

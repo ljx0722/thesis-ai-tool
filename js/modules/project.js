@@ -137,19 +137,42 @@
     setCurrentId(project.id);
     return project;
   }
+  var cloudSyncState = { inFlight: {}, dirty: {}, lastSavedAt: {}, lastError: {} };
   function syncProjectToCloud(project, cb) {
-    if (!cloudEnabled() || !project) { if (cb) cb(null); return; }
-    fetch('/api/projects', {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify({ project: project })
-    }).then(function(r){ return r.json(); }).then(function(d){
-      if (d && d.success && d.project) {
-        upsertLocal(d.project);
-        if (cb) cb(d.project);
-      } else if (cb) cb(null);
-    }).catch(function(){ if (cb) cb(null); });
+    if (!cloudEnabled() || !project) { if (cb) cb(null); return Promise.resolve(null); }
+    cloudSyncState.dirty[project.id] = true;
+    var previous = cloudSyncState.inFlight[project.id] || Promise.resolve();
+    var request = previous.catch(function(){}).then(function(){
+      return fetch('/api/projects', {
+        method: 'POST', headers: authHeaders(), body: JSON.stringify({ project: project })
+      }).then(function(r){
+        return r.json().catch(function(){ return {}; }).then(function(d){
+          if (r.status === 409) {
+            cloudSyncState.lastError[project.id] = d;
+            var err = new Error(d.error || '项目版本冲突'); err.code='PROJECT_VERSION_CONFLICT'; err.data=d; throw err;
+          }
+          if (!r.ok || !d.success || !d.project) throw new Error(d.error || ('云端同步失败 '+r.status));
+          upsertLocal(d.project);
+          cloudSyncState.dirty[project.id] = false;
+          cloudSyncState.lastSavedAt[project.id] = new Date().toISOString();
+          cloudSyncState.lastError[project.id] = null;
+          if (cb) cb(d.project);
+          return d.project;
+        });
+      });
+    }).catch(function(err){ cloudSyncState.lastError[project.id]=err.data||{error:err.message}; if(cb)cb(null); throw err; });
+    cloudSyncState.inFlight[project.id] = request.finally(function(){ delete cloudSyncState.inFlight[project.id]; });
+    return cloudSyncState.inFlight[project.id];
   }
+  function flushAllDirty(options){
+    options=options||{};var ps=[];
+    loadAll().forEach(function(p){if(cloudSyncState.dirty[p.id]||options.force)ps.push(syncProjectToCloud(p));});
+    return Promise.allSettled(ps).then(function(results){
+      var failed=results.filter(function(r){return r.status==='rejected';});
+      return {success:failed.length===0,failed:failed.length,results:results};
+    });
+  }
+  function getSaveState(projectId){return{dirty:!!cloudSyncState.dirty[projectId],saving:!!cloudSyncState.inFlight[projectId],lastSavedAt:cloudSyncState.lastSavedAt[projectId]||'',lastError:cloudSyncState.lastError[projectId]||null};}
   function pullCloudProjects(cb) {
     if (!cloudEnabled()) { if (cb) cb([]); return; }
     fetch('/api/projects', { headers: authHeaders() })
@@ -199,8 +222,7 @@
   function upsertProject(project) {
     if (!project.updatedAt) project.updatedAt = nowISO();
     var saved = upsertLocal(project);
-    // fire-and-forget cloud sync
-    try { syncProjectToCloud(saved); } catch (e) {}
+    try { syncProjectToCloud(saved).catch(function(){}); } catch (e) {}
     return saved;
   }
 
@@ -239,10 +261,14 @@
   }
 
   function ensureArtifacts(p) {
-    if (!p.artifacts) p.artifacts = { outline: null, chapters: {}, skillLogs: [], exports: [] };
+    if (!p.artifacts) p.artifacts = { outline: null, chapters: {}, skillLogs: [], exports: [], figures: [], dataProfiles: [], modelRuns: [] };
     if (!p.artifacts.chapters) p.artifacts.chapters = {};
     if (!p.artifacts.skillLogs) p.artifacts.skillLogs = [];
     if (!p.artifacts.exports) p.artifacts.exports = [];
+    if (!p.artifacts.figures) p.artifacts.figures = [];
+    if (!p.artifacts.figurePlans) p.artifacts.figurePlans = [];
+    if (!p.artifacts.dataProfiles) p.artifacts.dataProfiles = [];
+    if (!p.artifacts.modelRuns) p.artifacts.modelRuns = [];
     return p.artifacts;
   }
 
@@ -880,7 +906,7 @@
         '</div>' +
         '<div class="project-form">' +
           '<label>一句话研究想法 *</label>' +
-          '<textarea id="ideaText" class="ai-textarea" style="height:96px;margin:0" placeholder="例如：用机器学习做智慧工地安全风险动态分级评价"></textarea>' +
+          '<textarea id="ideaText" class="ai-textarea" style="height:96px;margin:0" placeholder="例如：研究某项技术、政策或管理措施对目标结果的影响"></textarea>' +
           '<div class="project-grid-2">' +
             '<div><label>学科/领域</label><input id="ideaField" class="ai-input" placeholder="如：工程管理 / 人工智能"></div>' +
             '<div><label>学位类型</label><select id="ideaDegree" class="ai-input"><option>硕士</option><option>本科</option><option>博士</option></select></div></div><div class="project-grid-2"><div><label>学校模板</label><select id="ideaTemplate" class="ai-input" onchange="ideaTemplateChanged(this.value)"><option value="">通用模板</option>' +
@@ -889,7 +915,7 @@
           '</div>' +
           '<div class="template-hint" id="templateHint" style="display:none"></div>' +
           '<label>关键词（选填，逗号分隔）</label>' +
-          '<input id="ideaKeywords" class="ai-input" placeholder="智慧工地, 风险评价, 机器学习">' +
+          '<input id="ideaKeywords" class="ai-input" placeholder="例如：核心对象, 研究方法, 结果变量">' +
           '<label>暂定题目（选填）</label>' +
           '<input id="ideaTitle" class="ai-input" placeholder="可先空着，后面用选题推荐生成">' +
         '</div>' +
@@ -1569,6 +1595,9 @@
     saveManuscriptRevision: saveManuscriptRevision,
     hydrateRevision: hydrateRevision,
     bootstrapAuthenticatedUser: bootstrapAuthenticatedUser,
+    flushAllDirty: flushAllDirty,
+    getSaveState: getSaveState,
+    syncProjectToCloud: syncProjectToCloud,
   };
   window.openExportHistory = openExportHistory;
   window.closeExportHistory = closeExportHistory;

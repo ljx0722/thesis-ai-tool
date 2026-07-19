@@ -135,6 +135,7 @@
     background: var(--bg-card); color: var(--text-secondary); cursor: pointer;
     font-size: .75rem; font-weight: 600;
   }
+.admin-pager{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:10px;font-size:.72rem;color:var(--text-muted)}.admin-pager select{border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);border-radius:6px;padding:5px 8px}.admin-pager button:disabled{opacity:.45;cursor:not-allowed}
 </style></head><body class="admin-page">
 <div class="admin-layout">
   <div id="loginBox" class="admin-login">
@@ -237,6 +238,7 @@
           <button class="admin-btn" onclick="loadUsers()">搜索</button>
         </div>
         <table class="admin-table" id="userTable"><thead><tr><th>ID</th><th>用户名</th><th>点数</th><th>邀请码</th><th>注册时间</th><th>操作</th></tr></thead><tbody></tbody></table>
+        <div id="userPager" class="admin-pager"></div>
       </div>
 
       <div id="orderSection" class="section-anchor">
@@ -261,6 +263,7 @@
         </div>
         <div class="admin-stats" id="orderSummary" style="margin-bottom:12px"></div>
         <table class="admin-table" id="orderTable"><thead><tr><th><input type="checkbox" id="orderCheckAll" onclick="toggleOrderChecks(this.checked)"></th><th>ID</th><th>用户</th><th>金额</th><th>点数</th><th>方式</th><th>状态</th><th>附言</th><th>创建</th><th>确认</th><th>操作</th></tr></thead><tbody></tbody></table>
+        <div id="orderPager" class="admin-pager"></div>
       </div>
 
       <div id="txSection" class="section-anchor">
@@ -284,6 +287,7 @@
           </select>
         </div>
         <table class="admin-table" id="txTable"><thead><tr><th>ID</th><th>用户</th><th>类型</th><th>变动(点)</th><th>余额后</th><th>说明</th><th>时间</th></tr></thead><tbody></tbody></table>
+        <div id="txPager" class="admin-pager"></div>
       </div>
 
       <div id="auditSection" class="section-anchor">
@@ -293,6 +297,7 @@
         </h2>
         <p style="font-size:.72rem;color:var(--text-muted)">记录管理员确认/拒绝订单、赠送点数等敏感操作。</p>
         <table class="admin-table" id="auditTable"><thead><tr><th>ID</th><th>操作者</th><th>动作</th><th>对象</th><th>详情</th><th>时间</th></tr></thead><tbody></tbody></table>
+        <div id="auditPager" class="admin-pager"></div>
       </div>
 
       <div id="opsSection" class="section-anchor">
@@ -550,6 +555,15 @@ function loadTimeseries(){
     }).catch(function(){});
 }
 
+var adminPages={users:{page:1,pageSize:20},orders:{page:1,pageSize:20},transactions:{page:1,pageSize:20},audit:{page:1,pageSize:20}};
+function renderPager(id,key,p){
+  var el=document.getElementById(id);if(!el||!p)return;adminPages[key].page=p.page;adminPages[key].pageSize=p.pageSize;
+  el.innerHTML='<span>共 '+p.total+' 条 · 第 '+p.page+'/'+Math.max(1,p.totalPages)+' 页</span><select onchange="setAdminPageSize(\''+key+'\',this.value)"><option value="20"'+(p.pageSize===20?' selected':'')+'>20/页</option><option value="100"'+(p.pageSize===100?' selected':'')+'>100/页</option></select><button class="admin-btn admin-btn-sm" '+(p.hasPrevious?'':'disabled')+' onclick="changeAdminPage(\''+key+'\',-1)">上一页</button><button class="admin-btn admin-btn-sm" '+(p.hasNext?'':'disabled')+' onclick="changeAdminPage(\''+key+'\',1)">下一页</button>';
+}
+function loadAdminPage(key){if(key==='users')loadUsers();else if(key==='orders')loadOrders();else if(key==='transactions')loadTransactions();else loadAuditLogs();}
+function changeAdminPage(key,delta){adminPages[key].page=Math.max(1,adminPages[key].page+delta);loadAdminPage(key);}
+function setAdminPageSize(key,size){adminPages[key].page=1;adminPages[key].pageSize=parseInt(size,10)||20;loadAdminPage(key);}
+
 function renderUsers(users){
   _usersCache=users||[];
   var uhtml='';
@@ -571,8 +585,9 @@ function renderUsers(users){
 function loadUsers(){
   if(!SECRET) return;
   var q=document.getElementById('userFilter').value.trim();
-  fetch('/api/admin/users?limit=200&q='+encodeURIComponent(q),{headers:authHeaders()})
-    .then(r=>r.json()).then(d=>{ if(d.success) renderUsers(d.users||[]); });
+  var st=adminPages.users;
+  fetch('/api/admin/users?page='+st.page+'&page_size='+st.pageSize+'&q='+encodeURIComponent(q),{headers:authHeaders()})
+    .then(r=>r.json()).then(d=>{ if(d.success){renderUsers(d.users||d.items||[]);renderPager('userPager','users',d.pagination);} });
 }
 function searchUsersLive(){
   var q=document.getElementById('unameHint').value.trim().toLowerCase();
@@ -657,11 +672,12 @@ function renderOrders(orders, summary){
 function loadOrders(){
   if(!SECRET) return;
   var q=document.getElementById('orderQ').value.trim();
-  var url='/api/admin/orders?limit=200';
+  var st=adminPages.orders;
+  var url='/api/admin/orders?page='+st.page+'&page_size='+st.pageSize;
   if(orderFilter) url+='&status='+encodeURIComponent(orderFilter);
   if(q) url+='&q='+encodeURIComponent(q);
   fetch(url,{headers:authHeaders()}).then(r=>r.json()).then(d=>{
-    if(d.success) renderOrders(d.orders||[], d.summary||{});
+    if(d.success){renderOrders(d.orders||[], d.summary||{});renderPager('orderPager','orders',d.pagination);}
   });
 }
 function parseAdminRechargeAmount(raw){
@@ -779,7 +795,8 @@ function closeUserDrawer(){
 }
 function loadAuditLogs(){
   if(!SECRET) return;
-  fetch('/api/admin/audit?limit=80',{headers:authHeaders()})
+  var st=adminPages.audit;
+  fetch('/api/admin/audit?page='+st.page+'&page_size='+st.pageSize,{headers:authHeaders()})
     .then(r=>r.json()).then(d=>{
       if(!d.success) return;
       var h='';
@@ -787,13 +804,15 @@ function loadAuditLogs(){
         h+='<tr><td>'+l.id+'</td><td>'+(l.actor_name||'-')+(l.actor_id?' #'+l.actor_id:'')+'</td><td>'+l.action+'</td><td>'+(l.target_type||'')+' '+(l.target_id||'')+'</td><td style="max-width:280px;word-break:break-all;font-size:.65rem">'+(l.detail||'')+'</td><td>'+(l.created_at||'').substring(0,16)+'</td></tr>';
       });
       document.querySelector('#auditTable tbody').innerHTML=h||'<tr><td colspan="6">暂无审计记录</td></tr>';
+      renderPager('auditPager','audit',d.pagination);
     });
 }
 
 function loadTransactions(){
   if(!SECRET) return;
   var t=document.getElementById('txType').value;
-  var url='/api/admin/transactions?limit=100';
+  var st=adminPages.transactions;
+  var url='/api/admin/transactions?page='+st.page+'&page_size='+st.pageSize;
   if(t) url+='&type='+encodeURIComponent(t);
   fetch(url,{headers:authHeaders()}).then(r=>r.json()).then(d=>{
     if(!d.success) return;
@@ -807,6 +826,7 @@ function loadTransactions(){
         '<td>'+(t.created_at||'').substring(0,16)+'</td></tr>';
     });
     document.querySelector('#txTable tbody').innerHTML=h||'<tr><td colspan="7">暂无流水</td></tr>';
+    renderPager('txPager','transactions',d.pagination);
   });
 }
 

@@ -87,6 +87,17 @@ def init_db():
             user_charged_credits INTEGER NOT NULL DEFAULT 0,
             model TEXT NOT NULL DEFAULT 'deepseek-chat',
             success INTEGER NOT NULL DEFAULT 0,
+            job_id TEXT,
+            provider TEXT,
+            provider_request_id TEXT,
+            api_cost_microyuan INTEGER,
+            cost_precision TEXT,
+            cached_input_tokens INTEGER NOT NULL DEFAULT 0,
+            reasoning_tokens INTEGER NOT NULL DEFAULT 0,
+            total_tokens INTEGER NOT NULL DEFAULT 0,
+            latency_ms INTEGER,
+            error_code TEXT,
+            pricing_snapshot_json TEXT,
             created_at TEXT,
             FOREIGN KEY (user_id) REFERENCES users(id)
         );
@@ -160,8 +171,24 @@ def init_db():
             versions_json TEXT,
             skill_logs_json TEXT,
             manuscript_meta_json TEXT,
+            figures_json TEXT,
+            figure_plans_json TEXT,
+            exports_json TEXT,
+            data_profiles_json TEXT,
+            model_runs_json TEXT,
             updated_at TEXT,
             FOREIGN KEY (project_id) REFERENCES projects(id)
+        );
+        CREATE TABLE IF NOT EXISTS service_runtime_state (
+            id INTEGER PRIMARY KEY CHECK (id=1),
+            mode TEXT NOT NULL DEFAULT 'normal',
+            message TEXT NOT NULL DEFAULT '',
+            starts_at TEXT,
+            deadline_at TEXT,
+            target_version TEXT,
+            target_commit TEXT,
+            updated_by TEXT,
+            updated_at TEXT
         );
         CREATE TABLE IF NOT EXISTS notifications (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -340,12 +367,45 @@ def init_db():
     except Exception as e:
         conn.close()
         raise RuntimeError(f'项目表迁移失败: {e}')
+    try:
+        usage_cols = [r[1] for r in conn.execute('PRAGMA table_info(llm_usage)').fetchall()]
+        usage_additions = {
+            'job_id': 'TEXT', 'provider': 'TEXT', 'provider_request_id': 'TEXT',
+            'api_cost_microyuan': 'INTEGER', 'cost_precision': 'TEXT',
+            'cached_input_tokens': 'INTEGER NOT NULL DEFAULT 0',
+            'reasoning_tokens': 'INTEGER NOT NULL DEFAULT 0',
+            'total_tokens': 'INTEGER NOT NULL DEFAULT 0', 'latency_ms': 'INTEGER',
+            'error_code': 'TEXT', 'pricing_snapshot_json': 'TEXT'
+        }
+        for col, ddl in usage_additions.items():
+            if col not in usage_cols:
+                conn.execute(f'ALTER TABLE llm_usage ADD COLUMN {col} {ddl}')
+        conn.execute("UPDATE llm_usage SET api_cost_microyuan=cost_credits*10000, cost_precision='legacy_fen' WHERE api_cost_microyuan IS NULL AND cost_credits>0")
+        conn.execute("UPDATE llm_usage SET cost_precision='legacy_unrecoverable' WHERE cost_precision IS NULL AND cost_credits=0")
+        conn.execute("UPDATE llm_usage SET total_tokens=COALESCE(prompt_tokens,0)+COALESCE(completion_tokens,0) WHERE total_tokens=0")
+        artifact_cols = [r[1] for r in conn.execute('PRAGMA table_info(project_artifacts)').fetchall()]
+        for col in ('figures_json','figure_plans_json','exports_json','data_profiles_json','model_runs_json'):
+            if col not in artifact_cols:
+                conn.execute(f'ALTER TABLE project_artifacts ADD COLUMN {col} TEXT')
+        conn.execute("INSERT OR IGNORE INTO service_runtime_state(id,mode,message,updated_at) VALUES(1,'normal','',datetime('now','localtime'))")
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        raise RuntimeError(f'运营数据迁移失败: {e}')
     for idx_sql in [
         'CREATE INDEX IF NOT EXISTS idx_projects_user_updated ON projects(user_id, updated_at)',
         'CREATE INDEX IF NOT EXISTS idx_materials_project_user ON project_materials(project_id, user_id, created_at)',
         'CREATE INDEX IF NOT EXISTS idx_revisions_project_user ON manuscript_revisions(project_id, user_id, revision_no)',
         'CREATE INDEX IF NOT EXISTS idx_rag_project_user ON rag_chunks(project_id, user_id, material_id)',
         'CREATE INDEX IF NOT EXISTS idx_jobs_user_created ON ai_jobs(user_id, created_at)',
+        'CREATE INDEX IF NOT EXISTS idx_users_created ON users(created_at, id)',
+        'CREATE INDEX IF NOT EXISTS idx_orders_status_id ON recharge_orders(status, id)',
+        'CREATE INDEX IF NOT EXISTS idx_orders_user_id ON recharge_orders(user_id, id)',
+        'CREATE INDEX IF NOT EXISTS idx_transactions_type_id ON transactions(type, id)',
+        'CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id, id)',
+        'CREATE INDEX IF NOT EXISTS idx_llm_usage_created ON llm_usage(created_at, id)',
+        'CREATE INDEX IF NOT EXISTS idx_llm_usage_user_created ON llm_usage(user_id, created_at)',
+        'CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at, id)',
         'CREATE INDEX IF NOT EXISTS idx_graph_nodes_project ON graph_nodes(project_id, revision_id)',
         'CREATE INDEX IF NOT EXISTS idx_graph_edges_project ON graph_edges(project_id, revision_id)'
     ]:
@@ -924,6 +984,47 @@ def health_ready():
         return jsonify({'ok': False, 'checks': checks, 'error': str(e), 'version': APP_VERSION, 'sha': BUILD_SHA}), 503
     ok = all(checks.values())
     return jsonify({'ok': ok, 'checks': checks, 'version': APP_VERSION, 'sha': BUILD_SHA}), (200 if ok else 503)
+
+@app.route('/api/runtime/status', methods=['GET'])
+def runtime_status():
+    db = get_db()
+    try:
+        row = db.execute('SELECT * FROM service_runtime_state WHERE id=1').fetchone()
+        data = dict(row) if row else {'mode': 'normal', 'message': ''}
+        return jsonify({
+            'success': True, 'mode': data.get('mode') or 'normal', 'message': data.get('message') or '',
+            'startsAt': data.get('starts_at'), 'deadlineAt': data.get('deadline_at'),
+            'targetVersion': data.get('target_version'), 'targetCommit': data.get('target_commit'),
+            'serverTime': datetime.utcnow().isoformat(timespec='seconds')+'Z',
+            'version': APP_VERSION, 'commit': BUILD_SHA,
+            'writePolicy': {'projectSave': True, 'newAiJobs': (data.get('mode') or 'normal') == 'normal', 'uploads': (data.get('mode') or 'normal') == 'normal'}
+        })
+    finally:
+        db.close()
+
+
+@app.route('/api/admin/runtime/status', methods=['PUT'])
+def admin_runtime_status():
+    data = request.get_json(silent=True) or {}
+    secret = data.get('secret') or _admin_secret_from_request()
+    if not _check_admin(secret):
+        return jsonify({'success': False, 'error': '无权限'}), 403
+    mode = (data.get('mode') or '').strip()
+    if mode not in ('normal','announced','draining','maintenance'):
+        return jsonify({'success': False, 'error': '无效维护状态'}), 400
+    db = get_db()
+    try:
+        actor_id, actor_name = _admin_actor_from_secret(secret)
+        db.execute("INSERT INTO service_runtime_state(id,mode,message,starts_at,deadline_at,target_version,target_commit,updated_by,updated_at) VALUES(1,?,?,?,?,?,?,?,datetime('now','localtime')) ON CONFLICT(id) DO UPDATE SET mode=excluded.mode,message=excluded.message,starts_at=excluded.starts_at,deadline_at=excluded.deadline_at,target_version=excluded.target_version,target_commit=excluded.target_commit,updated_by=excluded.updated_by,updated_at=excluded.updated_at",
+                   (mode, (data.get('message') or '')[:300], data.get('startsAt'), data.get('deadlineAt'), data.get('targetVersion'), data.get('targetCommit'), actor_name))
+        write_audit(actor_id, actor_name, 'set_runtime_status', 'service', 'runtime', {'mode': mode, 'deadlineAt': data.get('deadlineAt'), 'targetCommit': data.get('targetCommit')}, db=db)
+        db.commit()
+        return jsonify({'success': True, 'mode': mode})
+    except Exception as e:
+        db.rollback(); return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
 
 @app.route('/api/version', methods=['GET'])
 def api_version():
@@ -2303,7 +2404,8 @@ def llm_analyze():
         output_payload = {'content': content, 'usage': {'input_tokens': actual_input, 'output_tokens': actual_output, 'api_cost': round(api_cost, 4), 'cost_credits': charge_credits, 'cost_points': round(charge_credits/1000, 3), 'credits_after': after, 'points_after': round((after or 0)/1000, 3)}}
         db2.execute("UPDATE credit_reservations SET status='settled',amount_credits=?,settled_at=datetime('now','localtime') WHERE job_id=?", (charge_credits, job_id))
         db2.execute("UPDATE ai_jobs SET status='succeeded',actual_credits=?,prompt_tokens=?,completion_tokens=?,output_json=?,finished_at=datetime('now','localtime') WHERE id=?", (charge_credits, actual_input, actual_output, json.dumps(output_payload, ensure_ascii=False), job_id))
-        db2.execute("INSERT INTO llm_usage (user_id, module, prompt_tokens, completion_tokens, cost_credits, user_charged_credits, model, success, created_at) VALUES (?,?,?,?,?,?,?,1,datetime('now','localtime'))", (request.user_id, module, actual_input, actual_output, int(api_cost*100), charge_credits, DEEPSEEK_MODEL))
+        api_cost_microyuan = int(round(api_cost * 1000000))
+        db2.execute("INSERT INTO llm_usage (user_id, module, prompt_tokens, completion_tokens, cost_credits, user_charged_credits, model, success, api_cost_microyuan, cost_precision, total_tokens, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,datetime('now','localtime'))", (request.user_id, module, actual_input, actual_output, int(api_cost*100), charge_credits, DEEPSEEK_MODEL, 1, api_cost_microyuan, 'exact_microyuan', actual_input+actual_output))
         db2.commit()
     except Exception as e:
         db2.rollback()
@@ -2643,22 +2745,24 @@ def admin_users():
     s = request.args.get('secret', '') or _admin_secret_from_request()
     if not _check_admin(s): return jsonify({'error': '无权限'}), 403
     q = (request.args.get('q') or '').strip()
-    limit = min(500, max(1, int(request.args.get('limit', 200))))
+    page = max(1, int(request.args.get('page', 1)))
+    page_size = int(request.args.get('page_size', request.args.get('limit', 20)))
+    if page_size not in (20, 100):
+        return jsonify({'success': False, 'error': 'page_size 仅支持 20 或 100'}), 400
+    offset = (page - 1) * page_size
     db = get_db()
     try:
+        where, params = '', []
         if q:
-            like = f'%{q}%'
-            rows = [dict(r) for r in db.execute(
-                "SELECT id,username,credits,invite_code,is_admin,created_at FROM users "
-                "WHERE username LIKE ? OR CAST(id AS TEXT)=? ORDER BY id DESC LIMIT ?",
-                (like, q, limit)).fetchall()]
-        else:
-            rows = [dict(r) for r in db.execute(
-                'SELECT id,username,credits,invite_code,is_admin,created_at FROM users ORDER BY id DESC LIMIT ?',
-                (limit,)).fetchall()]
+            where = ' WHERE username LIKE ? OR CAST(id AS TEXT)=?'
+            params = [f'%{q}%', q]
+        total = db.execute('SELECT COUNT(*) as c FROM users'+where, params).fetchone()['c']
+        rows = [dict(r) for r in db.execute(
+            'SELECT id,username,credits,invite_code,is_admin,created_at FROM users'+where+' ORDER BY id DESC LIMIT ? OFFSET ?',
+            params + [page_size, offset]).fetchall()]
         for r in rows:
             r['points'] = round((r.get('credits') or 0) / 1000.0, 3)
-        return jsonify({'success': True, 'users': rows})
+        return jsonify({'success': True, 'users': rows, 'items': rows, 'pagination': {'page': page, 'pageSize': page_size, 'total': total, 'totalPages': (total + page_size - 1)//page_size, 'hasPrevious': page > 1, 'hasNext': offset + len(rows) < total}})
     finally: db.close()
 
 @app.route('/api/admin/credits', methods=['POST'])
@@ -2737,7 +2841,10 @@ def admin_orders():
         return jsonify({'success': False, 'error': '无权限'}), 403
     status = (request.args.get('status') or '').strip()
     q = (request.args.get('q') or '').strip()
-    limit = min(500, max(1, int(request.args.get('limit', 100))))
+    page = max(1, int(request.args.get('page', 1)))
+    page_size = int(request.args.get('page_size', request.args.get('limit', 20)))
+    if page_size not in (20, 100): return jsonify({'success': False, 'error': 'page_size 仅支持 20 或 100'}), 400
+    offset = (page - 1) * page_size
     db = get_db()
     try:
         sql = ("SELECT o.*, u.username FROM recharge_orders o "
@@ -2750,8 +2857,13 @@ def admin_orders():
             sql += " AND (u.username LIKE ? OR CAST(o.id AS TEXT)=? OR CAST(o.user_id AS TEXT)=?)"
             like = f'%{q}%'
             params.extend([like, q, q])
-        sql += " ORDER BY o.id DESC LIMIT ?"
-        params.append(limit)
+        count_sql = "SELECT COUNT(*) as c FROM recharge_orders o JOIN users u ON o.user_id=u.id WHERE 1=1"
+        count_params = []
+        if status: count_sql += " AND o.status = ?"; count_params.append(status)
+        if q: count_sql += " AND (u.username LIKE ? OR CAST(o.id AS TEXT)=? OR CAST(o.user_id AS TEXT)=?)"; count_params.extend([f'%{q}%', q, q])
+        total = db.execute(count_sql, count_params).fetchone()['c']
+        sql += " ORDER BY o.id DESC LIMIT ? OFFSET ?"
+        params.extend([page_size, offset])
         rows = [dict(r) for r in db.execute(sql, params).fetchall()]
         for r in rows:
             r['amount_yuan'] = _yuan_from_fen(r.get('amount_fen'))
@@ -2775,7 +2887,8 @@ def admin_orders():
                 'submitted_yuan': _yuan_from_fen(sub['s']),
                 'pending_count': pend['c'] or 0,
                 'pending_yuan': _yuan_from_fen(pend['s']),
-            }
+            },
+            'pagination': {'page': page, 'pageSize': page_size, 'total': total, 'totalPages': (total + page_size - 1)//page_size, 'hasPrevious': page > 1, 'hasNext': offset + len(rows) < total}
         })
     finally:
         db.close()
@@ -2908,21 +3021,21 @@ def admin_transactions():
     if not _check_admin(s):
         return jsonify({'success': False, 'error': '无权限'}), 403
     tx_type = (request.args.get('type') or '').strip()
-    limit = min(300, max(1, int(request.args.get('limit', 80))))
+    page = max(1, int(request.args.get('page', 1)))
+    page_size = int(request.args.get('page_size', request.args.get('limit', 20)))
+    if page_size not in (20, 100): return jsonify({'success': False, 'error': 'page_size 仅支持 20 或 100'}), 400
+    offset = (page - 1) * page_size
     db = get_db()
     try:
-        if tx_type:
-            rows = [dict(r) for r in db.execute(
-                "SELECT t.*, u.username FROM transactions t JOIN users u ON t.user_id=u.id "
-                "WHERE t.type=? ORDER BY t.id DESC LIMIT ?", (tx_type, limit)).fetchall()]
-        else:
-            rows = [dict(r) for r in db.execute(
-                "SELECT t.*, u.username FROM transactions t JOIN users u ON t.user_id=u.id "
-                "ORDER BY t.id DESC LIMIT ?", (limit,)).fetchall()]
+        where = ' WHERE t.type=?' if tx_type else ''
+        params = [tx_type] if tx_type else []
+        total = db.execute('SELECT COUNT(*) as c FROM transactions t'+where, params).fetchone()['c']
+        rows = [dict(r) for r in db.execute(
+            "SELECT t.*, u.username FROM transactions t JOIN users u ON t.user_id=u.id"+where+" ORDER BY t.id DESC LIMIT ? OFFSET ?", params+[page_size,offset]).fetchall()]
         for r in rows:
             r['points'] = round((r.get('amount_credits') or 0) / 1000.0, 3)
             r['points_after'] = round((r.get('credits_after') or 0) / 1000.0, 3)
-        return jsonify({'success': True, 'transactions': rows})
+        return jsonify({'success': True, 'transactions': rows, 'items': rows, 'pagination': {'page': page, 'pageSize': page_size, 'total': total, 'totalPages': (total + page_size - 1)//page_size, 'hasPrevious': page > 1, 'hasNext': offset + len(rows) < total}})
     finally:
         db.close()
 
@@ -3184,13 +3297,17 @@ def admin_audit_logs():
     s = request.args.get('secret', '') or _admin_secret_from_request()
     if not _check_admin(s):
         return jsonify({'success': False, 'error': '无权限'}), 403
-    limit = min(200, max(1, int(request.args.get('limit', 50))))
+    page = max(1, int(request.args.get('page', 1)))
+    page_size = int(request.args.get('page_size', request.args.get('limit', 20)))
+    if page_size not in (20, 100): return jsonify({'success': False, 'error': 'page_size 仅支持 20 或 100'}), 400
+    offset = (page - 1) * page_size
     db = get_db()
     try:
+        total = db.execute('SELECT COUNT(*) as c FROM audit_logs').fetchone()['c']
         rows = [dict(r) for r in db.execute(
             "SELECT id,actor_id,actor_name,action,target_type,target_id,detail,created_at "
-            "FROM audit_logs ORDER BY id DESC LIMIT ?", (limit,)).fetchall()]
-        return jsonify({'success': True, 'logs': rows})
+            "FROM audit_logs ORDER BY id DESC LIMIT ? OFFSET ?", (page_size,offset)).fetchall()]
+        return jsonify({'success': True, 'logs': rows, 'items': rows, 'pagination': {'page': page, 'pageSize': page_size, 'total': total, 'totalPages': (total + page_size - 1)//page_size, 'hasPrevious': page > 1, 'hasNext': offset + len(rows) < total}})
     finally:
         db.close()
 
@@ -3771,6 +3888,27 @@ def admin_pricing():
 
 
 
+@app.route('/api/admin/llm_usage', methods=['GET'])
+def admin_llm_usage():
+    s = request.args.get('secret', '') or _admin_secret_from_request()
+    if not _check_admin(s): return jsonify({'success': False, 'error': '无权限'}), 403
+    page=max(1,int(request.args.get('page',1)));page_size=int(request.args.get('page_size',20))
+    if page_size not in (20,100): return jsonify({'success':False,'error':'page_size 仅支持 20 或 100'}),400
+    offset=(page-1)*page_size;module=(request.args.get('module') or '').strip();success=request.args.get('success')
+    where=[];params=[]
+    if module: where.append('l.module=?');params.append(module)
+    if success in ('0','1'): where.append('l.success=?');params.append(int(success))
+    clause=(' WHERE '+' AND '.join(where)) if where else ''
+    db=get_db()
+    try:
+        total=db.execute('SELECT COUNT(*) as c FROM llm_usage l'+clause,params).fetchone()['c']
+        rows=[dict(r) for r in db.execute('SELECT l.*,u.username FROM llm_usage l JOIN users u ON u.id=l.user_id'+clause+' ORDER BY l.id DESC LIMIT ? OFFSET ?',params+[page_size,offset]).fetchall()]
+        for r in rows:
+            micro=r.get('api_cost_microyuan');r['api_cost_yuan']=None if micro is None else round(micro/1000000.0,6);r['charged_points']=round((r.get('user_charged_credits') or 0)/1000.0,3)
+        return jsonify({'success':True,'items':rows,'usage':rows,'pagination':{'page':page,'pageSize':page_size,'total':total,'totalPages':(total+page_size-1)//page_size,'hasPrevious':page>1,'hasNext':offset+len(rows)<total}})
+    finally: db.close()
+
+
 @app.route('/api/admin/llm_economics', methods=['GET'])
 def admin_llm_economics():
     s = request.args.get('secret', '')
@@ -4044,13 +4182,18 @@ def _project_row_to_dict(row, artifacts=None):
         'notes': d.get('notes') or '', 'createdAt': d.get('created_at'), 'updatedAt': d.get('updated_at'),
         'activeRevisionId': d.get('active_revision_id'), 'lastView': d.get('last_view') or 'workspace',
         'rowVersion': d.get('row_version') or 1, 'stageStatus': {},
-        'artifacts': {'outline': None, 'chapters': {}, 'skillLogs': [], '_versions': {}}
+        'artifacts': {'outline': None, 'chapters': {}, 'skillLogs': [], '_versions': {}, 'figures': [], 'figurePlans': [], 'exports': [], 'dataProfiles': [], 'modelRuns': []}
     }
     try: out['stageStatus'] = _json.loads(d.get('stage_status') or '{}') or {}
     except Exception: out['stageStatus'] = {}
     if artifacts:
         a = dict(artifacts)
-        for target, source, default in [('outline','outline_json',None),('chapters','chapters_json',{}),('_versions','versions_json',{}),('skillLogs','skill_logs_json',[]),('manuscriptMeta','manuscript_meta_json',None)]:
+        for target, source, default in [
+            ('outline','outline_json',None),('chapters','chapters_json',{}),('_versions','versions_json',{}),
+            ('skillLogs','skill_logs_json',[]),('manuscriptMeta','manuscript_meta_json',None),
+            ('figures','figures_json',[]),('figurePlans','figure_plans_json',[]),('exports','exports_json',[]),
+            ('dataProfiles','data_profiles_json',[]),('modelRuns','model_runs_json',[])
+        ]:
             try: out['artifacts'][target] = _json.loads(a.get(source) or ('null' if default is None else ('[]' if isinstance(default,list) else '{}')))
             except Exception: out['artifacts'][target] = default
     return out
@@ -4104,7 +4247,7 @@ def projects_upsert():
     artifacts = p.get('artifacts') or {}
     db = get_db()
     try:
-        exists = db.execute('SELECT id FROM projects WHERE id=? AND user_id=?', (pid, request.user_id)).fetchone()
+        exists = db.execute('SELECT id,row_version FROM projects WHERE id=? AND user_id=?', (pid, request.user_id)).fetchone()
         payload = (
             title,
             p.get('idea') or '',
@@ -4123,11 +4266,17 @@ def projects_upsert():
             request.user_id,
         )
         if exists:
+            submitted_version = int(p.get('rowVersion') or 1)
+            current_version = int(exists['row_version'] or 1)
+            if submitted_version != current_version:
+                current_row = db.execute('SELECT * FROM projects WHERE id=? AND user_id=?', (pid, request.user_id)).fetchone()
+                current_art = db.execute('SELECT * FROM project_artifacts WHERE project_id=?', (pid,)).fetchone()
+                return jsonify({'success': False, 'code': 'PROJECT_VERSION_CONFLICT', 'error': '云端项目已被其他会话更新', 'submittedRowVersion': submitted_version, 'currentRowVersion': current_version, 'serverProject': _project_row_to_dict(current_row, current_art)}), 409
             db.execute(
                 "UPDATE projects SET title=?, idea=?, field=?, keywords=?, degree=?, goal_words=?, current_stage=?, mode=?, "
-                "has_manuscript=?, stage_status=?, school_template=?, notes=?, updated_at=? "
-                "WHERE id=? AND user_id=?",
-                payload
+                "has_manuscript=?, stage_status=?, school_template=?, notes=?, updated_at=?, row_version=row_version+1 "
+                "WHERE id=? AND user_id=? AND row_version=?",
+                payload + (current_version,)
             )
         else:
             db.execute(
@@ -4138,14 +4287,16 @@ def projects_upsert():
             )
         # artifacts upsert
         db.execute(
-            "INSERT INTO project_artifacts(project_id, outline_json, chapters_json, versions_json, skill_logs_json, manuscript_meta_json, updated_at) "
-            "VALUES (?,?,?,?,?,?,?) "
+            "INSERT INTO project_artifacts(project_id, outline_json, chapters_json, versions_json, skill_logs_json, manuscript_meta_json, figures_json, figure_plans_json, exports_json, data_profiles_json, model_runs_json, updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?) "
             "ON CONFLICT(project_id) DO UPDATE SET "
             "outline_json=excluded.outline_json, "
             "chapters_json=excluded.chapters_json, "
             "versions_json=excluded.versions_json, "
             "skill_logs_json=excluded.skill_logs_json, "
             "manuscript_meta_json=excluded.manuscript_meta_json, "
+            "figures_json=excluded.figures_json, figure_plans_json=excluded.figure_plans_json, exports_json=excluded.exports_json, "
+            "data_profiles_json=excluded.data_profiles_json, model_runs_json=excluded.model_runs_json, "
             "updated_at=excluded.updated_at",
             (
                 pid,
@@ -4154,6 +4305,11 @@ def projects_upsert():
                 _json.dumps(artifacts.get('_versions') or {}, ensure_ascii=False),
                 _json.dumps(artifacts.get('skillLogs') or [], ensure_ascii=False),
                 _json.dumps(artifacts.get('manuscriptMeta'), ensure_ascii=False),
+                _json.dumps(artifacts.get('figures') or [], ensure_ascii=False),
+                _json.dumps(artifacts.get('figurePlans') or [], ensure_ascii=False),
+                _json.dumps(artifacts.get('exports') or [], ensure_ascii=False),
+                _json.dumps(artifacts.get('dataProfiles') or [], ensure_ascii=False),
+                _json.dumps(artifacts.get('modelRuns') or [], ensure_ascii=False),
                 now,
             )
         )

@@ -185,10 +185,10 @@ test('BUG-FIX: Non-body chapters excluded in search and analysis', function() {
   assert(src.indexOf('获奖|奖项|认证|荣誉|专利|攻读|在读') >= 0, 'Award/license chapters not excluded');
 });
 
-test('BUG-FIX: English 30% minimum enforced with exact pool splitting', function() {
+test('BUG-FIX: strict language and recency constraints use unified solver', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('cnPool') >= 0, 'cnPool/enPool split missing');
-  assert(src.indexOf('enWanted') >= 0, 'enWanted calculation missing');
+  assert(src.indexOf('function selectReferencesByConstraints') >= 0, 'strict constraint solver missing');
+  assert(src.indexOf('y3Min') >= 0 && src.indexOf('y5Min') >= 0, 'recency constraints missing');
 });
 
 test('BUG-FIX: refStatus element has null guard', function() {
@@ -238,9 +238,10 @@ test('EDGE: ref.ch falls back to 1 when undefined', function() {
   assert(src.indexOf('r.ch||1') >= 0 || src.indexOf('r.ch|| 1') >= 0, 'Missing ref.ch fallback');
 });
 
-test('EDGE: chapterForElement defaults to chapter 1', function() {
+test('EDGE: chapterForElement returns unknown instead of fabricating chapter 1', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf('lc=1') >= 0, 'chapterForElement missing default lc=1');
+  var start=src.indexOf('function chapterForElement');var body=src.substring(start,start+900);
+  assert(body.indexOf('return lc') >= 0 && body.indexOf('lc=0') >= 0, 'chapterForElement must preserve unknown chapter');
 });
 
 test('EDGE: beforeRefList returns true when no ref boundary found', function() {
@@ -798,21 +799,22 @@ test('UI: navClickToSec function exists', function() {
   assert(src.indexOf('function navClickToSec') >= 0, 'Missing navClickToSec function');
 });
 
-test('BUG: wrapExistingMarkers skips paragraphs before chapter 1', function() {
+test('BUG: wrapExistingMarkers scans the full body and preserves all occurrences', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf("getElementById('ch-1')") >= 0, 'Missing ch-1 reference in wrapExistingMarkers guard');
+  var wrap = src.substring(src.indexOf('function wrapExistingMarkers'), src.indexOf('function injectNewMarkers'));
+  assert(wrap.indexOf('occurrences') >= 0, 'Existing citations must preserve occurrences');
+  assert(wrap.indexOf("getElementById('ch-1')") < 0, 'Existing citation scan must not stop after chapter 1');
 });
 
-test('BUG: injectNewMarkers skips paragraphs before chapter 1', function() {
+test('BUG: injectNewMarkers uses structured body sentences instead of DOM pre-body guesses', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  var ch1Count = (src.match(/getElementById\('ch-1'\)/g) || []).length;
-  assert(ch1Count >= 2, 'ch-1 guard needed in both wrap AND inject, found: ' + ch1Count);
+  var inject = src.substring(src.indexOf('function injectNewMarkers'), src.indexOf('function scrollToRef'));
+  assert(inject.indexOf('_treeIndex.sentences') >= 0 && inject.indexOf('sent._paragraph.el') >= 0, 'Generated marker insertion must use structured body sentences');
 });
 
-test('BUG: ch-1 access includes null guard', function() {
+test('BUG: chapter location preserves unknown state', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  var hasNullGuard = src.indexOf('if(ch1El&&') >= 0 || src.indexOf('if(ch1&&') >= 0 || src.indexOf('if(fc4&&') >= 0;
-  assert(hasNullGuard, 'ch-1 access must include null check');
+  assert(src.indexOf('lc=0') >= 0 && src.indexOf("attributionStatus='unlocated'") >= 0, 'Unknown citation locations must not be fabricated');
 });
 
 
@@ -892,10 +894,10 @@ test('REGRESSION: injectNewMarkers uses tree index for sentence access', functio
   assert(injectFunc.indexOf("_treeIndex") >= 0, 'injectNewMarkers must use _treeIndex for sentence-level matching');
 });
 
-test('REGRESSION: WrapExistingMarkers skips paragraphs before chapter 1', function() {
+test('REGRESSION: WrapExistingMarkers locates citations across all chapters', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
   var wrapFunc = src.substring(src.indexOf("function wrapExistingMarkers"), src.indexOf("function injectNewMarkers"));
-  assert(wrapFunc.indexOf("compareDocumentPosition(ch1El)") >= 0 || wrapFunc.indexOf("compareDocumentPosition(ch1") >= 0, 'wrapExistingMarkers must skip pre-ch1 paragraphs');
+  assert(wrapFunc.indexOf('chapterSet') >= 0 && wrapFunc.indexOf('occurrences') >= 0, 'wrapExistingMarkers must retain cross-chapter occurrences');
 });
 
 test('REGRESSION: Batch verify sends catGame start in same event loop', function() {
@@ -941,10 +943,10 @@ test('REGRESSION: assignChapters is async and chunked', function() {
   assert(src.indexOf("sci<refs.length;sci+=30") >= 0, 'assignChapters must use 30-ref chunking');
 });
 
-test('REGRESSION: English 30% minimum enforced with pool split', function() {
+test('REGRESSION: strict constraint solver covers language and year windows', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  assert(src.indexOf("cnPool") >= 0 && src.indexOf("enPool") >= 0, 'Pool splitting must use cnPool/enPool');
-  assert(src.indexOf("enWanted") >= 0, 'enWanted calculation must exist');
+  assert(src.indexOf('selectReferencesByConstraints') >= 0, 'Constraint solver missing');
+  assert(src.indexOf('isRecentReference') >= 0, 'Shared year-window logic missing');
 });
 
 test('REGRESSION: Non-body chapters excluded from search rounds', function() {
@@ -1919,6 +1921,23 @@ test('RELEASE: machine-readable changelog and health endpoints exist', function(
   var py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
   assert(Array.isArray(change.entries)&&change.entries.some(function(e){return e.status==='released'&&e.commit;}),'released changelog entry missing');
   assert(py.indexOf('/health/live')>=0&&py.indexOf('/health/ready')>=0&&py.indexOf('/api/version')>=0,'health/version endpoints missing');
+});
+
+test('FIGURE: universal chart template registry is domain-neutral', function() {
+  var file=path.join(projectRoot,'static/chart_templates.json');assert(fs.existsSync(file),'chart_templates.json missing');
+  var data=JSON.parse(fs.readFileSync(file,'utf8'));assert((data.templates||[]).length>=20,'universal template registry too small');
+  var raw=JSON.stringify(data);assert(raw.indexOf('智慧工地')<0&&raw.indexOf('第2章')<0,'universal templates must not bind to one thesis');
+});
+
+test('FIGURE: domain example is isolated and not default', function() {
+  var file=path.join(projectRoot,'static/figure_examples/smart_construction.json');assert(fs.existsSync(file),'domain example missing');
+  var data=JSON.parse(fs.readFileSync(file,'utf8'));assert(data.isDefault===false,'domain example must not be default');
+});
+
+test('FIGURE: project plans are dynamic and persisted', function() {
+  var js=fs.readFileSync(path.join(projectRoot,'js/app-modules.js'),'utf8'),py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
+  assert(js.indexOf('function buildDynamicFigurePlan')>=0&&js.indexOf('getCurrentFigurePlanContext')>=0,'dynamic plan context missing');
+  assert(py.indexOf('figure_plans_json')>=0,'figure plans are not persisted');
 });
 
 // residual risk guards (string presence)

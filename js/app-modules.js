@@ -1,4 +1,31 @@
 
+(function initRuntimeUpgradeCoordinator(){
+  var loadedCommit='',deadlineMs=0,lastMode='normal',reloadStarted=false;
+  function formatRemaining(ms){var s=Math.max(0,Math.ceil(ms/1000)),m=Math.floor(s/60);return String(m).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
+  function flush(){
+    var btn=document.getElementById('serviceUpgradeSave');if(btn){btn.disabled=true;btn.textContent='保存中…';}
+    var p=window.ThesisProject&&ThesisProject.flushAllDirty?ThesisProject.flushAllDirty({force:true}):Promise.resolve({success:true});
+    return p.then(function(r){if(btn){btn.disabled=false;btn.textContent=r.success?'已保存':'重试保存';}return r;}).catch(function(){if(btn){btn.disabled=false;btn.textContent='重试保存';}return{success:false};});
+  }
+  function tick(){var el=document.getElementById('serviceUpgradeCountdown');if(el)el.textContent=deadlineMs?formatRemaining(deadlineMs-Date.now()):'等待恢复';}
+  function handleStatus(s){
+    lastMode=s.mode||'normal';var b=document.getElementById('serviceUpgradeBanner');if(!b)return;
+    if(lastMode==='normal'){
+      if(s.commit&&loadedCommit&&s.commit!==loadedCommit&&!reloadStarted){reloadStarted=true;flush().then(function(r){if(r.success)location.reload();else reloadStarted=false;});}
+      else b.hidden=true;
+      return;
+    }
+    b.hidden=false;
+    document.getElementById('serviceUpgradeTitle').textContent=lastMode==='announced'?'服务即将升级':'服务升级中';
+    document.getElementById('serviceUpgradeMessage').textContent=s.message||'请尽快保存当前内容；新任务暂时不可用。';
+    if(s.deadlineAt){var serverNow=Date.parse(s.serverTime)||Date.now(),serverDeadline=Date.parse(s.deadlineAt);deadlineMs=Date.now()+Math.max(0,serverDeadline-serverNow);}else deadlineMs=0;
+    tick();flush();
+  }
+  function poll(){fetch('/api/runtime/status',{cache:'no-store'}).then(function(r){return r.json();}).then(function(s){if(!loadedCommit)loadedCommit=s.commit||'';handleStatus(s);}).catch(function(){}).finally(function(){setTimeout(poll,lastMode==='normal'?25000:4000);});}
+  window.addEventListener('DOMContentLoaded',function(){var save=document.getElementById('serviceUpgradeSave');if(save)save.onclick=flush;setInterval(tick,1000);poll();});
+  window.addEventListener('visibilitychange',function(){if(!document.hidden)poll();});
+})();
+
 function escapeModuleHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function getSessionScope(){
   try{
@@ -953,11 +980,41 @@ function runDataAnalysis(container) {
   setTimeout(function(){ try{ loadDataAnalysisMaterials(); }catch(e){} }, 0);
 }
 
+function inferClaimTypes(claim){
+  var c=(claim||'').toLowerCase(),types=[];
+  if(/差异|比较|优于|降低|提高|组间|difference|compare/.test(c))types.push('group-difference');
+  if(/趋势|变化|时间|周期|预测|trend|forecast/.test(c))types.push('trend');
+  if(/相关|关系|影响|关联|relationship|association/.test(c))types.push('relationship');
+  if(/分布|异常|离群|distribution|outlier/.test(c))types.push('distribution');
+  if(/性能|准确|f1|auc|分类|模型|performance/.test(c))types.push('model-comparison');
+  if(/解释|贡献|重要|shap|importance/.test(c))types.push('importance');
+  if(/稳健|敏感|不确定|置信|robust|sensitivity|uncertainty/.test(c))types.push('robustness');
+  return types.length?types:['exploration'];
+}
+function getCurrentFigurePlanContext(){
+  var p=window.ThesisProject&&ThesisProject.getCurrentProject?ThesisProject.getCurrentProject():null,outline=p&&p.artifacts&&p.artifacts.outline;
+  var chapters=[];
+  if(outline&&outline.chapters)chapters=outline.chapters.map(function(c,i){return{id:c.id||('chapter-'+(i+1)),title:c.title||('第'+(i+1)+'章'),index:i+1};});
+  else if(window.sections)chapters=sections.filter(function(s){return!/参考文献|附录|致谢/.test(s.name||'');}).map(function(s,i){return{id:'chapter-'+(s.ch||i+1),title:s.name||('第'+(i+1)+'章'),index:s.ch||i+1};});
+  return{projectId:p&&p.id||'',title:p&&p.title||'',field:p&&p.field||'',keywords:p&&p.keywords||'',chapters:chapters};
+}
+function buildDynamicFigurePlan(artifact){
+  var ctx=getCurrentFigurePlanContext(),claimTypes=inferClaimTypes(artifact.claim),recs=artifact.recommendations||[],items=[];
+  recs.forEach(function(r,i){
+    var chapter=ctx.chapters.length?ctx.chapters[Math.min(i,ctx.chapters.length-1)]:null;
+    items.push({id:'figure-plan-item-'+Date.now().toString(36)+'-'+i,order:i+1,claim:artifact.claim,recommendation:r,templateId:artifact.templateIds&&artifact.templateIds[i]||'',chapterId:chapter&&chapter.id||null,chapterTitle:chapter&&chapter.title||'待确定',status:'proposed',sourceMaterialId:artifact.materialId});
+  });
+  return{id:'figure-plan-'+Date.now().toString(36),projectId:ctx.projectId,projectTitle:ctx.title,field:ctx.field,claimTypes:claimTypes,journal:artifact.journal,sourceMaterialId:artifact.materialId,items:items,status:'draft',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+}
+
 function openFigureAdvisor(){
   var sel=document.getElementById('daMaterialSelect');var materialId=sel&&sel.value;var materialName=sel&&sel.options[sel.selectedIndex]?sel.options[sel.selectedIndex].text:'';
+  var ctx=getCurrentFigurePlanContext();
+  var chapterOptions='<option value="">由系统结合论证目标推荐</option>'+ctx.chapters.map(function(c){return'<option value="'+escapeModuleHtml(c.id)+'">'+escapeModuleHtml(c.title)+'</option>';}).join('');
   var html='<div class="figure-advisor">'+
-    '<div class="ai-desc"><b>先明确这张图要论证什么。</b>图表顾问会先看数据类型、样本量、缺失、分布和分组，再推荐图型；不会直接套模板。</div>'+
-    '<label>想让读者相信什么？</label><textarea id="figureClaim" class="ai-textarea" placeholder="例如：方案 A 在各时间点均显著降低能耗，并且波动更小"></textarea>'+
+    '<div class="ai-desc"><b>先明确论证目标，再匹配数据和论文位置。</b>系统使用跨学科图型模板，不复制任何案例的章节、图号或固定图数。</div>'+
+    '<label>想让读者相信什么？</label><textarea id="figureClaim" class="ai-textarea" placeholder="例如：干预组的结局指标显著改善，且个体差异可见"></textarea>'+
+    '<label>计划放在哪个章节</label><select id="figureChapter" class="ai-input">'+chapterOptions+'</select>'+
     '<label>目标规范</label><select id="figureJournal" class="ai-input"><option value="thesis-zh">中文学位论文</option><option value="chinese-core">中文核心期刊</option><option value="nature">Nature / Science</option><option value="ieee">IEEE</option><option value="elsevier">Elsevier</option></select>'+
     '<div class="ai-desc">当前数据：'+escapeModuleHtml(materialId?(materialName||materialId):'尚未选择资料')+'</div>'+
     '<div id="figureAdvisorResult"></div>'+
@@ -971,13 +1028,23 @@ function runFigureAdvisor(materialId){
   result.innerHTML='<div class="finding info">正在读取数据画像…</div>';
   fetch('/api/materials/'+encodeURIComponent(materialId),{headers:authJsonHeaders()}).then(function(r){if(!r.ok)throw new Error('资料读取失败');return r.text();}).then(function(text){
     var lines=text.split(/\r?\n/).filter(function(x){return x.trim();});var sep=(lines[0]||'').indexOf('\t')>=0?'\t':',';var headers=(lines[0]||'').split(sep).map(function(x){return x.replace(/^"|"$/g,'').trim();});var rows=lines.slice(1,10001).map(function(line){return line.split(sep);});var numeric=[],categorical=[],missing={};headers.forEach(function(h,i){var vals=rows.map(function(r){return(r[i]||'').trim();});var nums=vals.filter(function(v){return v!==''&&!isNaN(Number(v));});missing[h]=vals.filter(function(v){return!v;}).length;if(nums.length>=Math.max(3,vals.length*.7))numeric.push(h);else categorical.push(h);});
-    var advice=[],warnings=[];if(numeric.length>=2)advice.push('散点图 + 回归/相关系数：适合论证两个连续变量的关系');if(categorical.length&&numeric.length){var groups={};var gi=headers.indexOf(categorical[0]);rows.forEach(function(r){var k=(r[gi]||'未分类').trim();groups[k]=(groups[k]||0)+1;});var ns=Object.keys(groups).map(function(k){return groups[k];});var minN=ns.length?Math.min.apply(null,ns):0;if(minN<10){advice.push('stripplot / 点图：直接展示每个样本');warnings.push('每组最小样本量 n='+minN+'，不建议均值柱或小提琴图，避免掩盖分布。');}else advice.push('箱线/小提琴 + 原始点：适合组间分布比较');}if(numeric.length>3)advice.push('相关性热力图：适合多变量关系筛查');if(!advice.length&&numeric.length===1)advice.push('直方图 + KDE 或箱线：适合展示连续变量分布');if(!numeric.length)advice.push('按频数排序的横向柱状图：适合分类构成，不建议饼图');warnings.push('禁止双 Y 轴、3D 图和 rainbow/jet 色图；误差棒必须注明 SD/SEM/95% CI 与样本量。');
+    var advice=[],templateIds=[],warnings=[];
+    var claimTypes=inferClaimTypes(claim);
+    if(numeric.length>=2){advice.push('散点图 + 回归/相关系数：适合论证两个连续变量的关系');templateIds.push('scatter-regression');}
+    if(categorical.length&&numeric.length){var groups={};var gi=headers.indexOf(categorical[0]);rows.forEach(function(r){var k=(r[gi]||'未分类').trim();groups[k]=(groups[k]||0)+1;});var ns=Object.keys(groups).map(function(k){return groups[k];});var minN=ns.length?Math.min.apply(null,ns):0;if(minN<10){advice.push('点图或箱线图 + 原始点：直接展示每个样本');templateIds.push('box-strip');warnings.push('每组最小样本量 n='+minN+'，不建议均值柱或小提琴图，避免掩盖分布。');}else{advice.push('箱线/小提琴 + 原始点：适合组间分布比较');templateIds.push('violin-strip');}}
+    if(numeric.length>3){advice.push('相关性热力图：适合多变量关系筛查');templateIds.push('correlation-heatmap');}
+    if(!advice.length&&numeric.length===1){advice.push('直方图 + KDE 或箱线：适合展示连续变量分布');templateIds.push('distribution-histogram');}
+    if(!numeric.length){advice.push('按频数排序的横向柱状图：适合分类构成，不建议饼图');templateIds.push('categorical-bar');}
+    if(claimTypes.indexOf('trend')>=0&&numeric.length){advice.unshift('趋势线与不确定性带：适合时间或有序条件下的变化');templateIds.unshift('time-series-band');}
+    if(claimTypes.indexOf('model-comparison')>=0){advice.push('交叉验证分布、ROC/PR或混淆矩阵：根据模型产物选择');templateIds.push('cross-validation');}
+    warnings.push('禁止双 Y 轴、3D 图和 rainbow/jet 色图；误差棒必须注明 SD/SEM/95% CI 与样本量。');
     var qa=['最终尺寸直接出图，不在 Word 中二次缩放','默认色盲安全配色并提供灰度预览','标签字号最终尺寸下 ≥6pt','导出 SVG/PDF 矢量版与 300 DPI PNG','检查缺字、裁切、刻度重叠和图例遮挡'];
     result.innerHTML='<div class="finding ok"><b>数据画像</b><br>'+rows.length+' 行 · '+headers.length+' 列 · 连续 '+numeric.length+' · 分类 '+categorical.length+'<br>缺失：'+Object.keys(missing).filter(function(k){return missing[k]>0;}).map(function(k){return escapeModuleHtml(k)+' '+Number(missing[k])}).join('；')+'</div><div class="finding info"><b>推荐</b><br>'+advice.map(function(x,i){return(i+1)+'. '+escapeModuleHtml(x)}).join('<br>')+'</div><div class="finding warn"><b>科研错误拦截</b><br>'+warnings.map(escapeModuleHtml).join('<br>')+'</div><div class="finding info"><b>出版质量门禁</b><br>'+qa.map(function(x){return'• '+escapeModuleHtml(x)}).join('<br>')+'</div><div class="ai-actions" data-sticky-actions><button class="ai-btn-clear" onclick="saveFigureArtifact(\''+materialId+'\')">保存 Figure Artifact</button><button class="ai-btn" onclick="switchModule(\'data-analysis\');closeAccountModal()">返回绘图</button></div>';
-    window._figureAdvisorArtifact={claim:claim,materialId:materialId,materialName:materialName,journal:document.getElementById('figureJournal').value,profile:{rows:rows.length,columns:headers,numeric:numeric,categorical:categorical,missing:missing},recommendations:advice,warnings:warnings,qa:qa,createdAt:new Date().toISOString()};
+    var chosenChapter=(document.getElementById('figureChapter')||{}).value||'';
+    window._figureAdvisorArtifact={schemaVersion:2,claim:claim,claimTypes:claimTypes,materialId:materialId,materialName:materialName,journal:document.getElementById('figureJournal').value,preferredChapterId:chosenChapter,profile:{rows:rows.length,columns:headers,numeric:numeric,categorical:categorical,missing:missing},templateIds:templateIds,recommendations:advice,warnings:warnings,qa:qa,createdAt:new Date().toISOString()};
   }).catch(function(e){result.innerHTML='<div class="finding err">'+e.message+'</div>';});
 }
-function saveFigureArtifact(materialId){var a=window._figureAdvisorArtifact;if(!a)return;try{var p=window.ThesisProject&&ThesisProject.getCurrentProject?ThesisProject.getCurrentProject():null;if(!p)throw new Error('请先创建项目');p.artifacts=p.artifacts||{};p.artifacts.figures=p.artifacts.figures||[];a.id='fig_'+Date.now().toString(36);a.sourceMaterialId=materialId;p.artifacts.figures.unshift(a);ThesisProject.updateCurrent({artifacts:p.artifacts});ThesisProject.logSkillRun({moduleId:'figure-advisor',title:'科研图表顾问',summary:a.claim});if(typeof ttp==='function')ttp('Figure Artifact 已保存到项目');}catch(e){alert(e.message);}}
+function saveFigureArtifact(materialId){var a=window._figureAdvisorArtifact;if(!a)return;try{var p=window.ThesisProject&&ThesisProject.getCurrentProject?ThesisProject.getCurrentProject():null;if(!p)throw new Error('请先创建项目');p.artifacts=p.artifacts||{};p.artifacts.figures=p.artifacts.figures||[];p.artifacts.figurePlans=p.artifacts.figurePlans||[];a.id='fig_'+Date.now().toString(36);a.sourceMaterialId=materialId;var plan=buildDynamicFigurePlan(a);if(a.preferredChapterId)plan.items.forEach(function(item){item.chapterId=a.preferredChapterId;});p.artifacts.figures.unshift(a);p.artifacts.figurePlans.unshift(plan);ThesisProject.updateCurrent({artifacts:p.artifacts});ThesisProject.logSkillRun({moduleId:'figure-advisor',title:'科研图表顾问',summary:a.claim});if(typeof ttp==='function')ttp('图表草案与项目绘图计划已保存');}catch(e){alert(e.message);}}
 window.openFigureAdvisor=openFigureAdvisor;window.runFigureAdvisor=runFigureAdvisor;window.saveFigureArtifact=saveFigureArtifact;
 
 function handleDataFile(input){
