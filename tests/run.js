@@ -319,10 +319,20 @@ test('Upload overlay / file input is present', function() {
 // ============================================================
 console.log('\n=== Section 5: Security & Robustness ===');
 
-test('SECURITY: Static file route cannot shadow extensionless API routes', function() {
+test('SECURITY: Static route preserves multi-dot parser library filenames', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
-  assert(src.indexOf("@app.route('/<path:stem>.<string:ext>')") >= 0, 'Static route must require a file extension');
-  assert(src.indexOf("@app.route('/<path:filename>')") < 0, 'Catch-all static route shadows API endpoints');
+  assert(src.indexOf("@app.route('/<path:filename>')") >= 0, 'Static route must preserve the full multi-dot filename');
+  assert(src.indexOf("filename.rsplit('.', 1)[-1]") >= 0, 'Static allowlist must inspect only the final extension');
+});
+
+test('IMPORT: dependency failure is non-blocking and recoverable', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var block = src.substring(src.indexOf('async function beginImportFile'), src.indexOf('window.beginImportFile'));
+  assert(block.indexOf('setImportRecovery') >= 0, 'Import errors must render a recoverable inline state');
+  assert(block.indexOf("alert(importError") < 0, 'Import errors must not open a blocking alert');
+  var dependency = src.substring(src.indexOf("if(ext==='docx')"), src.indexOf("updLoad('读取文件...", src.indexOf("if(ext==='docx')")));
+  assert(dependency.indexOf('for(var retry=') < 0, 'Missing parser libraries must not hold the process in a retry loop');
+  assert(dependency.indexOf('项目进度未受影响') >= 0, 'Dependency error must explain that progress is preserved');
 });
 
 test('SECURITY: No eval() in production code', function() {

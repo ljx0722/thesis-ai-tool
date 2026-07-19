@@ -562,12 +562,11 @@ if not ADMIN_SECRET:
 def index():
     return send_file('index.html', mimetype='text/html; charset=utf-8')
 
-@app.route('/<path:stem>.<string:ext>')
-def serve_static(stem, ext):
-    ext = ext.lower()
+@app.route('/<path:filename>')
+def serve_static(filename):
     allowed = {'js','css','html','json','png','jpg','jpeg','svg','ico','woff','woff2','ttf','eot','map'}
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
     if ext not in allowed: return "Not Found", 404
-    filename = stem + '.' + ext
     try: return send_file(filename)
     except FileNotFoundError: return "Not Found", 404
 

@@ -2745,6 +2745,12 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
   var fi=document.getElementById('fileInput');
   if(!fi)return;
   var importRunning=false,importSequence=0;
+  function setImportRecovery(message,showRetry){
+    var box=document.getElementById('uploadRecovery');if(!box)return;
+    box.hidden=!message;
+    box.innerHTML=message?(escapeHtml(message)+(showRetry?'<br><button type="button" id="uploadRetry">重新选择文件</button>':'') ):'';
+    var retry=document.getElementById('uploadRetry');if(retry)retry.onclick=function(){box.hidden=true;fi.click();};
+  }
   async function beginImportFile(file,intent){
     if(!file||importRunning)return;
     importRunning=true;var importId=++importSequence;
@@ -2760,7 +2766,8 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     }catch(importError){
       console.error('[import]',importError);
       if(typeof hideLoad==='function')hideLoad();
-      alert(importError&&importError.message?importError.message:'论文导入失败，请重试。');
+      setImportRecovery((importError&&importError.message)||'论文导入失败，请重新选择文件。',true);
+      try{showUploadOverlay();}catch(eRecovery){}
     }finally{
       if(importId===importSequence){importRunning=false;window._pendingImportFile=null;}
       fi.value='';
@@ -2792,7 +2799,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     try{
       headBuf = await f.slice(0, 8).arrayBuffer();
     }catch(erHead){
-      hideLoad(); alert('无法读取文件：'+erHead.message); return;
+      throw new Error('无法读取文件：'+erHead.message);
     }
     var u8=new Uint8Array(headBuf);
     var isZip = u8.length>=2 && u8[0]===0x50 && u8[1]===0x4B; // PK => docx/xlsx/zip
@@ -2802,10 +2809,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     else if(isOle || ext==='doc') kind='doc';
     else if(ext==='docx'||ext==='doc') kind=ext; // fallback to name
     if(kind==='unknown'){
-      hideLoad();
-      alert('无法识别该文件类型（扩展名：.'+ext+'）。\n\n请上传 Word 论文：\n• 推荐 .docx（可保留标题样式/目录）\n• 也支持旧版 .doc\n\n若文件来自网盘/微信，请确认未改坏后缀。');
-      document.getElementById('fileInput').value='';
-      return;
+      throw new Error('无法识别该文件类型（扩展名：.'+ext+'）。请选择 .docx，或先用 Word 将旧版 .doc 另存为 .docx。');
     }
     ext = kind; // normalize for downstream branches
     window._uploadFileKind = kind;
@@ -2822,14 +2826,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
 
     if(ext==='docx'){
     if(typeof mammoth==='undefined'||typeof JSZip==='undefined'){
-      updLoad('等待Word解析库加载...',3);
-      for(var retry=0;retry<15&&(typeof mammoth==='undefined'||typeof JSZip==='undefined');retry++){
-        await new Promise(function(rr){setTimeout(rr,200)});
-        var missing=[];if(typeof mammoth==='undefined')missing.push('Mammoth');if(typeof JSZip==='undefined')missing.push('JSZip');
-        updLoad('等待 '+missing.join(' / ')+' 加载...',Math.min(8,retry*0.5+3));
-      }
-      var missingFinal=[];if(typeof mammoth==='undefined')missingFinal.push('Mammoth');if(typeof JSZip==='undefined')missingFinal.push('JSZip');
-      if(missingFinal.length){throw new Error(missingFinal.join(' / ')+' 加载超时。请刷新页面后重试。');}
+      throw new Error('Word 解析组件暂时不可用，导入已安全停止；当前论文和项目进度未受影响。请稍后重新选择文件。');
     }
 
     updLoad('读取文件...',10);var buf;
