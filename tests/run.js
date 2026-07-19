@@ -1025,11 +1025,12 @@ test('RENDER: Tables are NOT hidden by CSS display:none', function() {
 
 test('RENDER: Upload immediately shows loading overlay', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
-  var handler = src.substring(src.indexOf("fileInput"), src.indexOf("convertToHtml"));
-  // showLoad should appear early in the handler, before the mammoth library check
-  var slIdx = handler.indexOf('showLoad(');
+  var start = src.indexOf('async function beginImportFile');
+  var handler = src.substring(start, src.indexOf('window.beginImportFile', start));
+  var slIdx = handler.indexOf("showLoad('准备导入...'");
+  var parseIdx = handler.indexOf('await parseImportedFile');
   assert(slIdx > 0, 'showLoad must be called in the upload handler');
-  assert(slIdx < 400, 'showLoad must appear early in the handler (within first 400 chars)');
+  assert(parseIdx > slIdx, 'Loading overlay must appear before parsing starts');
 });
 
 
