@@ -1,7 +1,20 @@
 /**
- * 论文看板 — 综合评估报告
- * 包含：综合评分、雷达图、维度详解、改进建议、章节分析、文献分析、对比基准
+ * 论文看板 — 综合评估行动中心
+ * 权威分数来自 computeThesisReview()；展示与行动映射在此层完成。
  */
+var THESIS_BOARD_WEIGHTS = [
+  { key: 'topic', label: '选题价值', weight: 0.10, modules: [{ id: 'topic-finder', name: '选题推荐' }, { id: 'proposal', name: '开题报告' }] },
+  { key: 'literature', label: '文献综述', weight: 0.15, modules: [{ id: 'references', name: '文献工作台' }, { id: 'knowledge-graph', name: '知识图谱' }] },
+  { key: 'struct', label: '框架结构', weight: 0.15, modules: [{ id: 'optimization', name: '结构优化' }, { id: 'review', name: '论文查错' }] },
+  { key: 'method', label: '研究方法', weight: 0.10, modules: [{ id: 'optimization', name: '结构优化' }, { id: 'data-analysis', name: '数据分析' }] },
+  { key: 'content', label: '内容论证', weight: 0.15, modules: [{ id: 'paragraph', name: '段落分析' }, { id: 'data-analysis', name: '数据分析' }] },
+  { key: 'conclusion', label: '结论展望', weight: 0.10, modules: [{ id: 'optimization', name: '结构优化' }, { id: 'proofread', name: '校对润色' }] },
+  { key: 'innovation', label: '创新性', weight: 0.05, modules: [{ id: 'topic-finder', name: '选题推荐' }, { id: 'review', name: '论文查错' }] },
+  { key: 'readable', label: '学术写作', weight: 0.08, modules: [{ id: 'proofread', name: '校对润色' }, { id: 'paragraph', name: '段落分析' }, { id: 'terminology', name: '术语检查' }] },
+  { key: 'format', label: '格式规范', weight: 0.05, modules: [{ id: 'format-check', name: '格式检查' }] },
+  { key: 'practical', label: '实践价值', weight: 0.07, modules: [{ id: 'review', name: '论文查错' }, { id: 'data-analysis', name: '数据分析' }] }
+];
+
 function showDashboard() {
   if (!(typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100)) {
     alert('请先上传论文');
@@ -17,446 +30,482 @@ function showDashboard() {
     }
   } catch (e) {}
 }
+
 function closeDashboard() {
   var overlay = document.getElementById('dbOverlay');
   if (overlay) overlay.style.display = 'none';
 }
+
 function buildDashboard() {
   showLoad('生成论文看板...', 10, '聚合分析数据');
-  setTimeout(function() {
+  setTimeout(function () {
+    var content = document.getElementById('dbContent');
     try {
-      var content = document.getElementById('dbContent');
       if (!content) { hideLoad(); return; }
       updLoad('计算评分...', 30);
-      var h = buildDashboardHTML();
-      content.innerHTML = h;
+      content.innerHTML = buildDashboardHTML();
+      bindDashboardActions(content);
       updLoad('渲染图表...', 70);
-      setTimeout(function() {
-        drawRadarChart(); drawChapterChart();
-        drawScoreBars(); drawLitPie();
+      setTimeout(function () {
+        drawRadarChart();
+        drawChapterChart();
+        drawLitPie();
         hideLoad();
-      }, 120);
-    } catch (e) { hideLoad(); content.innerHTML = '<div style="text-align:center;padding:60px;color:#ff3b30">渲染出错: ' + e.message + '</div>'; }
-  }, 80);
+      }, 80);
+    } catch (e) {
+      hideLoad();
+      if (content) content.innerHTML = '<div class="thesis-board-error">渲染出错：' + escBoard(e.message) + '</div>';
+    }
+  }, 40);
 }
 
-// ========== 评分计算 ==========
+function escBoard(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+function boardThemeColors() {
+  var styles = getComputedStyle(document.body);
+  function v(name, fallback) {
+    var val = styles.getPropertyValue(name);
+    return (val && val.trim()) || fallback;
+  }
+  return {
+    text: v('--text-primary', '#0f172a'),
+    muted: v('--text-muted', '#64748b'),
+    border: v('--border', '#e2e8f0'),
+    accent: v('--accent', '#6366f1'),
+    card: v('--bg-card', '#ffffff'),
+    success: v('--success', '#10b981'),
+    warning: v('--warning', '#f59e0b'),
+    danger: v('--danger', '#ef4444'),
+    info: v('--info', '#3b82f6')
+  };
+}
+
+function scoreTone(score) {
+  if (score >= 80) return 'ok';
+  if (score >= 60) return 'info';
+  if (score >= 40) return 'warn';
+  return 'bad';
+}
+
+function scoreLevel(score) {
+  if (score >= 80) return '优秀';
+  if (score >= 60) return '良好';
+  if (score >= 40) return '一般';
+  return '需改进';
+}
+
+function gradeMeta(composite) {
+  if (composite >= 85) return { grade: 'A', label: '优秀', tone: 'ok' };
+  if (composite >= 70) return { grade: 'B', label: '良好', tone: 'info' };
+  if (composite >= 55) return { grade: 'C', label: '中等', tone: 'warn' };
+  return { grade: 'D', label: '需改进', tone: 'bad' };
+}
+
 function computeAllScores() {
   var rev = typeof computeThesisReview === 'function' ? computeThesisReview() : null;
-  var dimScores = { struct:60, literature:45, format:70, readable:60, method:55, content:50, innovation:40, terminology:65, conclusion:55, practical:55 };
+  if (!rev || !rev.dimensions || rev.dimensions.length < 10) {
+    return null;
+  }
+  var dims = THESIS_BOARD_WEIGHTS.map(function (meta, idx) {
+    var source = rev.dimensions[idx] || { score: 0, label: meta.label, subItems: [] };
+    return {
+      key: meta.key,
+      label: meta.label,
+      weight: meta.weight,
+      score: source.score,
+      subItems: source.subItems || [],
+      modules: meta.modules
+    };
+  });
   var text = manuscriptText || '';
   var secs = sections || [];
   var bodyChs = secs.filter(isBodyChapter);
   var rl = (typeof mergedRefs !== 'undefined' && mergedRefs.length) ? mergedRefs : (typeof existingRefs !== 'undefined' ? existingRefs : []);
   var totalChars = text.length;
-  var cnRefs = rl.filter(function(r) { return /[一-鿿]/.test((r.title||r.ci||'').substring(0,5)); }).length;
+  var cnRefs = rl.filter(function (r) { return /[一-鿿]/.test((r.title || r.ci || '').substring(0, 5)); }).length;
   var enRefs = rl.length - cnRefs;
-  var recentRefs = rl.filter(function(r){var y=parseInt(r.year)||0;return y>=(new Date().getFullYear()-5);}).length;
-  var doiRefs = rl.filter(function(r){return r.doi&&r.doi.length>5;}).length;
-
-  if (rev && rev.dimensions) {
-    dimScores.struct = rev.dimensions[2].score;
-    dimScores.literature = rev.dimensions[1].score;
-    dimScores.format = rev.dimensions[8].score;
-    dimScores.readable = rev.dimensions[7].score;
-    dimScores.method = rev.dimensions[3].score;
-    dimScores.content = rev.dimensions[4].score;
-    dimScores.innovation = rev.dimensions[6].score;
-    dimScores.terminology = 65;
-    dimScores.conclusion = rev.dimensions[5].score;
-    dimScores.practical = rev.dimensions[9].score;
-  }
-  var composite = rev ? rev.composite : Math.round((dimScores.struct*0.1+dimScores.literature*0.2+dimScores.format*0.1+dimScores.readable*0.1+dimScores.method*0.15+dimScores.content*0.15+dimScores.innovation*0.05+dimScores.terminology*0.05+dimScores.conclusion*0.05+dimScores.practical*0.05));
-  var grade = composite>=85?'A':(composite>=70?'B':(composite>=55?'C':'D'));
-
-  var methods = [];
-  if(/问卷|调查|Interview|访谈/.test(text))methods.push('调研类');
-  if(/回归|因子|熵值|SWOT|PEST|博弈|统计分析|SPSS|Stata/.test(text))methods.push('量化实证');
-  if(/案例|case study/.test(text.toLowerCase()))methods.push('案例法');
-  if(/实验|仿真|模拟|样机/.test(text))methods.push('实验/仿真');
-  if(/技术路线|研究思路/.test(text))methods.push('技术路线');
-
-  var avgSentLen = 35;
-  var box = document.getElementById('thesisBox');
-  if (box) {
-    var paras = box.querySelectorAll('p'); var tc=0, ts=0;
-    for (var pi=0; pi<Math.min(paras.length,100); pi++) {
-      var pt=(paras[pi].textContent||'').trim();
-      if(pt.length<10)continue;
-      var sents=pt.split(/[。！？\.\?\!]/).filter(function(s){return s.trim().length>0;});
-      tc+=pt.length; ts+=sents.length;
-    }
-    avgSentLen = ts>0?Math.round(tc/ts):35;
-  }
-  var passiveDens = Math.round((text.match(/被/g)||[]).length/Math.max(1,totalChars/1000));
-  var hasIntro = bodyChs.some(function(c){return/绪论|引言|前言/.test(c.name);});
-  var hasLit = bodyChs.some(function(c){return/文献|综述|理论|基础/.test(c.name);});
-  var hasMethod = bodyChs.some(function(c){return/方法|模型|算法|设计/.test(c.name);});
-  var hasResult = bodyChs.some(function(c){return/结果|实证|调研|案例|分析/.test(c.name);});
-  var hasConclusion = bodyChs.some(function(c){return/结论|对策|建议|展望|总结/.test(c.name);});
-  var structCompleteness = [hasIntro,hasLit,hasMethod,hasResult,hasConclusion].filter(Boolean).length;
-  var figCount = (text.match(/图\s*\d+/g)||[]).length;
-  var secCount = 0; bodyChs.forEach(function(c){(c.sections||[]).forEach(function(sc){secCount++;if(sc.subs)secCount+=sc.subs.length;});});
-
+  var recentRefs = rl.filter(function (r) { var y = parseInt(r.year, 10) || 0; return y >= (new Date().getFullYear() - 5); }).length;
+  var doiRefs = rl.filter(function (r) { return r.doi && r.doi.length > 5; }).length;
+  var methods = (rev.stats && rev.stats.methods) || [];
+  var avgSentLen = (rev.stats && rev.stats.avgSentLen) || 35;
+  var hasIntro = bodyChs.some(function (c) { return /绪论|引言|前言/.test(c.name); });
+  var hasLit = bodyChs.some(function (c) { return /文献|综述|理论|基础/.test(c.name); });
+  var hasMethod = bodyChs.some(function (c) { return /方法|模型|算法|设计/.test(c.name); });
+  var hasResult = bodyChs.some(function (c) { return /结果|实证|调研|案例|分析/.test(c.name); });
+  var hasConclusion = bodyChs.some(function (c) { return /结论|对策|建议|展望|总结/.test(c.name); });
+  var structCompleteness = [hasIntro, hasLit, hasMethod, hasResult, hasConclusion].filter(Boolean).length;
+  var figCount = (text.match(/图\s*\d+/g) || []).length;
+  var secCount = 0;
+  bodyChs.forEach(function (c) {
+    (c.sections || []).forEach(function (sc) {
+      secCount++;
+      if (sc.subs) secCount += sc.subs.length;
+    });
+  });
+  var g = gradeMeta(rev.composite);
   return {
-    composite:composite, grade:grade, dimScores:dimScores,
-    totalChars:totalChars, chapters:bodyChs.length, sections:secCount, totalRefs:rl.length,
-    cnRefs:cnRefs, enRefs:enRefs, recentRefs:recentRefs, doiRate:rl.length>0?Math.round(doiRefs/rl.length*100):0,
-    methods:methods, avgSentLen:avgSentLen, passiveDens:passiveDens,
-    structCompleteness:structCompleteness, figCount:figCount,
-    enRate:rl.length>0?Math.round(enRefs/rl.length*100):0,
-    recentRate:rl.length>0?Math.round(recentRefs/rl.length*100):0,
-    bodyChs:bodyChs, totalChars:totalChars
+    composite: rev.composite,
+    grade: g.grade,
+    gradeLabel: g.label,
+    gradeTone: g.tone,
+    dims: dims,
+    totalChars: totalChars,
+    chapters: bodyChs.length,
+    sections: secCount,
+    totalRefs: rl.length,
+    cnRefs: cnRefs,
+    enRefs: enRefs,
+    recentRefs: recentRefs,
+    doiRate: rl.length ? Math.round(doiRefs / rl.length * 100) : 0,
+    methods: methods,
+    avgSentLen: avgSentLen,
+    passiveDens: Math.round((text.match(/被/g) || []).length / Math.max(1, totalChars / 1000)),
+    structCompleteness: structCompleteness,
+    figCount: figCount,
+    enRate: rl.length ? Math.round(enRefs / rl.length * 100) : 0,
+    recentRate: rl.length ? Math.round(recentRefs / rl.length * 100) : 0,
+    bodyChs: bodyChs,
+    review: rev
   };
 }
 
-// ========== HTML构建 ==========
+function buildDimInsight(dim) {
+  var auto = (dim.subItems || []).filter(function (item) { return item.auto; });
+  var manual = (dim.subItems || []).filter(function (item) { return !item.auto; });
+  var strengths = auto.filter(function (item) { return item.s == null || item.s >= 65; });
+  var weaknesses = auto.filter(function (item) { return item.s != null && item.s < 65; });
+  return {
+    strengths: strengths,
+    weaknesses: weaknesses,
+    manual: manual,
+    summary: weaknesses.length
+      ? weaknesses[0].d
+      : (strengths.length ? ('当前优势：' + strengths[0].d) : '暂无自动证据，可结合人工复核项判断。')
+  };
+}
+
+function getPriorityActions(s) {
+  return s.dims
+    .map(function (dim) {
+      var insight = buildDimInsight(dim);
+      var gap = Math.max(0, 70 - dim.score);
+      return {
+        dim: dim,
+        impact: gap * dim.weight,
+        reason: insight.summary,
+        module: dim.modules[0]
+      };
+    })
+    .filter(function (item) { return item.dim.score < 70; })
+    .sort(function (a, b) { return b.impact - a.impact; })
+    .slice(0, 5);
+}
+
+function boardSummary(s) {
+  var weak = s.dims.filter(function (d) { return d.score < 70; }).sort(function (a, b) { return a.score - b.score; }).slice(0, 2);
+  if (!weak.length) return '各维度较均衡，可继续在各模块精修细节。';
+  return '短板主要在' + weak.map(function (d) { return d.label + '（' + d.score + '）'; }).join('、') + '，优先用平台对应模块补强。';
+}
+
+function signalRow(label, value, tone) {
+  return '<div class="thesis-board-signal"><span>' + escBoard(label) + '</span><strong class="tone-' + tone + '">' + escBoard(value) + '</strong></div>';
+}
+
+function moduleButtons(modules) {
+  return (modules || []).map(function (mod) {
+    return '<button type="button" class="thesis-board-action" data-board-module="' + escBoard(mod.id) + '">' + escBoard(mod.name) + '</button>';
+  }).join('');
+}
+
 function buildDashboardHTML() {
   var s = computeAllScores();
-  var gc = s.grade==='A'?'#30d158':(s.grade==='B'?'#0071e3':(s.grade==='C'?'#ff9f0a':'#ff3b30'));
-  var gradeLabel = s.grade==='A'?'优秀':(s.grade==='B'?'良好':(s.grade==='C'?'中等':'需改进'));
-
-  var h = '<div style="display:flex;height:100%;gap:14px;font-size:.74rem;line-height:1.65">';
-
-  // ====== LEFT COLUMN (280px): Score + Radar + Chapter ======
-  h += '<div style="width:290px;flex-shrink:0;display:flex;flex-direction:column;gap:12px;overflow-y:auto">';
-
-  // Score circle
-  h += '<div style="background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.04);padding:18px;text-align:center">';
-  h += '<div style="position:relative;display:inline-block;width:110px;height:110px;border-radius:50%;background:conic-gradient('+gc+' '+(s.composite*3.6)+'deg,#e5e7eb 0deg);margin-bottom:10px">';
-  h += '<div style="position:absolute;top:8px;left:8px;width:94px;height:94px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column">';
-  h += '<span style="font-size:2rem;font-weight:800;color:'+gc+';font-family:SF Mono,monospace;line-height:1">'+s.composite+'</span>';
-  h += '<span style="font-size:.58rem;color:#86868b;font-weight:600">总分/100</span>';
-  h += '</div></div>';
-  h += '<div style="font-size:1.2rem;font-weight:800;color:'+gc+';font-family:SF Mono,monospace">'+s.grade+' 级 — '+gradeLabel+'</div>';
-  h += '<div style="font-size:.58rem;color:#86868b;margin-top:4px;line-height:1.5">加权公式：结构×15% + 文献×35% + 格式×20%<br>+ 可读性×15% + 术语×15%<br>十维雷达图源：选题/框架/方法/论证/结论/创新/写作/实践</div>';
-  h += '</div>';
-
-  // Radar
-  h += '<div style="background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.04);padding:14px;position:relative">';
-  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:.7rem;font-weight:600;color:#1d1d1f">📊 十维雷达图</span><span title="雷达图展示10个评审维度的得分分布。数据多边形面积越大代表论文越均衡。低分维度对应的三角形顶点会内缩。" style="font-size:.55rem;color:#86868b;cursor:help">ⓘ</span></div>';
-  h += '<canvas id="dbRadar" style="width:100%;height:230px"></canvas>';
-  h += '</div>';
-
-  // Chapter distribution
-  h += '<div style="background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.04);padding:14px">';
-  h += '<div style="font-size:.7rem;font-weight:600;color:#1d1d1f;margin-bottom:6px">📊 章节字数分布</div>';
-  h += '<canvas id="dbChapter" style="width:100%;height:110px"></canvas>';
-  h += '</div>';
-
-  // Quick stats
-  h += '<div style="background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.04);padding:14px">';
-  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:.7rem;font-weight:600;color:#1d1d1f">📈 快速统计</span><span title="下方指标基于论文文本和文献数据的自动检测结果" style="font-size:.55rem;color:#86868b;cursor:help">ⓘ</span></div>';
-  h += statRow('总字数',Math.round(s.totalChars/1000)+'k 字',s.totalChars>30000?'#30d158':(s.totalChars>15000?'#0071e3':'#ff9f0a'));
-  h += statRow('正文章节',s.chapters+' 章',s.chapters>=5?'#30d158':(s.chapters>=3?'#0071e3':'#ff3b30'));
-  h += statRow('小节数',s.sections+' 个',s.sections>=8?'#30d158':(s.sections>=4?'#0071e3':'#ff9f0a'));
-  h += statRow('参考文献',s.totalRefs+' 条',s.totalRefs>=30?'#30d158':(s.totalRefs>=15?'#0071e3':'#ff3b30'));
-  h += statRow('中外比例','中 '+s.cnRefs+' / 英 '+s.enRefs,s.enRate>=30?'#30d158':(s.enRate>=15?'#ff9f0a':'#ff3b30'));
-  h += statRow('近五年文献',s.recentRate+'%',s.recentRate>=50?'#30d158':(s.recentRate>=30?'#ff9f0a':'#ff3b30'));
-  h += statRow('DOI覆盖率',s.doiRate+'%',s.doiRate>=50?'#30d158':(s.doiRate>=30?'#ff9f0a':'#ff3b30'));
-  h += statRow('图表数量','图'+s.figCount+' 个',s.figCount>=5?'#30d158':(s.figCount>=2?'#0071e3':'#ff9f0a'));
-  h += statRow('研究方法',s.methods.length?s.methods.join('、'):'未检测到',s.methods.length>=2?'#30d158':(s.methods.length>=1?'#ff9f0a':'#ff3b30'));
-  h += statRow('结构完整度',s.structCompleteness+'/5要素',s.structCompleteness>=4?'#30d158':(s.structCompleteness>=3?'#ff9f0a':'#ff3b30'));
-  h += statRow('平均句长',s.avgSentLen+' 字',s.avgSentLen<=35?'#30d158':(s.avgSentLen<=50?'#ff9f0a':'#ff3b30'));
-  h += statRow('被动语态',s.passiveDens+' 处/千字',s.passiveDens<=8?'#30d158':(s.passiveDens<=15?'#ff9f0a':'#ff3b30'));
-  h += '</div>';
-  h += '</div>';
-
-  // ====== RIGHT (flex): Score bars + Details + Suggestions ======
-  h += '<div style="flex:1;display:flex;flex-direction:column;gap:12px;overflow-y:auto">';
-
-  // Dimension score bars
-  h += '<div style="background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.04);padding:16px">';
-  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:.72rem;font-weight:600;color:#1d1d1f">📈 十维得分详解</span><span title="十维评审体系各维度自动评分。绿色≥80分良好，蓝色≥60分正常，橙色≥40分需关注，红色<40分需重点改进。" style="font-size:.55rem;color:#86868b;cursor:help">ⓘ</span></div>';
-  var dims = [
-    {name:'选题价值',score:s.dimScores.innovation+5||45, info:'题目表述、研究范围、理论与实践价值'},
-    {name:'文献综述',score:s.dimScores.literature, info:'文献总量('+s.totalRefs+'条)、外文占比('+s.enRate+'%)、近五年率('+s.recentRate+'%)'},
-    {name:'框架结构',score:s.dimScores.struct, info:'章节数('+s.chapters+')、标准结构完整度('+s.structCompleteness+'/5)、均衡性'},
-    {name:'研究方法',score:s.dimScores.method, info:'检测到方法: '+(s.methods.join('、')||'无')+',技术路线、数据来源'},
-    {name:'内容论证',score:s.dimScores.content, info:'数据支撑('+(s.figCount?'图'+s.figCount+'个,':'')+'表格),案例材料,论证逻辑'},
-    {name:'结论展望',score:s.dimScores.conclusion||55, info:'结论清晰度、研究局限性说明、未来展望'},
-    {name:'创新性',score:s.dimScores.innovation, info:'理论/视角/方法/实践创新，差异化程度'},
-    {name:'学术写作',score:s.dimScores.readable, info:'句长('+s.avgSentLen+'字)、被动语态('+s.passiveDens+'处/千字)、口语化'},
-    {name:'格式规范',score:s.dimScores.format, info:'DOI覆盖率('+s.doiRate+'%)、图表编号、GB/T 7714规范'},
-    {name:'实践价值',score:s.dimScores.practical||55, info:'行业/政策/企业应用场景，落地可行性'},
-  ];
-  h += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">';
-  dims.forEach(function(d) {
-    var cl = d.score>=80?'#30d158':(d.score>=60?'#0071e3':(d.score>=40?'#ff9f0a':'#ff3b30'));
-    var lvl = d.score>=80?'优秀':(d.score>=60?'良好':(d.score>=40?'一般':'需改进'));
-    var fill = d.score/100;
-    h += '<div class="soccer-stat" title="'+d.info+' | 评分: '+d.score+'/100 — '+lvl+'\n\n计算公式：基于论文数据的多维度自动评估。" style="cursor:help;position:relative;overflow:hidden;background:#fff;border-radius:12px;padding:12px 10px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.06);transition:all .2s">';
-    h += '<div style="position:absolute;bottom:0;left:0;width:100%;height:'+(fill*100)+'%;background:'+cl+';opacity:'+(0.06+fill*0.06).toFixed(2)+';border-radius:0 0 12px 12px"></div>';
-    h += '<div style="position:relative;z-index:1">';
-    h += '<div style="font-size:1.5rem;font-weight:700;color:'+cl+';font-family:SF Mono,monospace;line-height:1">'+d.score+'</div>';
-    h += '<div style="font-size:.55rem;font-weight:600;color:#86868b;margin:2px 0">/100</div>';
-    h += '<div style="font-size:.7rem;font-weight:600;color:#1d1d1f;margin:4px 0">'+d.name+'</div>';
-    h += '<div style="font-size:.52rem;color:'+cl+';font-weight:600;background:rgba(0,0,0,0.03);padding:2px 8px;border-radius:8px;display:inline-block">'+lvl+'</div>';
-    h += '</div></div>';
-  });
-  h += '</div>';
-  h += '</div>';
-
-  // Suggestions card
-  h += '<div style="background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.04);padding:16px">';
-  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:.72rem;font-weight:600;color:#1d1d1f">💡 优先改进建议</span><span title="基于论文弱项维度自动生成的改进建议。先修高分影响项（如文献综述 ×35%），再修低影响项。" style="font-size:.55rem;color:#86868b;cursor:help">ⓘ</span></div>';
-  var suggestions = [];
-  ['struct','literature','format','method','content','conclusion','innovation','readable','practical'].forEach(function(key) {
-    var sc = s.dimScores[key]||50;
-    if (sc < 50) suggestions.push({dim:key, score:sc, items:getSuggestions(key, s)});
-  });
-  // Also add generic suggestions
-  if (s.totalRefs < 15) suggestions.push({dim:'literature', score:s.dimScores.literature, items:['参考文献仅 '+s.totalRefs+' 条，硕士论文建议 30-50 条。切换到参考文献模块，点击"检索文献"补充。']});
-  if (s.enRate < 25) suggestions.push({dim:'literature', score:s.dimScores.literature, items:['英文文献占比 '+s.enRate+'%（<25%），建议增加外文检索。在参考文献面板中增加英文关键词搜索。']});
-  if (s.structCompleteness < 4) suggestions.push({dim:'struct', score:s.dimScores.struct, items:['论文标准结构不完整（'+s.structCompleteness+'/5要素），建议补充缺失章节。硕士论文通常需包含：绪论→文献综述→研究方法→实证分析→结论。']});
-  if (s.figCount < 3 && s.totalChars > 20000) suggestions.push({dim:'content', score:s.dimScores.content, items:['图表仅 '+s.figCount+' 个（偏少），建议增加数据可视化图表增强论证说服力。']});
-  if (s.avgSentLen > 50) suggestions.push({dim:'readable', score:s.dimScores.readable, items:['平均句长 '+s.avgSentLen+' 字（偏高），建议拆分长句、简化从句，控制在 25-35 字为宜。']});
-
-  if (!suggestions.length) {
-    h += '<div style="text-align:center;padding:20px;color:#30d158;font-size:.78rem">🎉 论文整体质量良好，无明显短板！<br><span style="color:#86868b;font-size:.68rem">建议在各分析模块中查看详细检查结果</span></div>';
-  } else {
-    suggestions.forEach(function(sug, i) {
-      h += '<div style="padding:10px 12px;margin-bottom:6px;border-radius:10px;background:'+(sug.score<40?'rgba(239,68,68,.05)':'rgba(245,158,11,.05)')+';border:1px solid '+(sug.score<40?'rgba(239,68,68,.25)':'rgba(245,158,11,.25)')+'">';
-      h += '<div style="font-size:.68rem;font-weight:600;color:#1d1d1f;margin-bottom:4px">'+(i+1)+'. '+dimName(sug.dim)+'（得分 '+sug.score+'）</div>';
-      sug.items.forEach(function(item) {
-        h += '<div style="font-size:.64rem;color:#555;margin:3px 0;padding:4px 8px;border-radius:6px;background:rgba(100,116,139,.06)">• '+item+'</div>';
-      });
-      h += '</div>';
-    });
+  if (!s) {
+    return '<div class="thesis-board-error">暂无评估数据，请先上传并解析论文正文。</div>';
   }
-  h += '</div>';
-
-  h += '</div>'; // end right column
-  h += '</div>'; // end flex
-
-  // Store for chart rendering
   window._dbScores = s;
   window._dbBodyChs = s.bodyChs;
+  var actions = getPriorityActions(s);
+  var h = '';
+  h += '<div class="thesis-board">';
+  h += '<aside class="thesis-board-side">';
+  h += '<section class="thesis-board-card thesis-board-score">';
+  h += '<div class="thesis-board-score-value tone-' + s.gradeTone + '">' + s.composite + '</div>';
+  h += '<div class="thesis-board-score-meta"><span class="thesis-board-grade tone-' + s.gradeTone + '">' + s.grade + ' 级 · ' + s.gradeLabel + '</span><p>' + escBoard(boardSummary(s)) + '</p></div>';
+  h += '<details class="thesis-board-formula"><summary>评分权重</summary><p>选题 10% · 文献 15% · 框架 15% · 方法 10% · 论证 15% · 结论 10% · 创新 5% · 写作 8% · 格式 5% · 实践 7%</p></details>';
+  h += '</section>';
+  h += '<section class="thesis-board-card"><div class="thesis-board-card-title">十维雷达</div><canvas id="dbRadar" class="thesis-board-canvas radar"></canvas></section>';
+  h += '<section class="thesis-board-card"><div class="thesis-board-card-title">关键信号</div><div class="thesis-board-signals">';
+  h += signalRow('总字数', Math.round(s.totalChars / 1000) + 'k 字', s.totalChars > 30000 ? 'ok' : (s.totalChars > 15000 ? 'info' : 'warn'));
+  h += signalRow('正文章节', s.chapters + ' 章', s.chapters >= 5 ? 'ok' : (s.chapters >= 3 ? 'info' : 'bad'));
+  h += signalRow('参考文献', s.totalRefs + ' 条', s.totalRefs >= 30 ? 'ok' : (s.totalRefs >= 15 ? 'info' : 'bad'));
+  h += signalRow('中外比例', '中 ' + s.cnRefs + ' / 英 ' + s.enRefs, s.enRate >= 30 ? 'ok' : (s.enRate >= 15 ? 'warn' : 'bad'));
+  h += signalRow('近五年文献', s.recentRate + '%', s.recentRate >= 50 ? 'ok' : (s.recentRate >= 30 ? 'warn' : 'bad'));
+  h += signalRow('DOI 覆盖率', s.doiRate + '%', s.doiRate >= 50 ? 'ok' : (s.doiRate >= 30 ? 'warn' : 'bad'));
+  h += signalRow('结构完整度', s.structCompleteness + '/5', s.structCompleteness >= 4 ? 'ok' : (s.structCompleteness >= 3 ? 'warn' : 'bad'));
+  h += signalRow('平均句长', s.avgSentLen + ' 字', s.avgSentLen <= 35 ? 'ok' : (s.avgSentLen <= 50 ? 'warn' : 'bad'));
+  h += '</div></section>';
+  h += '<section class="thesis-board-card"><div class="thesis-board-card-title">章节字数</div><canvas id="dbChapter" class="thesis-board-canvas chapter"></canvas></section>';
+  h += '<section class="thesis-board-card" id="dbLitPieHost"><div class="thesis-board-card-title">文献构成</div><canvas id="dbLitPieCanvas" class="thesis-board-canvas pie"></canvas><div class="thesis-board-legend"><span>中文 ' + s.cnRefs + '</span><span>英文 ' + s.enRefs + '</span><span>近5年 ' + s.recentRate + '%</span></div></section>';
+  h += '</aside>';
 
+  h += '<div class="thesis-board-main">';
+  h += '<section class="thesis-board-card"><div class="thesis-board-card-title">十维概览</div><div class="thesis-board-grid">';
+  s.dims.forEach(function (dim, idx) {
+    h += '<button type="button" class="thesis-board-dim tone-' + scoreTone(dim.score) + '" data-board-scroll="dim-' + idx + '">';
+    h += '<strong>' + dim.score + '</strong><span>' + escBoard(dim.label) + '</span><em>' + scoreLevel(dim.score) + '</em>';
+    h += '</button>';
+  });
+  h += '</div></section>';
+
+  h += '<section class="thesis-board-card"><div class="thesis-board-card-title">优先行动</div>';
+  if (!actions.length) {
+    h += '<div class="thesis-board-empty">各维度均达到良好线，可在校对、格式和文献工作台继续精修。</div>';
+  } else {
+    h += '<div class="thesis-board-actions-list">';
+    actions.forEach(function (item, i) {
+      h += '<article class="thesis-board-action-item">';
+      h += '<header><span>' + (i + 1) + '. ' + escBoard(item.dim.label) + '</span><strong class="tone-' + scoreTone(item.dim.score) + '">' + item.dim.score + '</strong></header>';
+      h += '<p>' + escBoard(item.reason) + '</p>';
+      h += '<div class="thesis-board-action-row">' + moduleButtons([item.module]) + '<span class="thesis-board-impact">权重影响约 ' + Math.round(item.impact) + '</span></div>';
+      h += '</article>';
+    });
+    h += '</div>';
+  }
+  h += '</section>';
+
+  h += '<section class="thesis-board-card"><div class="thesis-board-card-title">维度详解</div><div class="thesis-board-details">';
+  s.dims.forEach(function (dim, idx) {
+    var insight = buildDimInsight(dim);
+    h += '<details class="thesis-board-detail" id="dim-' + idx + '"' + (idx === 0 || dim.score < 70 ? ' open' : '') + '>';
+    h += '<summary><span>' + escBoard(dim.label) + '</span><strong class="tone-' + scoreTone(dim.score) + '">' + dim.score + ' · ' + scoreLevel(dim.score) + '</strong></summary>';
+    h += '<div class="thesis-board-detail-body">';
+    h += '<p class="thesis-board-detail-summary">' + escBoard(insight.summary) + '</p>';
+    if (insight.weaknesses.length) {
+      h += '<div class="thesis-board-block"><h5>为什么偏低</h5><ul>' + insight.weaknesses.map(function (item) {
+        return '<li><b>' + escBoard(item.t) + '</b> ' + escBoard(item.d) + '</li>';
+      }).join('') + '</ul></div>';
+    }
+    if (insight.strengths.length) {
+      h += '<div class="thesis-board-block"><h5>为什么不低 / 已满足</h5><ul>' + insight.strengths.map(function (item) {
+        return '<li><b>' + escBoard(item.t) + '</b> ' + escBoard(item.d) + '</li>';
+      }).join('') + '</ul></div>';
+    }
+    if (insight.manual.length) {
+      h += '<div class="thesis-board-block muted"><h5>仍需人工复核</h5><ul>' + insight.manual.map(function (item) {
+        return '<li><b>' + escBoard(item.t) + '</b> ' + escBoard(item.d) + '</li>';
+      }).join('') + '</ul></div>';
+    }
+    h += '<div class="thesis-board-action-row">' + moduleButtons(dim.modules) + '</div>';
+    h += '</div></details>';
+  });
+  h += '</div></section>';
+  h += '</div></div>';
   return h;
 }
 
-function statRow(label, value, color) {
-  return '<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:.64rem"><span style="color:#86868b">'+label+'</span><span style="font-weight:600;color:'+color+'">'+value+'</span></div>';
-}
-function dimName(key) {
-  var m = {struct:'框架结构',literature:'文献综述',format:'格式规范',readable:'学术写作',method:'研究方法',content:'内容论证',conclusion:'结论展望',innovation:'创新性',practical:'实践价值'};
-  return m[key] || key;
-}
-function getSuggestions(key, s) {
-  var map = {
-    literature: ['外文文献偏少，建议检索英文数据库（PubMed/Semantic Scholar），确保英文占比 ≥30%', '近五年文献不足，关注最新研究动态', '缺少核心期刊文献支撑'],
-    struct: ['章节分配不均衡，建议调整各章篇幅比例', '缺少独立的研究方法章', '绪论/结论篇幅比例需优化'],
-    method: ['研究方法不够多样化，建议组合使用定量+定性方法', '缺少技术路线图说明研究路径', '方法论描述不够详细'],
-    content: ['数据支撑不足，建议补充统计图表', '案例分析深度不够', '缺少对比分析或验证环节'],
-    format: ['DOI覆盖率偏低，点击顶栏"补全DOI"自动修复', '图表编号可能不连续', '参考文献格式需检查GB/T 7714规范'],
-    readable: ['句长偏高，建议拆分超长句', '口语化表达较多', '被动语态使用偏多'],
-    innovation: ['创新点表述不够明确', '建议在绪论末尾单独列出创新点'],
-    conclusion: ['结论章偏短', '缺少研究局限性说明', '没有未来研究展望'],
-    practical: ['实践应用价值论述不足', '缺少落地可行性分析'],
-  };
-  return map[key] || ['建议在各分析模块中查看详细检查结果'];
+function openBoardModule(moduleId) {
+  closeDashboard();
+  if (moduleId === 'references') {
+    if (window.LiteratureWorkbench && typeof LiteratureWorkbench.open === 'function') {
+      LiteratureWorkbench.open({ mode: 'imported' });
+      return;
+    }
+    if (typeof switchModule === 'function') switchModule('references');
+    return;
+  }
+  if (typeof MODULE_RUNNERS !== 'undefined' && MODULE_RUNNERS[moduleId] && typeof window[MODULE_RUNNERS[moduleId]] === 'function') {
+    if (typeof switchModule === 'function') switchModule(moduleId);
+    window[MODULE_RUNNERS[moduleId]]();
+    return;
+  }
+  if (typeof switchModule === 'function') switchModule(moduleId);
 }
 
-// ========== 雷达图 ==========
+function bindDashboardActions(root) {
+  if (!root) return;
+  root.querySelectorAll('[data-board-module]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      openBoardModule(btn.getAttribute('data-board-module'));
+    });
+  });
+  root.querySelectorAll('[data-board-scroll]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var target = document.getElementById(btn.getAttribute('data-board-scroll'));
+      if (target) {
+        if (target.tagName === 'DETAILS') target.open = true;
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+}
+
 function drawRadarChart() {
   var canvas = document.getElementById('dbRadar');
   if (!canvas || !window._dbScores) return;
-  var s = window._dbScores, ds = s.dimScores;
-  var dims = [
-    {name:'选题',score:ds.innovation+5||45,color:'#0071e3'},
-    {name:'文献',score:ds.literature,color:'#30d158'},
-    {name:'框架',score:ds.struct,color:'#af52de'},
-    {name:'方法',score:ds.method,color:'#ff9f0a'},
-    {name:'论证',score:ds.content,color:'#ff375f'},
-    {name:'结论',score:ds.conclusion||55,color:'#5ac8fa'},
-    {name:'创新',score:ds.innovation,color:'#32d74b'},
-    {name:'写作',score:ds.readable,color:'#ff6482'},
-    {name:'格式',score:ds.format,color:'#bf5af2'},
-    {name:'实践',score:ds.practical||55,color:'#00c7be'},
-  ];
+  var s = window._dbScores;
+  var theme = boardThemeColors();
+  var dims = s.dims.map(function (d) { return { name: d.label.slice(0, 2), score: d.score }; });
   var ctx = canvas.getContext('2d');
-  var w = canvas.parentElement.clientWidth-28, h = 230;
-  canvas.width = w; canvas.height = h;
-  var cx = w/2, cy = h/2, n = dims.length, maxR = Math.min(w,h)/2-30;
-  ctx.clearRect(0,0,w,h);
-  for (var g=1;g<=4;g++) {
+  var w = Math.max(240, (canvas.parentElement.clientWidth || 280) - 24);
+  var h = 220;
+  canvas.width = w;
+  canvas.height = h;
+  var cx = w / 2, cy = h / 2, n = dims.length, maxR = Math.min(w, h) / 2 - 28;
+  ctx.clearRect(0, 0, w, h);
+  for (var g = 1; g <= 4; g++) {
     ctx.beginPath();
-    for (var i=0;i<=n;i++) {
-      var a = (Math.PI*2/n)*i - Math.PI/2;
-      var rx = cx+maxR*g/4*Math.cos(a), ry = cy+maxR*g/4*Math.sin(a);
-      i===0?ctx.moveTo(rx,ry):ctx.lineTo(rx,ry);
+    for (var i = 0; i <= n; i++) {
+      var a = (Math.PI * 2 / n) * i - Math.PI / 2;
+      var rx = cx + maxR * g / 4 * Math.cos(a), ry = cy + maxR * g / 4 * Math.sin(a);
+      i === 0 ? ctx.moveTo(rx, ry) : ctx.lineTo(rx, ry);
     }
-    ctx.closePath(); ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=1; ctx.stroke();
+    ctx.closePath();
+    ctx.strokeStyle = theme.border;
+    ctx.lineWidth = 1;
+    ctx.stroke();
   }
-  for (var i=0;i<n;i++) {
-    var a = (Math.PI*2/n)*i - Math.PI/2;
-    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+maxR*Math.cos(a),cy+maxR*Math.sin(a));
-    ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=1.5; ctx.stroke();
+  for (var j = 0; j < n; j++) {
+    var a2 = (Math.PI * 2 / n) * j - Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + maxR * Math.cos(a2), cy + maxR * Math.sin(a2));
+    ctx.strokeStyle = theme.border;
+    ctx.stroke();
   }
   ctx.beginPath();
-  for (var i=0;i<=n;i++) {
-    var idx=i%n, a=(Math.PI*2/n)*idx-Math.PI/2;
-    var rv = dims[idx].score/100*maxR;
-    var px=cx+rv*Math.cos(a), py=cy+rv*Math.sin(a);
-    i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+  for (var k = 0; k <= n; k++) {
+    var idx = k % n, a3 = (Math.PI * 2 / n) * idx - Math.PI / 2;
+    var rv = dims[idx].score / 100 * maxR;
+    var px = cx + rv * Math.cos(a3), py = cy + rv * Math.sin(a3);
+    k === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
   }
-  ctx.closePath(); ctx.fillStyle='rgba(0,113,227,0.08)'; ctx.fill();
-  ctx.strokeStyle='#0071e3'; ctx.lineWidth=2; ctx.stroke();
-  for (var i=0;i<n;i++) {
-    var a=(Math.PI*2/n)*i-Math.PI/2;
-    var rv=dims[i].score/100*maxR;
-    ctx.beginPath(); ctx.arc(cx+rv*Math.cos(a),cy+rv*Math.sin(a),4,0,Math.PI*2);
-    ctx.fillStyle=dims[i].color; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
-  }
-  ctx.font='bold 10px -apple-system,"PingFang SC",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  for (var i=0;i<n;i++) {
-    var a=(Math.PI*2/n)*i-Math.PI/2;
-    ctx.fillStyle='#1d1d1f';
-    ctx.fillText(dims[i].name+' '+dims[i].score, cx+(maxR+18)*Math.cos(a), cy+(maxR+18)*Math.sin(a));
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(99,102,241,0.12)';
+  ctx.fill();
+  ctx.strokeStyle = theme.accent;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.font = '11px system-ui,sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = theme.text;
+  for (var m = 0; m < n; m++) {
+    var a4 = (Math.PI * 2 / n) * m - Math.PI / 2;
+    ctx.fillText(dims[m].name + ' ' + dims[m].score, cx + (maxR + 16) * Math.cos(a4), cy + (maxR + 16) * Math.sin(a4));
   }
 }
 
 function drawChapterChart() {
   var canvas = document.getElementById('dbChapter');
-  if (!canvas||!window._dbBodyChs) return;
+  if (!canvas || !window._dbBodyChs) return;
   var bodyChs = window._dbBodyChs;
-  var tc = manuscriptText?manuscriptText.length:1;
-  var w = canvas.parentElement.clientWidth-28, h = 110;
-  canvas.width = w; canvas.height = h;
-  var ctx = canvas.getContext('2d'); ctx.clearRect(0,0,w,h);
+  var theme = boardThemeColors();
+  var tc = manuscriptText ? manuscriptText.length : 1;
+  var w = Math.max(220, (canvas.parentElement.clientWidth || 280) - 24);
+  var h = 110;
+  canvas.width = w;
+  canvas.height = h;
+  var ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
   if (!bodyChs.length) return;
-  var barCnt = bodyChs.length, bg = 16, bw = (w-bg*(barCnt+1))/barCnt;
-  var colors = ['#0071e3','#30d158','#af52de','#ff9f0a','#ff375f','#5ac8fa','#32d74b','#ff6482'];
-  var maxPct = 0; bodyChs.forEach(function(c){var p=(c.text||'').length/tc*100;if(p>maxPct)maxPct=p;});
-  bodyChs.forEach(function(cs,i) {
-    var pct = (cs.text||'').length/tc*100;
-    var bh = (pct/Math.max(1,maxPct))*(h-25);
-    ctx.fillStyle = colors[i%colors.length];
-    ctx.beginPath(); ctx.roundRect(bg+i*(bw+bg),h-bh,bw,bh,[4,4,0,0]); ctx.fill();
-    ctx.fillStyle='#1d1d1f'; ctx.font='9px sans-serif'; ctx.textAlign='center';
-    ctx.fillText(Math.round(pct)+'%',bg+i*(bw+bg)+bw/2,h-bh-4);
-    ctx.fillText((cs.name||'').replace('第','').substring(0,4),bg+i*(bw+bg)+bw/2,h-2);
+  var barCnt = bodyChs.length, bg = 12, bw = (w - bg * (barCnt + 1)) / barCnt;
+  var colors = [theme.accent, theme.success, theme.info, theme.warning, theme.danger, '#8b5cf6', '#06b6d4', '#f97316'];
+  var maxPct = 0;
+  bodyChs.forEach(function (c) { var p = (c.text || '').length / tc * 100; if (p > maxPct) maxPct = p; });
+  bodyChs.forEach(function (cs, i) {
+    var pct = (cs.text || '').length / tc * 100;
+    var bh = (pct / Math.max(1, maxPct)) * (h - 28);
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fillRect(bg + i * (bw + bg), h - bh - 12, bw, bh);
+    ctx.fillStyle = theme.text;
+    ctx.font = '10px system-ui,sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(Math.round(pct) + '%', bg + i * (bw + bg) + bw / 2, h - bh - 16);
+    ctx.fillStyle = theme.muted;
+    ctx.fillText((cs.name || '').replace('第', '').substring(0, 4), bg + i * (bw + bg) + bw / 2, h - 2);
   });
 }
 
-function drawScoreBars() {
-  // Bars are already rendered as HTML soccer-stat cards in buildDashboardHTML
-}
 function drawLitPie() {
-  // Inject a simple literature composition chart into the dashboard stats area
   var s = window._dbScores;
-  if (!s || !s.totalRefs) return;
-  var host = document.getElementById('dbContent');
-  if (!host || document.getElementById('dbLitPie')) return;
-  var wrap = document.createElement('div');
-  wrap.id = 'dbLitPie';
-  wrap.style.cssText = 'background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.04);padding:14px;margin-top:12px';
-  wrap.innerHTML = '<div style="font-size:.7rem;font-weight:600;color:#1d1d1f;margin-bottom:8px">📚 文献构成</div>' +
-    '<canvas id="dbLitPieCanvas" width="260" height="160" style="width:100%;max-width:280px;height:160px"></canvas>' +
-    '<div style="display:flex;gap:12px;font-size:.62rem;color:#86868b;margin-top:6px;flex-wrap:wrap">' +
-    '<span><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#6366f1;margin-right:4px"></i>中文 '+s.cnRefs+'</span>' +
-    '<span><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#22d3ee;margin-right:4px"></i>英文 '+s.enRefs+'</span>' +
-    '<span><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#34d399;margin-right:4px"></i>近5年 '+s.recentRate+'%</span>' +
-    '</div>';
-  // Prefer left column if present
-  var leftCol = host.querySelector('div[style*="width:290px"]');
-  if (leftCol) leftCol.appendChild(wrap); else host.appendChild(wrap);
   var canvas = document.getElementById('dbLitPieCanvas');
-  if (!canvas) return;
+  if (!s || !s.totalRefs || !canvas) return;
+  var theme = boardThemeColors();
   var ctx = canvas.getContext('2d');
-  var W = canvas.width, H = canvas.height;
-  var cx = 80, cy = H/2, r = 55;
+  var W = canvas.width = Math.max(220, (canvas.parentElement.clientWidth || 260) - 24);
+  var H = canvas.height = 150;
+  var cx = 70, cy = H / 2, r = 48;
   var total = Math.max(1, s.totalRefs);
-  var slices = [
-    {v:s.cnRefs, c:'#6366f1'},
-    {v:s.enRefs, c:'#22d3ee'}
-  ];
-  var start = -Math.PI/2;
-  slices.forEach(function(sl){
-    var ang = (sl.v/total)*Math.PI*2;
-    ctx.beginPath(); ctx.moveTo(cx,cy);
-    ctx.arc(cx,cy,r,start,start+ang); ctx.closePath();
-    ctx.fillStyle = sl.c; ctx.fill();
+  var slices = [{ v: s.cnRefs, c: theme.accent }, { v: s.enRefs, c: theme.info }];
+  var start = -Math.PI / 2;
+  slices.forEach(function (sl) {
+    var ang = (sl.v / total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, start, start + ang);
+    ctx.closePath();
+    ctx.fillStyle = sl.c;
+    ctx.fill();
     start += ang;
   });
-  // hole
-  ctx.beginPath(); ctx.arc(cx,cy,r*0.55,0,Math.PI*2);
-  ctx.fillStyle = '#fff'; ctx.fill();
-  ctx.fillStyle = '#1d1d1f'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText(s.totalRefs+'', cx, cy+2);
-  ctx.font = '10px sans-serif'; ctx.fillStyle = '#86868b';
-  ctx.fillText('总文献', cx, cy+16);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.55, 0, Math.PI * 2);
+  ctx.fillStyle = theme.card;
+  ctx.fill();
+  ctx.fillStyle = theme.text;
+  ctx.font = 'bold 14px system-ui,sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(String(s.totalRefs), cx, cy + 1);
+  ctx.font = '10px system-ui,sans-serif';
+  ctx.fillStyle = theme.muted;
+  ctx.fillText('总文献', cx, cy + 16);
 }
 
 function exportDashboardReport() {
-  var s = window._dbScores || (typeof computeAllScores === 'function' ? computeAllScores() : null);
+  var s = window._dbScores || computeAllScores();
   if (!s) { alert('请先打开论文看板生成评估数据'); return; }
-  var dims = [
-    ['选题价值', s.dimScores.innovation+5||45],
-    ['文献综述', s.dimScores.literature],
-    ['框架结构', s.dimScores.struct],
-    ['研究方法', s.dimScores.method],
-    ['内容论证', s.dimScores.content],
-    ['结论展望', s.dimScores.conclusion||55],
-    ['创新性', s.dimScores.innovation],
-    ['学术写作', s.dimScores.readable],
-    ['格式规范', s.dimScores.format],
-    ['实践价值', s.dimScores.practical||55]
-  ];
   var lines = [];
   lines.push('论文搭子 ThesisBuddy — 论文评估报告');
   lines.push('生成时间: ' + new Date().toLocaleString());
   lines.push('');
   lines.push('=== 综合评分 ===');
   lines.push('总分: ' + s.composite + ' / 100');
-  lines.push('等级: ' + s.grade);
+  lines.push('等级: ' + s.grade + '（' + s.gradeLabel + '）');
+  lines.push('摘要: ' + boardSummary(s));
+  lines.push('权重: 选题10% 文献15% 框架15% 方法10% 论证15% 结论10% 创新5% 写作8% 格式5% 实践7%');
   lines.push('');
-  lines.push('=== 十维得分 ===');
-  dims.forEach(function(d){ lines.push(d[0] + ': ' + d[1]); });
+  lines.push('=== 十维得分与证据 ===');
+  s.dims.forEach(function (dim) {
+    var insight = buildDimInsight(dim);
+    lines.push(dim.label + ': ' + dim.score + ' — ' + insight.summary);
+  });
+  lines.push('');
+  lines.push('=== 优先行动 ===');
+  var actions = getPriorityActions(s);
+  if (!actions.length) lines.push('整体质量良好，建议继续精修细节');
+  actions.forEach(function (item, i) {
+    lines.push((i + 1) + '. ' + item.dim.label + '（' + item.dim.score + '）→ ' + item.module.name + '：' + item.reason);
+  });
   lines.push('');
   lines.push('=== 基础统计 ===');
-  lines.push('总字数: ' + Math.round(s.totalChars/1000) + 'k');
-  lines.push('正文章节: ' + s.chapters);
-  lines.push('小节数: ' + s.sections);
-  lines.push('参考文献: ' + s.totalRefs + ' (中文 ' + s.cnRefs + ' / 英文 ' + s.enRefs + ')');
-  lines.push('近五年文献占比: ' + s.recentRate + '%');
-  lines.push('DOI覆盖率: ' + s.doiRate + '%');
-  lines.push('图表数量: ' + s.figCount);
-  lines.push('平均句长: ' + s.avgSentLen);
-  lines.push('被动语态密度: ' + s.passiveDens + '/千字');
+  lines.push('总字数: ' + Math.round(s.totalChars / 1000) + 'k');
+  lines.push('正文章节: ' + s.chapters + ' · 小节: ' + s.sections);
+  lines.push('参考文献: ' + s.totalRefs + '（中文 ' + s.cnRefs + ' / 英文 ' + s.enRefs + '）');
+  lines.push('近五年文献: ' + s.recentRate + '% · DOI: ' + s.doiRate + '%');
   lines.push('研究方法: ' + (s.methods.length ? s.methods.join('、') : '未检测到'));
-  lines.push('');
-  lines.push('=== 优先改进建议 ===');
-  var suggestions = [];
-  if (s.totalRefs < 15) suggestions.push('参考文献仅 ' + s.totalRefs + ' 条，建议补充至 30-50 条');
-  if (s.enRate < 25) suggestions.push('英文文献占比 ' + s.enRate + '%，建议提升至 ≥30%');
-  if (s.structCompleteness < 4) suggestions.push('标准结构完整度 ' + s.structCompleteness + '/5，建议补齐缺失章节');
-  if (s.figCount < 3 && s.totalChars > 20000) suggestions.push('图表偏少，建议增加数据可视化');
-  if (s.avgSentLen > 50) suggestions.push('平均句长偏高，建议控制在 25-35 字');
-  if (!suggestions.length) suggestions.push('整体质量良好，建议继续在各模块中精修细节');
-  suggestions.forEach(function(t,i){ lines.push((i+1) + '. ' + t); });
-  lines.push('');
-  lines.push('（本报告由本地分析模块自动生成，仅供写作参考）');
-
-  var blob = new Blob([lines.join('\n')], {type:'text/plain;charset=utf-8'});
+  var blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = '论文评估报告_' + new Date().toISOString().slice(0,10) + '.txt';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
-  if (typeof ttp === 'function') ttp('评估报告已导出');
+  a.download = '论文评估报告.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
-function showReviewInDashboard() {
-  var overlay = document.getElementById('dbOverlay');
-  if (!overlay) return;
-  overlay.style.display = 'flex';
-  var content = document.getElementById('dbContent');
-  if (!content) return;
-  content.innerHTML = '<div style="text-align:center;padding:60px;color:#86868b"><div style="font-size:2rem;margin-bottom:12px">⏳</div>正在生成评审报告...</div>';
-  setTimeout(function() {
-    var h = renderReviewReport();
-    content.innerHTML = h;
-  }, 100);
-}
+window.showDashboard = showDashboard;
+window.closeDashboard = closeDashboard;
+window.exportDashboardReport = exportDashboardReport;
+window.computeAllScores = computeAllScores;

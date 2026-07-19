@@ -575,7 +575,8 @@ function switchPanel(moduleId) {
     document.querySelectorAll('.tool-tab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-tooltab')==='refs'); });
     var lw=document.getElementById('literatureWorkbench');if(lw)lw.style.display='flex';
     var refsEl=document.getElementById('refs');if(refsEl)refsEl.style.display='none';
-    if(window.LiteratureWorkbench&&typeof LiteratureWorkbench.render==='function')LiteratureWorkbench.render();
+    if(window.LiteratureWorkbench&&typeof LiteratureWorkbench.show==='function')LiteratureWorkbench.show();
+    else if(window.LiteratureWorkbench&&typeof LiteratureWorkbench.render==='function')LiteratureWorkbench.render();
     updateStatusBar2();
     return;
   }

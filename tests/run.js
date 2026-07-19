@@ -335,6 +335,37 @@ test('IMPORT: dependency failure is non-blocking and recoverable', function() {
   assert(dependency.indexOf('项目进度未受影响') >= 0, 'Dependency error must explain that progress is preserved');
 });
 
+test('LITERATURE: workbench actions are bound once and report runtime errors', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/literature-workbench.js'), 'utf8');
+  assert(src.indexOf("root.dataset.literatureBound==='1'") >= 0, 'Workbench binding must be idempotent');
+  assert(src.indexOf('catch(err){reportSaveError(err);}') >= 0, 'Action handler errors must be visible');
+  assert(src.indexOf("state.view='audit';audit()") >= 0, 'Search without a selection must run audit instead of doing nothing');
+  assert(src.indexOf("action.dataset.action==='cart'") >= 0, 'Cart button must have a handler');
+});
+
+test('LITERATURE: imported references have a visible workbench view', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/literature-workbench.js'), 'utf8');
+  assert(src.indexOf('function ensureImportedPapers') >= 0, 'Imported references must migrate into literature papers');
+  assert(src.indexOf("['imported','已导入']") >= 0, 'Workbench must expose an imported references tab');
+  assert(src.indexOf('function importedView') >= 0, 'Imported references must have a rendered list');
+  assert(src.indexOf('persist(function(next)') >= 0, 'Migration must use persist mutator');
+  assert(src.indexOf('return next;') >= 0, 'Migration must write the cloned artifact');
+  assert(src.indexOf('function show()') >= 0, 'Workbench must expose show() for module switch path');
+});
+
+test('DASHBOARD: scores come from thesis-review dimensions with real weights', function() {
+  var dash = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
+  var review = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
+  assert(dash.indexOf('THESIS_BOARD_WEIGHTS') >= 0, 'Dashboard must declare dimension weights');
+  assert(dash.indexOf('dim1.score * 0.10') < 0 || review.indexOf('dim1.score * 0.10') >= 0, 'Review engine keeps authoritative weights');
+  assert(dash.indexOf('innovation+5') < 0, 'Topic score must not be faked from innovation');
+  assert(dash.indexOf('文献×35%') < 0, 'Dashboard must not claim fake literature weight');
+  assert(dash.indexOf('buildDimInsight') >= 0, 'Dashboard must explain high/low scores from evidence');
+  assert(dash.indexOf('openBoardModule') >= 0, 'Dashboard actions must deep-link into platform modules');
+  assert(dash.indexOf("background:#fff") < 0, 'Dashboard cards must not hardcode light surfaces');
+  assert(dash.indexOf('#1d1d1f') < 0, 'Dashboard text must not hardcode light-theme ink');
+});
+
 test('SECURITY: No eval() in production code', function() {
   var files = ['app.js', 'js/app-modules.js'];
   files.forEach(function(f) {
@@ -468,8 +499,8 @@ test('MODULE: thesis-review composite uses all dimensions', function() {
 
 test('MODULE: dashboard.js integrates review scores', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
-  assert(src.indexOf('computeThesisReview') >= 0 || src.indexOf('dimScores') >= 0, 'Missing review integration');
-  assert(src.indexOf('showReviewInDashboard') >= 0, 'Missing review handler');
+  assert(src.indexOf('computeThesisReview') >= 0, 'Missing review integration');
+  assert(src.indexOf('buildDimInsight') >= 0 || src.indexOf('openBoardModule') >= 0, 'Missing review-driven dashboard handlers');
 });
 
 test('UI: Dashboard entry exists', function() {
@@ -667,8 +698,8 @@ test('CODE: dashboard.js has complete rendering pipeline', function() {
 
 test('CODE: dashboard.js shows per-dimension explanations and suggestions', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
-  assert(src.indexOf('getSuggestions') >= 0, 'Missing suggestion generator');
-  assert(src.indexOf('dimName') >= 0, 'Missing dimension name mapper');
+  assert(src.indexOf('getPriorityActions') >= 0 || src.indexOf('buildDimInsight') >= 0, 'Missing suggestion generator');
+  assert(src.indexOf('THESIS_BOARD_WEIGHTS') >= 0, 'Missing dimension name/weight mapper');
 });
 
 test('CODE: loading.js exists as a module', function() {
@@ -857,20 +888,21 @@ test('REGRESSION: Dashboard overlay has dark background (not light)', function()
   assert(html.indexOf("rgba(30,30,32,0.92)") >= 0 || html.indexOf("rgba(30,30,32,0.92)") >= 0, 'Dashboard overlay must use dark background');
 });
 
-test('REGRESSION: Dashboard uses soccer-stat card layout', function() {
+test('REGRESSION: Dashboard uses dense dimension overview layout', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
-  assert(src.indexOf("soccer-stat") >= 0, 'Dashboard must use soccer-stat card classes');
-  assert(src.indexOf("grid-template-columns") >= 0, 'Dashboard dimension scores must use grid layout');
+  assert(src.indexOf('thesis-board-dim') >= 0 || src.indexOf('thesis-board-grid') >= 0, 'Dashboard must use dense dimension cards');
+  assert(src.indexOf('grid-template-columns') >= 0 || src.indexOf('thesis-board-grid') >= 0, 'Dashboard dimension scores must use grid layout');
 });
 
-test('REGRESSION: Dashboard score circle explains weighting formula', function() {
+test('REGRESSION: Dashboard score explains real weighting formula', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
-  assert(src.indexOf("结构×15%") >= 0 || src.indexOf("x 15%") >= 0, 'Score circle must show weighting breakdown');
+  assert(src.indexOf('文献 15%') >= 0 || src.indexOf('weight: 0.15') >= 0, 'Score panel must show real weighting breakdown');
+  assert(src.indexOf('文献×35%') < 0, 'Dashboard must not claim outdated literature weight');
 });
 
-test('REGRESSION: Dashboard has radar chart explanation icon', function() {
+test('REGRESSION: Dashboard has radar chart section', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
-  assert(src.indexOf("雷达图") >= 0 && src.indexOf("ⓘ") >= 0, 'Radar chart must have info icon');
+  assert(src.indexOf('雷达') >= 0 && src.indexOf('drawRadarChart') >= 0, 'Radar chart section must remain');
 });
 
 test('REGRESSION: Search progress panel has explanation text', function() {

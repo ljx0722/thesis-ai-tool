@@ -323,13 +323,13 @@
   <div style="background:var(--solid);border-radius:var(--r-xl);padding:24px;width:95%;height:92%;max-width:1500px;display:flex;flex-direction:column;box-shadow:0 25px 80px rgba(0,0,0,0.3),0 0 0 1px rgba(255,255,255,0.1);position:relative;border:1px solid rgba(255,255,255,0.08)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0">
       <div>
-        <h2 style="font-size:1.2rem;font-weight:700;color:#1d1d1f;margin:0;letter-spacing:-.02em">📊 论文看板</h2>
-        <div style="font-size:.68rem;color:var(--m);margin-top:2px">综合评估报告 · 数据来源于各分析模块</div>
+        <h2 style="font-size:1.05rem;font-weight:700;color:var(--text-primary);margin:0;letter-spacing:-.01em">论文看板</h2>
+        <div style="font-size:.68rem;color:var(--text-muted);margin-top:2px">综合评估 · 证据说明 · 平台行动建议</div>
       </div>
       <div style="display:flex;gap:6px;align-items:center">
-        <button onclick="showDashboard()" style="background:rgba(0,0,0,0.05);color:var(--t);border:none;border-radius:18px;padding:8px 16px;cursor:pointer;font-weight:500;font-size:.72rem">🔄 刷新</button>
-        <button onclick="exportDashboardReport()" style="background:rgba(99,102,241,0.12);color:#6366f1;border:none;border-radius:18px;padding:8px 16px;cursor:pointer;font-weight:600;font-size:.72rem">📄 导出报告</button>
-        <button onclick="closeDashboard()" style="background:rgba(0,0,0,0.06);color:var(--t);border:none;border-radius:18px;padding:8px 16px;cursor:pointer;font-weight:600;font-size:.85rem">✕ 关闭</button>
+        <button onclick="showDashboard()" class="thesis-board-shell-btn">刷新</button>
+        <button onclick="exportDashboardReport()" class="thesis-board-shell-btn primary">导出报告</button>
+        <button onclick="closeDashboard()" class="thesis-board-shell-btn">关闭</button>
       </div>
     </div>
     <div id="dbContent" style="flex:1;overflow-y:auto;border-radius:var(--radius)"></div>
