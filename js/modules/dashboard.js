@@ -186,7 +186,7 @@ function buildDashboardHTML() {
     var lvl = d.score>=80?'优秀':(d.score>=60?'良好':(d.score>=40?'一般':'需改进'));
     var fill = d.score/100;
     h += '<div class="soccer-stat" title="'+d.info+' | 评分: '+d.score+'/100 — '+lvl+'\n\n计算公式：基于论文数据的多维度自动评估。" style="cursor:help;position:relative;overflow:hidden;background:#fff;border-radius:12px;padding:12px 10px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.06);transition:all .2s">';
-    h += '<div style="position:absolute;bottom:0;left:0;width:100%;height:'+(fill*100)+'%;background:'+cl+';opacity:'+(0.06+fill*0.06).toFixed(2)+';transition:height .6s ease;border-radius:0 0 12px 12px"></div>';
+    h += '<div style="position:absolute;bottom:0;left:0;width:100%;height:'+(fill*100)+'%;background:'+cl+';opacity:'+(0.06+fill*0.06).toFixed(2)+';border-radius:0 0 12px 12px"></div>';
     h += '<div style="position:relative;z-index:1">';
     h += '<div style="font-size:1.5rem;font-weight:700;color:'+cl+';font-family:SF Mono,monospace;line-height:1">'+d.score+'</div>';
     h += '<div style="font-size:.55rem;font-weight:600;color:#86868b;margin:2px 0">/100</div>';
@@ -216,10 +216,10 @@ function buildDashboardHTML() {
     h += '<div style="text-align:center;padding:20px;color:#30d158;font-size:.78rem">🎉 论文整体质量良好，无明显短板！<br><span style="color:#86868b;font-size:.68rem">建议在各分析模块中查看详细检查结果</span></div>';
   } else {
     suggestions.forEach(function(sug, i) {
-      h += '<div style="padding:10px 12px;margin-bottom:6px;border-radius:10px;background:rgba(0,0,0,0.02);border-left:3px solid '+(sug.score<40?'#ff3b30':'#ff9f0a')+'">';
+      h += '<div style="padding:10px 12px;margin-bottom:6px;border-radius:10px;background:'+(sug.score<40?'rgba(239,68,68,.05)':'rgba(245,158,11,.05)')+';border:1px solid '+(sug.score<40?'rgba(239,68,68,.25)':'rgba(245,158,11,.25)')+'">';
       h += '<div style="font-size:.68rem;font-weight:600;color:#1d1d1f;margin-bottom:4px">'+(i+1)+'. '+dimName(sug.dim)+'（得分 '+sug.score+'）</div>';
       sug.items.forEach(function(item) {
-        h += '<div style="font-size:.64rem;color:#555;margin:3px 0;padding-left:8px;border-left:2px solid #e5e7eb">• '+item+'</div>';
+        h += '<div style="font-size:.64rem;color:#555;margin:3px 0;padding:4px 8px;border-radius:6px;background:rgba(100,116,139,.06)">• '+item+'</div>';
       });
       h += '</div>';
     });
@@ -405,7 +405,7 @@ function exportDashboardReport() {
     ['实践价值', s.dimScores.practical||55]
   ];
   var lines = [];
-  lines.push('学术论文AI一站式助手 — 论文评估报告');
+  lines.push('论文搭子 ThesisBuddy — 论文评估报告');
   lines.push('生成时间: ' + new Date().toLocaleString());
   lines.push('');
   lines.push('=== 综合评分 ===');

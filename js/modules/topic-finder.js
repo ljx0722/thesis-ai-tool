@@ -25,9 +25,8 @@ window.runTopicFinderAI = function() {
   fetch('/api/llm/analyze', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
     body: JSON.stringify({
-      module: 'topic-finder',
-      system_prompt: '你是顶尖学术导师，擅长分析研究趋势并为学生推荐有创新价值的论文题目。请用中文回答，结构清晰。',
-      user_prompt: '研究领域：' + domain + (keywords ? '\n关键词：' + keywords : '') + '\n\n请完成以下任务：\n1. 该领域近3年研究热点（100字）\n2. 研究空白与机会点（80字）\n3. 推荐5个论文题目（每个题目附50字简介 + 3-5个大纲方向）\n4. 每个题目建议3个最有价值的参考文献检索方向\n\n请按编号清晰列出。',
+      capability_id: 'topic-finder',
+      input: '研究领域：' + domain + (keywords ? '\n关键词：' + keywords : '') + '\n\n请完成以下任务：\n1. 该领域近3年研究热点（100字）\n2. 研究空白与机会点（80字）\n3. 推荐5个论文题目（每个题目附50字简介 + 3-5个大纲方向）\n4. 每个题目建议3个最有价值的参考文献检索方向\n\n请按编号清晰列出。',
       max_tokens: 3000
     })
   }).then(function(r) { return r.json(); })

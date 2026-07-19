@@ -9,7 +9,7 @@ function clearAll(){
     if(tb){
       var ws=document.getElementById('workspaceContent');
       if(ws){ Array.prototype.forEach.call(tb.children,function(ch){ if(ch!==ws) ch.style.display='none'; }); ws.style.display=''; }
-      else tb.innerHTML='<div id="workspaceContent" class="workspace-content"><div class="workspace-hero"><div class="workspace-icon">📋</div><h2 class="workspace-title">欢迎使用学术论文AI一站式助手</h2><p class="workspace-sub">上传你的论文，开始智能写作辅助之旅</p></div></div>';
+      else tb.innerHTML='<div id="workspaceContent" class="workspace-content"><div class="workspace-hero"><div class="workspace-icon">📋</div><h2 class="workspace-title">欢迎使用论文搭子 ThesisBuddy</h2><p class="workspace-sub">从想法到答辩，继续你的论文全流程</p></div></div>';
     }
     var nt=document.getElementById('navTree'); if(nt) nt.innerHTML='<i style="color:var(--m);font-size:.7rem;padding:8px;display:block">请先上传论文</i>';
     var refs=document.getElementById('refs'); if(refs) refs.innerHTML='<div style="text-align:center;padding:60px;color:#9ca3af;font-size:.82rem">← 请先上传论文</div>';

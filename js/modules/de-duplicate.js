@@ -23,7 +23,7 @@ window.runDedupAI = function(mode) {
     : '请对以下论文段落进行降重改写，保持学术原意但更换表达方式、调整句式结构、替换同义词。逐段给出原文→改写对照。\n\n' + input.substring(0, 4000);
   fetch('/api/llm/analyze', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-    body: JSON.stringify({ module: 'de-duplicate', system_prompt: '你是学术论文查重与降重专家。请用中文回答，结构化输出。', user_prompt: prompt, max_tokens: 2500 })
+    body: JSON.stringify({ capability_id: 'de-duplicate', input: prompt, max_tokens: 2500 })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.success) {
       out.innerHTML = '<div class="ai-output">'+d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>';

@@ -1,5 +1,5 @@
 /**
- * 学术论文AI一站式助手 — 操作指南
+ * 论文搭子 ThesisBuddy — 操作指南
  * 首次登录自动播放；右下角 ? 可重开
  * 高亮目标 + 全屏半透明蒙版；说明气泡贴近控件
  */
@@ -206,21 +206,27 @@ function renderTourTooltip(step) {
   });
 }
 
+var TOUR_VERSION = '2';
+function tourStorageKey(){try{var u=JSON.parse(sessionStorage.getItem('thesis_ai_user')||'{}');return 'thesisbuddy_tour_v'+TOUR_VERSION+'_u'+(u.id!=null?u.id:'guest');}catch(e){return 'thesisbuddy_tour_v'+TOUR_VERSION+'_guest';}}
+
 function tourStart() {
   buildTourSteps();
-  _tourIdx = 0;
+  var saved=0;try{var state=JSON.parse(localStorage.getItem(tourStorageKey())||'{}');saved=Number(state.step||0);}catch(e){}
+  _tourIdx=Math.max(0,Math.min(saved,_tourSteps.length-1));
   _tourRunning = true;
-  renderTourTooltip(0);
+  renderTourTooltip(_tourIdx);
 }
 function tourNext() {
   if (_tourIdx < _tourSteps.length - 1) {
     _tourIdx++;
+    try{localStorage.setItem(tourStorageKey(),JSON.stringify({step:_tourIdx,completed:false}));}catch(e){}
     renderTourTooltip(_tourIdx);
   } else tourEnd();
 }
 function tourPrev() {
   if (_tourIdx > 0) {
     _tourIdx--;
+    try{localStorage.setItem(tourStorageKey(),JSON.stringify({step:_tourIdx,completed:false}));}catch(e){}
     renderTourTooltip(_tourIdx);
   }
 }
@@ -229,7 +235,7 @@ function tourEnd() {
   _tourClearChrome();
   try {
     sessionStorage.setItem('thesis_ai_tour_seen', '1');
-    localStorage.setItem('thesis_tour_done', '1');
+    localStorage.setItem(tourStorageKey(), JSON.stringify({step:0,completed:true}));
   } catch (e) {}
 }
 
@@ -243,7 +249,7 @@ window.buildTourSteps = buildTourSteps;
 // 首次登录自动打开
 (function () {
   var seen = false;
-  try { seen = sessionStorage.getItem('thesis_ai_tour_seen') === '1' || localStorage.getItem('thesis_tour_done') === '1'; } catch (e) {}
+  try { var state=JSON.parse(localStorage.getItem(tourStorageKey())||'{}');seen = sessionStorage.getItem('thesis_ai_tour_seen') === '1' || state.completed===true; } catch (e) {}
   if (seen) return;
   var isLoggedIn = false;
   try {

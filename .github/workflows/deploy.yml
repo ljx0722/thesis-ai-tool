@@ -1,44 +1,131 @@
-name: Build and Deploy
+name: Verify, Build and Deploy
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: thesisbuddy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/ljx0722/thesis-ai-tool
+
 jobs:
-  build-and-push:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Check JavaScript syntax
+        run: |
+          node --check app.js
+          node --check js/app-modules.js
+          node --check js/modules/project.js
+      - name: Check Python syntax
+        run: python -m py_compile kg_server.py
+      - name: Run regression suite
+        run: node tests/run.js
+      - name: Scan committed secrets
+        run: |
+          if git grep -nE '(ADMIN_PASSWORD|ADMIN_SECRET|JWT_SECRET)=(admin123|changeme|password)' -- ':!tests/*'; then
+            echo 'Default production secret detected'
+            exit 1
+          fi
+
+  build:
+    if: github.event_name != 'pull_request'
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+      - id: build
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ghcr.io/ljx0722/thesis-ai-tool:latest
-          labels: org.opencontainers.image.source=https://github.com/ljx0722/thesis-ai-tool
+          build-args: |
+            APP_VERSION=0.9.0
+            BUILD_SHA=${{ github.sha }}
+          tags: |
+            ${{ env.IMAGE }}:sha-${{ github.sha }}
+            ${{ env.IMAGE }}:release-0.9.0
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
 
-  deploy-to-sealos:
-    needs: build-and-push
+  deploy-production:
+    if: github.event_name != 'pull_request'
+    needs: build
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: azure/setup-kubectl@v4
         with:
           version: latest
-      - name: Deploy to Sealos
+      - name: Configure cluster
         run: |
           mkdir -p ~/.kube
           echo "${{ secrets.SEALOS_KUBECONFIG }}" | base64 -d > ~/.kube/config
-          kubectl set env deployment/thesis-ai-tool -n ns-mzyybqj8 DEEPSEEK_API_KEY="${{ secrets.DEEPSEEK_API_KEY }}"
-          kubectl set env deployment/thesis-ai-tool -n ns-mzyybqj8 DB_PATH=/app/data/thesis.db
-          kubectl rollout restart deployment/thesis-ai-tool -n ns-mzyybqj8
-          kubectl rollout status deployment/thesis-ai-tool -n ns-mzyybqj8 --timeout=180s
+      - name: Verify production secrets
+        run: |
+          test -n "${{ secrets.JWT_SECRET }}"
+          test -n "${{ secrets.ADMIN_SECRET }}"
+          test -n "${{ secrets.ADMIN_PASSWORD }}"
+          test -n "${{ secrets.DEEPSEEK_API_KEY }}"
+      - name: Deploy immutable image
+        run: |
+          kubectl set env deployment/thesis-ai-tool -n ns-mzyybqj8 \
+            ENV=production \
+            APP_VERSION=0.9.0 \
+            BUILD_SHA=${{ github.sha }} \
+            JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            ADMIN_SECRET="${{ secrets.ADMIN_SECRET }}" \
+            ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
+            DEEPSEEK_API_KEY="${{ secrets.DEEPSEEK_API_KEY }}" \
+            DB_PATH=/app/data/thesis.db \
+            MATERIALS_DIR=/app/data/materials \
+            SNAPSHOTS_DIR=/app/data/snapshots
+          kubectl set image deployment/thesis-ai-tool -n ns-mzyybqj8 thesis-ai-tool=${{ env.IMAGE }}@${{ needs.build.outputs.digest }}
+          kubectl rollout status deployment/thesis-ai-tool -n ns-mzyybqj8 --timeout=240s
+      - name: Production smoke test
+        run: |
+          kubectl port-forward -n ns-mzyybqj8 deployment/thesis-ai-tool 18080:5000 >/tmp/port-forward.log 2>&1 &
+          PF_PID=$!
+          trap 'kill $PF_PID || true' EXIT
+          python - <<'PY'
+          import json, time, urllib.request
+          for _ in range(30):
+              try:
+                  with urllib.request.urlopen('http://127.0.0.1:18080/health/ready', timeout=3) as r:
+                      data=json.load(r)
+                      assert data['ok'] is True
+                      assert data['sha']
+                      break
+              except Exception:
+                  time.sleep(2)
+          else:
+              raise SystemExit('production readiness smoke failed')
+          PY

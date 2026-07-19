@@ -21,7 +21,7 @@ window.runDefenseAI = function() {
   var token = sessionStorage.getItem('thesis_ai_token');
   fetch('/api/llm/analyze', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-    body: JSON.stringify({ module: 'defense-ppt', system_prompt: '你是答辩PPT设计专家。请根据论文内容生成一份专业的答辩PPT大纲。每页格式：页码 + 标题 + 3-5个要点 + [建议展示方式:图表/文字/流程图]。结构：封面→目录→研究背景→研究目的→文献综述→研究方法→技术路线→实验/数据→结果分析→创新点→结论→不足与展望→致谢。共15-20页。', user_prompt: '请根据以下论文内容生成答辩PPT大纲：\n\n'+input.substring(0,12000), max_tokens: 3000 })
+    body: JSON.stringify({ capability_id: 'defense-ppt', input: '请根据以下论文内容生成答辩PPT大纲：\n\n'+input.substring(0,12000), max_tokens: 3000 })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.success) {
       out.innerHTML = '<div class="ai-output">'+d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>';

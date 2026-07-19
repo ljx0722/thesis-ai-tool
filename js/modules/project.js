@@ -7,12 +7,13 @@
   var CURRENT_KEY = 'thesis_ai_current_project_id';
 
   var STAGES = [
-    { id: 'ideation', name: '选题立项', icon: '🎯', desc: '从想法到题目与研究问题', modules: ['topic-finder', 'proposal'] },
-    { id: 'literature', name: '文献地图', icon: '📚', desc: '检索、筛选、图谱化文献', modules: ['references', 'knowledge-graph'] },
-    { id: 'writing', name: '分章写作', icon: '✍️', desc: '大纲落地、章节扩写与数据', modules: ['expand', 'data-analysis'], primaryAction: 'open-outline' },
-    { id: 'polish', name: '打磨审校', icon: '🔍', desc: '查错、降重、格式与术语', modules: ['proofread', 'de-duplicate', 'format-check', 'terminology', 'paragraph'] },
-    { id: 'review', name: '综合评审', icon: '📊', desc: '审阅、优化与十维看板', modules: ['review', 'optimization', 'dashboard'] },
-    { id: 'defense', name: '答辩输出', icon: '🎤', desc: '英文摘要与答辩材料', modules: ['en-abstract', 'defense-ppt'] }
+    { id: 'ideation', name: '想清楚', icon: '🎯', desc: '选题打磨、研究问题与开题方案', modules: ['topic-finder', 'proposal'] },
+    { id: 'literature', name: '找资料', icon: '📚', desc: '文献检索、引用整理与研究脉络', modules: ['references', 'knowledge-graph'] },
+    { id: 'structure', name: '搭结构', icon: '🧭', desc: '论文大纲、章节计划与研究设计', modules: ['proposal'], primaryAction: 'open-outline' },
+    { id: 'writing', name: '写出来', icon: '✍️', desc: '分章写作、数据解读与图表表达', modules: ['expand', 'data-analysis'], primaryAction: 'open-outline' },
+    { id: 'polish', name: '改得好', icon: '🔍', desc: '查错、降重、格式、术语与逻辑', modules: ['proofread', 'de-duplicate', 'format-check', 'terminology', 'paragraph'] },
+    { id: 'review', name: '过评审', icon: '📊', desc: '综合审阅、论文看板与修改清单', modules: ['review', 'optimization', 'dashboard'] },
+    { id: 'defense', name: '做答辩', icon: '🎤', desc: '英文摘要、答辩 PPT 与问答演练', modules: ['en-abstract', 'defense-ppt'] }
   ];
 
   var SCHOOL_TEMPLATES = [
@@ -75,6 +76,21 @@
   ];
 
 
+  function currentUserId() {
+    try {
+      var user = JSON.parse(sessionStorage.getItem('thesis_ai_user') || '{}');
+      return user && user.id != null ? String(user.id) : '';
+    } catch (e) { return ''; }
+  }
+
+  function scopedKey(base) {
+    var uid = currentUserId();
+    return uid ? base + '_u' + uid : base + '_guest';
+  }
+
+  function projectStorageKey() { return scopedKey(STORAGE_KEY); }
+  function currentProjectKey() { return scopedKey(CURRENT_KEY); }
+
   function uid() {
     return 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   }
@@ -85,7 +101,7 @@
 
   function loadAll() {
     try {
-      var raw = localStorage.getItem(STORAGE_KEY);
+      var raw = localStorage.getItem(projectStorageKey());
       if (!raw) return [];
       var list = JSON.parse(raw);
       return Array.isArray(list) ? list : [];
@@ -96,7 +112,7 @@
 
   function saveAll(list) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(list || []));
+      localStorage.setItem(projectStorageKey(), JSON.stringify(list || []));
     } catch (e) {}
   }
 
@@ -162,13 +178,13 @@
 
 
   function getCurrentId() {
-    try { return localStorage.getItem(CURRENT_KEY) || ''; } catch (e) { return ''; }
+    try { return localStorage.getItem(currentProjectKey()) || ''; } catch (e) { return ''; }
   }
 
   function setCurrentId(id) {
     try {
-      if (id) localStorage.setItem(CURRENT_KEY, id);
-      else localStorage.removeItem(CURRENT_KEY);
+      if (id) localStorage.setItem(currentProjectKey(), id);
+      else localStorage.removeItem(currentProjectKey());
     } catch (e) {}
   }
 
@@ -472,7 +488,7 @@
         }
       });
       if (changed) {
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(all)); } catch (e) {}
+        try { localStorage.setItem(projectStorageKey(), JSON.stringify(all)); } catch (e) {}
       }
     } catch (e) {}
   }
@@ -549,6 +565,12 @@
         { ok: s.refCount >= 3 || s.hasOutline || s.hasPaper, label: s.hasPaper ? ('文献 ≥3 条（当前 ' + s.refCount + '）') : ('已建大纲/题目，或文献≥3（当前 ' + s.refCount + '）') },
         { ok: s.chCount > 0 || s.hasOutline || s.hasIdea, label: '有章节、大纲或研究想法' },
         { ok: s.refCount >= 5 || s.hasOutline || s.hasPaper, label: '文献≥5 或已具备写作结构' }
+      ];
+    } else if (stageId === 'structure') {
+      checks = [
+        { ok: s.hasOutline, label: '大纲 ≥3 章' },
+        { ok: !!(project && project.field) || s.hasIdea, label: '研究领域或问题已明确' },
+        { ok: s.hasOutline && s.stats.total >= 3, label: '章节计划已建立' }
       ];
     } else if (stageId === 'writing') {
       // 流水线骨架通常 <300 字/章，不能只看 ready；有 pipeline/template 骨架时放宽
@@ -761,12 +783,22 @@
     renderProjectChrome();
   }
 
-  function switchToProject(projectId) {
-    if (!projectId) return;
-    setCurrentId(projectId);
-    closeProjectSwitcher();
+  function unloadProjectRuntime() {
+    if (typeof window.clearManuscriptRuntime === 'function') window.clearManuscriptRuntime();
+  }
+
+  function activateProjectRuntime(projectId) {
+    setCurrentId(projectId || '');
+    unloadProjectRuntime();
+    if (typeof window.restoreScopedSession === 'function') window.restoreScopedSession();
     refreshOpenProjectUIs();
     if (typeof switchView === 'function') switchView('workspace');
+  }
+
+  function switchToProject(projectId) {
+    if (!projectId) return;
+    activateProjectRuntime(projectId);
+    closeProjectSwitcher();
     if (typeof ttp === 'function') ttp('已切换项目');
   }
 
@@ -1110,7 +1142,7 @@
       var badgeCls = c.status === 'ready' ? 'ok' : (c.status === 'draft' ? 'warn' : 'muted');
       return '<div class="chapter-card" onclick="openChapterEditor(\'' + c.key + '\')">' +
         '<div class="chapter-card-top"><b>' + escapeHtml(c.title) + '</b><span class="chapter-badge ' + badgeCls + '">' + badge + '</span></div>' +
-        '<div class="chapter-card-meta">' + c.words + ' 字 · 引用 ' + ((c.content||'').match(/\[\d+\]/g)||[]).length + ' 处 · 引用 ' + ((c.content||'').match(/\[\d+\]/g)||[]).length + ' 处 · ' + (c.sections.length || 0) + ' 个小节</div>' +
+        '<div class="chapter-card-meta">' + c.words + ' 字 · 引用 ' + ((c.content||'').match(/\[\d+\]/g)||[]).length + ' 处 · ' + (c.sections.length || 0) + ' 个小节</div>' +
         '<div class="chapter-card-preview">' + escapeHtml((c.content || c.sections.join(' / ') || '点击开始写这一章').slice(0, 72)) + '</div>' +
       '</div>';
     }).join('');
@@ -1446,6 +1478,39 @@
     return getCurrentProject();
   }
 
+  function saveManuscriptRevision(meta) {
+    var p=getCurrentProject();
+    if(!p||!cloudEnabled())return Promise.resolve(null);
+    var snapshot={
+      schemaVersion:1,
+      text:(typeof manuscriptText!=='undefined'?manuscriptText:''),
+      html:(typeof manuscriptHTML!=='undefined'?manuscriptHTML:''),
+      sections:(typeof sections!=='undefined'?sections:[]).map(function(ch){return{ch:ch.ch,name:ch.name,text:ch.text||'',sections:(ch.sections||[]).map(function(s){return{num:s.num,title:s.title,text:s.text||'',subs:(s.subs||[]).map(function(u){return{num:u.num,title:u.title,text:u.text||''};})};})};}),
+      references:(typeof existingRefs!=='undefined'?existingRefs:[]).map(function(r){return{num:r.num,ci:r.ci,title:r.title,journal:r.journal,year:r.year||r.yr,doi:r.doi,reftype:r.reftype,ch:r.ch};}),
+      topics:(typeof paperTopics!=='undefined'?paperTopics:[]),
+      source:meta||{}
+    };
+    return fetch('/api/projects/'+encodeURIComponent(p.id)+'/revisions',{method:'POST',headers:authHeaders(),body:JSON.stringify({source_type:(meta&&meta.sourceType)||'import',file_name:(meta&&meta.fileName)||'',file_kind:(meta&&meta.kind)||'',size_bytes:(meta&&meta.sizeBytes)||0,parser_version:'web-1',structure_summary:{chapters:snapshot.sections.length,references:snapshot.references.length,textChars:snapshot.text.length},calibration:(meta&&meta.calibration)||{},snapshot:snapshot})}).then(function(r){return r.json();}).then(function(d){
+      if(!d.success)throw new Error(d.error||'版本保存失败');
+      return fetch('/api/projects/'+encodeURIComponent(p.id)+'/revisions/'+encodeURIComponent(d.revision_id)+'/activate',{method:'POST',headers:authHeaders(),body:'{}'}).then(function(r){return r.json();}).then(function(a){if(!a.success)throw new Error(a.error||'版本激活失败');p.activeRevisionId=d.revision_id;p.hasManuscript=true;p.updatedAt=nowISO();upsertLocal(p);return d;});
+    });
+  }
+
+  function hydrateRevision(projectId, revisionId) {
+    if(!projectId||!revisionId)return Promise.resolve(false);
+    return fetch('/api/projects/'+encodeURIComponent(projectId)+'/revisions/'+encodeURIComponent(revisionId),{headers:authHeaders()}).then(function(r){return r.json();}).then(function(d){
+      if(!d.success)throw new Error(d.error||'版本加载失败');
+      unloadProjectRuntime();var s=d.snapshot||{};
+      manuscriptText=s.text||'';manuscriptHTML=s.html||'';sections=s.sections||[];existingRefs=s.references||[];mergedRefs=[];paperTopics=s.topics||[];
+      var tb=document.getElementById('thesisBox'),ws=document.getElementById('workspaceContent');if(tb){Array.prototype.slice.call(tb.childNodes).forEach(function(n){if(n!==ws)tb.removeChild(n);});if(ws)ws.style.display='none';var root=document.createElement('div');root.id='paperContentRoot';root.className='paper-content-root';root.innerHTML=manuscriptHTML;tb.appendChild(root);}
+      if(typeof renderNavTree==='function')renderNavTree(sections);if(typeof renderExistingOnly==='function')renderExistingOnly();if(typeof onThesisLoaded==='function')onThesisLoaded();return true;
+    });
+  }
+
+  function bootstrapAuthenticatedUser() {
+    return new Promise(function(resolve){pullCloudProjects(function(list){var current=getCurrentProject();if(!current&&list&&list.length){setCurrentId(list[0].id);current=list[0];}if(current&&current.activeRevisionId){hydrateRevision(current.id,current.activeRevisionId).catch(function(){unloadProjectRuntime();}).finally(function(){renderProjectChrome();if(typeof switchView==='function')switchView('workspace');resolve(current);});}else{unloadProjectRuntime();renderProjectChrome();if(typeof switchView==='function')switchView('workspace');resolve(current);}});});
+  }
+
   function onManuscriptReady() {
     var p = getCurrentProject();
     if (!p) {
@@ -1468,6 +1533,7 @@
     // 导入后显示论文正文（可滚动），不盖住原文
     if (typeof switchView === 'function') switchView('paper');
     try { ensureUnifiedProjectState(); } catch (e) {}
+    try { saveManuscriptRevision({sourceType:'import',fileName:window._uploadFileName||'',kind:window._uploadFileKind||'',sizeBytes:window._uploadFileSize||0}).catch(function(e){console.warn('[revision]',e.message);if(typeof ttp==='function')ttp('论文已载入，但云端版本保存失败');}); } catch (eRev) {}
     if (typeof ttp === 'function') ttp('论文已导入：目录树与正文已就绪，可点「工作台」查看主线进度');
   }
 
@@ -1499,6 +1565,9 @@
     paperSignals: paperSignals,
     recordExport: recordExport,
     openExportHistory: openExportHistory,
+    saveManuscriptRevision: saveManuscriptRevision,
+    hydrateRevision: hydrateRevision,
+    bootstrapAuthenticatedUser: bootstrapAuthenticatedUser,
   };
   window.openExportHistory = openExportHistory;
   window.closeExportHistory = closeExportHistory;
@@ -1526,7 +1595,7 @@
       var bc = c.status === "ready" ? "ok" : (c.status === "draft" ? "warn" : "muted");
       return '<div class="chapter-card" onclick="openChapterEditor(\'' + c.key + '\')">' +
         '<div class="chapter-card-top"><b>' + escapeHtml(c.title) + '</b><span class="chapter-badge ' + bc + '">' + b + '</span></div>' +
-        '<div class="chapter-card-meta">' + c.words + ' 字 · 引用 ' + ((c.content||'').match(/\[\d+\]/g)||[]).length + ' 处 · 引用 ' + ((c.content||'').match(/\[\d+\]/g)||[]).length + ' 处 · ' + (c.sections.length||0) + ' 小节' + (c.updatedAt ? ' · ' + formatTime(c.updatedAt) : '') + '</div>' +
+        '<div class="chapter-card-meta">' + c.words + ' 字 · 引用 ' + ((c.content||'').match(/\[\d+\]/g)||[]).length + ' 处 · ' + (c.sections.length||0) + ' 小节' + (c.updatedAt ? ' · ' + formatTime(c.updatedAt) : '') + '</div>' +
         '<div class="chapter-card-preview">' + escapeHtml((c.content||'小节：'+(c.sections.join('、')||'待补充')).slice(0,80)) + '</div>' +
         '<div class="chapter-card-actions" onclick="event.stopPropagation()"><button class="ai-btn-clear" onclick="openChapterEditor(\''+c.key+'\')">编辑</button><button class="ai-btn-clear" onclick="seedChapterFromSections(\''+c.key+'\')">小节骨架</button></div>' +
       '</div>';
@@ -1604,7 +1673,7 @@ function closeChapterOverlays() {
     var sp='你是学术论文导师，擅长充实论文章节。请基于提供的章节草稿进行扩写，保持学术语气，补充论据和解释，不变更核心论点与结构。用中文输出完整扩写后内容。';
     var up='章节标题：'+meta.title+'\n小节：'+(meta.sections||[]).join('、')+'\n\n当前草稿：\n'+draft.content.substring(0,6000)+'\n\n请扩写充实，补充论据与学术引用。';
     fetch('/api/llm/analyze',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body:JSON.stringify({module:'chapter-expand',system_prompt:sp,user_prompt:up,max_tokens:3000})})
+      body:JSON.stringify({capability_id:'chapter-expand',input:up,max_tokens:3000,project_id:(getCurrentProject()||{}).id||'',revision_id:(getCurrentProject()||{}).activeRevisionId||''})})
     .then(function(r){return r.json()}).then(function(d){
       if(typeof hideLoad==='function') hideLoad();
       if(d.success){
@@ -2653,7 +2722,7 @@ function closeChapterOverlays() {
     fetch('/api/projects/'+encodeURIComponent(p.id)+'/materials', {headers: authHeaders()})
       .then(function(r){return r.json();})
       .then(function(d){
-        if(!d.success){ el.innerHTML='<div style="color:#fca5a5">'+(d.error||'加载失败')+'</div>'; return; }
+        if(!d.success){ el.textContent=d.error||'加载失败'; el.style.color='#fca5a5'; return; }
         var items=d.materials||[];
         var dataN=items.filter(function(m){ var n=(m.filename||'').toLowerCase(); return /\.(csv|tsv|txt)$/i.test(n); }).length;
         if(!items.length){ el.innerHTML='<div style="color:var(--text-muted);padding:12px">暂无资料。可上传 CSV/TXT/DOCX/PDF 等。</div>'; try{ if(typeof updateDaMatCountBadge==='function') updateDaMatCountBadge(0,0);}catch(e){} return; }
@@ -2694,12 +2763,16 @@ function closeChapterOverlays() {
     next();
   }
   function downloadMaterial(id){
-    var token=null; try{token=sessionStorage.getItem('thesis_ai_token');}catch(e){}
-    window.open('/api/materials/'+encodeURIComponent(id)+'?access_token='+encodeURIComponent(token||''), '_blank');
-    // fallback fetch blob
     fetch('/api/materials/'+encodeURIComponent(id), {headers: authHeaders()})
-      .then(function(r){ if(!r.ok) throw new Error('download fail'); return r.blob(); })
-      .then(function(b){ var a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='material'; document.body.appendChild(a); a.click(); a.remove(); });
+      .then(function(r){
+        if(!r.ok) throw new Error('download fail');
+        var disposition=r.headers.get('Content-Disposition')||'';
+        var match=disposition.match(/filename\*?=(?:UTF-8''|"?)([^";]+)/i);
+        var name=match?decodeURIComponent(match[1].replace(/"/g,'')):'material';
+        return r.blob().then(function(blob){return{blob:blob,name:name};});
+      })
+      .then(function(file){var a=document.createElement('a');a.href=URL.createObjectURL(file.blob);a.download=file.name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href);},500);})
+      .catch(function(){alert('资料下载失败');});
   }
   function deleteMaterial(id){
     if(!confirm('删除该资料？')) return;

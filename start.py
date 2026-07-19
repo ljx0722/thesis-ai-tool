@@ -1,5 +1,5 @@
 """
-学术论文AI一站式助手 - 一键启动
+论文搭子 ThesisBuddy - 一键启动
 """
 import subprocess, sys, webbrowser, time, os
 
@@ -8,7 +8,7 @@ os.chdir(script_dir)
 
 def main():
     print("=" * 50)
-    print("  学术论文AI一站式助手")
+    print("  论文搭子 ThesisBuddy")
     print("  http://localhost:5000")
     print("=" * 50)
     print()

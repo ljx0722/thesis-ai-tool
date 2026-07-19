@@ -1,4 +1,32 @@
 
+function escapeModuleHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function getSessionScope(){
+  try{
+    var user=JSON.parse(sessionStorage.getItem('thesis_ai_user')||'{}');
+    var uid=user&&user.id!=null?String(user.id):'guest';
+    var pid=window.ThesisProject&&ThesisProject.getCurrentProject?((ThesisProject.getCurrentProject()||{}).id||'unassigned'):'unassigned';
+    return uid+'_'+pid;
+  }catch(e){return 'guest_unassigned';}
+}
+function manuscriptBackupKey(kind){return 'thesis_backup_'+kind+'_'+getSessionScope();}
+function legacyBackupKey(kind){return 'thesis_backup_'+kind;}
+function clearManuscriptRuntime(){
+  existingRefs=[];mergedRefs=[];manuscriptText='';manuscriptHTML='';paperTopics=[];sections=[];
+  _treeIndex={chapters:[],sections:[],subs:[],paragraphs:[],sentences:[]};
+  _thesisLoaded=false;_analysisCache={};kgCurrentData=null;
+  var tb=document.getElementById('thesisBox');
+  if(tb){
+    var ws=document.getElementById('workspaceContent');
+    Array.prototype.slice.call(tb.childNodes).forEach(function(n){if(n!==ws)tb.removeChild(n);});
+    if(ws){ws.style.display='';ws.style.height='';ws.style.overflow='visible';}
+  }
+  if(typeof renderNavTree==='function')renderNavTree([]);
+  var refs=document.getElementById('refs');if(refs)refs.innerHTML='<div class="panel-empty">导入论文或检索后，文献会出现在这里</div>';
+  var kw=document.getElementById('kwBar');if(kw)kw.style.display='none';
+  updateBarActions();updateStatusBar2();updateNavStates();
+}
+window.clearManuscriptRuntime=clearManuscriptRuntime;
+
 function ensureLoggedIn(msg){
   try{
     var t=sessionStorage.getItem('thesis_ai_token');
@@ -13,7 +41,7 @@ function ensureLoggedIn(msg){
   return false;
 }
 /**
- * 学术论文AI一站式助手 — 模块系统
+ * 论文搭子 ThesisBuddy — 模块系统
  * 模块标签顶栏 / 操作按钮顶栏 / 键盘快捷键 / 换论文 / 悬浮上传
  */
 
@@ -28,18 +56,19 @@ function isBodyChapter(s) {
 
 // ===== Tool dock (right panel home) + favorites =====
 var TOOLBOX_KEY = 'thesis_ai_toolbox_favs_v1';
+function toolboxStorageKey(){try{var u=JSON.parse(sessionStorage.getItem('thesis_ai_user')||'{}');return TOOLBOX_KEY+'_u'+(u.id!=null?u.id:'guest');}catch(e){return TOOLBOX_KEY+'_guest';}}
 var DEFAULT_FAVS = ['data-analysis','topic-finder','proofread','defense-ppt','materials','pipeline'];
 
 function loadToolboxFavs(){
   try{
-    var raw = localStorage.getItem(TOOLBOX_KEY);
+    var raw = localStorage.getItem(toolboxStorageKey());
     if(!raw) return DEFAULT_FAVS.slice();
     var arr = JSON.parse(raw);
     return Array.isArray(arr) && arr.length ? arr : DEFAULT_FAVS.slice();
   }catch(e){ return DEFAULT_FAVS.slice(); }
 }
 function saveToolboxFavs(arr){
-  try{ localStorage.setItem(TOOLBOX_KEY, JSON.stringify(arr||[])); }catch(e){}
+  try{ localStorage.setItem(toolboxStorageKey(), JSON.stringify(arr||[])); }catch(e){}
 }
 function toolMeta(id){
   if(id==='materials') return {id:id, name:'资料库', icon:'📁', requiresThesis:false, desc:'上传/选用 CSV 等项目文件'};
@@ -51,6 +80,7 @@ function toolMeta(id){
   return m || {id:id, name:id, icon:'•', requiresThesis:true, desc:''};
 }
 function launchTool(id){
+  if(window.innerWidth<1024)toggleToolPanel(true);
   if(id==='materials'){ if(typeof openMaterialsLibrary==='function') openMaterialsLibrary(); return; }
   if(id==='pipeline'){ if(typeof runOneClickPipeline==='function') runOneClickPipeline(); return; }
   if(id==='defense-pack'){ if(typeof openDefensePack==='function') openDefensePack(); return; }
@@ -101,6 +131,7 @@ function saveToolboxPicker(){
 }
 function openFeatureCatalog(){ openToolHome(); }
 function openToolHome(){
+  if(window.innerWidth<1024)toggleToolPanel(true);
   var home=document.getElementById('toolHome');
   if(home){
     home.style.display='';
@@ -150,8 +181,19 @@ function renderToolHome(){
 }
 function toggleTocPanel(){
   var p=document.getElementById('tocPanel'); if(!p) return;
+  if(window.innerWidth<1024){
+    document.body.classList.toggle('toc-drawer-open');
+    document.body.classList.remove('tool-drawer-open');
+    return;
+  }
   p.classList.toggle('collapsed');
 }
+function toggleToolPanel(force){
+  var open=typeof force==='boolean'?force:!document.body.classList.contains('tool-drawer-open');
+  document.body.classList.toggle('tool-drawer-open',open);
+  if(open)document.body.classList.remove('toc-drawer-open');
+}
+window.toggleToolPanel=toggleToolPanel;
 function setToolPanelHeader(name, sub){
   var t=document.getElementById('toolPanelTitle'); if(t) t.textContent=name||'工具台';
   var s=document.getElementById('toolPanelSub'); if(s) s.textContent=sub||'';
@@ -844,7 +886,7 @@ function runExpandModule(container) {
     var suggest=len<500?'建议至少扩写至2000字（当前'+Math.round(len/100)/10+'千字）。可增加：文献综述、理论框架、案例支撑。':
                 (len<2000?'内容偏少，建议补充实证数据、案例分析和图表说明。':
                 (len<5000?'结构合理，可在结论部分增加未来展望和局限讨论。':'内容较充实，检查是否有冗余段落可精简。'));
-    container.innerHTML+='<div style="border-left:1px solid '+(len<500?'#ff3b30':len<2000?'#ff9f0a':len<5000?'#30d158':'#0071e3')+';padding:8px 12px;margin:6px 0;border-radius:6px;background:rgba(0,0,0,.02)">'+
+    container.innerHTML+='<div style="border:1px solid '+(len<500?'rgba(239,68,68,.28)':len<2000?'rgba(245,158,11,.28)':len<5000?'rgba(16,185,129,.25)':'rgba(59,130,246,.25)')+';padding:8px 12px;margin:6px 0;border-radius:6px;background:'+(len<500?'rgba(239,68,68,.04)':len<2000?'rgba(245,158,11,.04)':len<5000?'rgba(16,185,129,.04)':'rgba(59,130,246,.04)')+'">'+
       '<div style="font-weight:600;font-size:.76rem">'+cs.name+' <span style="font-size:.62rem;color:var(--m)">('+Math.round(len/100)/10+'k字 | '+Math.round(ratio)+'%)</span> '+status+'</div>'+
       '<div style="font-size:.68rem;color:#666;margin-top:4px">'+suggest+'</div>'+
       '</div>';
@@ -892,6 +934,7 @@ function runDataAnalysis(container) {
       '<select id="daMaterialSelect" style="width:100%;max-width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input,#fff);color:var(--text-primary);font-size:.78rem"><option value="">加载资料列表…</option></select>'+
       '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">'+
         '<button type="button" class="ai-btn" style="flex:0 0 auto;padding:8px 12px" onclick="analyzeSelectedMaterial()">用所选资料分析</button>'+
+        '<button type="button" class="ai-btn-clear" style="padding:8px 12px" onclick="openFigureAdvisor()">科研图表顾问</button>'+
         '<button type="button" class="ai-btn-clear" style="padding:8px 12px" onclick="openMaterialsLibrary()">打开资料库</button>'+
         '<button type="button" class="ai-btn-clear" style="padding:8px 12px" onclick="loadDataAnalysisMaterials()">刷新列表</button>'+
       '</div>'+
@@ -909,6 +952,31 @@ function runDataAnalysis(container) {
   // 关键：渲染后立刻拉资料列表（此前未调用导致下拉一直「加载中」）
   setTimeout(function(){ try{ loadDataAnalysisMaterials(); }catch(e){} }, 0);
 }
+
+function openFigureAdvisor(){
+  var sel=document.getElementById('daMaterialSelect');var materialId=sel&&sel.value;var materialName=sel&&sel.options[sel.selectedIndex]?sel.options[sel.selectedIndex].text:'';
+  var html='<div class="figure-advisor">'+
+    '<div class="ai-desc"><b>先明确这张图要论证什么。</b>图表顾问会先看数据类型、样本量、缺失、分布和分组，再推荐图型；不会直接套模板。</div>'+
+    '<label>想让读者相信什么？</label><textarea id="figureClaim" class="ai-textarea" placeholder="例如：方案 A 在各时间点均显著降低能耗，并且波动更小"></textarea>'+
+    '<label>目标规范</label><select id="figureJournal" class="ai-input"><option value="thesis-zh">中文学位论文</option><option value="chinese-core">中文核心期刊</option><option value="nature">Nature / Science</option><option value="ieee">IEEE</option><option value="elsevier">Elsevier</option></select>'+
+    '<div class="ai-desc">当前数据：'+escapeModuleHtml(materialId?(materialName||materialId):'尚未选择资料')+'</div>'+
+    '<div id="figureAdvisorResult"></div>'+
+    '<div class="ai-actions" data-sticky-actions><button class="ai-btn-clear" onclick="closeAccountModal()">关闭</button><button class="ai-btn" onclick="runFigureAdvisor(\''+(materialId||'')+'\')">分析并推荐图型</button></div></div>';
+  if(typeof openAccountModal==='function')openAccountModal('科研图表顾问',html);else alert('请先打开资料库选择 CSV/TSV 数据');
+}
+function runFigureAdvisor(materialId){
+  var claim=(document.getElementById('figureClaim').value||'').trim();var result=document.getElementById('figureAdvisorResult');if(!claim){result.innerHTML='<div class="finding warn">请先写明这张图要论证的观点。</div>';return;}if(!materialId){result.innerHTML='<div class="finding warn">请先在数据分析页选择 CSV/TSV 资料。</div>';return;}
+  result.innerHTML='<div class="finding info">正在读取数据画像…</div>';
+  fetch('/api/materials/'+encodeURIComponent(materialId),{headers:authJsonHeaders()}).then(function(r){if(!r.ok)throw new Error('资料读取失败');return r.text();}).then(function(text){
+    var lines=text.split(/\r?\n/).filter(function(x){return x.trim();});var sep=(lines[0]||'').indexOf('\t')>=0?'\t':',';var headers=(lines[0]||'').split(sep).map(function(x){return x.replace(/^"|"$/g,'').trim();});var rows=lines.slice(1,10001).map(function(line){return line.split(sep);});var numeric=[],categorical=[],missing={};headers.forEach(function(h,i){var vals=rows.map(function(r){return(r[i]||'').trim();});var nums=vals.filter(function(v){return v!==''&&!isNaN(Number(v));});missing[h]=vals.filter(function(v){return!v;}).length;if(nums.length>=Math.max(3,vals.length*.7))numeric.push(h);else categorical.push(h);});
+    var advice=[],warnings=[];if(numeric.length>=2)advice.push('散点图 + 回归/相关系数：适合论证两个连续变量的关系');if(categorical.length&&numeric.length){var groups={};var gi=headers.indexOf(categorical[0]);rows.forEach(function(r){var k=(r[gi]||'未分类').trim();groups[k]=(groups[k]||0)+1;});var ns=Object.keys(groups).map(function(k){return groups[k];});var minN=ns.length?Math.min.apply(null,ns):0;if(minN<10){advice.push('stripplot / 点图：直接展示每个样本');warnings.push('每组最小样本量 n='+minN+'，不建议均值柱或小提琴图，避免掩盖分布。');}else advice.push('箱线/小提琴 + 原始点：适合组间分布比较');}if(numeric.length>3)advice.push('相关性热力图：适合多变量关系筛查');if(!advice.length&&numeric.length===1)advice.push('直方图 + KDE 或箱线：适合展示连续变量分布');if(!numeric.length)advice.push('按频数排序的横向柱状图：适合分类构成，不建议饼图');warnings.push('禁止双 Y 轴、3D 图和 rainbow/jet 色图；误差棒必须注明 SD/SEM/95% CI 与样本量。');
+    var qa=['最终尺寸直接出图，不在 Word 中二次缩放','默认色盲安全配色并提供灰度预览','标签字号最终尺寸下 ≥6pt','导出 SVG/PDF 矢量版与 300 DPI PNG','检查缺字、裁切、刻度重叠和图例遮挡'];
+    result.innerHTML='<div class="finding ok"><b>数据画像</b><br>'+rows.length+' 行 · '+headers.length+' 列 · 连续 '+numeric.length+' · 分类 '+categorical.length+'<br>缺失：'+Object.keys(missing).filter(function(k){return missing[k]>0;}).map(function(k){return escapeModuleHtml(k)+' '+Number(missing[k])}).join('；')+'</div><div class="finding info"><b>推荐</b><br>'+advice.map(function(x,i){return(i+1)+'. '+escapeModuleHtml(x)}).join('<br>')+'</div><div class="finding warn"><b>科研错误拦截</b><br>'+warnings.map(escapeModuleHtml).join('<br>')+'</div><div class="finding info"><b>出版质量门禁</b><br>'+qa.map(function(x){return'• '+escapeModuleHtml(x)}).join('<br>')+'</div><div class="ai-actions" data-sticky-actions><button class="ai-btn-clear" onclick="saveFigureArtifact(\''+materialId+'\')">保存 Figure Artifact</button><button class="ai-btn" onclick="switchModule(\'data-analysis\');closeAccountModal()">返回绘图</button></div>';
+    window._figureAdvisorArtifact={claim:claim,materialId:materialId,materialName:materialName,journal:document.getElementById('figureJournal').value,profile:{rows:rows.length,columns:headers,numeric:numeric,categorical:categorical,missing:missing},recommendations:advice,warnings:warnings,qa:qa,createdAt:new Date().toISOString()};
+  }).catch(function(e){result.innerHTML='<div class="finding err">'+e.message+'</div>';});
+}
+function saveFigureArtifact(materialId){var a=window._figureAdvisorArtifact;if(!a)return;try{var p=window.ThesisProject&&ThesisProject.getCurrentProject?ThesisProject.getCurrentProject():null;if(!p)throw new Error('请先创建项目');p.artifacts=p.artifacts||{};p.artifacts.figures=p.artifacts.figures||[];a.id='fig_'+Date.now().toString(36);a.sourceMaterialId=materialId;p.artifacts.figures.unshift(a);ThesisProject.updateCurrent({artifacts:p.artifacts});ThesisProject.logSkillRun({moduleId:'figure-advisor',title:'科研图表顾问',summary:a.claim});if(typeof ttp==='function')ttp('Figure Artifact 已保存到项目');}catch(e){alert(e.message);}}
+window.openFigureAdvisor=openFigureAdvisor;window.runFigureAdvisor=runFigureAdvisor;window.saveFigureArtifact=saveFigureArtifact;
 
 function handleDataFile(input){
   var f=input.files[0];if(!f)return;
@@ -1478,17 +1546,22 @@ function drawBarChart(canvas, items) {
 
 // ==================== 初始化 ====================
 (function() {
-  // 先尝试从 sessionStorage 恢复，恢复成功就不弹上传遮罩
+  var restoreSession = function() {
+  // 身份确认后再恢复；备份按 user + project 命名，旧全局备份不自动认领
   try{
-    var savedT=sessionStorage.getItem('thesis_backup_text');
-    var savedH=sessionStorage.getItem('thesis_backup_html');
+    if(!getAuthToken())return;
+    var savedT=sessionStorage.getItem(manuscriptBackupKey('text'));
+    var savedH=sessionStorage.getItem(manuscriptBackupKey('html'));
     if(savedT&&savedH&&savedT.length>100){
-      console.log('[session] Restoring thesis from sessionStorage:',Math.round(savedT.length/1000)+'k chars');
+      console.log('[session] Restoring scoped thesis:',Math.round(savedT.length/1000)+'k chars');
       manuscriptText=savedT;manuscriptHTML=savedH;
-      document.getElementById('thesisBox').innerHTML=manuscriptHTML;
+      var thesisBox=document.getElementById('thesisBox');
+      var ws=document.getElementById('workspaceContent');
+      Array.prototype.slice.call(thesisBox.childNodes).forEach(function(n){if(n!==ws)thesisBox.removeChild(n);});
+      if(ws)ws.style.display='none';
+      var paper=document.createElement('div');paper.id='paperContentRoot';paper.className='paper-content-root';paper.innerHTML=manuscriptHTML;thesisBox.appendChild(paper);
       try{
-        var box2=document.getElementById('thesisBox');
-        sections=[];var allEls5=box2.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
+        sections=[];var allEls5=paper.querySelectorAll('p,h1,h2,h3,h4,h5,h6');
         var refBound2=null;
         for(var ri2=0;ri2<allEls5.length;ri2++){var rt2=(allEls5[ri2].textContent||'').replace(/\s+/g,'');if(rt2.indexOf('参考文献')===0&&rt2.length<20){refBound2=allEls5[ri2];break;}}
         var bodyStart2=Math.max(0,Math.floor(allEls5.length*0.08));
@@ -1507,12 +1580,15 @@ function drawBarChart(canvas, items) {
           var dup2=false;for(var di2=0;di2<allHd2.length;di2++){if(allHd2[di2].el===ef2){dup2=true;break;}}if(dup2)continue;
           allHd2.push({el:ef2,txt:tf2,level:-1,tagLevel:-1,bare:false});
         }
-        sections=buildFullTree(box2,allHd2,bodyStart2,refBound2);
+        sections=buildFullTree(paper,allHd2,bodyStart2,refBound2);
         paperTopics=extractTopics(manuscriptText);renderNavTree(sections);
       }catch(e){console.warn('[session] Tree rebuild failed:',e.message);}
       document.getElementById('statusBar').textContent='已恢复 '+(sections.length||0)+'章（刷新恢复）';
     }
   }catch(e3){}
+  };
+  window.restoreScopedSession=restoreSession;
+  if(getAuthToken())restoreSession();
 
   // 页面刷新时已有论文数据就不弹上传遮罩
   var hasData = (typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100)
@@ -1538,6 +1614,37 @@ function drawBarChart(canvas, items) {
   }, 1000);
 })();
 
+
+
+var BUDDY_PREF_DEFAULTS={colorMode:'system',accentPreset:'indigo',fontFamily:'auto',density:'default',fontScale:1,reduceMotion:false};
+var BUDDY_ACCENTS={indigo:['#6366f1','#4f46e5','#818cf8'],ocean:['#0284c7','#0369a1','#38bdf8'],forest:['#059669','#047857','#34d399'],rose:['#e11d48','#be123c','#fb7185'],sunset:['#ea580c','#c2410c','#fb923c']};
+function buddyUserKey(base){try{var u=JSON.parse(sessionStorage.getItem('thesis_ai_user')||'{}');return base+'_u'+(u.id!=null?u.id:'guest');}catch(e){return base+'_guest';}}
+function loadPreferences(){try{return Object.assign({},BUDDY_PREF_DEFAULTS,JSON.parse(localStorage.getItem(buddyUserKey('thesisbuddy_preferences_v1'))||'{}'));}catch(e){return Object.assign({},BUDDY_PREF_DEFAULTS);}}
+function applyPreferences(p){
+  p=Object.assign({},BUDDY_PREF_DEFAULTS,p||{});var b=document.body;
+  var dark=p.colorMode==='dark'||(p.colorMode==='system'&&window.matchMedia('(prefers-color-scheme:dark)').matches);
+  b.classList.toggle('dark',dark);b.classList.toggle('light',!dark);b.dataset.density=p.density;b.dataset.font=p.fontFamily;b.dataset.reduceMotion=String(!!p.reduceMotion);
+  document.documentElement.style.fontSize=(15*Number(p.fontScale||1))+'px';
+  var ac=BUDDY_ACCENTS[p.accentPreset]||BUDDY_ACCENTS.indigo;
+  document.documentElement.style.setProperty('--accent',ac[0]);document.documentElement.style.setProperty('--accent-dark',ac[1]);document.documentElement.style.setProperty('--accent-light',ac[2]);
+}
+function openThemeStudio(){var p=loadPreferences();document.getElementById('prefColorMode').value=p.colorMode;document.getElementById('prefAccent').value=p.accentPreset;document.getElementById('prefDensity').value=p.density;document.getElementById('prefFont').value=p.fontFamily;document.getElementById('prefScale').value=String(p.fontScale);document.getElementById('prefReduceMotion').checked=!!p.reduceMotion;document.getElementById('themeStudio').classList.add('open');document.getElementById('themeStudioBackdrop').classList.add('open');}
+function closeThemeStudio(){document.getElementById('themeStudio').classList.remove('open');document.getElementById('themeStudioBackdrop').classList.remove('open');}
+function readPreferenceForm(){return{colorMode:document.getElementById('prefColorMode').value,accentPreset:document.getElementById('prefAccent').value,density:document.getElementById('prefDensity').value,fontFamily:document.getElementById('prefFont').value,fontScale:Number(document.getElementById('prefScale').value),reduceMotion:document.getElementById('prefReduceMotion').checked};}
+function previewPreferences(){applyPreferences(readPreferenceForm());}
+function savePreferences(){var p=readPreferenceForm();localStorage.setItem(buddyUserKey('thesisbuddy_preferences_v1'),JSON.stringify(p));applyPreferences(p);closeThemeStudio();if(typeof ttp==='function')ttp('外观设置已保存');}
+function resetPreferences(){applyPreferences(BUDDY_PREF_DEFAULTS);localStorage.removeItem(buddyUserKey('thesisbuddy_preferences_v1'));openThemeStudio();}
+function openContextHelp(){if(typeof tourStart==='function')tourStart();else openAccountModal('当前页面帮助','<p>从左侧故事线选择阶段，中间查看论文，右侧运行能力。论文搭子助手会优先引用当前项目资料。</p>');}
+function openBuddyAssistant(){var d=document.getElementById('buddyDrawer');d.classList.add('open');d.setAttribute('aria-hidden','false');document.getElementById('buddyBackdrop').classList.add('open');var p=window.ThesisProject&&ThesisProject.getCurrentProject?ThesisProject.getCurrentProject():null;var ctx=document.getElementById('buddyContext');if(ctx)ctx.textContent=p?(p.title+' · '+(p.currentStage||'进行中')):'尚未选择项目';setTimeout(function(){document.getElementById('buddyInput').focus();},100);}
+function closeBuddyAssistant(){var d=document.getElementById('buddyDrawer');d.classList.remove('open');d.setAttribute('aria-hidden','true');document.getElementById('buddyBackdrop').classList.remove('open');}
+function appendBuddyMessage(text,kind){var host=document.getElementById('buddyMessages');var el=document.createElement('div');el.className='buddy-message '+(kind||'assistant');el.textContent=text;host.appendChild(el);host.scrollTop=host.scrollHeight;return el;}
+function askBuddyAssistant(){
+  var input=document.getElementById('buddyInput'),q=(input.value||'').trim();if(!q)return;if(!ensureLoggedIn())return;input.value='';appendBuddyMessage(q,'user');var pending=appendBuddyMessage('正在检索当前项目证据…','assistant');var p=window.ThesisProject&&ThesisProject.getCurrentProject?ThesisProject.getCurrentProject():null;
+  var projectContext=p?('项目：'+p.title+'\n阶段：'+(p.currentStage||'')+'\n想法：'+(p.idea||'')+'\n'):'';
+  fetch('/api/assistant/query',{method:'POST',headers:authJsonHeaders(),body:JSON.stringify({project_id:p&&p.id,question:q,context:projectContext,idempotency_key:'buddy_'+Date.now()})}).then(function(r){return r.json().then(function(d){return{status:r.status,data:d};});}).then(function(x){var d=x.data||{};if(!d.success)throw new Error(d.error||'回答失败');pending.textContent=d.answer||d.content||'没有找到可用回答';if(d.sources&&d.sources.length)pending.textContent+='\n\n来源：\n'+d.sources.map(function(s){return'• '+s.filename+' · '+(s.heading||('片段'+(s.ordinal+1)));}).join('\n');if(d.usage&&d.usage.cost_points!=null)document.getElementById('buddyCostHint').textContent='本次 '+Number(d.usage.cost_points).toFixed(3)+' 点';if(typeof updateBalanceDisplay==='function')updateBalanceDisplay();}).catch(function(e){pending.textContent='暂时无法回答：'+e.message;});
+}
+window.openBuddyAssistant=openBuddyAssistant;window.closeBuddyAssistant=closeBuddyAssistant;window.askBuddyAssistant=askBuddyAssistant;window.openThemeStudio=openThemeStudio;window.closeThemeStudio=closeThemeStudio;window.previewPreferences=previewPreferences;window.savePreferences=savePreferences;window.resetPreferences=resetPreferences;window.openContextHelp=openContextHelp;
+try{applyPreferences(loadPreferences());}catch(e){}
 
 function downloadText(filename, text){
   var blob=new Blob([text],{type:'text/csv;charset=utf-8;'});

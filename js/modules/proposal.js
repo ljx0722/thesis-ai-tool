@@ -5,7 +5,7 @@
 function runProposalModule(container) {
   var c = container || document.querySelector('.module-panel');
   if (!c) return;
-  c.innerHTML = '<div class="module-panel" style="max-width:800px;margin:0 auto">' +
+  c.innerHTML = '<div style="max-width:800px;margin:0 auto;width:100%">' +
     '<h4>📝 开题报告 → 论文大纲建议</h4>' +
     '<div class="ai-desc">将你的开题报告内容粘贴到下方，AI 会分析并输出：<br>' +
     '<b>· 论文大纲结构</b>（章/节/小节）<br>' +
@@ -32,9 +32,8 @@ window.runProposalAI = function() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
     body: JSON.stringify({
-      module: 'proposal',
-      system_prompt: '你是一位资深的学术论文导师，擅长帮助研究生从开题报告梳理出完整的论文大纲。请用中文回答，输出结构清晰、有层次。',
-      user_prompt: '请根据以下开题报告内容，完成以下任务：\n\n1. 梳理论文大纲结构（章→节→小节，至少3章）\n2. 每章核心内容建议（各100-200字）\n3. 建议的研究方法与技术路线（含数据可视化方案，推荐合适的图表类型）\n4. 参考文献方向建议（至少3个领域）\n5. 潜在创新点与注意事项\n\n开题报告内容：\n' + input.substring(0, 8000),
+      capability_id: 'proposal',
+      input: '请根据以下开题报告内容，完成以下任务：\n\n1. 梳理论文大纲结构（章→节→小节，至少3章）\n2. 每章核心内容建议（各100-200字）\n3. 建议的研究方法与技术路线（含数据可视化方案，推荐合适的图表类型）\n4. 参考文献方向建议（至少3个领域）\n5. 潜在创新点与注意事项\n\n开题报告内容：\n' + input.substring(0, 8000),
       max_tokens: 2500
     })
   }).then(function(r) { return r.json(); })
@@ -60,12 +59,12 @@ window.addLLMButton = function(containerId, moduleName, promptText) {
   var outputId = containerId + '_llm_output';
   btn.onclick = function() {
     var out = document.getElementById(outputId);
-    if (!out) { out = document.createElement('div'); out.id = outputId; out.className = 'ai-output'; out.style.cssText = 'margin-top:10px;max-height:400px;overflow-y:auto'; el.appendChild(out); }
+    if (!out) { out = document.createElement('div'); out.id = outputId; out.className = 'ai-output'; out.style.cssText = 'margin-top:10px'; el.appendChild(out); }
     out.innerHTML = '<div class="ai-loading">⏳ AI 分析中...</div>';
     var token = sessionStorage.getItem('thesis_ai_token');
     fetch('/api/llm/analyze', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ module: moduleName, system_prompt: '你是一位学术论文评审专家。请用中文进行分析。', user_prompt: promptText(), max_tokens: 2000 })
+      body: JSON.stringify({ capability_id: moduleName, input: promptText(), max_tokens: 2000 })
     }).then(function(r) { return r.json(); })
       .then(function(d) {
         if (d.success) {

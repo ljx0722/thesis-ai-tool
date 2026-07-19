@@ -1,9 +1,9 @@
-<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>学术论文AI一站式助手</title>
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>论文搭子 ThesisBuddy — AI 论文全流程工作台</title>
 
-<meta property="og:title" content="学术论文AI一站式助手 — 智能论文写作辅助平台">
-<meta property="og:description" content="一站式论文写作工具：DOCX解析、12源文献检索、十维评审、知识图谱、术语分析等">
+<meta property="og:title" content="论文搭子 ThesisBuddy — AI 论文全流程工作台">
+<meta property="og:description" content="从一个想法到答辩通关，你的AI论文搭子，陪你搞定论文全流程">
 <meta property="og:type" content="website">
-<meta name="description" content="学术论文AI一站式助手 — 智能论文写作辅助平台。支持DOCX论文解析、多源文献检索、GB/T 7714参考文献管理、论文评估报告、知识图谱可视化。">
+<meta name="description" content="论文搭子 ThesisBuddy：从一个想法到答辩通关，覆盖选题、文献、写作、审校、评审、科研绘图与答辩。">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>">
@@ -18,8 +18,8 @@
     <!-- Left: Hero + Feature Grid -->
     <div class="landing-hero">
       <div class="landing-brand">
-        <h1 class="landing-title">学术论文AI<br>一站式助手</h1>
-        <p class="landing-desc">从一句话想法开始，到大纲、文献、分章写作、打磨与答辩。<br>既是论文生产流水线，也能导入 DOCX 做专业打磨。</p>
+        <h1 class="landing-title">论文搭子<br><span>ThesisBuddy</span></h1>
+        <p class="landing-desc">从一个想法到答辩通关，你的AI论文搭子，陪你搞定论文全流程</p>
       </div>
 
       <div class="landing-highlights" style="display:none" aria-hidden="true"></div>
@@ -114,7 +114,8 @@
 <!-- ====== 顶栏 ====== -->
 <div class="bar">
   <div class="bar-left">
-    <h1>学术论文AI一站式助手</h1>
+    <button class="workspace-drawer-btn" onclick="toggleTocPanel()" title="打开目录">目录</button>
+    <h1>论文搭子 <span class="brand-en">ThesisBuddy</span></h1>
     <button id="projectTitleChip" class="project-chip" onclick="openIdeaWizard()" title="创建或查看项目">未创建项目</button>
     <span id="projectProgressChip" class="project-progress-chip">创建项目后显示进度</span>
   </div>
@@ -125,6 +126,7 @@
     <button class="bar-tab" data-view="dashboard" onclick="showDashboard()">看板</button>
   </div>
   <div class="bar-right">
+    <button class="workspace-drawer-btn" onclick="toggleToolPanel()" title="打开工具台">工具</button>
     <span id="statusBar" style="font-size:.62rem;color:var(--m)">等待上传...</span>
     <span id="balanceBar" style="font-size:.65rem;color:rgba(255,255,255,.4);cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.06);padding:3px 10px;border-radius:12px;margin-left:6px" onclick="showRechargeModal()" title="点击充值">✨ <strong id="balanceAmount" style="color:inherit;font-weight:700">0.000</strong> 点 <span id="freeQuotaChip" style="display:none;font-size:.5rem;color:rgba(255,255,255,.35);margin-left:2px"></span> <span style="font-size:.5rem;color:rgba(255,255,255,.3)">+</span></span>
     <button id="notifyBellBtn" onclick="toggleNotifyPanel()" style="position:relative;background:rgba(255,255,255,.06);color:rgba(255,255,255,.55);border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.62rem;margin-left:4px" title="消息中心">🔔<span id="notifyBadge" style="display:none;position:absolute;top:-3px;right:-2px;min-width:14px;height:14px;padding:0 3px;border-radius:8px;background:#ef4444;color:#fff;font-size:.5rem;line-height:14px;font-weight:700">0</span></button>
@@ -158,16 +160,16 @@
 2026-07-05 初版发布：DOCX解析 / 多源文献检索 / 知识图谱</div>
   </div>
 </div>
-<script>function toggleChangelog(){var p=document.getElementById('changelogPanel');p.style.display=p.style.display==='none'?'block':'none';}</script>
+<script>function toggleChangelog(){var p=document.getElementById('changelogPanel');var opening=p.style.display==='none';p.style.display=opening?'block':'none';if(!opening)return;fetch('/static/changelog.json').then(function(r){return r.json();}).then(function(d){var entries=(d.entries||[]).filter(function(e){return e.status==='released'&&e.commit;});var body=entries.map(function(e){return'<section style="padding:10px 0;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between;gap:10px"><b>'+e.version+' · '+e.summary+'</b><span style="color:var(--text-muted)">'+e.date+'</span></div><ul style="margin:7px 0 0 18px">'+(e.changes||[]).map(function(c){return'<li>'+c+'</li>';}).join('')+'</ul></section>';}).join('');p.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>功能更新日志</b><button onclick="toggleChangelog()" style="border:0;background:transparent;color:var(--text-muted);cursor:pointer">关闭</button></div>'+body;}).catch(function(){p.innerHTML='<div style="padding:16px">更新日志加载失败，请稍后重试。</div>';});}</script>
 
 <!-- ====== 四栏工作台：导航 | 目录 | 正文 | 工具台 ====== -->
 <div class="main" id="mainLayout">
   <!-- 1) 左侧导航轨 -->
   <div class="nav-sidebar" id="navSidebar">
-    <div class="nav-brand-mini">论文工作台</div>
+    <div class="nav-brand-mini">ThesisBuddy</div>
     <div class="nav-upload" id="navUpload">
       <button onclick="openIdeaWizard()" class="nav-upload-btn primary">💡 从想法开始</button>
-      <button onclick="triggerUpload()" class="nav-upload-btn">📎 导入论文</button>
+      <button onclick="openImportDialog('new')" class="nav-upload-btn">📎 导入论文</button>
     </div>
 
     <div class="nav-section-label">主线进度</div>
@@ -210,7 +212,7 @@
     <div class="thesis-bar">
       <h3>📄 论文全貌 <span id="upStatus" style="font-size:.68rem;color:var(--m);font-weight:400">尚未生长内容</span></h3>
       <div class="thesis-bar-actions">
-        <button class="bar-mini" onclick="triggerUpload()">导入/换论文</button>
+        <button class="bar-mini" onclick="openImportDialog('replace')">导入/换论文</button>
         <button class="bar-mini" onclick="openFullPaperPreview()">预览</button>
         <button class="bar-mini" onclick="mergeDraftsIntoThesis()">合并草稿</button>
         <button class="bar-mini" onclick="zoomThesis(-0.1)">-</button>
@@ -265,7 +267,7 @@
   </div>
 </div>
 <input type="file" id="fileInput" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none">
-    <script>window._pendingFile=null;window.triggerUpload=function(){document.getElementById('fileInput').click();};</script>
+    <script>window._pendingFile=null;window._importIntent='new';window.openImportDialog=function(intent){window._importIntent=intent||'new';if(typeof showUploadOverlay==='function')showUploadOverlay();else document.getElementById('uploadOverlay').classList.add('show');};window.triggerUpload=function(){window.openImportDialog('new');};</script>
 
 <!-- ====== 上传弹窗 ====== -->
 <div class="upload-overlay" id="uploadOverlay">
@@ -273,9 +275,8 @@
     <div class="upload-icon">📄</div>
     <h2>上传论文</h2>
     <p>支持 <b>.docx</b>（推荐）与 <b>.doc</b>。docx 本地解析可保留样式；doc 会先转换。</p>
-    <div class="upload-drop" id="uploadDrop" onclick="document.getElementById('uploadFileInput').click()">
+    <div class="upload-drop" id="uploadDrop" onclick="document.getElementById('fileInput').click()">
       拖拽文件到此处或点击选择
-      <input type="file" id="uploadFileInput" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onchange="var dt=new DataTransfer();dt.items.add(this.files[0]);document.getElementById('fileInput').files=dt.files;document.getElementById('fileInput').dispatchEvent(new Event('change'));hideUploadOverlay()" style="display:none">
     </div>
     <button onclick="hideUploadOverlay()" style="margin-top:16px;padding:8px 20px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface-alt);color:var(--text-muted);cursor:pointer;font-size:var(--font-size-sm);font-family:var(--font-sans)">取消</button>
   </div>
@@ -288,9 +289,9 @@
       <div style="display:flex;align-items:center;gap:12px">
         <h2 style="font-size:1.1rem;font-weight:700;color:var(--t);margin:0">🕸️ 知识图谱</h2>
         <div id="kgTabs" style="display:flex;gap:2px;background:rgba(0,0,0,0.04);border-radius:18px;padding:2px">
-          <button onclick="switchKGView('cloud')" id="kgTabCloud" class="kg-tab active" title="词云视图：交互式关键词可视化。词的大小代表出现频率，连线代表同章共现关系。鼠标悬停高亮关联词，滚轮缩放。">☁️ 词云</button>
-          <button onclick="switchKGView('network')" id="kgTabNetwork" class="kg-tab" title="网络图视图：力导向节点关系图。蓝色=关键词，绿色=章节，紫色=小节，橙色=文献。滚轮缩放，左键拖拽。">🔗 网络</button>
-          <button onclick="switchKGView('timeline')" id="kgTabTimeline" class="kg-tab" title="时间线视图：文献按发表年份排布。圆点颜色：蓝=原文文献，紫=顺延文献，绿=新增文献。悬停查看标题、期刊、年份。">📅 时间线</button>
+          <button onclick="switchKGView('cloud')" id="kgTabCloud" class="kg-tab active" title="概念分析：区分高频词、特色词与章节分布。共现只表示共同出现，不代表因果。">🧭 概念概览</button>
+          <button onclick="switchKGView('network')" id="kgTabNetwork" class="kg-tab" title="研究关系概览：章节、概念与文献的可追溯关系。现有共现边不自动解释为支持或因果。">🔗 研究关系</button>
+          <button onclick="switchKGView('timeline')" id="kgTabTimeline" class="kg-tab" title="文献时间线：按年份观察研究演进与来源。">📅 文献演进</button>
         </div>
       </div>
       <div style="display:flex;gap:6px;align-items:center">
@@ -299,6 +300,7 @@
         <button onclick="closeKnowledgeGraph()" style="background:rgba(0,0,0,0.06);color:var(--t);border:none;border-radius:18px;padding:8px 16px;cursor:pointer;font-weight:600;font-size:.85rem">✕ 关闭</button>
       </div>
     </div>
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 0 10px;font-size:.68rem;color:var(--m);flex-shrink:0"><span>当前视图为研究概览；“共同出现”不等于支持、反驳或因果关系。</span><button type="button" onclick="openConceptExplorer()" style="margin-left:auto;border:1px solid var(--border);background:var(--surface-alt);color:var(--text-secondary);border-radius:8px;padding:5px 10px;cursor:pointer">概念证据</button></div>
     <div id="kgContent" style="flex:1;overflow:hidden;background:rgba(0,0,0,0.02);border-radius:var(--radius);position:relative;min-height:400px">
       <div id="kgCloudPanel" style="position:absolute;top:0;left:0;width:100%;height:100%;overflow:hidden;display:none;padding:16px 20px"></div>
       <div id="kgGraphPanel" style="position:absolute;top:0;left:0;width:100%;height:100%;overflow:hidden">
@@ -439,8 +441,8 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
     }else{timer=setInterval(spawnOne,1800);spawnOne();}
   };
   var _origHide=hideLoad;hideLoad=function(){clearAll();if(typeof stopCatGame==='function')stopCatGame();_origHide();};
-  // 拖拽上传
-  var drop=document.getElementById('uploadDrop');if(drop){['dragenter','dragover','dragleave','drop'].forEach(function(ev){document.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();},false);});['dragenter','dragover'].forEach(function(ev){document.addEventListener(ev,function(){drop.classList.add('dragover');},false);});['dragleave','drop'].forEach(function(ev){document.addEventListener(ev,function(){drop.classList.remove('dragover');},false);});document.addEventListener('drop',function(e){var files=e.dataTransfer.files;if(files.length){var fi=document.getElementById('fileInput');var dt=new DataTransfer();dt.items.add(files[0]);fi.files=dt.files;fi.dispatchEvent(new Event('change'));}});}
+  // 拖拽上传：仅投放区接收文件，所有入口走统一 fileInput
+  var drop=document.getElementById('uploadDrop');if(drop){['dragenter','dragover'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();drop.classList.add('dragover');},false);});['dragleave','drop'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();drop.classList.remove('dragover');},false);});drop.addEventListener('drop',function(e){var files=e.dataTransfer.files;if(files.length&&typeof beginImportFile==='function')beginImportFile(files[0],window._importIntent||'new');});}
 })();
 </script>
 </div>
@@ -448,7 +450,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 // Dark mode toggle
 (function(){
   var mq=window.matchMedia('(prefers-color-scheme:dark)');
-  var saved=null;try{saved=localStorage.getItem('thesis-ai-dark')}catch(e){}
+  var saved=null;try{var legacyA=localStorage.getItem('thesis-ai-dark');var legacyB=localStorage.getItem('thesis_ai_dark');saved=legacyA!==null?legacyA:legacyB;}catch(e){}
   function setDark(on){
     document.body.classList.toggle('dark',on);
     document.body.classList.toggle('light',!on);
@@ -461,7 +463,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
   window.toggleDarkMode=function(){
     var isDark=document.body.classList.contains('dark');
     setDark(!isDark);
-    try{localStorage.setItem('thesis-ai-dark',isDark?'0':'1')}catch(e){}
+    try{localStorage.setItem('thesis-ai-dark',isDark?'0':'1');localStorage.removeItem('thesis_ai_dark')}catch(e){}
   };
 })();
 </script>
@@ -475,12 +477,20 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
   var loginOverlay = document.getElementById('loginOverlay');
   var appShell = document.getElementById('appShell');
 
+  function finishAuthenticatedBootstrap(user) {
+    if(user)sessionStorage.setItem(USER_KEY,JSON.stringify(user));
+    hideLogin();updateBalanceDisplay();if(window.pollNotifications)window.pollNotifications();
+    if(window.ThesisProject&&ThesisProject.bootstrapAuthenticatedUser){ThesisProject.bootstrapAuthenticatedUser().catch(function(e){console.warn('[bootstrap]',e);});}
+    else if(window.restoreScopedSession)window.restoreScopedSession();
+  }
+
   // Check existing token
   var savedToken = sessionStorage.getItem(TOKEN_KEY);
   if (savedToken) {
     fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + savedToken } })
-      .then(function(r) { if (r.ok) { hideLogin(); return; } })
-      .catch(function() {});
+      .then(function(r) { if(!r.ok)throw new Error('expired');return r.json(); })
+      .then(function(d){if(!d.success)throw new Error('expired');finishAuthenticatedBootstrap(d.user);})
+      .catch(function() { sessionStorage.removeItem(TOKEN_KEY);sessionStorage.removeItem(USER_KEY);if(window.clearManuscriptRuntime)window.clearManuscriptRuntime(); });
   }
 
   if(loginOverlay) loginOverlay.style.display = 'flex';
@@ -526,9 +536,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
             window.location.href = '/admin.html';
             return;
           }
-          hideLogin();
-          updateBalanceDisplay();
-          if (window.pollNotifications) window.pollNotifications();
+          finishAuthenticatedBootstrap(d.user);
         } else { err.textContent = d.error; }
       }).catch(function() { err.textContent = '网络错误'; });
   };
@@ -560,8 +568,10 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
   }
 
   window.doLogout = function() {
+    if(window.clearManuscriptRuntime)window.clearManuscriptRuntime();
     sessionStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(USER_KEY);
+    sessionStorage.removeItem('thesis_ai_admin_secret');
     location.reload();
   };
 
@@ -607,35 +617,96 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 
   // 充值弹窗
   window._selectedAmount = 0;
+  window._selectedAmountFen = null;
   window._selectedPayment = 'alipay';
   window._pendingOrderId = null;
+  window.parseRechargeAmountFen = function(raw) {
+    var text = String(raw == null ? '' : raw).trim();
+    if (!text) return { error: '请输入充值金额' };
+    if (!/^\d+(?:\.\d{1,2})?$/.test(text)) {
+      return { error: /^\d+\.\d{3,}$/.test(text) ? '金额最多保留 2 位小数' : '请输入有效金额' };
+    }
+    var amount = Number(text);
+    if (!Number.isFinite(amount)) return { error: '请输入有效金额' };
+    var fen = Math.round(amount * 100);
+    if (fen < 100) return { error: '最低充值 1 元' };
+    if (fen > 500000) return { error: '单笔最高 5000 元' };
+    return { fen: fen, yuan: fen / 100, text: (fen / 100).toFixed(2) };
+  };
+  function setRechargeError(message) {
+    var el = document.getElementById('rechargeAmountError');
+    if (el) el.textContent = message || '';
+  }
+  function resetRechargePaymentStep(clearInput) {
+    window._selectedAmount = 0;
+    window._selectedAmountFen = null;
+    window._pendingOrderId = null;
+    var inp = document.getElementById('rechargeAmountInput');
+    if (inp && clearInput) inp.value = '';
+    var prev = document.getElementById('rechargePointsPreview');
+    if (prev) prev.textContent = '= 0 点';
+    var payAmt = document.getElementById('rechargePayAmountLabel');
+    if (payAmt) payAmt.textContent = '—';
+    var payment = document.getElementById('rechargePayment');
+    if (payment) payment.style.display = 'none';
+    var info = document.getElementById('rechargeOrderInfo');
+    if (info) { info.style.display = 'none'; info.textContent = ''; }
+    var btns = document.querySelectorAll('.recharge-amt-btn');
+    for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+    var btn = document.getElementById('rechargeSubmitBtn');
+    if (btn) { btn.textContent = '创建订单并显示支付说明'; btn.disabled = false; btn.onclick = submitRecharge; }
+    setRechargeError('');
+  }
+  window.onRechargeAmountEdited = function() {
+    resetRechargePaymentStep(false);
+    var inp = document.getElementById('rechargeAmountInput');
+    var parsed = parseRechargeAmountFen(inp ? inp.value : '');
+    var prev = document.getElementById('rechargePointsPreview');
+    if (parsed.error) {
+      if (prev) prev.textContent = '= — 点';
+      if (inp && inp.value.trim()) setRechargeError(parsed.error);
+      return;
+    }
+    if (prev) prev.textContent = '= ' + parsed.text + ' 点';
+    setRechargeError('');
+    var btns = document.querySelectorAll('.recharge-amt-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', Number(btns[i].getAttribute('data-amt')) * 100 === parsed.fen);
+    }
+  };
   window.showRechargeModal = function() {
+    resetRechargePaymentStep(true);
     var el = document.getElementById('rechargeModal');
     if (el) el.style.display = 'flex';
-    window._pendingOrderId = null;
     if (!window._selectedPayment) window._selectedPayment = 'alipay';
     updateRechargeBalance();
     loadRechargeHistory();
     try { switchQR(window._selectedPayment || 'alipay'); } catch (e) {}
-    var btn = (document.getElementById('rechargeSubmitBtn')||document.querySelector('#rechargePayment button'));
-    if (btn) { btn.textContent = '我已支付，提交申请'; btn.disabled = false; btn.onclick = submitRecharge; }
   };
   window.hideRechargeModal = function() {
     var el = document.getElementById('rechargeModal');
-    if (el) { el.style.display = 'none'; }
-    window._selectedAmount = 0;
-    window._pendingOrderId = null;
-    document.getElementById('rechargePayment').style.display = 'none';
+    if (el) el.style.display = 'none';
+    resetRechargePaymentStep(true);
   };
-  window.selectRechargeAmount = function(amount) {
-    window._selectedAmount = amount;
-    window._pendingOrderId = null;
+  window.fillRechargeAmount = function(amount) {
+    var inp = document.getElementById('rechargeAmountInput');
+    if (inp) inp.value = String(amount);
+    onRechargeAmountEdited();
+  };
+  window.selectRechargeAmountFromInput = function() {
+    var inp = document.getElementById('rechargeAmountInput');
+    var parsed = parseRechargeAmountFen(inp ? inp.value : '');
+    if (parsed.error) { setRechargeError(parsed.error); if (inp) inp.focus(); return; }
+    window._selectedAmountFen = parsed.fen;
+    window._selectedAmount = parsed.yuan;
+    if (inp) inp.value = parsed.text;
+    var prev = document.getElementById('rechargePointsPreview');
+    if (prev) prev.textContent = '= ' + parsed.text + ' 点';
+    var payAmt = document.getElementById('rechargePayAmountLabel');
+    if (payAmt) payAmt.textContent = parsed.text;
     document.getElementById('rechargePayment').style.display = '';
-    var btns = document.querySelectorAll('.recharge-amt-btn');
-    for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('active', parseInt(btns[i].getAttribute('data-amt')) === amount);
+    setRechargeError('');
     try { switchQR(window._selectedPayment || 'alipay'); } catch (e) {}
-    var btn = (document.getElementById('rechargeSubmitBtn')||document.querySelector('#rechargePayment button'));
-    if (btn) { btn.textContent = '我已支付，提交申请'; btn.disabled = false; btn.onclick = submitRecharge; }
   };
   window.switchQR = function(method) {
     window._selectedPayment = method || 'alipay';
@@ -647,60 +718,67 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
     }
     var lab = document.getElementById('rechargePayMethodLabel');
     if (lab) lab.textContent = window._selectedPayment === 'wechat' ? '微信' : '支付宝';
-    var img = document.getElementById('qrImage');
-    if (img) img.src = 'static/qr-' + window._selectedPayment + '.png';
   };
   window.submitRecharge = function() {
-    if (!window._selectedAmount) { alert('请选择充值金额'); return; }
+    var inp = document.getElementById('rechargeAmountInput');
+    var parsed = parseRechargeAmountFen(inp ? inp.value : '');
+    if (parsed.error) { setRechargeError(parsed.error); return; }
+    if (parsed.fen !== window._selectedAmountFen) {
+      onRechargeAmountEdited();
+      setRechargeError('金额已变化，请重新点击“下一步：扫码支付”');
+      return;
+    }
+    var btn = document.getElementById('rechargeSubmitBtn');
+    if (btn) btn.disabled = true;
     var token = sessionStorage.getItem(TOKEN_KEY);
     fetch('/api/payment/recharge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ amount_yuan: window._selectedAmount, payment_method: window._selectedPayment })
+      body: JSON.stringify({ amount_yuan: parsed.text, payment_method: window._selectedPayment })
     }).then(function(r) { return r.json(); })
       .then(function(d) {
-        if (d.success) {
-          window._pendingOrderId = d.order_id || null;
-          alert('请扫码支付 ¥'+window._selectedAmount+(d.order_id?'（订单#'+d.order_id+'，转账备注请填订单号）':'')+'，支付完成后回来点击"确认已支付"');
-          var btn = (document.getElementById('rechargeSubmitBtn')||document.querySelector('#rechargePayment button'));
-          if (btn) { btn.textContent = '✅ 确认已支付，提交审核'; btn.onclick = confirmPaid; btn.disabled = false; }
-          loadRechargeHistory();
-        } else { alert(d.error); }
-      }).catch(function() { alert('网络错误'); });
+        if (!d.success) { if (btn) btn.disabled = false; alert(d.error || '创建订单失败'); return; }
+        var responseFen = Number(d.amount_fen);
+        if (!Number.isInteger(responseFen)) responseFen = Math.round(Number(d.amount_yuan) * 100);
+        window._selectedAmountFen = responseFen;
+        window._selectedAmount = responseFen / 100;
+        window._pendingOrderId = d.order_id || null;
+        var amountText = (responseFen / 100).toFixed(2);
+        if (inp) inp.value = amountText;
+        var info = document.getElementById('rechargeOrderInfo');
+        if (info) {
+          info.style.display = 'block';
+          info.innerHTML = '订单 <b>#'+d.order_id+'</b> · 请转账 <b>¥'+amountText+'</b>（='+amountText+' 点）· 备注请填订单号 <b>'+d.order_id+'</b>';
+        }
+        var payAmt = document.getElementById('rechargePayAmountLabel');
+        if (payAmt) payAmt.textContent = amountText;
+        alert('订单 #'+d.order_id+' 已创建。\n请按 ¥'+amountText+' 扫码转账，备注填写订单号 '+d.order_id+'。\n支付完成后点击「我已支付」。');
+        if (btn) { btn.textContent = '我已支付，提交审核'; btn.onclick = confirmPaid; btn.disabled = false; }
+        loadRechargeHistory();
+      }).catch(function() { if (btn) btn.disabled = false; alert('网络错误'); });
   };
   window.confirmPaid = function() {
-    var token = sessionStorage.getItem(TOKEN_KEY);
-    function doSubmit(orderId) {
-      fetch('/api/payment/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({ order_id: orderId })
-      }).then(function(r2) { return r2.json(); })
-        .then(function(d2) {
-          if (d2.success) {
-            alert(d2.message || '已提交审核，请等待管理员确认到账');
-            loadRechargeHistory();
-            if (window.pollNotifications) window.pollNotifications();
-            var btn = (document.getElementById('rechargeSubmitBtn')||document.querySelector('#rechargePayment button'));
-            if (btn) { btn.textContent = '已提交，等待确认'; btn.disabled = true; }
-            window._pendingOrderId = null;
-          } else { alert(d2.error); }
-        });
-    }
-    if (window._pendingOrderId) {
-      doSubmit(window._pendingOrderId);
+    if (!window._pendingOrderId) {
+      alert('当前支付订单信息已失效，请按原金额重新创建或获取订单');
       return;
     }
-    fetch('/api/payment/orders', { headers: { 'Authorization': 'Bearer ' + token } })
-      .then(function(r) { return r.json(); })
+    var orderId = window._pendingOrderId;
+    var btn = document.getElementById('rechargeSubmitBtn');
+    if (btn) btn.disabled = true;
+    var token = sessionStorage.getItem(TOKEN_KEY);
+    fetch('/api/payment/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ order_id: orderId })
+    }).then(function(r) { return r.json(); })
       .then(function(d) {
-        if (d.success && d.orders && d.orders.length) {
-          var last = d.orders.find(function(o){ return o.status === 'pending'; }) || d.orders[0];
-          if (last && last.status === 'pending') doSubmit(last.id);
-          else if (last && last.status === 'submitted') alert('该订单已提交，请等待管理员确认到账');
-          else alert('未找到待支付订单，请重新选择金额发起充值');
-        }
-      });
+        if (!d.success) { if (btn) btn.disabled = false; alert(d.error || '提交失败'); return; }
+        alert(d.message || '已提交审核，请等待管理员确认到账');
+        loadRechargeHistory();
+        if (window.pollNotifications) window.pollNotifications();
+        if (btn) { btn.textContent = '已提交，等待确认'; btn.disabled = true; }
+        window._pendingOrderId = null;
+      }).catch(function() { if (btn) btn.disabled = false; alert('网络错误'); });
   };
   function updateRechargeBalance() {
     var token = sessionStorage.getItem(TOKEN_KEY);
@@ -865,6 +943,10 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
   });
   setTimeout(function(){ window.pollNotifications(); }, 800);
   setInterval(function(){ window.pollNotifications(); }, 20000);
+  setTimeout(function(){
+    var inp = document.getElementById('rechargeAmountInput');
+    if (inp) inp.addEventListener('input', onRechargeAmountEdited);
+  }, 0);
 })();
 </script>
 
@@ -876,15 +958,22 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
       <button onclick="hideRechargeModal()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.2rem;font-family:var(--font-sans)">&times;</button>
     </div>
     <p style="font-size:var(--font-size-md);color:var(--text-muted);margin:0 0 8px">当前余额: <strong id="rechargeBalance" style="color:var(--text-primary)">0.00</strong> 点</p>
-    <p style="font-size:.68rem;color:var(--text-muted);margin:0 0 12px;line-height:1.55">充值规则：<b>1 元 = 1 点</b>。到账后可用于智能与分析能力。</p>
-    <h4 style="font-size:var(--font-size-base);color:var(--text-secondary);margin:0 0 8px;font-weight:var(--font-weight-semibold)">选择充值金额（1元=1点）</h4>
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-      <button class="recharge-amt-btn" data-amt="1" onclick="selectRechargeAmount(1)">1元<span style="display:block;font-size:.5rem;opacity:.4;margin-top:1px">=1.0点</span></button>
-      <button class="recharge-amt-btn" data-amt="5" onclick="selectRechargeAmount(5)">5元<span style="display:block;font-size:.5rem;opacity:.4;margin-top:1px">=5.0点</span></button>
-      <button class="recharge-amt-btn" data-amt="10" onclick="selectRechargeAmount(10)">10元<span style="display:block;font-size:.5rem;opacity:.4;margin-top:1px">=10.0点</span></button>
-      <button class="recharge-amt-btn" data-amt="20" onclick="selectRechargeAmount(20)">20元<span style="display:block;font-size:.5rem;opacity:.4;margin-top:1px">=20.0点</span></button>
-      <button class="recharge-amt-btn" data-amt="50" onclick="selectRechargeAmount(50)">50元<span style="display:block;font-size:.5rem;opacity:.4;margin-top:1px">=50.0点</span></button>
+    <p style="font-size:.68rem;color:var(--text-muted);margin:0 0 12px;line-height:1.55">充值规则：<b>1 元 = 1 点</b>。请按您填写的金额转账；管理员按实收确认到账。</p>
+    <h4 style="font-size:var(--font-size-base);color:var(--text-secondary);margin:0 0 8px;font-weight:var(--font-weight-semibold)">充值金额（元）</h4>
+    <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap">
+      <input type="text" inputmode="decimal" id="rechargeAmountInput" autocomplete="off" placeholder="请输入金额，如 10.00" aria-describedby="rechargePointsPreview rechargeAmountError" style="flex:1;min-width:140px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:.9rem;font-family:var(--font-sans)">
+      <span id="rechargePointsPreview" style="font-size:.78rem;color:var(--text-muted);white-space:nowrap">= 0 点</span>
     </div>
+    <div id="rechargeAmountError" aria-live="polite" style="min-height:16px;margin:-3px 0 7px;color:#ef4444;font-size:.68rem"></div>
+    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+      <button type="button" class="recharge-amt-btn" data-amt="5" onclick="fillRechargeAmount(5)" aria-label="充值 5 元">5 元</button>
+      <button type="button" class="recharge-amt-btn" data-amt="10" onclick="fillRechargeAmount(10)" aria-label="充值 10 元">10 元</button>
+      <button type="button" class="recharge-amt-btn" data-amt="20" onclick="fillRechargeAmount(20)" aria-label="充值 20 元">20 元</button>
+      <button type="button" class="recharge-amt-btn" data-amt="50" onclick="fillRechargeAmount(50)" aria-label="充值 50 元">50 元</button>
+      <button type="button" class="recharge-amt-btn" data-amt="100" onclick="fillRechargeAmount(100)" aria-label="充值 100 元">100 元</button>
+    </div>
+    <button type="button" class="ai-btn" style="width:100%;margin-bottom:12px" onclick="selectRechargeAmountFromInput()">下一步：扫码支付</button>
+    <div id="rechargeOrderInfo" aria-live="polite" style="display:none;font-size:.75rem;color:var(--accent);margin:0 0 10px;padding:8px 10px;border-radius:8px;background:var(--accent-glow);border:1px solid var(--accent)"></div>
     <div id="rechargePayment" style="display:none;padding:14px;background:var(--surface-alt);border-radius:var(--radius-lg);border:1px solid var(--border);margin-bottom:12px">
       <h4 style="font-size:var(--font-size-md);color:var(--text-muted);margin:0 0 10px;font-weight:var(--font-weight-semibold)">扫码支付</h4>
       <div class="recharge-qr-pair" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:12px">
@@ -899,9 +988,9 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
           <div style="font-size:.62rem;color:var(--text-muted);margin-top:6px">扫码向商家付款</div>
         </div>
       </div>
-      <p id="rechargePayHint" style="font-size:var(--font-size-xs);color:var(--text-muted);text-align:center;margin:0 0 10px">请使用<strong id="rechargePayMethodLabel">支付宝</strong>扫码支付所选金额，转账备注可填订单号</p>
-      <button id="rechargeSubmitBtn" onclick="submitRecharge()" style="width:100%;padding:12px;border-radius:var(--radius-md);border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:var(--font-weight-bold);font-size:var(--font-size-base);font-family:var(--font-sans)">我已支付，提交申请</button>
-      <p style="font-size:var(--font-size-xs);color:var(--text-muted);text-align:center;margin:8px 0 0">支付完成后点下方按钮提交审核；管理员确认后到账，并通过消息中心通知你</p>
+      <p id="rechargePayHint" style="font-size:var(--font-size-xs);color:var(--text-muted);text-align:center;margin:0 0 10px">请使用<strong id="rechargePayMethodLabel">支付宝</strong>转账 <strong id="rechargePayAmountLabel">—</strong> 元，备注务必填写订单号</p>
+      <button id="rechargeSubmitBtn" onclick="submitRecharge()" style="width:100%;padding:12px;border-radius:var(--radius-md);border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:var(--font-weight-bold);font-size:var(--font-size-base);font-family:var(--font-sans)">创建订单并显示支付说明</button>
+      <p style="font-size:var(--font-size-xs);color:var(--text-muted);text-align:center;margin:8px 0 0">支付完成后点「我已支付」提交审核；管理员按实收金额确认到账</p>
     </div>
     <h4 style="font-size:var(--font-size-md);color:var(--text-secondary);margin:12px 0 6px;font-weight:var(--font-weight-semibold)">修改密码</h4>
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
@@ -1210,6 +1299,32 @@ window.showPricingInfo = function(){
 document.getElementById('accountModalMask').addEventListener('click', function(e){ if(e.target.id==='accountModalMask') closeAccountModal(); });
 </script>
 
+
+<div class="buddy-tools" id="buddyTools" aria-label="论文搭子快捷工具">
+  <button type="button" onclick="openBuddyAssistant()" title="打开论文搭子助手">搭子</button>
+  <button type="button" onclick="openThemeStudio()" title="外观与阅读设置">主题</button>
+  <button type="button" onclick="openContextHelp()" title="查看当前页面帮助">帮助</button>
+</div>
+<div class="buddy-backdrop" id="buddyBackdrop" onclick="closeBuddyAssistant()"></div>
+<aside class="buddy-drawer" id="buddyDrawer" aria-hidden="true" aria-label="论文搭子助手">
+  <header><div><strong>论文搭子</strong><span id="buddyContext">当前项目助手</span></div><button type="button" onclick="closeBuddyAssistant()">关闭</button></header>
+  <div class="buddy-body" id="buddyMessages"><div class="buddy-welcome">我会优先使用当前项目、论文版本和资料证据回答；找不到依据时会明确说明。</div></div>
+  <footer><textarea id="buddyInput" rows="3" placeholder="例如：总结当前章节；下一步做什么；资料中有哪些证据支持这个论点？"></textarea><div><span id="buddyCostHint">回答前显示预计点数</span><button type="button" onclick="askBuddyAssistant()">发送</button></div></footer>
+</aside>
+
+<div class="theme-studio-backdrop" id="themeStudioBackdrop" onclick="closeThemeStudio()"></div>
+<section class="theme-studio" id="themeStudio" aria-hidden="true">
+  <header><div><strong>外观与阅读</strong><span>即时预览，设置按账号保存</span></div><button type="button" onclick="closeThemeStudio()">关闭</button></header>
+  <div class="theme-studio-body">
+    <label>颜色模式<select id="prefColorMode" onchange="previewPreferences()"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
+    <label>强调色<select id="prefAccent" onchange="previewPreferences()"><option value="indigo">靛蓝</option><option value="ocean">海洋</option><option value="forest">森林</option><option value="rose">玫红</option><option value="sunset">日落</option></select></label>
+    <label>界面密度<select id="prefDensity" onchange="previewPreferences()"><option value="compact">紧凑</option><option value="default">标准</option><option value="relaxed">宽松</option></select></label>
+    <label>正文字体<select id="prefFont" onchange="previewPreferences()"><option value="auto">系统</option><option value="sans">无衬线</option><option value="serif">衬线</option></select></label>
+    <label>字号<select id="prefScale" onchange="previewPreferences()"><option value="0.9">90%</option><option value="1">100%</option><option value="1.1">110%</option></select></label>
+    <label class="theme-check"><input type="checkbox" id="prefReduceMotion" onchange="previewPreferences()">减少动态效果</label>
+  </div>
+  <footer><button type="button" onclick="resetPreferences()">恢复默认</button><button type="button" onclick="savePreferences()">保存设置</button></footer>
+</section>
 
 <!-- 消息中心：body 级 fixed，避免被 .bar 层叠上下文挡住 -->
 <div id="notifyPanel" style="display:none;position:fixed;top:52px;right:12px;width:360px;max-width:92vw;max-height:70vh;overflow:hidden;background:var(--bg-card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.22);z-index:100060">

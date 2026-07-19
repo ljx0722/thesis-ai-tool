@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>管理员看板 — 学术论文AI一站式助手</title>
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>管理员看板 — 论文搭子 ThesisBuddy</title>
 <link rel="stylesheet" href="css/style.css?v=56">
 <style>
   html, body.admin-page { height: auto !important; max-height: none !important; overflow-x: hidden !important; overflow-y: auto !important; }
@@ -628,13 +628,12 @@ function renderOrders(orders, summary){
   var ohtml='';
   (orders||[]).forEach(function(o){
     var ops='';
-    var canAct = (o.status==='submitted' || o.status==='pending' || o.status==='paid');
-    if(canAct){
-      ops+='<button class="admin-btn admin-btn-sm admin-btn-success" onclick="confirmOrder('+o.id+')">确认到账</button> ';
-      ops+='<button class="admin-btn admin-btn-sm admin-btn-danger" onclick="rejectOrder('+o.id+')">拒绝</button>';
-    }
+    var canConfirm = (o.status==='submitted' || o.status==='pending' || o.status==='paid');
+    var canReject = canConfirm;
+    if(canConfirm) ops+='<button class="admin-btn admin-btn-sm admin-btn-success" onclick="confirmOrder('+o.id+','+Number(o.amount_yuan)+')">确认到账</button> ';
+    if(canReject) ops+='<button class="admin-btn admin-btn-sm admin-btn-danger" onclick="rejectOrder('+o.id+')">拒绝</button>';
     ohtml+='<tr>'+
-      '<td>'+(canAct?'<input type="checkbox" class="order-check" value="'+o.id+'">':'')+'</td>'+
+      '<td>'+(canConfirm?'<input type="checkbox" class="order-check" value="'+o.id+'">':'')+'</td>'+
       '<td>'+o.id+'</td>'+
       '<td><span class="user-pick" onclick="openUserDrawer('+o.user_id+')">'+o.username+'</span> <span style="color:var(--text-muted);font-size:.65rem">#'+o.user_id+'</span></td>'+
       '<td>&yen;'+o.amount_yuan+'</td>'+
@@ -664,11 +663,27 @@ function loadOrders(){
     if(d.success) renderOrders(d.orders||[], d.summary||{});
   });
 }
-function confirmOrder(oid){
-  if(!confirm('确认订单 #'+oid+' 已收款并到账？')) return;
-  fetch('/api/payment/confirm',{method:'POST',headers:authHeaders(true),body:JSON.stringify({secret:SECRET,order_id:oid})})
+function parseAdminRechargeAmount(raw){
+  var s=String(raw==null?'':raw).trim();
+  if(!/^\d+(?:\.\d{1,2})?$/.test(s)) return {error:'请输入有效金额，最多保留 2 位小数'};
+  var y=Number(s);
+  if(!Number.isFinite(y) || y<1 || y>5000) return {error:'实收金额须在 1～5000 元之间'};
+  var fen=Math.round(y*100);
+  return {fen:fen, yuan:fen/100, text:(fen/100).toFixed(2)};
+}
+function confirmOrder(oid, declaredYuan){
+  var declared=Number(declaredYuan||0);
+  var defAmt=declared>0?declared.toFixed(2):'';
+  var input=prompt('请输入实际到账金额（元）。\n订单 #'+oid+(defAmt?(' 用户申报 ¥'+defAmt):'')+'\n可修改为实收金额；点取消则中止。',defAmt||'1.00');
+  if(input===null) return;
+  var parsed=parseAdminRechargeAmount(input);
+  if(parsed.error){alert(parsed.error);return;}
+  if(declared>0 && Math.round(declared*100)!==parsed.fen){
+    if(!confirm('订单申报 ¥'+declared.toFixed(2)+'，实收 ¥'+parsed.text+'。\n将按实收金额发放 '+parsed.text+' 点并回写订单金额，是否继续？')) return;
+  }
+  fetch('/api/payment/confirm',{method:'POST',headers:authHeaders(true),body:JSON.stringify({secret:SECRET,order_id:oid,amount_yuan:parsed.text})})
     .then(r=>r.json()).then(d=>{
-      if(d.success){ toast(d.message||'已确认'); loadOrders(); loadDashboard(true); loadTransactions(); loadTimeseries(); loadAuditLogs(); }
+      if(d.success){toast('已按 ¥'+Number(d.amount_yuan).toFixed(2)+' 到账 '+Number(d.points).toFixed(3)+' 点');loadOrders();loadDashboard(true);loadTransactions();loadTimeseries();loadAuditLogs();}
       else alert(d.error);
     }).catch(function(){alert('网络错误')});
 }
@@ -690,7 +705,7 @@ function batchConfirmSelected(){
   var ids=[];
   document.querySelectorAll('.order-check:checked').forEach(function(c){ ids.push(parseInt(c.value,10)); });
   if(!ids.length){ alert('请先勾选待确认订单'); return; }
-  if(!confirm('批量确认 '+ids.length+' 笔订单到账？')) return;
+  if(!confirm('将按订单申报金额批量确认 '+ids.length+' 笔订单。\n如有金额不符，请取消并改为逐笔确认。')) return;
   fetch('/api/admin/batch_confirm',{method:'POST',headers:authHeaders(true),body:JSON.stringify({secret:SECRET,order_ids:ids})})
     .then(r=>r.json()).then(d=>{
       if(d.success){

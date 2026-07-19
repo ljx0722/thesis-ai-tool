@@ -1,0 +1,14 @@
+.git
+.github
+.claude
+.env
+.env.*
+__pycache__
+*.py[cod]
+*.db
+*.sqlite*
+data/
+test-results/
+node_modules/
+SYSTEM_REVIEW.md
+SYSTEM_FULL_REVIEW.md

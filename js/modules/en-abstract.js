@@ -42,7 +42,7 @@ window.runEnAI = function() {
   var token = sessionStorage.getItem('thesis_ai_token');
   fetch('/api/llm/analyze', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-    body: JSON.stringify({ module: 'en-abstract', system_prompt: '你是学术翻译与写作专家，精通中英文学术写作规范。', user_prompt: prompt, max_tokens: 2000 })
+    body: JSON.stringify({ capability_id: 'en-abstract', input: prompt, max_tokens: 2000 })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.success) {
       out.innerHTML = '<div class="ai-output">'+d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>';

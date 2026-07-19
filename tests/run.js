@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 学术论文AI一站式助手 — 自动化测试套件
+ * 论文搭子 ThesisBuddy — 自动化测试套件
  * 运行: node tests/run.js
  * 覆盖所有历史修复过的 Bug 和关键功能回归检查
  */
@@ -1373,11 +1373,15 @@ test('INTEGRITY: Section anchoring searches p+h1~h6 (not just h1-h3)', function(
 });
 
 // --- CATEGORY I: Test suite self-integrity ---
-test('INTEGRITY: No test() calls after process.exit in run.js', function() {
+test('INTEGRITY: All test declarations precede final result reporting', function() {
   var src=fs.readFileSync(path.join(projectRoot,'tests/run.js'),'utf8');
-  var exitIdx=src.lastIndexOf('process.exit');
-  var testAfter=src.indexOf('test(',exitIdx);
-  assert(testAfter<0,'test() calls found after process.exit - dead code!');
+  var resultMatches=[];
+  var resultRe=/^\/\/ Results\s*$/gm;
+  var match;
+  while((match=resultRe.exec(src))!==null)resultMatches.push(match.index);
+  var resultIdx=resultMatches.length?resultMatches[resultMatches.length-1]:-1;
+  var testAfter=resultIdx>=0?src.indexOf('\ntest(',resultIdx):-1;
+  assert(resultIdx>=0&&testAfter<0,'test() calls found after final result reporting');
 });
 
 // --- CATEGORY J: HTML load order ---
@@ -1689,6 +1693,73 @@ test('API: materials + pricing schedules exist', function() {
   assert(src.indexOf('/api/admin/ops_stats') >= 0, 'ops stats missing');
   assert(src.indexOf('payment/webhook') >= 0, 'payment webhook missing');
 });
+test('RECHARGE: free amount flow uses integer cents and explicit order state', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  var admin = fs.readFileSync(path.join(projectRoot, 'admin.html'), 'utf8');
+  var py = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  assert(html.indexOf('parseRechargeAmountFen') >= 0, 'frontend amount parser missing');
+  assert(html.indexOf('window._selectedAmountFen') >= 0, 'integer-cent frontend state missing');
+  assert(html.indexOf('金额已变化，请重新点击') >= 0, 'edited amount guard missing');
+  assert(html.indexOf("find(function(o){ return o.status === 'pending'; })") < 0, 'confirmPaid still guesses a pending order');
+  assert(admin.indexOf('parseAdminRechargeAmount') >= 0, 'admin amount parser missing');
+  assert(admin.indexOf('将按实收金额发放') >= 0, 'admin override confirmation missing');
+  assert(py.indexOf('_parse_yuan_to_fen') >= 0 && py.indexOf('Decimal(text)') >= 0, 'backend Decimal parsing missing');
+  assert(py.indexOf("status='pending' AND amount_fen=?") >= 0, 'pending reuse must use amount_fen');
+  assert(py.indexOf('RECHARGE_PAYMENT_METHODS') >= 0, 'payment method whitelist missing');
+  assert(py.indexOf('def _confirm_recharge_order') >= 0, 'shared confirmation helper missing');
+  assert(py.indexOf("int(float(order['amount_yuan']) * 1000)") < 0, 'legacy float credit conversion remains');
+  assert(py.indexOf('SUM(amount_yuan)') < 0, 'recharge summaries still use REAL amounts');
+});
+
+test('RECHARGE: amount parsers reject malformed and out-of-range values', function() {
+  function parse(raw) {
+    var text = String(raw == null ? '' : raw).trim();
+    if (!text || !/^\d+(?:\.\d{1,2})?$/.test(text)) return null;
+    var amount = Number(text);
+    if (!Number.isFinite(amount)) return null;
+    var fen = Math.round(amount * 100);
+    return fen >= 100 && fen <= 500000 ? fen : null;
+  }
+  assert(parse('1') === 100, '1 yuan parsing failed');
+  assert(parse('1.01') === 101, 'cent parsing failed');
+  assert(parse('5000.00') === 500000, 'max amount parsing failed');
+  ['', 'abc', '1abc', 'NaN', 'Infinity', '1e3', '0.99', '5000.01', '1.001'].forEach(function(v) {
+    assert(parse(v) === null, 'invalid amount accepted: ' + v);
+  });
+});
+
+test('RECHARGE: backend Decimal parser and confirmation are exact', function() {
+  var cp = require('child_process');
+  var script = [
+    'import os, tempfile, json',
+    'tmp=tempfile.mkdtemp()',
+    "os.environ['DB_PATH']=os.path.join(tmp,'test.db')",
+    "os.environ['JWT_SECRET']='test-secret'",
+    "os.environ['ADMIN_SECRET']='test-admin'",
+    'import kg_server as k',
+    "assert k._parse_yuan_to_fen('1') == 100",
+    "assert k._parse_yuan_to_fen('1.01') == 101",
+    "assert k._parse_yuan_to_fen('5000.00') == 500000",
+    "for value in (None,'','NaN','Infinity','-Infinity','0.99','5000.01','1.001'):",
+    '    try: k._parse_yuan_to_fen(value)',
+    '    except ValueError: pass',
+    "    else: raise AssertionError('accepted '+repr(value))",
+    'db=k.get_db()',
+    "db.execute(\"INSERT INTO users(username,password_hash,credits,created_at) VALUES('tester','x',0,datetime('now'))\")",
+    "uid=db.execute(\"SELECT id FROM users WHERE username='tester'\").fetchone()['id']",
+    "db.execute(\"INSERT INTO recharge_orders(user_id,amount_yuan,amount_fen,status,payment_method,created_at) VALUES(?,1.01,101,'submitted','alipay',datetime('now'))\",(uid,))",
+    "order=db.execute('SELECT * FROM recharge_orders').fetchone()",
+    "result,error=k._confirm_recharge_order(db,order,101,None,'test','confirm_order',('submitted',),'test')",
+    'assert error is None and result[\'points\'] == 1.01',
+    "assert db.execute('SELECT credits FROM users WHERE id=?',(uid,)).fetchone()['credits'] == 1010",
+    'db.rollback(); db.close()',
+    "print('ok')"
+  ].join('\n');
+  var result = cp.spawnSync('python', ['-c', script], {cwd: projectRoot, encoding: 'utf8', timeout: 20000});
+  if (result.error && result.error.code === 'ENOENT') result = cp.spawnSync('py', ['-3', '-c', script], {cwd: projectRoot, encoding: 'utf8', timeout: 20000});
+  assert(result.status === 0, 'backend recharge behavior failed: ' + (result.stderr || result.stdout || result.error || 'unknown'));
+});
+
 test('IMPORT: file accept includes doc and docx', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
   assert(html.indexOf('accept=".doc,.docx') >= 0 || html.indexOf("accept='.doc,.docx") >= 0 || html.indexOf('.doc,.docx') >= 0, 'accept doc/docx missing');
@@ -1745,29 +1816,36 @@ test('UX: two-path home exists', function() {
   assert(src.indexOf('上传') >= 0, 'upload path missing');
 });
 
-// Results
-// ============================================================
-console.log('\n=== RESULTS ===');
-console.log('  Passed:  ' + passed);
-console.log('  Failed:  ' + failed);
-console.log('  Warnings:' + warnings);
-console.log('  Total:   ' + (passed + failed + warnings));
+test('RELEASE: ThesisBuddy platform contracts are present', function() {
+  var py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
+  var html=fs.readFileSync(path.join(projectRoot,'index.html'),'utf8');
+  var modules=fs.readFileSync(path.join(projectRoot,'js/app-modules.js'),'utf8');
+  var project=fs.readFileSync(path.join(projectRoot,'js/modules/project.js'),'utf8');
+  var docker=fs.readFileSync(path.join(projectRoot,'Dockerfile'),'utf8');
+  assert(html.indexOf('论文搭子')>=0&&html.indexOf('ThesisBuddy')>=0,'brand migration missing');
+  assert(py.indexOf('manuscript_revisions')>=0&&py.indexOf('active_revision_id')>=0,'revision lifecycle missing');
+  assert(py.indexOf('CAPABILITY_REGISTRY')>=0&&py.indexOf('credit_reservations')>=0&&py.indexOf('ai_jobs')>=0,'safe AI platform missing');
+  assert(py.indexOf('/api/assistant/query')>=0&&py.indexOf('rag_chunks')>=0,'project RAG missing');
+  assert(modules.indexOf('openFigureAdvisor')>=0&&modules.indexOf('saveFigureArtifact')>=0,'figure advisor missing');
+  assert(modules.indexOf('openThemeStudio')>=0&&modules.indexOf('openBuddyAssistant')>=0,'theme/assistant UI missing');
+  assert(project.indexOf('bootstrapAuthenticatedUser')>=0&&project.indexOf('projectStorageKey')>=0,'user-scoped bootstrap missing');
+  assert(docker.indexOf('ENV ADMIN_PASSWORD="admin123"')<0,'default admin password remains in Dockerfile');
+  assert(py.indexOf("data.get('system_prompt'")<0,'client-controlled system prompt remains');
+});
 
-if (failed > 0) {
-  console.log('\n❌ TESTS FAILED — fix before deploying!');
-  process.exit(1);
-} else {
-  console.log('\n✅ All tests passed — ready to deploy.');
-  process.exit(0);
-}
-
+test('RELEASE: machine-readable changelog and health endpoints exist', function() {
+  var change=JSON.parse(fs.readFileSync(path.join(projectRoot,'static/changelog.json'),'utf8'));
+  var py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
+  assert(Array.isArray(change.entries)&&change.entries.some(function(e){return e.status==='released'&&e.commit;}),'released changelog entry missing');
+  assert(py.indexOf('/health/live')>=0&&py.indexOf('/health/ready')>=0&&py.indexOf('/api/version')>=0,'health/version endpoints missing');
+});
 
 // residual risk guards (string presence)
 try {
   const fs = require('fs');
   const ks = fs.readFileSync(require('path').join(__dirname, '..', 'kg_server.py'), 'utf8');
   function assertIncludes(label, s) {
-    if (!ks.includes(s)) { console.error('FAIL', label); process.exitCode = 1; }
+    if (!ks.includes(s)) { console.error('FAIL', label); failed++; }
     else console.log('OK', label);
   }
   assertIncludes('search price 500', "'search': 500");
@@ -1779,4 +1857,19 @@ try {
   assertIncludes('webhook hmac', 'compare_digest');
 } catch (e) { console.warn('residual tests skipped', e.message); }
 
-try{ const app=fs.readFileSync(require('path').join(__dirname,'..','app.js'),'utf8'); if(!app.includes('scrollInThesisBox')) {console.error('FAIL scrollInThesisBox'); process.exitCode=1;} else console.log('OK scrollInThesisBox'); if(!app.includes('openSearchConfigModal')) {console.error('FAIL search modal'); process.exitCode=1;} else console.log('OK search modal'); }catch(e){}
+try{ const app=fs.readFileSync(require('path').join(__dirname,'..','app.js'),'utf8'); if(!app.includes('scrollInThesisBox')) {console.error('FAIL scrollInThesisBox'); failed++;} else console.log('OK scrollInThesisBox'); if(!app.includes('openSearchConfigModal')) {console.error('FAIL search modal'); failed++;} else console.log('OK search modal'); }catch(e){failed++;}
+
+// Results
+// ============================================================
+console.log('\n=== RESULTS ===');
+console.log('  Passed:  ' + passed);
+console.log('  Failed:  ' + failed);
+console.log('  Warnings:' + warnings);
+console.log('  Total:   ' + (passed + failed + warnings));
+
+if (failed > 0) {
+  console.log('\n❌ TESTS FAILED — fix before deploying!');
+  process.exit(1);
+}
+console.log('\n✅ All tests passed — ready to deploy.');
+process.exit(0);
