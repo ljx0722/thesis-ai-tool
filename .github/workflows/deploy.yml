@@ -112,7 +112,9 @@ jobs:
           kubectl rollout status deployment/thesis-ai-tool -n ns-mzyybqj8 --timeout=240s
       - name: Production smoke test
         run: |
-          POD=$(kubectl get pods -n ns-mzyybqj8 -l app=thesis-ai-tool --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
+          kubectl wait -n ns-mzyybqj8 --for=condition=available deployment/thesis-ai-tool --timeout=120s
+          POD=$(kubectl get pods -n ns-mzyybqj8 --field-selector=status.phase=Running -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.ownerReferences[0].name}{"\n"}{end}' | awk '$1 ~ /^thesis-ai-tool-/ {print $1; exit}')
+          test -n "$POD"
           kubectl port-forward -n ns-mzyybqj8 pod/$POD 18080:5000 >/tmp/port-forward.log 2>&1 &
           PF_PID=$!
           trap 'kill $PF_PID || true' EXIT
