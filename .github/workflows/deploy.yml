@@ -112,7 +112,8 @@ jobs:
           kubectl rollout status deployment/thesis-ai-tool -n ns-mzyybqj8 --timeout=240s
       - name: Production smoke test
         run: |
-          kubectl port-forward -n ns-mzyybqj8 deployment/thesis-ai-tool 18080:5000 >/tmp/port-forward.log 2>&1 &
+          POD=$(kubectl get pods -n ns-mzyybqj8 -l app=thesis-ai-tool -o jsonpath='{.items[0].metadata.name}')
+          kubectl port-forward -n ns-mzyybqj8 pod/$POD 18080:5000 >/tmp/port-forward.log 2>&1 &
           PF_PID=$!
           trap 'kill $PF_PID || true' EXIT
           python - <<'PY'
@@ -127,5 +128,6 @@ jobs:
               except Exception:
                   time.sleep(2)
           else:
+              print(open('/tmp/port-forward.log', encoding='utf-8', errors='replace').read())
               raise SystemExit('production readiness smoke failed')
           PY
