@@ -8,7 +8,7 @@ ENV PYTHONUNBUFFERED=1
 ENV APP_VERSION=$APP_VERSION
 ENV BUILD_SHA=$BUILD_SHA
 ENV BUILD_TIME=$BUILD_TIME
-RUN addgroup --system thesisbuddy && adduser --system --ingroup thesisbuddy thesisbuddy
+RUN addgroup --system --gid 999 thesisbuddy && adduser --system --uid 999 --ingroup thesisbuddy thesisbuddy
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=thesisbuddy:thesisbuddy . .

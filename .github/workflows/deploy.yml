@@ -108,7 +108,7 @@ jobs:
             DB_PATH=/app/data/thesis.db \
             MATERIALS_DIR=/app/data/materials \
             SNAPSHOTS_DIR=/tmp/thesisbuddy-snapshots
-          kubectl patch deployment/thesis-ai-tool -n ns-mzyybqj8 --type='strategic' -p '{"spec":{"template":{"spec":{"securityContext":{"fsGroup":999},"containers":[{"name":"thesis-ai-tool","securityContext":{"runAsNonRoot":true,"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}}}'
+          kubectl patch deployment/thesis-ai-tool -n ns-mzyybqj8 --type='strategic' -p '{"spec":{"template":{"spec":{"securityContext":{"fsGroup":999},"containers":[{"name":"thesis-ai-tool","securityContext":{"runAsUser":999,"runAsGroup":999,"runAsNonRoot":true,"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}}}'
           kubectl set image deployment/thesis-ai-tool -n ns-mzyybqj8 thesis-ai-tool=${{ env.IMAGE }}@${{ needs.build.outputs.digest }}
           kubectl rollout status deployment/thesis-ai-tool -n ns-mzyybqj8 --timeout=240s
       - name: Production smoke test
