@@ -107,11 +107,11 @@ jobs:
             DEEPSEEK_API_KEY="${{ secrets.DEEPSEEK_API_KEY }}" \
             DB_PATH=/app/data/thesis.db \
             MATERIALS_DIR=/app/data/materials \
-            SNAPSHOTS_DIR=/app/data/snapshots
+            SNAPSHOTS_DIR=/tmp/thesisbuddy-snapshots
+          kubectl patch deployment/thesis-ai-tool -n ns-mzyybqj8 --type='strategic' -p '{"spec":{"template":{"spec":{"securityContext":{"fsGroup":999},"containers":[{"name":"thesis-ai-tool","securityContext":{"runAsNonRoot":true,"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}}}'
           kubectl set image deployment/thesis-ai-tool -n ns-mzyybqj8 thesis-ai-tool=${{ env.IMAGE }}@${{ needs.build.outputs.digest }}
           kubectl rollout status deployment/thesis-ai-tool -n ns-mzyybqj8 --timeout=240s
       - name: Production smoke test
-        continue-on-error: true
         run: |
           kubectl wait -n ns-mzyybqj8 --for=condition=available deployment/thesis-ai-tool --timeout=120s
           kubectl get pods -n ns-mzyybqj8 -o wide
