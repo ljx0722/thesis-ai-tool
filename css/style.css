@@ -1867,6 +1867,17 @@ body.dark /* bar uses --bg-topbar */
 .figure-stage.ready>span{background:var(--success-bg);color:var(--success)}
 .figure-stage b{font-size:var(--font-size-xs);color:var(--text-primary)}
 .figure-stage p{margin:3px 0 0;white-space:normal;word-break:break-word;color:var(--text-muted);font-size:var(--font-size-xs);line-height:1.45}
+.figure-section-title{margin:12px 0 6px;font-size:var(--font-size-sm);font-weight:700;color:var(--text-primary)}
+.figure-preview-card{margin:12px 0;padding:12px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg-card)}
+.figure-preview-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:8px}
+.figure-preview-head b{color:var(--text-primary)}
+.figure-preview-head span{color:var(--text-muted);font-size:var(--font-size-xs)}
+.figure-preview-card svg{width:100%;height:auto;display:block;border-radius:10px;background:var(--surface-alt)}
+.figure-preview-card p{margin:8px 0 0;color:var(--text-muted);font-size:var(--font-size-xs);line-height:1.5}
+.figure-preview-title{fill:var(--text-primary);font-size:16px;font-weight:700}
+.figure-advanced{margin-top:10px;border:1px solid var(--border-light);border-radius:var(--radius-sm);background:var(--surface-alt)}
+.figure-advanced summary{cursor:pointer;padding:9px 10px;color:var(--text-secondary);font-weight:600}
+.figure-advanced pre,.figure-code{white-space:pre-wrap;word-break:break-word;margin:6px 0 0;font-size:var(--font-size-xs);line-height:1.45}
 .capability-notice{margin:0 0 12px}
 .capability-empty{text-align:center;padding:40px 16px;color:var(--text-secondary)}
 .capability-empty h4{margin:0 0 8px;color:var(--text-primary)}

@@ -1093,16 +1093,62 @@ function runFigureAdvisor(materialId){
     window._figureAdvisorArtifact={schemaVersion:3,claim:claim,claimTypes:claimTypes,materialId:materialId,materialName:materialName,journal:document.getElementById('figureJournal').value,preferredChapterId:chosenChapter,profile:{rows:rows.length,columns:headers,numeric:numeric,categorical:categorical,missing:missing},templateIds:templateIds,recommendations:advice,warnings:warnings,qa:qa,renderSpec:null,code:null,render:null,createdAt:new Date().toISOString()};
     return window._figureAdvisorArtifact;
   });}
+  function renderFigurePreview(csvText,spec,profile){
+    var lines=String(csvText||'').split(/\r?\n/).filter(function(x){return x.trim();});
+    if(lines.length<2)return '<div class="finding warn">数据不足，无法生成预览。</div>';
+    var sep=(lines[0]||'').indexOf('\t')>=0?'\t':',';
+    function parseLine(line){var out=[],cur='',quoted=false;for(var i=0;i<line.length;i++){var ch=line[i];if(ch==='"'){if(quoted&&line[i+1]==='"'){cur+='"';i++;}else quoted=!quoted;}else if(ch===sep&&!quoted){out.push(cur);cur='';}else cur+=ch;}out.push(cur);return out;}
+    var headers=parseLine(lines[0]).map(function(x){return x.trim();});
+    var rows=lines.slice(1,50001).map(function(line){var vals=parseLine(line),obj={};headers.forEach(function(h,i){obj[h]=vals[i]==null?'':vals[i].trim();});return obj;});
+    var chartType=spec.chart_type,cols=spec.columns||{},x=cols.x||'',y=cols.y||cols.value||'';
+    var width=920,height=460,pad={l:72,r:28,t:52,b:92},pw=width-pad.l-pad.r,ph=height-pad.t-pad.b;
+    var colors=['#0072B2','#D55E00','#009E73','#CC79A7','#E69F00','#56B4E9','#F0E442','#000000'];
+    function escSvg(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+    function num(v){var n=Number(String(v).replace(/,/g,''));return isFinite(n)?n:null;}
+    function quantile(arr,q){if(!arr.length)return 0;var a=arr.slice().sort(function(a,b){return a-b;}),p=(a.length-1)*q,i=Math.floor(p),f=p-i;return a[i]+((a[i+1]==null?a[i]:a[i+1])-a[i])*f;}
+    function nice(n){if(Math.abs(n)>=10000)return (n/1000).toFixed(1)+'k';if(Math.abs(n)>=100)return Math.round(n);if(Math.abs(n)>=10)return n.toFixed(1);return n.toFixed(2);}
+    var marks='',axes='',legend='',caption='',title=spec.title||'科研图表预览';
+    if(chartType==='histogram'){
+      var vals=rows.map(function(r){return num(r[x]);}).filter(function(v){return v!=null;}),bins=24,min=Math.min.apply(null,vals),max=Math.max.apply(null,vals);if(!vals.length)return '<div class="finding warn">所选列没有可绘制数值。</div>';var span=max-min||1,counts=new Array(bins).fill(0);vals.forEach(function(v){counts[Math.min(bins-1,Math.floor((v-min)/span*bins))]++;});var mc=Math.max.apply(null,counts)||1,bw=pw/bins;counts.forEach(function(c,i){var h=c/mc*ph;marks+='<rect x="'+(pad.l+i*bw+1)+'" y="'+(pad.t+ph-h)+'" width="'+Math.max(1,bw-2)+'" height="'+h+'" fill="'+colors[0]+'" opacity=".82"/>';});axes='<text x="'+(pad.l+pw/2)+'" y="'+(height-20)+'" text-anchor="middle">'+escSvg(x)+'</text><text transform="translate(18 '+(pad.t+ph/2)+') rotate(-90)" text-anchor="middle">频数</text>';caption='分布范围 '+nice(min)+'–'+nice(max)+'，n='+vals.length;
+    }else if(chartType==='box'){
+      var groups={};rows.forEach(function(r){var k=r[x]||'未分类',v=num(r[y]);if(v!=null)(groups[k]||(groups[k]=[])).push(v);});var keys=Object.keys(groups).sort(function(a,b){return groups[b].length-groups[a].length;}).slice(0,12),all=[];keys.forEach(function(k){all=all.concat(groups[k]);});if(!all.length)return '<div class="finding warn">所选分组/数值列无法绘图。</div>';var ymin=Math.min.apply(null,all),ymax=Math.max.apply(null,all),ys=ymax-ymin||1,gw=pw/Math.max(1,keys.length);keys.forEach(function(k,i){var a=groups[k],q1=quantile(a,.25),med=quantile(a,.5),q3=quantile(a,.75),lo=quantile(a,.05),hi=quantile(a,.95),cx=pad.l+(i+.5)*gw,sy=function(v){return pad.t+ph-(v-ymin)/ys*ph;};marks+='<line x1="'+cx+'" y1="'+sy(lo)+'" x2="'+cx+'" y2="'+sy(hi)+'" stroke="'+colors[i%colors.length]+'"/><rect x="'+(cx-gw*.28)+'" y="'+sy(q3)+'" width="'+(gw*.56)+'" height="'+Math.max(2,sy(q1)-sy(q3))+'" fill="'+colors[i%colors.length]+'" opacity=".35" stroke="'+colors[i%colors.length]+'"/><line x1="'+(cx-gw*.28)+'" y1="'+sy(med)+'" x2="'+(cx+gw*.28)+'" y2="'+sy(med)+'" stroke="var(--text-primary)" stroke-width="2"/><text x="'+cx+'" y="'+(height-48)+'" transform="rotate(-32 '+cx+' '+(height-48)+')" text-anchor="end">'+escSvg(k.slice(0,18))+'</text>';});axes='<text x="'+(pad.l+pw/2)+'" y="'+(height-12)+'" text-anchor="middle">'+escSvg(x)+'</text><text transform="translate(18 '+(pad.t+ph/2)+') rotate(-90)" text-anchor="middle">'+escSvg(y)+'</text>';caption='箱体为 Q1–Q3，中线为中位数，须线为 5%–95%；显示频数最高的 '+keys.length+' 组';
+    }else if(chartType==='bar'){
+      var ag={};rows.forEach(function(r){var k=r[x]||'未分类',v=num(r[y]);if(!ag[k])ag[k]={sum:0,n:0};if(v!=null){ag[k].sum+=v;ag[k].n++;}});var keys=Object.keys(ag).filter(function(k){return ag[k].n;}).sort(function(a,b){return ag[b].n-ag[a].n;}).slice(0,14),vals=keys.map(function(k){return ag[k].sum/ag[k].n;}),max=Math.max.apply(null,vals)||1,bw=pw/Math.max(1,keys.length);keys.forEach(function(k,i){var h=vals[i]/max*ph;marks+='<rect x="'+(pad.l+i*bw+bw*.16)+'" y="'+(pad.t+ph-h)+'" width="'+(bw*.68)+'" height="'+h+'" rx="3" fill="'+colors[i%colors.length]+'"/><text x="'+(pad.l+(i+.5)*bw)+'" y="'+(pad.t+ph-h-7)+'" text-anchor="middle">'+nice(vals[i])+'</text><text x="'+(pad.l+(i+.5)*bw)+'" y="'+(height-48)+'" transform="rotate(-32 '+(pad.l+(i+.5)*bw)+' '+(height-48)+')" text-anchor="end">'+escSvg(k.slice(0,18))+'</text>';});axes='<text x="'+(pad.l+pw/2)+'" y="'+(height-12)+'" text-anchor="middle">'+escSvg(x)+'</text><text transform="translate(18 '+(pad.t+ph/2)+') rotate(-90)" text-anchor="middle">平均 '+escSvg(y)+'</text>';caption='按 '+x+' 分组计算 '+y+' 均值；显示样本量最高的 '+keys.length+' 组';
+    }else if(chartType==='line'){
+      var pts=rows.map(function(r){var d=Date.parse(r[x]),v=num(r[y]);return isFinite(d)&&v!=null?[d,v]:null;}).filter(Boolean).sort(function(a,b){return a[0]-b[0];});if(!pts.length)return '<div class="finding warn">时间列或数值列无法解析。</div>';var bucket=Math.max(1,Math.ceil(pts.length/300)),series=[];for(var i=0;i<pts.length;i+=bucket){var slice=pts.slice(i,i+bucket);series.push([slice[0][0],slice.reduce(function(s,p){return s+p[1];},0)/slice.length]);}var xmin=series[0][0],xmax=series[series.length-1][0],ys=series.map(function(p){return p[1];}),ymin=Math.min.apply(null,ys),ymax=Math.max.apply(null,ys),path=series.map(function(p,i){var px=pad.l+(p[0]-xmin)/(xmax-xmin||1)*pw,py=pad.t+ph-(p[1]-ymin)/(ymax-ymin||1)*ph;return(i?'L':'M')+px.toFixed(1)+' '+py.toFixed(1);}).join(' ');marks='<path d="'+path+'" fill="none" stroke="'+colors[0]+'" stroke-width="2"/>';axes='<text x="'+(pad.l+pw/2)+'" y="'+(height-20)+'" text-anchor="middle">'+escSvg(x)+'</text><text transform="translate(18 '+(pad.t+ph/2)+') rotate(-90)" text-anchor="middle">'+escSvg(y)+'</text>';caption='按时间排序并降采样至 '+series.length+' 个点；原始 n='+pts.length;
+    }else{
+      var pts=rows.map(function(r){var xv=num(r[x]),yv=num(r[y]);return xv!=null&&yv!=null?[xv,yv]:null;}).filter(Boolean);if(!pts.length)return '<div class="finding warn">散点图需要两个连续数值列，当前选择不满足。</div>';var sample=pts.length>3000?pts.filter(function(_,i){return i%Math.ceil(pts.length/3000)===0;}):pts,xv=sample.map(function(p){return p[0];}),yv=sample.map(function(p){return p[1];}),xmin=Math.min.apply(null,xv),xmax=Math.max.apply(null,xv),ymin=Math.min.apply(null,yv),ymax=Math.max.apply(null,yv);sample.forEach(function(p){var px=pad.l+(p[0]-xmin)/(xmax-xmin||1)*pw,py=pad.t+ph-(p[1]-ymin)/(ymax-ymin||1)*ph;marks+='<circle cx="'+px+'" cy="'+py+'" r="2.5" fill="'+colors[0]+'" opacity=".35"/>';});axes='<text x="'+(pad.l+pw/2)+'" y="'+(height-20)+'" text-anchor="middle">'+escSvg(x)+'</text><text transform="translate(18 '+(pad.t+ph/2)+') rotate(-90)" text-anchor="middle">'+escSvg(y)+'</text>';caption='浏览器预览最多抽样 3000 点；原始有效 n='+pts.length;
+    }
+    var svg='<svg viewBox="0 0 '+width+' '+height+'" role="img" aria-label="'+escSvg(title)+'"><rect width="100%" height="100%" rx="12" fill="var(--bg-card)"/><text x="'+(width/2)+'" y="28" text-anchor="middle" class="figure-preview-title">'+escSvg(title)+'</text><line x1="'+pad.l+'" y1="'+(pad.t+ph)+'" x2="'+(pad.l+pw)+'" y2="'+(pad.t+ph)+'" stroke="var(--border)"/><line x1="'+pad.l+'" y1="'+pad.t+'" x2="'+pad.l+'" y2="'+(pad.t+ph)+'" stroke="var(--border)"/>'+marks+axes+legend+'</svg>';
+    return '<section class="figure-preview-card"><div class="figure-preview-head"><b>可视化预览</b><span>浏览器本地渲染 · 未上传第三方</span></div>'+svg+'<p>'+escapeModuleHtml(caption)+'</p><div class="ai-actions"><button type="button" class="ai-btn-clear" onclick="downloadFigurePreviewSvg()">下载 SVG</button></div></section>';
+  }
   function renderBackendArtifact(d){
     var allowed=['distribution-histogram','box-strip','violin-strip','categorical-bar','stacked-bar','scatter-regression','time-series-band','correlation-heatmap','matrix-heatmap','roc-pr','confusion-matrix','cross-validation','hyperparameter-heatmap','feature-importance','shap-beeswarm','shap-dependence','shap-waterfall','pca-projection','cluster-projection','sensitivity-line','ablation-comparison','forecast-actual','residual-distribution','acf-pacf','radar-profile','scatter','line','bar','histogram','box','violin','heatmap'];
     var recs=d.recommendations||d.alternatives||[],accepted=recs.map(function(r){if(typeof r==='string')return {template_id:r,id:r,label:r};return r;}).filter(function(r){return allowed.indexOf(r.template_id||r.templateId||r.id||r.chart_type)>=0;});
+    if(!accepted.length&&d.plan)accepted=[{template_id:d.plan.template_id||d.plan.chart_type,id:d.plan.template_id||d.plan.chart_type,label:d.plan.reason||d.plan.chart_type,chart_type:d.plan.chart_type,reason:d.plan.reason||'',columns:d.plan.columns||{}}];
     var rejected=recs.length-accepted.length,warnings=(d.quality_warnings||d.warnings||[]).slice();if(rejected)warnings.push(rejected+' 个非白名单图型已拦截。');
-    var qa=d.qa||d.quality_assurance||[];var stages=[['数据画像',d.profile],['推荐方案',accepted],['渲染规范',d.render_spec||d.plan],['代码',d.code],['渲染产物',d.render||{executed:false,policy:'never-on-server'}],['质量检查',qa]];
-    result.innerHTML='<div class="figure-workflow">'+stages.map(function(s,i){var value=s[1],ready=value&&(Array.isArray(value)?value.length:typeof value==='string'?value.length:Object.keys(value||{}).length);return '<section class="figure-stage '+(ready?'ready':'pending')+'"><span>'+(i+1)+'</span><div><b>'+s[0]+'</b><p>'+(ready?escapeModuleHtml(typeof value==='string'?value:JSON.stringify(value,null,2)).replace(/\n/g,'<br>'):'等待后端产物')+'</p></div></section>';}).join('')+'</div>'+(warnings.length?'<div class="finding warn"><b>质量警告</b><br>'+warnings.map(escapeModuleHtml).join('<br>')+'</div>':'')+'<div class="ai-actions" data-sticky-actions><button class="ai-btn-clear" onclick="saveFigureArtifact(\''+materialId+'\')">保存 Figure Artifact</button><button class="ai-btn" onclick="switchModule(\'data-analysis\');closeAccountModal()">返回绘图</button></div>';
-    window._figureAdvisorArtifact={schemaVersion:3,claim:claim,claimTypes:intent.claim_types,materialId:materialId,materialName:materialName,journal:intent.journal_profile,preferredChapterId:intent.chapter_id,profile:d.profile||{},templateIds:accepted.map(function(r){return r.template_id||r.templateId||r.id||r.chart_type;}),recommendations:accepted,warnings:warnings,qa:qa,renderSpec:d.render_spec||d.plan||null,code:d.code||null,render:d.render||null,createdAt:new Date().toISOString()};
+    var qa=d.qa||d.quality_assurance||[];
+    var previewHtml=d.previewHtml||'';
+    var profileSummary=d.profile||{};
+    var profileText=escapeModuleHtml((profileSummary.rows||0)+' 行 · '+(profileSummary.numeric||[]).length+' 连续 · '+(profileSummary.categorical||[]).length+' 分类');
+    var recHtml=accepted.map(function(r,i){return '<div class="finding '+(i===0?'ok':'info')+'"><b>'+(i+1)+'. '+escapeModuleHtml(r.label||r.reason||r.template_id||r.chart_type||'推荐')+'</b><br>图型：'+escapeModuleHtml(r.chart_type||r.template_id||'')+(r.columns?' · 字段：'+escapeModuleHtml(JSON.stringify(r.columns)):'')+'</div>';}).join('')||'<div class="finding warn">暂无推荐方案</div>';
+    var code=d.code||'';
+    result.innerHTML=
+      '<div class="finding ok"><b>数据画像</b><br>'+profileText+'</div>'+
+      '<div class="figure-section-title">推荐方案</div>'+recHtml+
+      previewHtml+
+      '<details class="figure-advanced"><summary>渲染规范 / 代码 / 质检（高级）</summary>'+
+      '<div class="finding info"><b>渲染规范</b><pre>'+escapeModuleHtml(JSON.stringify(d.render_spec||d.plan||{},null,2))+'</pre></div>'+
+      '<div class="finding info"><b>可复现代码</b><pre class="figure-code">'+escapeModuleHtml(code)+'</pre></div>'+
+      '<div class="finding info"><b>渲染策略</b><br>executed=false · never-on-server · 预览在浏览器本地完成</div>'+
+      '<div class="finding '+(qa&&qa.passed!==false?'ok':'warn')+'"><b>质量检查</b><pre>'+escapeModuleHtml(JSON.stringify(qa,null,2))+'</pre></div>'+
+      '</details>'+
+      (warnings.length?'<div class="finding warn"><b>质量警告</b><br>'+warnings.map(escapeModuleHtml).join('<br>')+'</div>':'')+
+      '<div class="ai-actions" data-sticky-actions><button class="ai-btn-clear" onclick="saveFigureArtifact(\''+materialId+'\')">保存 Figure Artifact</button><button class="ai-btn" onclick="switchModule(\'data-analysis\');closeAccountModal()">返回绘图</button></div>';
+    window._figureAdvisorArtifact={schemaVersion:3,claim:claim,claimTypes:intent.claim_types,materialId:materialId,materialName:materialName,journal:intent.journal_profile,preferredChapterId:intent.chapter_id,profile:d.profile||{},templateIds:accepted.map(function(r){return r.template_id||r.templateId||r.id||r.chart_type;}),recommendations:accepted,warnings:warnings,qa:qa,renderSpec:d.render_spec||d.plan||null,code:code,render:d.render||null,previewSvg:window._lastFigurePreviewSvg||'',createdAt:new Date().toISOString()};
   }
   function runBackendLoop(){
-    result.innerHTML='<div class="finding info">正在读取数据并完成画像 → 推荐 → 代码 → 质检闭环…</div>';
+    result.innerHTML='<div class="finding info">正在读取数据并完成画像 → 推荐 → 预览 → 代码 → 质检闭环…</div>';
     return fetch('/api/materials/'+encodeURIComponent(materialId),{headers:authJsonHeaders()}).then(function(r){
       if(!r.ok)throw new Error('资料读取失败');
       return r.text();
@@ -1112,9 +1158,10 @@ function runFigureAdvisor(materialId){
         if(!profile.columns&&profileResp.columns)profile={n_rows:profileResp.n_rows,columns:profileResp.columns};
         return fetch('/api/figures/plan',{method:'POST',headers:authJsonHeaders(),body:JSON.stringify({profile:profile,claim:claim,claim_types:intent.claim_types,journal_profile:intent.journal_profile,chapter_id:intent.chapter_id,material_id:materialId})}).then(function(r){return r.json().then(function(d){if(!r.ok||d.success===false)throw new Error(d.error||'图型推荐失败');return d;});}).then(function(planResp){
           var plan=planResp.plan||planResp;
+          var recs=plan.recommendations||[];
           var chartType=plan.chart_type||mapTemplateToChartType((plan.template_id||plan.templateId||''));
           var templateId=plan.template_id||plan.templateId||chartType;
-          var recommendations=[{template_id:templateId,id:templateId,label:plan.reason||templateId,chart_type:chartType,reason:plan.reason||''}];
+          var recommendations=recs.length?recs:[{template_id:templateId,id:templateId,label:plan.reason||templateId,chart_type:chartType,reason:plan.reason||'',columns:plan.columns||{}}];
           var spec={
             chart_type:chartType,
             palette:plan.palette||'categorical',
@@ -1129,16 +1176,20 @@ function runFigureAdvisor(materialId){
             return fetch('/api/figures/qa',{method:'POST',headers:authJsonHeaders(),body:JSON.stringify({spec:codeResp.spec||spec,plan:plan,code:codeResp.code||''})}).then(function(r){return r.json().then(function(d){if(!r.ok||d.success===false)throw new Error(d.error||'图表质检失败');return d;});}).then(function(qaResp){
               var localProfile=profileToLocalShape(profile);
               var warnings=(qaResp.qa&&qaResp.qa.warnings)||qaResp.warnings||[];
-              if(plan.reason)warnings=warnings.slice();
+              if(plan.warnings&&plan.warnings.length)warnings=warnings.concat(plan.warnings);
+              var previewHtml=renderFigurePreview(text,codeResp.spec||spec,localProfile);
+              var m=previewHtml.match(/<svg[\s\S]*?<\/svg>/);
+              window._lastFigurePreviewSvg=m?m[0]:'';
               renderBackendArtifact({
                 profile:localProfile,
                 recommendations:recommendations,
                 plan:plan,
                 render_spec:codeResp.spec||spec,
                 code:codeResp.code||'',
-                render:{executed:false,execution_policy:codeResp.execution_policy||'never-on-server',language:codeResp.language||'python'},
+                render:{executed:false,execution_policy:codeResp.execution_policy||'never-on-server',language:codeResp.language||'python',preview:'browser-local-svg'},
                 qa:qaResp.qa||qaResp,
-                warnings:warnings
+                warnings:warnings,
+                previewHtml:previewHtml
               });
               return window._figureAdvisorArtifact;
             });
@@ -1149,8 +1200,14 @@ function runFigureAdvisor(materialId){
   }
   runBackendLoop().catch(function(){return localFallback();}).catch(function(e){result.innerHTML='<div class="finding err">'+escapeModuleHtml(e.message)+'</div>';});
 }
+function downloadFigurePreviewSvg(){
+  var svg=window._lastFigurePreviewSvg||(window._figureAdvisorArtifact&&window._figureAdvisorArtifact.previewSvg)||'';
+  if(!svg){if(typeof ttp==='function')ttp('暂无可下载预览');return;}
+  var blob=new Blob([svg],{type:'image/svg+xml;charset=utf-8'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='figure-preview.svg';document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(a.href);},500);
+}
 function saveFigureArtifact(materialId){var a=window._figureAdvisorArtifact;if(!a)return;try{var p=window.ThesisProject&&ThesisProject.getCurrentProject?ThesisProject.getCurrentProject():null;if(!p)throw new Error('请先创建项目');p.artifacts=p.artifacts||{};p.artifacts.figures=p.artifacts.figures||[];p.artifacts.figurePlans=p.artifacts.figurePlans||[];a.id='fig_'+Date.now().toString(36);a.sourceMaterialId=materialId;var plan=buildDynamicFigurePlan(a);if(a.preferredChapterId)plan.items.forEach(function(item){item.chapterId=a.preferredChapterId;});p.artifacts.figures.unshift(a);p.artifacts.figurePlans.unshift(plan);ThesisProject.updateCurrent({artifacts:p.artifacts});ThesisProject.logSkillRun({moduleId:'figure-advisor',title:'科研图表顾问',summary:a.claim});if(typeof ttp==='function')ttp('图表草案与项目绘图计划已保存');}catch(e){alert(e.message);}}
-window.openFigureAdvisor=openFigureAdvisor;window.runFigureAdvisor=runFigureAdvisor;window.saveFigureArtifact=saveFigureArtifact;
+window.openFigureAdvisor=openFigureAdvisor;window.runFigureAdvisor=runFigureAdvisor;window.saveFigureArtifact=saveFigureArtifact;window.downloadFigurePreviewSvg=downloadFigurePreviewSvg;
 
 function handleDataFile(input){
   var f=input.files[0];if(!f)return;

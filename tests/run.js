@@ -2133,8 +2133,10 @@ test('FIGURE: advisor closed loop uses profile/plan/render-code/qa', function() 
   assert(js.indexOf('/api/data/profile')>=0&&js.indexOf('/api/figures/plan')>=0,'figure advisor profile/plan wiring missing');
   assert(js.indexOf('/api/figures/render-code')>=0&&js.indexOf('/api/figures/qa')>=0,'figure advisor code/qa wiring missing');
   assert(js.indexOf('/api/figures/advisor')<0,'legacy figures/advisor path must not remain');
+  assert(js.indexOf('function renderFigurePreview')>=0&&js.indexOf('downloadFigurePreviewSvg')>=0,'browser-local figure preview missing');
   assert(py.indexOf("@app.route('/api/data/profile'")>=0&&py.indexOf("@app.route('/api/figures/plan'")>=0,'backend figure loop routes missing');
   assert(py.indexOf("execution_policy': 'never-on-server'")>=0||py.indexOf('never-on-server')>=0,'server-side figure execution must stay disabled');
+  assert(py.indexOf("add_rec('box'")>=0||py.indexOf("add_rec('bar'")>=0,'smarter figure plan recommendations missing');
 });
 
 // residual risk guards (string presence)

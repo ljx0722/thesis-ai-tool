@@ -5360,11 +5360,90 @@ def figure_plan():
     data = request.get_json(silent=True) or {}
     profile = data.get('profile') or {}
     columns = profile.get('columns') or [] if isinstance(profile, dict) else []
-    numeric = [c.get('name') for c in columns if c.get('dtype') == 'numeric']
-    categorical = [c.get('name') for c in columns if c.get('dtype') != 'numeric']
+    claim = str(data.get('claim') or '')
+    claim_types = data.get('claim_types') or []
+    if not isinstance(claim_types, list):
+        claim_types = []
+    numeric_cols, categorical_cols, binary_cols, datetime_cols = [], [], [], []
+    for c in columns:
+        name = c.get('name') or ''
+        dtype = c.get('dtype') or 'categorical'
+        stats = c.get('stats') or {}
+        unique = int(c.get('unique') or 0)
+        top_values = c.get('top_values') or []
+        lname = name.lower()
+        if dtype == 'numeric':
+            mn, mx = stats.get('min'), stats.get('max')
+            if unique <= 2 and mn in (0, 0.0) and mx in (1, 1.0):
+                binary_cols.append(name)
+            else:
+                numeric_cols.append(name)
+        else:
+            sample = ' '.join(str(v.get('value', '')) for v in top_values[:3])
+            if any(k in lname for k in ('time', 'date', '日期', '时间')) or re.search(r'\d{4}[-/]\d{1,2}[-/]\d{1,2}', sample):
+                datetime_cols.append(name)
+            else:
+                categorical_cols.append(name)
+    # Prefer scientific defaults: avoid scatter of ID vs metric; favor group comparison.
+    recommendations = []
+    def add_rec(chart_type, reason, cols, template_id=None, priority=0):
+        recommendations.append({
+            'template_id': template_id or chart_type,
+            'id': template_id or chart_type,
+            'chart_type': chart_type,
+            'label': reason,
+            'reason': reason,
+            'columns': cols,
+            'priority': priority,
+        })
+    group_col = next((c for c in categorical_cols if c and 'type' in c.lower()), None) or (categorical_cols[0] if categorical_cols else '')
+    project_col = next((c for c in categorical_cols if c and 'project' in c.lower()), None)
+    metric_col = numeric_cols[0] if numeric_cols else (binary_cols[0] if binary_cols else '')
+    rate_col = binary_cols[0] if binary_cols else ''
+    if group_col and metric_col:
+        add_rec('box', f'按 {group_col} 比较 {metric_col} 的分布，展示中位数/四分位并避免均值柱掩盖离群值', {'x': group_col, 'y': metric_col}, 'box-strip', 90)
+        add_rec('bar', f'按 {group_col} 汇总 {metric_col} 的组均值/计数（投稿时建议叠加样本量）', {'x': group_col, 'y': metric_col}, 'categorical-bar', 70)
+    if group_col and rate_col:
+        add_rec('bar', f'按 {group_col} 比较正常率 {rate_col}（0/1 二值字段按比例展示）', {'x': group_col, 'y': rate_col, 'value': rate_col}, 'categorical-bar', 95)
+    if project_col and metric_col and project_col != group_col:
+        add_rec('bar', f'按 {project_col} 比较 {metric_col} 的项目差异', {'x': project_col, 'y': metric_col}, 'categorical-bar', 65)
+    if metric_col:
+        add_rec('histogram', f'展示 {metric_col} 的整体分布，检查长尾与异常心跳间隔', {'x': metric_col}, 'distribution-histogram', 60)
+    if len(numeric_cols) >= 2:
+        add_rec('scatter', f'检查两个连续变量 {numeric_cols[0]} 与 {numeric_cols[1]} 的关系', {'x': numeric_cols[0], 'y': numeric_cols[1]}, 'scatter-regression', 50)
+    if datetime_cols and metric_col:
+        add_rec('line', f'按时间 {datetime_cols[0]} 观察 {metric_col} 的变化趋势', {'x': datetime_cols[0], 'y': metric_col}, 'time-series-band', 80)
+    if 'trend' in claim_types or re.search(r'趋势|时间|变化|周期', claim):
+        if datetime_cols and metric_col:
+            recommendations.sort(key=lambda r: (0 if r['chart_type'] == 'line' else 1, -r['priority']))
+    if not recommendations:
+        chart_type = 'bar'
+        cols = {'x': (categorical_cols or numeric_cols or [''])[0], 'y': (numeric_cols or binary_cols or [''])[0]}
+        add_rec(chart_type, '基于列类型选择单一主图形，避免双Y轴和无分布柱状图', cols, chart_type, 10)
+    recommendations.sort(key=lambda r: -r['priority'])
+    primary = recommendations[0]
     requested = data.get('chart_type')
-    chart_type = requested if requested in _FIGURE_TYPES else ('scatter' if len(numeric) >= 2 else ('bar' if categorical and numeric else 'histogram' if numeric else 'bar'))
-    plan = {'schema_version': 1, 'chart_type': chart_type, 'reason': '基于列类型选择单一主图形，避免双Y轴和无分布柱状图', 'columns': {'x': (categorical or numeric or [''])[0], 'y': (numeric or [''])[0]}, 'palette': 'categorical' if categorical else 'sequential', 'accessibility': {'table_view': True, 'color_not_only_encoding': True, 'grayscale_review': True}}
+    if requested in _FIGURE_TYPES:
+        match = next((r for r in recommendations if r['chart_type'] == requested), None)
+        if match:
+            primary = match
+        else:
+            primary = dict(primary)
+            primary['chart_type'] = requested
+    plan = {
+        'schema_version': 2,
+        'chart_type': primary['chart_type'],
+        'template_id': primary.get('template_id') or primary['chart_type'],
+        'reason': primary.get('reason') or '',
+        'columns': primary.get('columns') or {},
+        'palette': 'categorical' if (categorical_cols or binary_cols) else 'sequential',
+        'recommendations': recommendations[:5],
+        'warnings': [
+            '服务端不执行绘图代码；预览在浏览器本地完成',
+            'ID 类字段不适合作为散点横轴；优先分组比较与分布图',
+        ],
+        'accessibility': {'table_view': True, 'color_not_only_encoding': True, 'grayscale_review': True},
+    }
     return jsonify({'success': True, 'plan': plan})
 
 
