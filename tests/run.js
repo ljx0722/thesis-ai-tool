@@ -2136,7 +2136,19 @@ test('FIGURE: advisor closed loop uses profile/plan/render-code/qa', function() 
   assert(js.indexOf('function renderFigurePreview')>=0&&js.indexOf('downloadFigurePreviewSvg')>=0,'browser-local figure preview missing');
   assert(py.indexOf("@app.route('/api/data/profile'")>=0&&py.indexOf("@app.route('/api/figures/plan'")>=0,'backend figure loop routes missing');
   assert(py.indexOf("execution_policy': 'never-on-server'")>=0||py.indexOf('never-on-server')>=0,'server-side figure execution must stay disabled');
-  assert(py.indexOf("add_rec('box'")>=0||py.indexOf("add_rec('bar'")>=0,'smarter figure plan recommendations missing');
+  assert(py.indexOf("role = 'binary'")>=0&&py.indexOf("role = 'datetime'")>=0&&py.indexOf("role = 'identifier'")>=0,'semantic column-role classification missing');
+  assert(py.indexOf("column_roles")>=0,'column role metadata missing from figure plan');
+});
+
+test('TIME: Beijing timezone helpers and hourly client sync exist', function() {
+  var py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
+  var js=fs.readFileSync(path.join(projectRoot,'js/app-modules.js'),'utf8');
+  var docker=fs.readFileSync(path.join(projectRoot,'Dockerfile'),'utf8');
+  assert(py.indexOf("def now_beijing")>=0&&py.indexOf("Asia/Shanghai")>=0,'backend Beijing clock helpers missing');
+  assert(py.indexOf("@app.route('/api/time'")>=0,'server time endpoint missing');
+  assert(js.indexOf('initBeijingTimeSync')>=0||js.indexOf('syncBeijingTime')>=0,'frontend Beijing sync missing');
+  assert(js.indexOf('60*60*1000')>=0||js.indexOf('3600000')>=0,'hourly time sync interval missing');
+  assert(docker.indexOf('TZ=Asia/Shanghai')>=0,'container timezone not set to Beijing');
 });
 
 // residual risk guards (string presence)

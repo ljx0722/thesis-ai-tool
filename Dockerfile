@@ -8,7 +8,14 @@ ENV PYTHONUNBUFFERED=1
 ENV APP_VERSION=$APP_VERSION
 ENV BUILD_SHA=$BUILD_SHA
 ENV BUILD_TIME=$BUILD_TIME
-RUN addgroup --system --gid 999 thesisbuddy && adduser --system --uid 999 --ingroup thesisbuddy thesisbuddy
+ENV TZ=Asia/Shanghai
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tzdata \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone \
+    && rm -rf /var/lib/apt/lists/* \
+    && addgroup --system --gid 999 thesisbuddy \
+    && adduser --system --uid 999 --ingroup thesisbuddy thesisbuddy
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=thesisbuddy:thesisbuddy . .

@@ -26,6 +26,53 @@
   window.addEventListener('visibilitychange',function(){if(!document.hidden)poll();});
 })();
 
+(function initBeijingTimeSync(){
+  var clockOffsetMs=0,lastSyncAt=0,timer=null;
+  function applyServerTime(payload){
+    if(!payload)return;
+    var unix=Number(payload.unix_ms||0);
+    var parsed=Date.parse(payload.iso||payload.server_time||'');
+    var serverMs=unix||parsed;
+    if(!serverMs||!isFinite(serverMs))return;
+    clockOffsetMs=serverMs-Date.now();
+    lastSyncAt=Date.now();
+    window.__beijingClockOffsetMs=clockOffsetMs;
+    window.__beijingServerTime=payload.server_time||'';
+    window.__beijingTimezone=payload.timezone||'Asia/Shanghai';
+    try{localStorage.setItem('thesisbuddy_clock_offset_ms',String(clockOffsetMs));localStorage.setItem('thesisbuddy_clock_synced_at',String(lastSyncAt));}catch(e){}
+  }
+  function syncBeijingTime(){
+    return fetch('/api/time',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+      if(d&&(d.success||d.server_time||d.unix_ms))applyServerTime(d);
+      return d;
+    }).catch(function(){
+      return fetch('/api/version',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+        if(d&&d.server_time)applyServerTime({server_time:d.server_time,timezone:d.timezone||'Asia/Shanghai'});
+        return d;
+      });
+    }).catch(function(){return null;});
+  }
+  function beijingNow(){return new Date(Date.now()+Number(window.__beijingClockOffsetMs||0));}
+  function formatBeijing(date){
+    var d=date||beijingNow();
+    function p(n){return String(n).padStart(2,'0');}
+    return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+  }
+  window.syncBeijingTime=syncBeijingTime;
+  window.beijingNow=beijingNow;
+  window.formatBeijingTime=formatBeijing;
+  try{
+    var saved=Number(localStorage.getItem('thesisbuddy_clock_offset_ms')||0);
+    if(isFinite(saved)){clockOffsetMs=saved;window.__beijingClockOffsetMs=saved;}
+  }catch(e){}
+  window.addEventListener('DOMContentLoaded',function(){
+    syncBeijingTime();
+    if(timer)clearInterval(timer);
+    timer=setInterval(syncBeijingTime,60*60*1000); // hourly sync with Beijing server clock
+  });
+  window.addEventListener('visibilitychange',function(){if(!document.hidden)syncBeijingTime();});
+})();
+
 function escapeModuleHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function getSessionScope(){
   try{

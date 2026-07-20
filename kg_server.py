@@ -6,8 +6,23 @@ from flask import Flask, request, jsonify, send_file
 import math, random, json, re, os, html, time, threading, sqlite3, hashlib, secrets, csv, io, statistics
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
-from datetime import datetime, date
+from datetime import datetime, date, timezone, timedelta
 from decimal import Decimal, InvalidOperation
+
+try:
+    from zoneinfo import ZoneInfo
+    BEIJING_TZ = ZoneInfo('Asia/Shanghai')
+except Exception:
+    BEIJING_TZ = timezone(timedelta(hours=8))
+
+def now_beijing():
+    return datetime.now(BEIJING_TZ)
+
+def now_beijing_str(fmt='%Y-%m-%d %H:%M:%S'):
+    return now_beijing().strftime(fmt)
+
+def today_beijing():
+    return now_beijing().date()
 
 try:
     import jwt as pyjwt
@@ -22,6 +37,13 @@ except ImportError:
     HAS_REQUESTS = False
 
 app = Flask(__name__)
+os.environ.setdefault('TZ', 'Asia/Shanghai')
+try:
+    import time as _time
+    if hasattr(_time, 'tzset'):
+        _time.tzset()
+except Exception:
+    pass
 
 # ========== 数据库 ==========
 DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'thesis.db'))
@@ -994,7 +1016,7 @@ def search_baidu_xueshu(query, max_rows=80):
 def _consume_daily_quota(user_id, free_limit, price_key, usage_desc):
     """日免费额度用尽后按 price_key 扣点。返回 (ok, err, meta, http_status)。"""
     from datetime import date as _date
-    today = _date.today().isoformat()
+    today = _today_beijing().isoformat()
     prefix = usage_desc.split(':')[0]
     used = 0
     db = get_db()
@@ -1043,7 +1065,20 @@ def _consume_daily_quota(user_id, free_limit, price_key, usage_desc):
 # ========== 健康检查与版本 ==========
 @app.route('/health/live', methods=['GET'])
 def health_live():
-    return jsonify({'ok': True, 'service': 'ThesisBuddy', 'version': APP_VERSION, 'sha': BUILD_SHA})
+    return jsonify({'ok': True, 'service': 'ThesisBuddy', 'version': APP_VERSION, 'sha': BUILD_SHA, 'server_time': now_beijing_str(), 'timezone': 'Asia/Shanghai'})
+
+
+@app.route('/api/time', methods=['GET'])
+def api_time():
+    now = now_beijing()
+    return jsonify({
+        'success': True,
+        'timezone': 'Asia/Shanghai',
+        'server_time': now.strftime('%Y-%m-%d %H:%M:%S'),
+        'iso': now.isoformat(),
+        'unix_ms': int(now.timestamp() * 1000),
+        'offset_minutes': 480,
+    })
 
 @app.route('/health/ready', methods=['GET'])
 def health_ready():
@@ -1103,7 +1138,7 @@ def admin_runtime_status():
 
 @app.route('/api/version', methods=['GET'])
 def api_version():
-    return jsonify({'success': True, 'brand': '论文搭子', 'product': 'ThesisBuddy', 'version': APP_VERSION, 'commit': BUILD_SHA, 'build_time': BUILD_TIME, 'api_version': 1})
+    return jsonify({'success': True, 'brand': '论文搭子', 'product': 'ThesisBuddy', 'version': APP_VERSION, 'commit': BUILD_SHA, 'build_time': BUILD_TIME, 'api_version': 1, 'server_time': now_beijing_str(), 'timezone': 'Asia/Shanghai'})
 
 # ========== 统一检索 API ==========
 @app.route('/ping', methods=['GET'])
@@ -1641,7 +1676,7 @@ def auth_me():
         user = db.execute('SELECT id, username, credits, is_admin, invite_code, free_used_date FROM users WHERE id = ?',
                           (request.user_id,)).fetchone()
         if not user: return jsonify({'success': False, 'error': '用户不存在'}), 404
-        today = date.today().isoformat()
+        today = today_beijing().isoformat()
         return jsonify({'success': True, 'user': {
             'id': user['id'], 'username': user['username'],
             'credits': user['credits'], 'is_admin': bool(user['is_admin']),
@@ -1927,7 +1962,7 @@ def payment_balance():
     db = get_db()
     try:
         u = db.execute('SELECT credits, free_used_date FROM users WHERE id = ?', (request.user_id,)).fetchone()
-        today = date.today().isoformat()
+        today = today_beijing().isoformat()
         free_row = db.execute('SELECT used FROM daily_free_usage WHERE user_id = ? AND usage_date = ?',
                               (request.user_id, today)).fetchone()
         used = free_row['used'] if free_row else 0
@@ -1956,7 +1991,7 @@ def usage_check_free():
     """统一：返回今日免费本地操作 已用/上限/剩余。"""
     db = get_db()
     try:
-        today = date.today().isoformat()
+        today = today_beijing().isoformat()
         row = db.execute('SELECT used FROM daily_free_usage WHERE user_id = ? AND usage_date = ?',
                          (request.user_id, today)).fetchone()
         used = int(row['used']) if row else 0
@@ -1978,7 +2013,7 @@ def usage_mark_free():
     """兼容旧前端：消耗 1 次免费额度（计数+1，不再写成布尔）。"""
     db = get_db()
     try:
-        today = date.today().isoformat()
+        today = today_beijing().isoformat()
         free_limit = DAILY_FREE_OPS if 'DAILY_FREE_OPS' in globals() else 5
         db.execute('BEGIN IMMEDIATE')
         db.execute('INSERT OR IGNORE INTO daily_free_usage (user_id, usage_date, used) VALUES (?, ?, 0)',
@@ -2012,7 +2047,7 @@ def usage_module():
     # LLM modules should not use this endpoint for real charge
     db = get_db()
     try:
-        today = date.today().isoformat()
+        today = today_beijing().isoformat()
         free_limit = DAILY_FREE_OPS if 'DAILY_FREE_OPS' in globals() else 5
         db.execute('BEGIN IMMEDIATE')
         db.execute('INSERT OR IGNORE INTO daily_free_usage (user_id, usage_date, used) VALUES (?, ?, 0)',
@@ -2105,7 +2140,7 @@ def get_active_pricing_config():
     import json as _json
     db = get_db()
     try:
-        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        now = now_beijing_str()
         row = db.execute(
             "SELECT * FROM pricing_schedules WHERE effective_at <= ? ORDER BY effective_at DESC, id DESC LIMIT 1",
             (now,)
@@ -2511,7 +2546,7 @@ def llm_analyze():
             u = db.execute('SELECT credits FROM users WHERE id=?', (request.user_id,)).fetchone()
             current = int(u['credits'] or 0) if u else 0
             return jsonify({'success': False, 'error': f'点数不足。预计需 {est_credits/1000:.3f} 点，当前 {current/1000:.3f} 点', 'needed_points': round(est_credits/1000, 3), 'points': round(current/1000, 3)}), 402
-        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        now = now_beijing_str()
         db.execute("INSERT INTO ai_jobs(id,user_id,project_id,revision_id,capability_id,capability_version,idempotency_key,status,model,estimated_credits,created_at,started_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                    (job_id, request.user_id, project_id, revision_id, capability_id, capability['version'], idempotency_key, 'running', DEEPSEEK_MODEL, est_credits, now, now))
         db.execute("INSERT INTO credit_reservations(id,job_id,user_id,amount_credits,status,created_at) VALUES (?,?,?,?,?,?)",
@@ -2721,7 +2756,7 @@ def invite_apply():
                         (code, request.user_id)).fetchone()
         if not ic: return jsonify({'success': False, 'error': '邀请码无效或已被使用'}), 404
         # 邀请人每日上限
-        today = date.today().isoformat()
+        today = today_beijing().isoformat()
         used_today = db.execute(
             "SELECT COUNT(*) as c FROM invite_codes WHERE owner_id=? AND used_by IS NOT NULL AND used_at LIKE ?",
             (ic['owner_id'], today + '%')).fetchone()['c']
@@ -2873,7 +2908,7 @@ def admin_dashboard():
             except: pass
         if not authorized:
             return jsonify({'error': '无权限'}), 403
-        today = date.today().isoformat()
+        today = today_beijing().isoformat()
         total_users = db.execute('SELECT COUNT(*) as c FROM users').fetchone()['c']
         today_users = db.execute("SELECT COUNT(*) as c FROM users WHERE created_at LIKE ?", (today+'%',)).fetchone()['c']
         total_credits = db.execute('SELECT SUM(credits) as s FROM users').fetchone()['s'] or 0
@@ -2984,7 +3019,7 @@ def admin_credits():
             (uid, tx_type, amount, new_bal, reason))
         if notify:
             pts = abs(amount) / 1000.0
-            now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
+            now_str = now_beijing_str('%Y-%m-%d %H:%M')
             if amount > 0:
                 title = '系统管理员赠送点数'
                 body = f'系统管理员于 {now_str} 赠送了你 {pts:.3f} 点。原因：{reason}。当前余额 {new_bal/1000:.3f} 点。'
@@ -3117,7 +3152,7 @@ def admin_timeseries():
     db = get_db()
     try:
         from datetime import timedelta
-        today = date.today()
+        today = today_beijing()
         labels = []
         series = {
             'new_users': [],
@@ -3292,7 +3327,7 @@ def account_overview():
             (request.user_id,)).fetchone()
         if not u:
             return jsonify({'success': False, 'error': '用户不存在'}), 404
-        today = date.today().isoformat()
+        today = today_beijing().isoformat()
         free_row = db.execute(
             'SELECT used FROM daily_free_usage WHERE user_id=? AND usage_date=?',
             (request.user_id, today)).fetchone()
@@ -4098,7 +4133,7 @@ def admin_llm_economics():
         return jsonify({'success': False, 'error': '无权限'}), 403
     db = get_db()
     try:
-        today = date.today().isoformat()
+        today = today_beijing().isoformat()
         total_calls = db.execute('SELECT COUNT(*) as c FROM llm_usage').fetchone()['c']
         today_calls = db.execute("SELECT COUNT(*) as c FROM llm_usage WHERE created_at LIKE ?", (today+'%',)).fetchone()['c']
         api_cost_fen_total = db.execute('SELECT SUM(cost_credits) as s FROM llm_usage').fetchone()['s'] or 0
@@ -4177,7 +4212,7 @@ def _extract_material_text(row):
 def _index_material(db, row):
     text = _extract_material_text(row)
     db.execute('DELETE FROM rag_chunks WHERE material_id=? AND user_id=?', (row['id'], row['user_id']))
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = now_beijing_str()
     chunks = _split_rag_text(text)
     for idx, chunk in enumerate(chunks):
         db.execute('INSERT INTO rag_chunks(id,project_id,user_id,material_id,ordinal,heading,page_no,content,content_hash,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
@@ -4217,7 +4252,7 @@ def _load_revision_snapshot(db, project_id, user_id, revision_id=None):
 
 def _index_revision_context(db, project_id, user_id, revision_id, snapshot):
     db.execute('DELETE FROM project_context_chunks WHERE project_id=? AND user_id=? AND revision_id=?', (project_id, user_id, revision_id))
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = now_beijing_str()
     count = 0
     for section in _snapshot_sections(snapshot):
         for ordinal, chunk in enumerate(_split_rag_text(section['content'])):
@@ -4266,7 +4301,7 @@ def project_pipeline_runs(project_id):
         if error: return jsonify({'success': False, 'error': error}), 400
         pipeline_type = (data.get('pipeline_type') or 'decompose').strip()
         if pipeline_type not in ('decompose', 'context-index', 'full'): return jsonify({'success': False, 'error': '不支持的 pipeline_type'}), 400
-        run_id, now = 'run_'+secrets.token_hex(10), datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        run_id, now = 'run_'+secrets.token_hex(10), now_beijing_str()
         rid, snapshot = loaded['revision']['id'], loaded['snapshot']
         db.execute('INSERT INTO project_pipeline_runs(id,project_id,user_id,revision_id,pipeline_type,status,input_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)', (run_id, project_id, request.user_id, rid, pipeline_type, 'running', json.dumps(data.get('input') or {}, ensure_ascii=False), now, now))
         outputs = {}
@@ -4378,7 +4413,7 @@ def assistant_query():
             if not conversation: return jsonify({'success': False, 'error': '会话不存在'}), 404
         else:
             conversation_id = 'conv_'+secrets.token_hex(10)
-            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            now = now_beijing_str()
             db.execute('INSERT INTO assistant_conversations(id,project_id,user_id,title,revision_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?)', (conversation_id, project_id, request.user_id, question[:80], revision_id or None, now, now))
         db.commit()
     finally: db.close()
@@ -4393,7 +4428,7 @@ def assistant_query():
         if payload.get('content'): payload['answer'] = payload['content']
         db = get_db()
         try:
-            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            now = now_beijing_str()
             db.execute('INSERT INTO assistant_messages(id,conversation_id,role,content,sources_json,revision_id,created_at) VALUES (?,?,?,?,?,?,?)', ('msg_'+secrets.token_hex(10), conversation_id, 'user', question, '[]', revision_id or None, now))
             db.execute('INSERT INTO assistant_messages(id,conversation_id,role,content,sources_json,revision_id,created_at) VALUES (?,?,?,?,?,?,?)', ('msg_'+secrets.token_hex(10), conversation_id, 'assistant', payload.get('answer') or payload.get('content') or '', json.dumps(evidence, ensure_ascii=False), revision_id or None, now))
             db.execute('UPDATE assistant_conversations SET updated_at=?,revision_id=? WHERE id=?', (now, revision_id or None, conversation_id)); db.commit()
@@ -4461,7 +4496,7 @@ def project_revisions(project_id):
         user_dir = os.path.join(SNAPSHOTS_DIR, str(request.user_id), project_id)
         os.makedirs(user_dir, exist_ok=True)
         snapshot_path = os.path.join(user_dir, revision_id+'.json')
-        now=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        now=now_beijing_str()
         try:
             db.execute('BEGIN IMMEDIATE')
             existing = db.execute('SELECT * FROM manuscript_revisions WHERE project_id=? AND user_id=? AND content_hash=?', (project_id, request.user_id, content_hash)).fetchone()
@@ -4712,7 +4747,7 @@ def project_literature(project_id):
             return jsonify({'success': False, 'code': 'LITERATURE_VERSION_CONFLICT', 'error': '文献工作台已被其他会话更新', 'currentVersion': current}), 409
         next_version = current + 1
         literature['version'] = next_version
-        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        now = now_beijing_str()
         db.execute(
             "INSERT INTO project_artifacts(project_id,literature_json,literature_version,updated_at) VALUES(?,?,?,?) "
             "ON CONFLICT(project_id) DO UPDATE SET literature_json=excluded.literature_json,literature_version=excluded.literature_version,updated_at=excluded.updated_at",
@@ -4770,7 +4805,7 @@ def projects_upsert():
     if not pid:
         pid = 'p_' + secrets.token_hex(8)
     title = (p.get('title') or '未命名论文项目').strip()[:200]
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = now_beijing_str()
     stage_status = p.get('stageStatus') or {}
     artifacts = p.get('artifacts') or {}
     db = get_db()
@@ -4957,7 +4992,7 @@ def materials_upload(project_id):
             meta = _json.loads(request.form.get('meta') or '{}')
         except Exception:
             meta = {}
-        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        now = now_beijing_str()
         db.execute(
             'INSERT INTO project_materials(id, project_id, user_id, filename, kind, mime, size_bytes, storage_path, meta_json, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
             (mid, project_id, request.user_id, filename, kind, f.mimetype or '', len(raw), storage_path, _json.dumps(meta, ensure_ascii=False), now)
@@ -5047,7 +5082,7 @@ def admin_pricing_schedules():
         return jsonify({'success': False, 'error': 'config 不能为空'}), 400
     db = get_db()
     try:
-        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        now = now_beijing_str()
         cur = db.execute(
             "INSERT INTO pricing_schedules(name, config_json, effective_at, created_by, created_at, is_active) VALUES (?,?,?,?,?,0)",
             (name, _json.dumps(config, ensure_ascii=False), effective_at, None, now)
@@ -5071,7 +5106,7 @@ def admin_ops_stats():
         return jsonify({'success': False, 'error': '无权限'}), 403
     db = get_db()
     try:
-        today = date.today().isoformat()
+        today = today_beijing().isoformat()
         users = db.execute('SELECT COUNT(*) as c FROM users').fetchone()['c']
         orders_pending = db.execute("SELECT COUNT(*) as c FROM recharge_orders WHERE status='pending'").fetchone()['c']
         orders_today = db.execute("SELECT COUNT(*) as c, COALESCE(SUM(amount_fen),0) as s FROM recharge_orders WHERE created_at LIKE ?", (today+'%',)).fetchone()
@@ -5364,27 +5399,62 @@ def figure_plan():
     claim_types = data.get('claim_types') or []
     if not isinstance(claim_types, list):
         claim_types = []
-    numeric_cols, categorical_cols, binary_cols, datetime_cols = [], [], [], []
-    for c in columns:
-        name = c.get('name') or ''
-        dtype = c.get('dtype') or 'categorical'
+    n_rows = int(profile.get('n_rows') or profile.get('rows') or 0)
+
+    def classify_column(c):
+        name = str(c.get('name') or '')
+        dtype = str(c.get('dtype') or 'categorical')
         stats = c.get('stats') or {}
         unique = int(c.get('unique') or 0)
         top_values = c.get('top_values') or []
+        sample_vals = [str(v.get('value', '')) for v in top_values[:8]]
+        sample = ' '.join(sample_vals)
         lname = name.lower()
+        role = 'unknown'
         if dtype == 'numeric':
             mn, mx = stats.get('min'), stats.get('max')
             if unique <= 2 and mn in (0, 0.0) and mx in (1, 1.0):
-                binary_cols.append(name)
+                role = 'binary'
+            elif unique >= max(20, int((n_rows or unique) * 0.5)) and re.search(r'(^|_)(id|code|no|num|编号|序号)(_|$)', lname):
+                role = 'identifier'
             else:
-                numeric_cols.append(name)
+                role = 'metric'
         else:
-            sample = ' '.join(str(v.get('value', '')) for v in top_values[:3])
-            if any(k in lname for k in ('time', 'date', '日期', '时间')) or re.search(r'\d{4}[-/]\d{1,2}[-/]\d{1,2}', sample):
-                datetime_cols.append(name)
+            date_hits = sum(1 for v in sample_vals if re.search(r'\d{4}[-/\.年]\d{1,2}[-/\.月]\d{1,2}', v) or re.search(r'\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}', v))
+            if date_hits >= max(1, min(3, len(sample_vals)//2)) or any(k in lname for k in ('time', 'date', 'timestamp', '日期', '时间', '时刻')):
+                role = 'datetime'
+            elif unique >= max(50, int((n_rows or unique) * 0.6)) or re.search(r'(^|_)(id|uuid|code|key|编号|序号)(_|$)', lname):
+                role = 'identifier'
+            elif 2 <= unique <= 40:
+                role = 'group'
             else:
-                categorical_cols.append(name)
-    # Prefer scientific defaults: avoid scatter of ID vs metric; favor group comparison.
+                role = 'categorical'
+        return {
+            'name': name,
+            'role': role,
+            'dtype': dtype,
+            'unique': unique,
+            'stats': stats,
+            'top_values': top_values,
+        }
+
+    classified = [classify_column(c) for c in columns if c.get('name')]
+    metrics = [c for c in classified if c['role'] == 'metric']
+    binaries = [c for c in classified if c['role'] == 'binary']
+    groups = [c for c in classified if c['role'] == 'group']
+    datetimes = [c for c in classified if c['role'] == 'datetime']
+    identifiers = [c for c in classified if c['role'] == 'identifier']
+    categoricals = [c for c in classified if c['role'] in ('group', 'categorical')]
+
+    def pick_group():
+        # Prefer moderate-cardinality groups; avoid pure IDs.
+        ranked = sorted(groups, key=lambda c: (abs((c['unique'] or 1) - 8), c['unique'] or 1))
+        if ranked:
+            return ranked[0]['name']
+        ranked = [c for c in categoricals if 2 <= (c['unique'] or 0) <= 40]
+        ranked = sorted(ranked, key=lambda c: c['unique'] or 1)
+        return ranked[0]['name'] if ranked else ''
+
     recommendations = []
     def add_rec(chart_type, reason, cols, template_id=None, priority=0):
         recommendations.append({
@@ -5396,31 +5466,41 @@ def figure_plan():
             'columns': cols,
             'priority': priority,
         })
-    group_col = next((c for c in categorical_cols if c and 'type' in c.lower()), None) or (categorical_cols[0] if categorical_cols else '')
-    project_col = next((c for c in categorical_cols if c and 'project' in c.lower()), None)
-    metric_col = numeric_cols[0] if numeric_cols else (binary_cols[0] if binary_cols else '')
-    rate_col = binary_cols[0] if binary_cols else ''
-    if group_col and metric_col:
-        add_rec('box', f'按 {group_col} 比较 {metric_col} 的分布，展示中位数/四分位并避免均值柱掩盖离群值', {'x': group_col, 'y': metric_col}, 'box-strip', 90)
-        add_rec('bar', f'按 {group_col} 汇总 {metric_col} 的组均值/计数（投稿时建议叠加样本量）', {'x': group_col, 'y': metric_col}, 'categorical-bar', 70)
+
+    group_col = pick_group()
+    metric_col = metrics[0]['name'] if metrics else ''
+    rate_col = binaries[0]['name'] if binaries else ''
+    time_col = datetimes[0]['name'] if datetimes else ''
+    second_metric = metrics[1]['name'] if len(metrics) >= 2 else ''
+
     if group_col and rate_col:
-        add_rec('bar', f'按 {group_col} 比较正常率 {rate_col}（0/1 二值字段按比例展示）', {'x': group_col, 'y': rate_col, 'value': rate_col}, 'categorical-bar', 95)
-    if project_col and metric_col and project_col != group_col:
-        add_rec('bar', f'按 {project_col} 比较 {metric_col} 的项目差异', {'x': project_col, 'y': metric_col}, 'categorical-bar', 65)
+        add_rec('bar', f'按分组字段 {group_col} 比较二值字段 {rate_col} 的比例（0/1）', {'x': group_col, 'y': rate_col, 'value': rate_col}, 'categorical-bar', 95)
+    if group_col and metric_col:
+        add_rec('box', f'按分组字段 {group_col} 比较 {metric_col} 的分布（中位数/四分位，避免均值柱掩盖离群）', {'x': group_col, 'y': metric_col}, 'box-strip', 90)
+        add_rec('bar', f'按分组字段 {group_col} 汇总 {metric_col} 的组均值（建议标注样本量）', {'x': group_col, 'y': metric_col}, 'categorical-bar', 70)
+    if time_col and metric_col:
+        add_rec('line', f'按时间字段 {time_col} 观察 {metric_col} 的变化趋势', {'x': time_col, 'y': metric_col}, 'time-series-band', 85)
+    if time_col and rate_col and not metric_col:
+        add_rec('line', f'按时间字段 {time_col} 观察二值字段 {rate_col} 的变化', {'x': time_col, 'y': rate_col}, 'time-series-band', 75)
     if metric_col:
-        add_rec('histogram', f'展示 {metric_col} 的整体分布，检查长尾与异常心跳间隔', {'x': metric_col}, 'distribution-histogram', 60)
-    if len(numeric_cols) >= 2:
-        add_rec('scatter', f'检查两个连续变量 {numeric_cols[0]} 与 {numeric_cols[1]} 的关系', {'x': numeric_cols[0], 'y': numeric_cols[1]}, 'scatter-regression', 50)
-    if datetime_cols and metric_col:
-        add_rec('line', f'按时间 {datetime_cols[0]} 观察 {metric_col} 的变化趋势', {'x': datetime_cols[0], 'y': metric_col}, 'time-series-band', 80)
-    if 'trend' in claim_types or re.search(r'趋势|时间|变化|周期', claim):
-        if datetime_cols and metric_col:
-            recommendations.sort(key=lambda r: (0 if r['chart_type'] == 'line' else 1, -r['priority']))
+        add_rec('histogram', f'展示连续字段 {metric_col} 的整体分布与长尾', {'x': metric_col}, 'distribution-histogram', 60)
+    if second_metric:
+        add_rec('scatter', f'检查两个连续字段 {metric_col} 与 {second_metric} 的关系', {'x': metric_col, 'y': second_metric}, 'scatter-regression', 55)
+    if not metric_col and not rate_col and group_col:
+        # pure categorical composition
+        add_rec('bar', f'展示分类字段 {group_col} 的频数构成', {'x': group_col, 'y': group_col}, 'categorical-bar', 50)
     if not recommendations:
-        chart_type = 'bar'
-        cols = {'x': (categorical_cols or numeric_cols or [''])[0], 'y': (numeric_cols or binary_cols or [''])[0]}
-        add_rec(chart_type, '基于列类型选择单一主图形，避免双Y轴和无分布柱状图', cols, chart_type, 10)
-    recommendations.sort(key=lambda r: -r['priority'])
+        # last-resort generic fallback based on roles, never hardcode domain names
+        x = group_col or time_col or (metrics[0]['name'] if metrics else (classified[0]['name'] if classified else ''))
+        y = metric_col or rate_col or (metrics[0]['name'] if metrics else '')
+        chart_type = 'line' if time_col and y else ('bar' if group_col else ('histogram' if y else 'bar'))
+        add_rec(chart_type, '基于列角色（连续/分类/二值/时间/标识）自动选择主图型', {'x': x, 'y': y}, chart_type, 10)
+
+    if 'trend' in claim_types or re.search(r'趋势|时间|变化|周期|时序', claim):
+        recommendations.sort(key=lambda r: (0 if r['chart_type'] == 'line' else 1, -r['priority']))
+    else:
+        recommendations.sort(key=lambda r: -r['priority'])
+
     primary = recommendations[0]
     requested = data.get('chart_type')
     if requested in _FIGURE_TYPES:
@@ -5431,18 +5511,21 @@ def figure_plan():
             primary = dict(primary)
             primary['chart_type'] = requested
     plan = {
-        'schema_version': 2,
+        'schema_version': 3,
         'chart_type': primary['chart_type'],
         'template_id': primary.get('template_id') or primary['chart_type'],
         'reason': primary.get('reason') or '',
         'columns': primary.get('columns') or {},
-        'palette': 'categorical' if (categorical_cols or binary_cols) else 'sequential',
+        'palette': 'categorical' if (groups or binaries or categoricals) else 'sequential',
         'recommendations': recommendations[:5],
+        'column_roles': {c['name']: c['role'] for c in classified},
         'warnings': [
+            '推荐由列角色与基数自动推断，不绑定固定表结构',
+            '高基数 ID 字段不会作为默认横轴',
             '服务端不执行绘图代码；预览在浏览器本地完成',
-            'ID 类字段不适合作为散点横轴；优先分组比较与分布图',
         ],
         'accessibility': {'table_view': True, 'color_not_only_encoding': True, 'grayscale_review': True},
+        'excluded_identifiers': [c['name'] for c in identifiers[:12]],
     }
     return jsonify({'success': True, 'plan': plan})
 
