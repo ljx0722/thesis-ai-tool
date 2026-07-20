@@ -3886,29 +3886,46 @@ async function generateKnowledgeGraph(){
   var tc=document.getElementById('kgTimelineCanvas');if(tc)tc.style.display='none';
   document.getElementById('kgTabCloud').classList.remove('active');document.getElementById('kgTabNetwork').classList.add('active');
   document.getElementById('kgTabTimeline').classList.remove('active');
-  ph.innerHTML='<div style="font-size:2.5rem;margin-bottom:16px">⚙️</div><div>正在调用Python后端生成知识图谱...</div>';
+  ph.innerHTML='<div style="font-size:2.5rem;margin-bottom:16px">⚙️</div><div>正在调用服务生成知识图谱...</div>';
   var req={paper_topics:paperTopics,sections:sections,merged_refs:mergedRefs.map(function(r){return{title:r.title||'',journal:r.journal||'',year:r.year||'',ch:r.ch||1,conf:r.conf||0,displayNum:r.displayNum||0}}),manuscript_text:manuscriptText};
   try{
     var resp=await fetch(kgApiUrl,{method:'POST',headers:apiAuthHeaders(true),body:JSON.stringify(req)});
-    if(!resp.ok)throw new Error('API: '+resp.status);
-    var r=await resp.json();if(!r.success)throw new Error(r.error||'error');
+    var r=null;try{r=await resp.json();}catch(eJson){r=null;}
+    if(resp.status===401){
+      ph.innerHTML='<div style="font-size:2.5rem;margin-bottom:12px">🔐</div><div style="margin-bottom:12px">请先登录后再生成知识图谱</div>';
+      if(typeof ttp==='function')ttp('请先登录');
+      return;
+    }
+    if(resp.status===402){
+      var need=r&&r.needed_points!=null?('，预计需 '+r.needed_points+' 点'):'';
+      ph.innerHTML='<div style="font-size:2.5rem;margin-bottom:12px">💳</div><div style="margin-bottom:12px">'+(r&&r.error?r.error:('点数不足'+need))+'</div>'+(typeof showRechargeModal==='function'?'<button class="ai-btn" onclick="showRechargeModal()">去充值</button>':'');
+      if(typeof updateBalanceDisplay==='function')updateBalanceDisplay();
+      if(typeof ttp==='function')ttp((r&&r.error)||'点数不足');
+      return;
+    }
+    if(!resp.ok||!r||!r.success){
+      var msg=(r&&r.error)||('服务暂不可用'+(resp.status?(' ('+resp.status+')'):''));
+      ph.innerHTML='<div style="font-size:2.5rem;margin-bottom:12px">⚠️</div><div style="margin-bottom:12px">'+msg+'</div><div style="color:var(--text-muted);font-size:.75rem;margin-bottom:12px">为避免未扣点使用，已禁用离线免费图谱回退。</div><button class="ai-btn" onclick="generateKnowledgeGraph()">重试</button>';
+      if(typeof ttp==='function')ttp(msg);
+      return;
+    }
     kgCurrentData=r.data;renderKnowledgeGraph(r.data);
-  }catch(e){console.warn('[KG] fallback JS:',e);generateKnowledgeGraphJS();}
+    try{
+      if(r.usage&&r.usage.free&&typeof ttp==='function')ttp('今日图谱免费 '+(r.usage.free_used||'')+'/'+(r.usage.free_limit||''));
+      else if(r.usage&&r.usage.cost_points>0&&typeof ttp==='function')ttp('图谱 -'+Number(r.usage.cost_points).toFixed(3)+' 点');
+      if(typeof updateBalanceDisplay==='function')updateBalanceDisplay();
+    }catch(eU){}
+  }catch(e){
+    console.warn('[KG] failed:',e);
+    ph.innerHTML='<div style="font-size:2.5rem;margin-bottom:12px">⚠️</div><div style="margin-bottom:12px">知识图谱生成失败，请稍后重试</div><button class="ai-btn" onclick="generateKnowledgeGraph()">重试</button>';
+    if(typeof ttp==='function')ttp('知识图谱生成失败');
+  }
 }
 function generateKnowledgeGraphJS(){
+  // Offline preview disabled for billing integrity. Keep symbol for legacy callers.
+  var ph=document.getElementById('kgPlaceholder');
+  if(ph)ph.innerHTML='<div style="font-size:2.5rem;margin-bottom:12px">💳</div><div>离线免费图谱已停用，请通过服务生成（按次计点/每日免费额度）。</div><button class="ai-btn" onclick="generateKnowledgeGraph()">通过服务生成</button>';
   kgCurrentData=null;
-  var ph=document.getElementById('kgPlaceholder'),sv=document.getElementById('kgSvg');
-  ph.style.display='block';sv.style.display='none';sv.innerHTML='';
-  if(!paperTopics.length&&!sections.length&&!mergedRefs.length){ph.innerHTML='<div style="font-size:3rem;margin-bottom:16px">📄</div><div>请先上传论文并检索文献</div>';return;}
-  var ents=[],links=[],ls=new Set();
-  paperTopics.slice(0,15).forEach(function(t,i){ents.push({id:'topic_'+i,label:t.label,fullLabel:t.label,count:t.count||0,type:'keyword',radius:5+Math.min((t.count||1)*.5,8)});});
-  sections.forEach(function(cs){ents.push({id:'ch_'+cs.ch,label:cs.name.replace(/第[一二三四五六七八九十\d]+章\s*/,'').substring(0,12),fullLabel:cs.name,type:'chapter',radius:12});
-    if(cs.sections)cs.sections.forEach(function(sec){var sid='sec_'+sec.num.replace(/\./g,'_');ents.push({id:sid,label:sec.title.substring(0,10),fullLabel:sec.num+' '+sec.title,type:'section',radius:7});links.push({source:'ch_'+cs.ch,target:sid,type:'has',id:'link_'+cs.ch+'_'+sid});});});
-  var rl=Math.min(30,mergedRefs.length);
-  for(var ri=0;ri<rl;ri++){var rf=mergedRefs[ri];if(rf.title)ents.push({id:'ref_'+ri,label:rf.title.substring(0,30)+(rf.title.length>30?'...':''),fullLabel:rf.title,count:rf.conf||0,type:'reference',radius:4+Math.min((rf.conf||0)*.1,6),year:rf.year,ch:rf.ch});}
-  sections.forEach(function(cs){paperTopics.slice(0,15).forEach(function(t,i){var kw=t.label.toLowerCase(),lid='kw_ch_'+i+'_'+cs.ch;if((cs.text||manuscriptText||'').toLowerCase().indexOf(kw)>=0&&!ls.has(lid)){links.push({source:'topic_'+i,target:'ch_'+cs.ch,type:'in',id:lid});ls.add(lid);}})});
-  mergedRefs.slice(0,rl).forEach(function(r,ri){if(r.ch){var lid='ch_ref_'+r.ch+'_'+ri;if(!ls.has(lid)){links.push({source:'ch_'+r.ch,target:'ref_'+ri,type:'cites',id:lid});ls.add(lid);}}});
-  kgCurrentData={entities:ents,links:links,stats:{total_entities:ents.length,total_links:links.length}};renderKnowledgeGraph(kgCurrentData);
 }
 function renderKnowledgeGraph(data){
   var ph=document.getElementById('kgPlaceholder'),sv=document.getElementById('kgSvg');

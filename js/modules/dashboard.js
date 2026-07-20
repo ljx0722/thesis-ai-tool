@@ -20,15 +20,37 @@ function showDashboard() {
     alert('请先上传论文');
     return;
   }
+  if (typeof ensureLoggedIn === 'function' && !ensureLoggedIn('登录后即可使用论文看板')) return;
   var overlay = document.getElementById('dbOverlay');
   if (!overlay) return;
-  overlay.style.display = 'flex';
-  buildDashboard();
-  try {
-    if (window.ThesisProject && ThesisProject.logSkillRun) {
-      ThesisProject.logSkillRun({ moduleId: 'dashboard', title: '论文看板', summary: '打开综合评估' });
+  var openBoard = function () {
+    overlay.style.display = 'flex';
+    buildDashboard();
+    try {
+      if (window.ThesisProject && ThesisProject.logSkillRun) {
+        ThesisProject.logSkillRun({ moduleId: 'dashboard', title: '论文看板', summary: '打开综合评估' });
+      }
+    } catch (e) {}
+  };
+  if (typeof chargeModule !== 'function') {
+    openBoard();
+    return;
+  }
+  chargeModule('dashboard').then(function (res) {
+    if (!res || !res.ok) {
+      var msg = (res && res.error) || '无法打开论文看板';
+      if (res && res.needRecharge && typeof showRechargeModal === 'function') {
+        if (typeof ttp === 'function') ttp(msg);
+        showRechargeModal();
+      } else if (typeof ttp === 'function') {
+        ttp(msg);
+      } else {
+        alert(msg);
+      }
+      return;
     }
-  } catch (e) {}
+    openBoard();
+  });
 }
 
 function closeDashboard() {

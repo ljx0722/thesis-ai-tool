@@ -366,6 +366,23 @@ test('DASHBOARD: scores come from thesis-review dimensions with real weights', f
   assert(dash.indexOf('#1d1d1f') < 0, 'Dashboard text must not hardcode light-theme ink');
 });
 
+test('BILLING: dashboard open charges before render', function() {
+  var dash = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
+  var appMod = fs.readFileSync(path.join(projectRoot, 'js/app-modules.js'), 'utf8');
+  assert(dash.indexOf("chargeModule('dashboard')") >= 0, 'showDashboard must call chargeModule');
+  assert(appMod.indexOf("showDashboard();\n      moduleArea.innerHTML") < 0, 'switchPanel must not open dashboard before charge');
+  assert(appMod.indexOf('modDef.localCharge || modDef.serverFixed') >= 0, 'serverFixed modules must enter charge gate');
+  assert(appMod.indexOf("id: 'data-analysis'") >= 0 && appMod.indexOf('localCharge: true') >= 0, 'data-analysis must be localCharge');
+});
+
+test('BILLING: knowledge graph never falls back to free offline graph', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var gen = src.substring(src.indexOf('async function generateKnowledgeGraph'), src.indexOf('function generateKnowledgeGraphJS'));
+  assert(gen.indexOf('generateKnowledgeGraphJS()') < 0, 'API failure must not invoke free offline KG');
+  assert(gen.indexOf('resp.status===402') >= 0, 'Insufficient credits must be handled explicitly');
+  assert(src.indexOf('Offline preview disabled for billing integrity') >= 0 || src.indexOf('离线免费图谱已停用') >= 0, 'Offline free KG path must be disabled');
+});
+
 test('SECURITY: No eval() in production code', function() {
   var files = ['app.js', 'js/app-modules.js'];
   files.forEach(function(f) {

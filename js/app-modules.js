@@ -233,7 +233,7 @@ var APP_MODULES = [
   // 撰写阶段
   { id: 'references',      name: '参考文献',   icon: '📋', requiresThesis: true,  aiDriven: false },
   { id: 'expand',          name: '论文扩写',   icon: '✍️', requiresThesis: false, aiDriven: true },
-  { id: 'data-analysis',   name: '数据分析',   icon: '📈', requiresThesis: false, aiDriven: false, serverFixed: true },
+  { id: 'data-analysis',   name: '数据分析',   icon: '📈', requiresThesis: false, aiDriven: false, serverFixed: true, localCharge: true },
   { id: 'knowledge-graph', name: '知识图谱',   icon: '🕸️', requiresThesis: true,  aiDriven: false, serverFixed: true },
   // 打磨阶段
   { id: 'proofread',       name: '论文查错',   icon: '✏️', requiresThesis: false, aiDriven: true },
@@ -616,8 +616,9 @@ function switchPanel(moduleId) {
 
   if (moduleId === 'dashboard') {
     if (_thesisLoaded) {
-      showDashboard();
-      moduleArea.innerHTML = '<div class="module-panel"><div style="text-align:center;padding:50px"><div style="font-size:3rem;margin-bottom:16px">📊</div><div style="color:var(--m);margin-bottom:16px">论文看板弹窗已打开</div><button onclick="showDashboard()" style="font-size:.85rem;padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:18px;cursor:pointer;font-weight:600">重新打开看板</button></div></div>';
+      moduleArea.innerHTML = '<div class="module-panel"><div style="text-align:center;padding:50px"><div style="font-size:3rem;margin-bottom:16px">📊</div><div style="color:var(--m);margin-bottom:16px">论文看板</div><div style="color:var(--text-muted);font-size:.78rem;margin-bottom:16px">综合评估按次计点，确认后打开</div><button id="dbOpenBtn" style="font-size:.85rem;padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:18px;cursor:pointer;font-weight:600">打开看板</button></div></div>';
+      var openBtn=document.getElementById('dbOpenBtn');
+      if(openBtn) openBtn.onclick=function(){ if(typeof showDashboard==='function') showDashboard(); };
     } else {
       moduleArea.innerHTML = '<div class="module-panel" style="text-align:center;padding:60px 20px"><div style="font-size:3rem;margin-bottom:16px">📎</div><h4 style="margin-bottom:8px">需要先上传论文</h4><p style="color:var(--text-muted);font-size:.8rem;margin-bottom:20px">论文看板需要论文数据才能生成</p><button onclick="triggerUpload()" style="font-size:.85rem;padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:18px;cursor:pointer;font-weight:600">📎 上传论文</button></div>';
     }
@@ -680,7 +681,7 @@ function switchPanel(moduleId) {
   }
 
   // 本地固定价模块：先扣点/走每日免费，再运行
-  if (modDef && modDef.localCharge) {
+  if (modDef && (modDef.localCharge || modDef.serverFixed)) {
     chargeModule(moduleId).then(function(res){
       if(res.ok){
         try{
