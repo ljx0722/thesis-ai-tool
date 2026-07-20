@@ -115,7 +115,7 @@ function manuscriptRevisionId(){
 }
 function ensureTreeStableIds(){
   var revisionId=manuscriptRevisionId();
-  (_treeIndex.paragraphs||[]).forEach(function(entry,index){
+  (((window._treeIndex||{}).paragraphs)||[]).forEach(function(entry,index){
     var p=entry.node||entry,text=citationPlainText(entry.el).trim()||entry.text||'',chapter=entry._chapter&&entry._chapter.ch||0,section=entry._section&&entry._section.num||'',sub=entry._subsection&&entry._subsection.num||'';
     p.revisionId=revisionId;p.paragraphId=p.paragraphId||('para-'+chapter+'-'+String(section).replace(/\W/g,'-')+'-'+String(sub).replace(/\W/g,'-')+'-'+index+'-'+simpleTextHash(text));p.structuralPath={chapter:chapter,section:section,subsection:sub,paragraph:index};p.textHash=simpleTextHash(text);p.text=text;
     (p.sentences||[]).forEach(function(s,sIndex){s.revisionId=revisionId;s.sentenceId=s.sentenceId||p.paragraphId+'-sent-'+sIndex;s.paragraphId=p.paragraphId;s.structuralPath=p.structuralPath;s.textHash=simpleTextHash(s.text||'');});
@@ -123,7 +123,12 @@ function ensureTreeStableIds(){
 }
 function getManuscriptScope(){
   ensureTreeStableIds();
-  return{revisionId:manuscriptRevisionId(),paragraphs:(_treeIndex.paragraphs||[]).map(function(entry){var p=entry.node||entry;return{paragraphId:p.paragraphId,text:p.text,textHash:p.textHash,structuralPath:p.structuralPath,sentences:(p.sentences||[]).map(function(s){return{sentenceId:s.sentenceId,text:s.text,start:s.start,end:s.end,textHash:s.textHash};})};})};
+  var paragraphs=(_treeIndex&&_treeIndex.paragraphs)||[];
+  if(!paragraphs.length){
+    var root=document.getElementById('paperContentRoot'),blocks=root?leafCitationBlocks(root):[];
+    paragraphs=blocks.map(function(el,index){var text=citationPlainText(el).trim();return{paragraphId:'flat-para-'+index+'-'+simpleTextHash(text),text:text,textHash:simpleTextHash(text),structuralPath:{chapter:0,section:'',subsection:'',paragraph:index},sentences:splitCitationSentences(text).map(function(s){return{sentenceId:'flat-para-'+index+'-sent-'+s.index,text:s.text,start:s.start,end:s.end,textHash:simpleTextHash(s.text)};})};});
+  }
+  return{revisionId:manuscriptRevisionId(),structured:!!(window._thesisStructured&&(_treeIndex&&_treeIndex.chapters||[]).length),paragraphs:paragraphs.map(function(p){return{paragraphId:p.paragraphId,text:p.text,textHash:p.textHash,structuralPath:p.structuralPath,occurrences:(p.occurrences||[]).map(function(o){return{occurrenceId:o.id||o.occurrenceId,referenceNo:o.rawNumber||o.displayNumber,confidence:o.confidence,source:o.source,reasons:o.reason?[o.reason]:(o.reasons||[]),charOffset:o.charOffset};}),sentences:(p.sentences||[]).map(function(s){return{sentenceId:s.sentenceId,text:s.text,start:s.start,end:s.end,textHash:s.textHash};})};})};
 }
 function rangeOffsetWithinElement(el,container,offset){
   var range=document.createRange();range.selectNodeContents(el);range.setEnd(container,offset);
@@ -356,6 +361,43 @@ function isAfterRefBoundary(el,boundary){
 function beforeRefList(el){var b=bodyBoundaryEl();return !b||!isAfterRefBoundary(el,b);}
 function firstBodyChEl(){return document.getElementById('ch-1');}
 
+function applyDocxSuperscriptRuns(root){
+  if(!root||!window._docxFontInfo||!window._docxFontInfo.length)return;
+  var els=root.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li'),used=0;
+  function wrapRange(el,start,end){
+    if(end<=start)return;
+    var map=textNodeMap(el),a=domPointForOffset(map,start,false),b=domPointForOffset(map,end,true);
+    if(!a||!b)return;
+    var range=document.createRange();try{range.setStart(a.node,a.offset);range.setEnd(b.node,b.offset);}catch(e){return;}
+    if(range.collapsed)return;
+    var existing=range.cloneContents();
+    if(existing.querySelector&&existing.querySelector('sup,[data-docx-vert-align="superscript"]'))return;
+    var sup=document.createElement('sup');sup.dataset.docxVertAlign='superscript';sup.setAttribute('data-docx-preserved','true');
+    try{sup.appendChild(range.extractContents());range.insertNode(sup);}catch(e2){}
+  }
+  (window._docxFontInfo||[]).forEach(function(info){
+    var target=null,needle=window._normText?window._normText(info.text):String(info.text||'').replace(/\s+/g,' ').trim();
+    for(var i=used;i<els.length;i++){var et=window._normText?window._normText(els[i].textContent||''):String(els[i].textContent||'').replace(/\s+/g,' ').trim();if(et===needle||(needle.length>10&&et.indexOf(needle.substring(0,Math.min(40,needle.length)))===0)){target=els[i];used=i+1;break;}}
+    if(!target)return;
+    var offset=0,open=-1;
+    (info.runs||[]).forEach(function(run){var len=String(run.text||'').length,isSup=run.props&&run.props.vertAlign==='superscript';if(isSup&&open<0)open=offset;if(!isSup&&open>=0){wrapRange(target,open,offset);open=-1;}offset+=len;});
+    if(open>=0)wrapRange(target,open,offset);
+  });
+}
+
+function domCitationMarkers(block,map,refMap){
+  var hits=parseCitationMarkers(map.text),seen={};
+  var tw=document.createTreeWalker(block,NodeFilter.SHOW_TEXT,null,false),node;
+  while((node=tw.nextNode())){
+    var parent=node.parentElement,semantic=parent&&parent.closest('sup,[data-docx-vert-align="superscript"]');
+    if(!semantic||semantic.closest('h1,h2,h3,h4,h5,h6,.reference-list,.ref-list,#refs,nav'))continue;
+    var local=node.textContent||'',base=map.nodes.reduce(function(acc,item){return acc+(item.node===node?item.start:0);},0);
+    var sm=/(^|[^\d])((?:\d{1,3})(?:\s*[,，、]\s*\d{1,3})*)(?=$|[^\d])/g,m;
+    while((m=sm.exec(local))!==null){var raw=m[2],start=base+m.index+(m[1]?m[1].length:0),group='citation-group-sup-'+start;raw.split(/\s*[,，、]\s*/).forEach(function(value,index,arr){var n=parseInt(value,10);if(!refMap.has(n)||n<1||n>999)return;var key=n+'@'+start;if(seen[key])return;seen[key]=true;hits.push({rawNumber:n,start:start,end:start+raw.length,raw:raw,format:'superscript',markerGroup:group,groupIndex:index,groupSize:arr.length,confidence:'high',source:'dom-superscript',reason:'DOCX/DOM semantic superscript and imported reference number'});});}
+  }
+  return hits.sort(function(a,b){return a.start-b.start||a.groupIndex-b.groupIndex;});
+}
+
 function parseCitationMarkers(text,options){
   text=String(text||'');options=options||{};
   var hits=[],groupId=0;
@@ -447,7 +489,7 @@ function collectCitationOccurrences(box,refs){
     if(boundary&&(block===boundary||isAfterRefBoundary(block,boundary)))continue;
     if(block.closest&&block.closest('h1,h2,h3,h4,h5,h6,.toc-panel,.reference-list,.ref-list,#refs'))continue;
     var map=textNodeMap(block);if(!map.text.trim())continue;
-    var markers=parseCitationMarkers(map.text),sentences=splitCitationSentences(map.text),groups={};
+    var markers=domCitationMarkers(block,map,refMap),sentences=splitCitationSentences(map.text),groups={};
     markers.forEach(function(marker){if(refMap.has(marker.rawNumber)){if(!groups[marker.markerGroup])groups[marker.markerGroup]=[];groups[marker.markerGroup].push(marker);}});
     var groupList=Object.keys(groups).map(function(key){return groups[key];}).sort(function(a,b){return b[0].start-a[0].start;});
     for(var gi=0;gi<groupList.length;gi++){
@@ -463,7 +505,7 @@ function collectCitationOccurrences(box,refs){
         var ref=refMap.get(marker.rawNumber),display=ref.displayNum||ref.num||marker.rawNumber,span=document.createElement('span');
         span.className='cite-marker '+(ref.subType==='displaced'?'displaced':'existing');span.textContent='['+display+']';span.dataset.refId=ref.id;span.dataset.occurrenceId='occ-'+ref.id+'-'+(ref.occurrences.length+1);span.title='引用['+display+']';
         span.onclick=function(nn){return function(e){e.stopPropagation();scrollToRef(nn);};}(display);
-        var occurrence={id:span.dataset.occurrenceId,refId:ref.id,rawNumber:marker.rawNumber,displayNumber:display,markerType:marker.format,source:'imported-existing',status:location&&location.chapter?'detected':'unlocated',chapter:location&&location.chapter?{num:location.chapter.ch,name:location.chapter.name,anchor:location.chapter.el}:null,section:location&&location.section?{num:location.section.num,title:location.section.title,anchor:location.section.el}:null,subsection:location&&location.subsection?{num:location.subsection.num,title:location.subsection.title,anchor:location.subsection.el}:null,paragraph:{el:block,id:block.id||'',text:map.text},sentence:sentence?{index:sentence.index,text:sentence.text,start:sentence.start,end:sentence.end}:null,charOffset:{paragraphStart:0,paragraphEnd:map.text.length,markerStart:first.start,markerEnd:first.end},documentOrder:order++,markerEl:span,context:sentence?sentence.text:''};
+        var occurrence={id:span.dataset.occurrenceId,refId:ref.id,rawNumber:marker.rawNumber,displayNumber:display,markerType:marker.format,source:marker.source||'imported-existing',confidence:marker.confidence||(marker.format==='superscript'?'high':'medium'),reasons:marker.reason?[marker.reason]:['Imported numeric marker matched bibliography number'],status:location&&location.chapter?'detected':'unlocated',structuralPath:location&&location.paragraph&&location.paragraph.structuralPath||null,chapter:location&&location.chapter?{num:location.chapter.ch,name:location.chapter.name,anchor:location.chapter.el}:null,section:location&&location.section?{num:location.section.num,title:location.section.title,anchor:location.section.el}:null,subsection:location&&location.subsection?{num:location.subsection.num,title:location.subsection.title,anchor:location.subsection.el}:null,paragraph:{el:block,id:block.id||'',paragraphId:location&&location.paragraph&&location.paragraph.paragraphId||'',text:map.text},sentence:sentence?{index:sentence.index,text:sentence.text,start:sentence.start,end:sentence.end}:null,charOffset:{paragraphStart:0,paragraphEnd:map.text.length,markerStart:marker.start,markerEnd:marker.end},documentOrder:order++,markerEl:span,context:sentence?sentence.text:''};
         ref.occurrences.push(occurrence);ref.occurrenceIds.push(occurrence.id);if(occurrence.chapter&&ref.chapterSet.indexOf(occurrence.chapter.num)<0)ref.chapterSet.push(occurrence.chapter.num);allOccurrences.push(occurrence);
         if(!ref._domEl)ref._domEl=span;
         if(location&&location.paragraph&&sentence){
@@ -3043,6 +3085,8 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
               if(iM){rFonts.italic=true;hasVals=true;}
               var colorM=rpr.match(/<w:color[^>]*w:val="([^"]*)"/);
               if(colorM){rFonts.color='#'+colorM[1];hasVals=true;}
+              var vertM=rpr.match(/<w:vertAlign[^>]*w:val="([^"]*)"/);
+              if(vertM){rFonts.vertAlign=vertM[1];hasVals=true;}
             }
             // 回退到样式级 rPr: run 无 rPr 或 rPr 中无字体数据
             if(!hasVals && styleDefRpr){
@@ -3101,6 +3145,8 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     _paperWrap.className = 'paper-content-root';
     _paperWrap.innerHTML = manuscriptHTML;
     thesisBoxEl.appendChild(_paperWrap);
+    applyDocxSuperscriptRuns(_paperWrap);
+    manuscriptHTML=_paperWrap.innerHTML;
     var tbs=_paperWrap.querySelectorAll('table');for(var ti=0;ti<tbs.length;ti++)tbs[ti].style.display='';
     // 后续 DOM 查询以 paper 根为准
     var thesisBoxElForDom = _paperWrap;
@@ -3424,7 +3470,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
     });
     // 无可信章标题时保留正文，但不伪造目录
     if (!sections.length) {
-      window._thesisStructured=false;window._treeIndex=[];
+      window._thesisStructured=false;window._treeIndex={chapters:[],sections:[],subs:[],paragraphs:[],sentences:[]};
       console.warn('[chapters] no trusted chapters after calibration — keep manuscript unstructured');
     }
     // 给章节打 DOM 锚点

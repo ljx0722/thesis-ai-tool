@@ -1606,8 +1606,21 @@
     });
   }
 
+  function restoreImportDecomposition(project) {
+    var saved=project&&project.artifacts&&project.artifacts.importDecomposition;
+    if(saved)renderImportDecomposition(saved);
+    if(!cloudEnabled()||!project||!project.id)return Promise.resolve(saved||null);
+    return fetch('/api/projects/'+encodeURIComponent(project.id)+'/pipeline/runs',{headers:authHeaders()}).then(function(r){return r.json();}).then(function(d){
+      if(!d.success||!d.runs||!d.runs.length)return saved||null;
+      var current=normalizePipelineJob({run:d.runs[0]});
+      renderImportDecomposition(current);
+      if(current.status==='completed'||current.status==='failed')recordImportDecomposition(current);
+      return current;
+    }).catch(function(){return saved||null;});
+  }
+
   function bootstrapAuthenticatedUser() {
-    return new Promise(function(resolve){pullCloudProjects(function(list){var current=getCurrentProject();if(!current&&list&&list.length){setCurrentId(list[0].id);current=list[0];}if(current&&current.activeRevisionId){hydrateRevision(current.id,current.activeRevisionId).catch(function(){unloadProjectRuntime();}).finally(function(){renderProjectChrome();if(typeof switchView==='function')switchView('workspace');resolve(current);});}else{unloadProjectRuntime();renderProjectChrome();if(typeof switchView==='function')switchView('workspace');resolve(current);}});});
+    return new Promise(function(resolve){pullCloudProjects(function(list){var current=getCurrentProject();if(!current&&list&&list.length){setCurrentId(list[0].id);current=list[0];}if(current&&current.activeRevisionId){hydrateRevision(current.id,current.activeRevisionId).catch(function(){unloadProjectRuntime();}).finally(function(){restoreImportDecomposition(current);renderProjectChrome();if(typeof switchView==='function')switchView('workspace');resolve(current);});}else{unloadProjectRuntime();restoreImportDecomposition(current);renderProjectChrome();if(typeof switchView==='function')switchView('workspace');resolve(current);}});});
   }
 
   function onManuscriptReady() {
@@ -1632,8 +1645,144 @@
     // 导入后显示论文正文（可滚动），不盖住原文
     if (typeof switchView === 'function') switchView('paper');
     try { ensureUnifiedProjectState(); } catch (e) {}
-    try { saveManuscriptRevision({sourceType:'import',fileName:window._uploadFileName||'',kind:window._uploadFileKind||'',sizeBytes:window._uploadFileSize||0}).catch(function(e){console.warn('[revision]',e.message);if(typeof ttp==='function')ttp('论文已载入，但云端版本保存失败');}); } catch (eRev) {}
+    try { saveManuscriptRevision({sourceType:'import',fileName:window._uploadFileName||'',kind:window._uploadFileKind||'',sizeBytes:window._uploadFileSize||0}).then(function(d){return runImportDecomposition({intent:window._importIntent||'new',fileName:window._uploadFileName||'',revisionId:d&&d.revision_id||''});}).catch(function(e){console.warn('[revision/decomposition]',e.message);if(typeof ttp==='function')ttp('论文已载入，云端拆解可稍后重试');}); } catch (eRev) {}
     if (typeof ttp === 'function') ttp('论文已导入：目录树与正文已就绪，可点「工作台」查看主线进度');
+  }
+
+  function renderImportDecomposition(job) {
+    var box=document.getElementById('uploadDecomposition'),state=document.getElementById('uploadDecompositionState'),bar=document.getElementById('uploadDecompositionProgress'),list=document.getElementById('uploadDecompositionChecklist'),retry=document.getElementById('uploadDecompositionRetry'),nav=document.getElementById('uploadDecompositionNavigate');
+    if(!box)return;job=job||{};box.hidden=false;
+    var status=job.status||job.state||'queued';
+    if(status==='succeeded')status='completed';
+    if(status==='running')status='processing';
+    var pct=Math.max(0,Math.min(100,Number(job.progress==null?(status==='completed'?100:status==='failed'?100:35):job.progress)));
+    if(status!=='completed'&&status!=='failed'&&typeof showUploadOverlay==='function')showUploadOverlay();
+    if(state)state.textContent=status==='completed'?'已完成':status==='failed'?(job.error||'失败'):'处理中';
+    if(bar){bar.style.width='100%';bar.style.transform='scaleX('+(pct/100)+')';bar.style.transformOrigin='left center';}
+    var steps=job.checklist||[];
+    if(!steps.length){
+      var runSteps=job.steps||[];
+      if(runSteps.length){
+        steps=runSteps.map(function(s){
+          var label=s.step_key==='decompose'?'识别章节结构':s.step_key==='context-index'?'建立版本上下文索引':(s.step_key||'处理步骤');
+          return {label:label,done:s.status==='succeeded'||status==='completed'};
+        });
+      }else{
+        steps=[{label:'提交拆解任务',done:pct>=10},{label:'识别章节与参考文献',done:pct>=55},{label:'建立上下文索引并同步项目',done:status==='completed'}];
+      }
+    }
+    if(list)list.innerHTML='<div class="import-checklist-head"><strong>拆解清单</strong><span>'+Math.round(pct)+'%</span></div>'+steps.map(function(s){return '<div class="checklist-item '+(s.done?'is-done':'')+'"><div class="checklist-left"><span class="checklist-dot">'+(s.done?'✓':'○')+'</span><div><b>'+escapeHtml(s.label||'处理步骤')+'</b></div></div></div>';}).join('');
+    if(retry){retry.hidden=status!=='failed';retry.onclick=function(){runImportDecomposition({intent:window._importIntent||'new',fileName:window._uploadFileName||'',revisionId:(getCurrentProject()||{}).activeRevisionId||''});};}
+    if(nav){nav.hidden=status!=='completed';nav.onclick=function(){if(typeof switchView==='function')switchView('workspace');if(typeof openChapterBoard==='function')openChapterBoard();};}
+  }
+  function normalizePipelineJob(payload) {
+    var run=(payload&&payload.run)||payload||{};
+    var status=run.status||payload.status||'queued';
+    if(status==='succeeded')status='completed';
+    var steps=run.steps||[];
+    var done=steps.filter(function(s){return s.status==='succeeded';}).length;
+    var progress=status==='completed'?100:status==='failed'?100:Math.max(15, Math.round(((done+1)/(Math.max(steps.length,2)+1))*100));
+    var checklist=steps.map(function(s){
+      return {label:s.step_key==='decompose'?'识别章节结构':s.step_key==='context-index'?'建立版本上下文索引':(s.step_key||'处理步骤'), done:s.status==='succeeded'||status==='completed'};
+    });
+    if(!checklist.length) checklist=[{label:'提交拆解任务',done:true},{label:'识别章节结构',done:status==='completed'},{label:'建立上下文索引',done:status==='completed'}];
+    return {
+      success:true,
+      id:run.id||payload.run_id||payload.job_id||'',
+      job_id:run.id||payload.run_id||payload.job_id||'',
+      status:status,
+      state:status,
+      progress:progress,
+      checklist:checklist,
+      steps:steps,
+      output:run.output||payload.output||{},
+      error:run.error||payload.error||''
+    };
+  }
+  function runImportDecomposition(meta) {
+    renderImportDecomposition({status:'queued',progress:8});
+    return startImportDecomposition(meta).then(function(job){
+      renderImportDecomposition(job);
+      var id=job.job_id||job.id;
+      if(!id){
+        recordImportDecomposition(job);
+        return job;
+      }
+      if(job.status==='completed'||job.status==='failed'){
+        recordImportDecomposition(job);
+        return job;
+      }
+      return new Promise(function(resolve){
+        var tries=0;
+        var poll=setInterval(function(){
+          tries++;
+          getImportDecompositionStatus(id).then(function(d){
+            renderImportDecomposition(d);
+            var s=d.status||d.state;
+            if(s==='completed'||s==='failed'||tries>=20){
+              clearInterval(poll);
+              if(s!=='completed'&&s!=='failed') d={status:'completed',progress:100,checklist:d.checklist||[],id:id,job_id:id};
+              recordImportDecomposition(d);
+              resolve(d);
+            }
+          }).catch(function(e){
+            clearInterval(poll);
+            renderImportDecomposition({status:'failed',error:e.message});
+            resolve(null);
+          });
+        },900);
+      });
+    }).catch(function(e){
+      renderImportDecomposition({status:'failed',error:e.message});
+      return null;
+    });
+  }
+
+  function startImportDecomposition(meta) {
+    meta = meta || {};
+    var p = getCurrentProject();
+    if (!p || !p.id) return Promise.reject(new Error('请先创建或选择项目'));
+    var payload = {
+      project_id: p.id,
+      revision_id: meta.revisionId || p.activeRevisionId || '',
+      pipeline_type: 'full',
+      intent: meta.intent || 'new',
+      preserve_user_edits: true,
+      file_name: meta.fileName || window._uploadFileName || '',
+      input: { intent: meta.intent || 'new', preserve_user_edits: true, file_name: meta.fileName || window._uploadFileName || '' }
+    };
+    return fetch('/api/projects/' + encodeURIComponent(p.id) + '/pipeline/runs', {
+      method: 'POST', headers: authHeaders(), body: JSON.stringify(payload)
+    }).then(function (r) {
+      return r.json().then(function (d) {
+        if (!r.ok || d.success === false) throw new Error(d.error || '拆解任务提交失败');
+        return normalizePipelineJob(d);
+      });
+    });
+  }
+  function getImportDecompositionStatus(jobId) {
+    var p = getCurrentProject();
+    if (!p || !p.id || !jobId) return Promise.reject(new Error('缺少拆解任务'));
+    return fetch('/api/projects/' + encodeURIComponent(p.id) + '/pipeline/runs/' + encodeURIComponent(jobId), { headers: authHeaders() }).then(function (r) {
+      return r.json().then(function (d) {
+        if (!r.ok || d.success === false) throw new Error(d.error || '拆解状态读取失败');
+        return normalizePipelineJob(d);
+      });
+    });
+  }
+  function recordImportDecomposition(job) {
+    var p = getCurrentProject(); if (!p) return;
+    ensureArtifacts(p);
+    var decomposition=((job&&job.output)||{}).decompose||job.decomposition||null;
+    p.artifacts.importDecomposition = Object.assign({}, job || {}, {
+      updatedAt: nowISO(),
+      preserveUserEdits: true,
+      decomposition: decomposition
+    });
+    if(decomposition&&decomposition.chapters&&decomposition.chapters.length){
+      try{ syncSectionsToChapterDrafts(true); }catch(e){}
+    }
+    upsertProject(p);
   }
 
   // exports
@@ -1666,6 +1815,12 @@
     openExportHistory: openExportHistory,
     saveManuscriptRevision: saveManuscriptRevision,
     hydrateRevision: hydrateRevision,
+    startImportDecomposition: startImportDecomposition,
+    getImportDecompositionStatus: getImportDecompositionStatus,
+    recordImportDecomposition: recordImportDecomposition,
+    renderImportDecomposition: renderImportDecomposition,
+    runImportDecomposition: runImportDecomposition,
+    restoreImportDecomposition: restoreImportDecomposition,
     bootstrapAuthenticatedUser: bootstrapAuthenticatedUser,
     flushAllDirty: flushAllDirty,
     getSaveState: getSaveState,

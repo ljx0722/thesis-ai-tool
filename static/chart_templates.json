@@ -28,5 +28,12 @@
     {"id":"radar-profile","family":"multivariate-profile","name":"多指标雷达图","claimTypes":["case-profile","multi-criteria-comparison"],"requiredRoles":{"dimension":"categorical","value":"normalized-continuous"},"optionalRoles":{"case":"categorical"},"renderer":"radar","alternatives":["matrix-heatmap","parallel-dot"],"warnings":["normalized-scales-only","limit-dimensions"],"supports":{"facets":true,"grayscale":true,"vector":true}}
   ],
   "globalBans": ["pie","3d-bar","3d-pie","dual-y-unrelated","rainbow-colormap","mean-bar-small-n"],
+  "advisorWorkflow": {
+    "stages": ["profile","recommend","render_spec","code","render","qa"],
+    "whitelistRequired": true,
+    "fallbackTemplate": "distribution-histogram",
+    "artifactSchemaVersion": 3,
+    "qualityGates": ["template-whitelist","sample-size","missing-data","uncertainty-label","grayscale","minimum-font","export-formats"]
+  },
   "publicationDefaults": {"palette":"okabe-ito","minFontPt":6,"dpi":300,"formats":["svg","pdf","png"],"grayscalePreview":true}
 }

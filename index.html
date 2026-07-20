@@ -284,6 +284,15 @@
       拖拽文件到此处或点击选择
     </div>
     <div class="upload-recovery" id="uploadRecovery" role="status" aria-live="polite" hidden></div>
+    <section class="upload-decomposition" id="uploadDecomposition" aria-live="polite" hidden>
+      <div class="upload-decomposition-head"><strong>论文拆解进度</strong><span id="uploadDecompositionState">等待提交</span></div>
+      <div class="upload-decomposition-bar"><span id="uploadDecompositionProgress"></span></div>
+      <div class="import-checklist" id="uploadDecompositionChecklist"></div>
+      <div class="upload-decomposition-actions">
+        <button type="button" class="ai-btn-clear" id="uploadDecompositionRetry" hidden>重试拆解</button>
+        <button type="button" class="ai-btn-clear" id="uploadDecompositionNavigate" hidden>查看项目章节</button>
+      </div>
+    </section>
     <button onclick="hideUploadOverlay()" style="margin-top:16px;padding:8px 20px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface-alt);color:var(--text-muted);cursor:pointer;font-size:var(--font-size-sm);font-family:var(--font-sans)">取消</button>
   </div>
 </div>

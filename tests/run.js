@@ -1892,9 +1892,22 @@ test('RECHARGE: backend Decimal parser and confirmation are exact', function() {
     'db.rollback(); db.close()',
     "print('ok')"
   ].join('\n');
-  var result = cp.spawnSync('python', ['-c', script], {cwd: projectRoot, encoding: 'utf8', timeout: 20000});
-  if (result.error && result.error.code === 'ENOENT') result = cp.spawnSync('py', ['-3', '-c', script], {cwd: projectRoot, encoding: 'utf8', timeout: 20000});
-  assert(result.status === 0, 'backend recharge behavior failed: ' + (result.stderr || result.stdout || result.error || 'unknown'));
+  var candidates = [
+    {cmd:'python', args:['-c', script]},
+    {cmd:'py', args:['-3', '-c', script]}
+  ];
+  if (process.platform === 'win32' && process.env.LOCALAPPDATA) {
+    candidates.push({
+      cmd:path.join(process.env.LOCALAPPDATA, 'Programs', 'Python', 'Python312', 'python.exe'),
+      args:['-c', script]
+    });
+  }
+  var result = null;
+  for (var ci = 0; ci < candidates.length; ci++) {
+    result = cp.spawnSync(candidates[ci].cmd, candidates[ci].args, {cwd: projectRoot, encoding: 'utf8', timeout: 20000});
+    if (!(result.error && result.error.code === 'ENOENT')) break;
+  }
+  assert(result && result.status === 0, 'backend recharge behavior failed: ' + ((result && (result.stderr || result.stdout || result.error)) || 'python runtime unavailable'));
 });
 
 test('IMPORT: file accept includes doc and docx', function() {
@@ -2070,6 +2083,58 @@ test('FIGURE: project plans are dynamic and persisted', function() {
   var js=fs.readFileSync(path.join(projectRoot,'js/app-modules.js'),'utf8'),py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
   assert(js.indexOf('function buildDynamicFigurePlan')>=0&&js.indexOf('getCurrentFigurePlanContext')>=0,'dynamic plan context missing');
   assert(py.indexOf('figure_plans_json')>=0,'figure plans are not persisted');
+});
+
+test('CAPABILITY: preflight routes and client wiring match', function() {
+  var py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
+  var js=fs.readFileSync(path.join(projectRoot,'js/app-modules.js'),'utf8');
+  assert(py.indexOf("@app.route('/api/capabilities/<capability_id>/preflight'")>=0,'capability id preflight route missing');
+  assert(py.indexOf("@app.route('/api/capabilities/preflight'")>=0,'compat preflight route missing');
+  assert(py.indexOf("result['state']")>=0||py.indexOf("'state': state")>=0,'preflight state field missing');
+  assert(js.indexOf("/api/capabilities/'+encodeURIComponent(moduleId)+'/preflight")>=0||js.indexOf('/api/capabilities/')>=0,'frontend preflight path missing');
+  assert(js.indexOf('function preflightCapability')>=0&&js.indexOf('function runCapability')>=0,'capability helpers missing');
+  assert(js.indexOf("openOnly: true")>=0,'data-analysis openOnly gate missing');
+});
+
+test('UPLOAD: decomposition uses pipeline runs and progress recovery', function() {
+  var project=fs.readFileSync(path.join(projectRoot,'js/modules/project.js'),'utf8');
+  var py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
+  var html=fs.readFileSync(path.join(projectRoot,'index.html'),'utf8');
+  assert(project.indexOf('/pipeline/runs')>=0,'import decomposition does not call pipeline runs');
+  assert(project.indexOf('normalizePipelineJob')>=0&&project.indexOf('restoreImportDecomposition')>=0,'pipeline normalization/recovery missing');
+  assert(project.indexOf("pipeline_type: 'full'")>=0||project.indexOf('pipeline_type: "full"')>=0,'full pipeline type missing');
+  assert(py.indexOf("/api/projects/<project_id>/pipeline/runs")>=0&&py.indexOf('project_context_chunks')>=0,'backend pipeline/context index missing');
+  assert(html.indexOf('uploadDecomposition')>=0&&html.indexOf('uploadDecompositionRetry')>=0,'upload decomposition UI missing');
+});
+
+test('CITATION: DOCX superscript fidelity and audit runs are wired', function() {
+  var app=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8');
+  var lit=fs.readFileSync(path.join(projectRoot,'js/modules/literature-workbench.js'),'utf8');
+  assert(app.indexOf('function applyDocxSuperscriptRuns')>=0&&app.indexOf('vertAlign')>=0,'DOCX superscript preservation missing');
+  assert(app.indexOf('function domCitationMarkers')>=0&&app.indexOf('dom-superscript')>=0,'structured citation detection missing');
+  assert(app.indexOf('/(?:\\d{1,3})')>=0||app.indexOf('(?:\\d{1,3})')>=0||app.indexOf('(?:\\d{1,3}')>=0||/\/\(?:\^|\[\\\^d\]\)\(\(?:\\d\{1,3\}\)|\(\?:\d\{1,3\}\)/.test(app)||app.indexOf('(?:\\d{1,3})')>=0||app.indexOf('(?:\d{1,3})')>=0,'numeric citation regex missing');
+  assert(lit.indexOf('auditRun')>=0&&lit.indexOf('async function audit')>=0,'repeatable audit run state missing');
+  assert(lit.indexOf('lastSeenRunId')>=0&&lit.indexOf('auditRuns')>=0,'audit merge/idempotency missing');
+});
+
+test('BUDDY: multi-source retrieval and conversation memory contracts', function() {
+  var py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
+  var js=fs.readFileSync(path.join(projectRoot,'js/app-modules.js'),'utf8');
+  assert(py.indexOf('assistant_conversations')>=0&&py.indexOf('assistant_messages')>=0,'assistant conversation tables missing');
+  assert(py.indexOf("source_type': 'revision'")>=0||py.indexOf("source_type = 'revision'")>=0,'revision source fusion missing');
+  assert(py.indexOf('revision_quota')>=0&&py.indexOf('legacy_quota')>=0,'source quotas missing');
+  assert(js.indexOf('conversation_id')>=0&&js.indexOf('saveBuddyConversationId')>=0,'frontend conversation persistence missing');
+  assert(js.indexOf('renderBuddySources')>=0&&js.indexOf('buddy-sources')>=0,'buddy source explanation missing');
+});
+
+test('FIGURE: advisor closed loop uses profile/plan/render-code/qa', function() {
+  var js=fs.readFileSync(path.join(projectRoot,'js/app-modules.js'),'utf8');
+  var py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
+  assert(js.indexOf('/api/data/profile')>=0&&js.indexOf('/api/figures/plan')>=0,'figure advisor profile/plan wiring missing');
+  assert(js.indexOf('/api/figures/render-code')>=0&&js.indexOf('/api/figures/qa')>=0,'figure advisor code/qa wiring missing');
+  assert(js.indexOf('/api/figures/advisor')<0,'legacy figures/advisor path must not remain');
+  assert(py.indexOf("@app.route('/api/data/profile'")>=0&&py.indexOf("@app.route('/api/figures/plan'")>=0,'backend figure loop routes missing');
+  assert(py.indexOf("execution_policy': 'never-on-server'")>=0||py.indexOf('never-on-server')>=0,'server-side figure execution must stay disabled');
 });
 
 // residual risk guards (string presence)

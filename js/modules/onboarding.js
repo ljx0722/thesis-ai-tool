@@ -16,10 +16,11 @@ function buildTourSteps() {
     },
     {
       title: '导入或新建论文',
-      body: '可「从想法开始」创建项目，或点「导入论文」上传 .docx。<br>上传后会进入标题校准，确认章 / 节 / 小节样式（同济模板可用 标题_TJ、一级标题_TJ、二级标题_TJ）。',
+      body: '可「从想法开始」创建项目，或点「导入论文」上传 .docx。<br>上传后会校准标题样式，并自动创建论文版本、拆解章节、建立上下文索引；可在拆解清单查看进度与重试。',
       el: function () {
         return document.querySelector('[onclick*="triggerUpload"]')
           || document.getElementById('uploadDrop')
+          || document.getElementById('uploadDecomposition')
           || document.querySelector('.home-choice')
           || document.querySelector('[onclick*="openIdeaWizard"]');
       },
@@ -45,8 +46,8 @@ function buildTourSteps() {
       pos: 'left', icon: '📄'
     },
     {
-      title: '参考文献',
-      body: '顶栏「参考文献」或右侧「参考文献」标签，查看已识别文献、检索与校验。<br>删除文献会同步去掉正文角标并重编号。',
+      title: '参考文献与全文审计',
+      body: '查看已识别文献、检索与校验；DOCX 上标引用会保留语义。<br>「全文审计」可重复运行，只标缺引位置，不自动改原文。',
       el: function () {
         return document.querySelector('[data-view="refs"]')
           || document.querySelector('[onclick*="references"]')
@@ -56,19 +57,29 @@ function buildTourSteps() {
     },
     {
       title: '检索与科研图表',
-      body: '文献检索可同时设置条数、中文、英文、近3年和近5年最低比例；条件不足时会明确提示。<br>数据分析中的「科研图表顾问」会按论证目标、数据画像和目标期刊推荐图型，并保存 Figure Artifact。',
+      body: '文献检索可设置条数、中英文与近3/5年比例。<br>「科研图表顾问」会完成数据画像→图型推荐→安全代码→质量检查，服务端不会执行绘图代码。',
       el: function () { return document.getElementById('baSearch'); },
       pos: 'bottom', icon: '🔍'
     },
     {
-      title: '工具台',
-      body: '右侧可打开选题、开题、查错、降重、格式检查、数据分析、知识图谱等能力。<br>使用智能能力时按用量计点，可在「账户 / 计费」查看说明。',
+      title: '工具台与费用状态',
+      body: '打开模块只会做 preflight 可用性检查，不会扣点；真正运行时才按 free/paid 计费。<br>点数不足会提示充值，本地分析仍可部分使用。',
       el: function () {
         return document.getElementById('refPanel')
           || document.querySelector('.tool-panel')
           || document.querySelector('[data-view="tools"]');
       },
       pos: 'left', icon: '🧰'
+    },
+    {
+      title: '论文搭子助手',
+      body: '右下角助手会检索当前正文版本与项目资料，回答后展示来源分组。<br>会话会保存 conversation_id，下次打开可继续同一对话。',
+      el: function () {
+        return document.getElementById('buddyFab')
+          || document.getElementById('buddyDrawer')
+          || document.querySelector('[onclick*="openBuddyAssistant"]');
+      },
+      pos: 'left', icon: '🤝'
     },
     {
       title: '主线进度',
