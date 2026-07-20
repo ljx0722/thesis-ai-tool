@@ -7,14 +7,31 @@
   var CURRENT_KEY = 'thesis_ai_current_project_id';
 
   var STAGES = [
-    { id: 'ideation', name: '想清楚', icon: '🎯', desc: '选题打磨、研究问题与开题方案', modules: ['topic-finder', 'proposal'] },
-    { id: 'literature', name: '找资料', icon: '📚', desc: '文献检索、引用整理与研究脉络', modules: ['references', 'knowledge-graph'] },
-    { id: 'structure', name: '搭结构', icon: '🧭', desc: '论文大纲、章节计划与研究设计', modules: ['proposal'], primaryAction: 'open-outline' },
-    { id: 'writing', name: '写出来', icon: '✍️', desc: '分章写作、数据解读与图表表达', modules: ['expand', 'data-analysis'], primaryAction: 'open-outline' },
-    { id: 'polish', name: '改得好', icon: '🔍', desc: '查错、降重、格式、术语与逻辑', modules: ['proofread', 'de-duplicate', 'format-check', 'terminology', 'paragraph'] },
-    { id: 'review', name: '过评审', icon: '📊', desc: '综合审阅、论文看板与修改清单', modules: ['review', 'optimization', 'dashboard'] },
-    { id: 'defense', name: '做答辩', icon: '🎤', desc: '英文摘要、答辩 PPT 与问答演练', modules: ['en-abstract', 'defense-ppt'] }
+    { id: 'ideation', name: '想清楚', icon: '🎯', desc: '选题打磨、研究问题与开题方案', artifact: '明确选题与开题方案', paths: ['idea'], modules: ['topic-finder', 'proposal'] },
+    { id: 'literature', name: '找资料', icon: '📚', desc: '文献检索、候选证据与研究脉络', artifact: '形成可核验的文献与证据地图', paths: ['idea','docx'], modules: ['references', 'knowledge-graph'] },
+    { id: 'structure', name: '搭结构', icon: '🧭', desc: '论文大纲、章节计划与研究设计', artifact: '形成章节结构与研究路线', paths: ['idea','docx'], modules: ['proposal'], primaryAction: 'open-outline' },
+    { id: 'writing', name: '写出来', icon: '✍️', desc: '分章写作、数据解读与图表表达', artifact: '积累分章候选稿与分析结果', paths: ['idea'], modules: ['expand', 'data-analysis'], primaryAction: 'open-outline' },
+    { id: 'polish', name: '改得好', icon: '🔍', desc: '查错、降重、格式、术语与逻辑', artifact: '得到逐项可确认的修改清单', paths: ['idea','docx'], modules: ['proofread', 'de-duplicate', 'format-check', 'terminology', 'paragraph'] },
+    { id: 'review', name: '过评审', icon: '📊', desc: '综合审阅、论文看板与修改清单', artifact: '定位风险、证据缺口与优先级', paths: ['idea','docx'], modules: ['review', 'optimization', 'dashboard'] },
+    { id: 'defense', name: '做答辩', icon: '🎤', desc: '英文摘要、答辩 PPT 与问答演练', artifact: '形成答辩结构、讲稿与问答提纲', paths: ['idea','docx'], modules: ['en-abstract', 'defense-ppt'] }
   ];
+
+  function projectPath(project) {
+    return project && project.mode === 'import' ? 'docx' : 'idea';
+  }
+
+  function availableStages(project) {
+    var path = projectPath(project);
+    return STAGES.filter(function (stage) { return !stage.paths || stage.paths.indexOf(path) >= 0; });
+  }
+
+  function nextAvailableStage(project, stageId) {
+    var stages = availableStages(project);
+    for (var i = 0; i < stages.length; i++) {
+      if (stages[i].id === stageId) return stages[i + 1] || null;
+    }
+    return null;
+  }
 
   var SCHOOL_TEMPLATES = [
     { id: 'sjtu', name: '上海交通大学', degree: '硕士', minChapters: 5, minWords: 30000,
@@ -161,12 +178,13 @@
         });
       });
     }).catch(function(err){ cloudSyncState.lastError[project.id]=err.data||{error:err.message}; if(cb)cb(null); throw err; });
-    cloudSyncState.inFlight[project.id] = request.finally(function(){ delete cloudSyncState.inFlight[project.id]; });
-    return cloudSyncState.inFlight[project.id];
+    var tracked = request.finally(function(){ if (cloudSyncState.inFlight[project.id] === tracked) delete cloudSyncState.inFlight[project.id]; });
+    cloudSyncState.inFlight[project.id] = tracked;
+    return tracked;
   }
   function flushAllDirty(options){
     options=options||{};var ps=[];
-    loadAll().forEach(function(p){if(cloudSyncState.dirty[p.id]||options.force)ps.push(syncProjectToCloud(p));});
+    loadAll().forEach(function(p){if(cloudSyncState.dirty[p.id]||options.force)ps.push(syncProjectToCloud(p));var key='literature:'+p.id;if(cloudSyncState.inFlight[key])ps.push(cloudSyncState.inFlight[key]);});
     return Promise.allSettled(ps).then(function(results){
       var failed=results.filter(function(r){return r.status==='rejected';});
       return {success:failed.length===0,failed:failed.length,results:results};
@@ -322,19 +340,23 @@
     var key='literature:'+p.id,previous=cloudSyncState.inFlight[key]||Promise.resolve();
     cloudSyncState.dirty[key]=true;
     var request=previous.catch(function(){}).then(function(){
+      var latestProject=loadAll().filter(function(item){return item.id===p.id;})[0]||p;
+      var latestLiterature=ensureArtifacts(latestProject).literature;
+      var version=(latestLiterature&&latestLiterature.version)||submittedVersion;
       return fetch('/api/projects/'+encodeURIComponent(p.id)+'/literature',{
-        method:'PUT',headers:authHeaders(),body:JSON.stringify({literature:incoming,version:submittedVersion})
+        method:'PUT',headers:authHeaders(),body:JSON.stringify({literature:latestLiterature,version:version})
       }).then(function(r){return r.json().catch(function(){return{};}).then(function(d){
         if(r.status===409){var conflict=new Error(d.error||'文献工作台版本冲突');conflict.code='LITERATURE_VERSION_CONFLICT';conflict.data=d;throw conflict;}
         if(!r.ok||!d.success||!d.literature)throw new Error(d.error||('文献工作台同步失败 '+r.status));
-        var latest=getCurrentProject();if(latest){ensureArtifacts(latest).literature=ensureLiteratureShape(d.literature);latest.updatedAt=nowISO();upsertLocal(latest);}
+        var latest=loadAll().filter(function(item){return item.id===p.id;})[0];if(latest){ensureArtifacts(latest).literature=ensureLiteratureShape(d.literature);latest.updatedAt=nowISO();upsertLocal(latest);}
         cloudSyncState.dirty[key]=false;cloudSyncState.lastSavedAt[key]=new Date().toISOString();cloudSyncState.lastError[key]=null;
         try{window.dispatchEvent(new CustomEvent('literature-artifact-changed',{detail:{projectId:p.id,version:d.version}}));}catch(e3){}
         return d.literature;
       });});
     }).catch(function(err){cloudSyncState.lastError[key]=err.data||{error:err.message};throw err;});
-    cloudSyncState.inFlight[key]=request.finally(function(){delete cloudSyncState.inFlight[key];});
-    return cloudSyncState.inFlight[key];
+    var tracked=request.finally(function(){if(cloudSyncState.inFlight[key]===tracked)delete cloudSyncState.inFlight[key];});
+    cloudSyncState.inFlight[key]=tracked;
+    return tracked;
   }
 
   function updateLiteratureArtifact(mutator, options) {
@@ -550,10 +572,9 @@
   function completeStage(stageId) {
     var p = markStage(stageId, 'done');
     if (!p) return null;
-    var idx = -1;
-    for (var i = 0; i < STAGES.length; i++) if (STAGES[i].id === stageId) { idx = i; break; }
-    if (idx >= 0 && idx < STAGES.length - 1) {
-      var next = STAGES[idx + 1].id;
+    var nextStage = nextAvailableStage(p, stageId);
+    if (nextStage) {
+      var next = nextStage.id;
       if (p.stageStatus[next] !== 'done') p.stageStatus[next] = 'active';
       p.currentStage = next;
       upsertProject(p);
@@ -727,7 +748,8 @@
     if (!project) return null;
     project.stageStatus = project.stageStatus || {};
     var changed = false;
-    STAGES.forEach(function (st) {
+    var stages = availableStages(project);
+    stages.forEach(function (st) {
       var ev = evaluateStage(project, st.id);
       var cur = project.stageStatus[st.id] || 'todo';
       if (ev.done && cur !== 'done') {
@@ -739,11 +761,11 @@
       }
     });
     if (project.stageStatus[project.currentStage] === 'done') {
-      for (var i = 0; i < STAGES.length; i++) {
-        if (project.stageStatus[STAGES[i].id] !== 'done') {
-          if (project.currentStage !== STAGES[i].id) {
-            project.currentStage = STAGES[i].id;
-            if (project.stageStatus[STAGES[i].id] !== 'done') project.stageStatus[STAGES[i].id] = 'active';
+      for (var i = 0; i < stages.length; i++) {
+        if (project.stageStatus[stages[i].id] !== 'done') {
+          if (project.currentStage !== stages[i].id) {
+            project.currentStage = stages[i].id;
+            if (project.stageStatus[stages[i].id] !== 'done') project.stageStatus[stages[i].id] = 'active';
             changed = true;
           }
           break;
@@ -1372,7 +1394,8 @@
       try { project = autoSyncStageProgress(project) || project; } catch (e) {}
     }
     var html = '';
-    STAGES.forEach(function (s, idx) {
+    var stages = project ? availableStages(project) : STAGES;
+    stages.forEach(function (s, idx) {
       var st = project ? ((project.stageStatus || {})[s.id] || 'todo') : 'todo';
       var cur = project && project.currentStage === s.id;
       var meta = '';
@@ -1390,7 +1413,7 @@
     host.innerHTML = html;
   }
 
-  function openProjectStage(stageId) {
+  function openProjectStage(stageId, moduleId) {
     var project = getCurrentProject();
     if (!project) {
       openIdeaWizard();
@@ -1411,7 +1434,7 @@
       else openChapterBoard();
       return;
     }
-    var mod = stage.modules && stage.modules[0];
+    var mod = moduleId || (stage.modules && stage.modules[0]);
     if (stage.primaryAction === 'open-outline') {
       openOutlineEditor();
       return;
@@ -1437,7 +1460,7 @@
   function runProjectAction(action, stageId, moduleId) {
     if (action === 'open-idea-wizard') return openIdeaWizard();
     if (action === 'upload') return typeof triggerUpload === 'function' ? triggerUpload() : null;
-    if (action === 'open-stage') return openProjectStage(stageId || 'ideation');
+    if (action === 'open-stage') return openProjectStage(stageId || 'ideation', moduleId);
     if (action === 'open-outline') return openOutlineEditor();
     if (action === 'open-chapters') return openChapterBoard();
     if (action === 'open-settings') return openProjectSettings();

@@ -3943,8 +3943,7 @@ async function generateKnowledgeGraph(){
       return;
     }
     if(resp.status===402){
-      var need=r&&r.needed_points!=null?('，预计需 '+r.needed_points+' 点'):'';
-      ph.innerHTML='<div style="font-size:2.5rem;margin-bottom:12px">💳</div><div style="margin-bottom:12px">'+(r&&r.error?r.error:('点数不足'+need))+'</div>'+(typeof showRechargeModal==='function'?'<button class="ai-btn" onclick="showRechargeModal()">去充值</button>':'');
+      ph.innerHTML='<div style="font-size:2.5rem;margin-bottom:12px">💳</div><div style="margin-bottom:12px">点数不足，请查看账户计费说明或充值后重试</div>'+(typeof showRechargeModal==='function'?'<button class="ai-btn" onclick="showRechargeModal()">去充值</button>':'');
       if(typeof updateBalanceDisplay==='function')updateBalanceDisplay();
       if(typeof ttp==='function')ttp((r&&r.error)||'点数不足');
       return;
@@ -3957,8 +3956,8 @@ async function generateKnowledgeGraph(){
     }
     kgCurrentData=r.data;renderKnowledgeGraph(r.data);
     try{
-      if(r.usage&&r.usage.free&&typeof ttp==='function')ttp('今日图谱免费 '+(r.usage.free_used||'')+'/'+(r.usage.free_limit||''));
-      else if(r.usage&&r.usage.cost_points>0&&typeof ttp==='function')ttp('图谱 -'+Number(r.usage.cost_points).toFixed(3)+' 点');
+      if(r.usage&&r.usage.free&&typeof ttp==='function')ttp('本次图谱生成使用体验额度');
+      else if(r.usage&&r.usage.cost_points>0&&typeof ttp==='function')ttp('本次图谱生成已按当前规则计费');
       if(typeof updateBalanceDisplay==='function')updateBalanceDisplay();
     }catch(eU){}
   }catch(e){

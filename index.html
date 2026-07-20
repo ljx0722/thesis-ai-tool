@@ -26,50 +26,33 @@
         <p class="landing-desc">从一个想法到答辩通关，你的AI论文搭子，陪你搞定论文全流程</p>
       </div>
 
-      <div class="landing-highlights" style="display:none" aria-hidden="true"></div>
-      <div class="landing-features">
-        <div class="feature-item">
-          <div class="feature-icon" style="--fa:#818cf8">💡</div>
-          <div class="feature-text">
-            <span class="feature-title">从想法立项</span>
-            <span class="feature-sub">选题 · 研究问题 · 开题大纲</span>
+      <div class="landing-workflow" aria-labelledby="landingWorkflowTitle">
+        <div class="landing-workflow-head">
+          <div>
+            <span class="landing-kicker">论文全流程工作台</span>
+            <h2 id="landingWorkflowTitle">一条主线，七个论文阶段</h2>
           </div>
+          <span class="landing-live-note"><i></i>按阶段推进，不堆工具</span>
         </div>
-        <div class="feature-item">
-          <div class="feature-icon" style="--fa:#a78bfa">📚</div>
-          <div class="feature-text">
-            <span class="feature-title">文献与证据</span>
-            <span class="feature-sub">多源检索 · 知识图谱 · 引用管理</span>
-          </div>
+        <div class="landing-paths" role="tablist" aria-label="开始路径">
+          <button type="button" class="landing-path is-active" role="tab" aria-selected="true" data-landing-path="idea">💡 从想法开始<span>立项 → 大纲 → 分章写作</span></button>
+          <button type="button" class="landing-path" role="tab" aria-selected="false" data-landing-path="docx">📄 导入已有论文<span>解析 DOCX → 审阅 → 导出</span></button>
         </div>
-        <div class="feature-item">
-          <div class="feature-icon" style="--fa:#22d3ee">✍️</div>
-          <div class="feature-text">
-            <span class="feature-title">分阶段写作</span>
-            <span class="feature-sub">扩写 · 数据 · 论证补强</span>
-          </div>
+        <div class="landing-stage-rail" role="tablist" aria-label="论文阶段">
+          <button type="button" class="landing-stage is-active" role="tab" aria-selected="true" data-stage="0"><b>·</b><span>想清楚</span></button>
+          <button type="button" class="landing-stage" role="tab" aria-selected="false" data-stage="1"><b>·</b><span>找资料</span></button>
+          <button type="button" class="landing-stage" role="tab" aria-selected="false" data-stage="2"><b>·</b><span>搭结构</span></button>
+          <button type="button" class="landing-stage" role="tab" aria-selected="false" data-stage="3"><b>·</b><span>写出来</span></button>
+          <button type="button" class="landing-stage" role="tab" aria-selected="false" data-stage="4"><b>·</b><span>改得好</span></button>
+          <button type="button" class="landing-stage" role="tab" aria-selected="false" data-stage="5"><b>·</b><span>过评审</span></button>
+          <button type="button" class="landing-stage" role="tab" aria-selected="false" data-stage="6"><b>·</b><span>做答辩</span></button>
         </div>
-        <div class="feature-item">
-          <div class="feature-icon" style="--fa:#f59e0b">📊</div>
-          <div class="feature-text">
-            <span class="feature-title">评审与答辩</span>
-            <span class="feature-sub">十维看板 · 查错降重 · PPT 大纲</span>
-          </div>
+        <div class="landing-stage-detail" role="tabpanel" aria-live="polite" aria-labelledby="landingStageName">
+          <div class="landing-stage-index" id="landingStageIndex" aria-hidden="true">想</div>
+          <div><h3 id="landingStageName">想清楚</h3><p id="landingStageDesc">把模糊想法变成可研究的问题、选题方向和开题方案。</p><div class="landing-stage-tags" id="landingStageTags"><span>选题打磨</span><span>开题方案</span></div></div>
+          <span class="landing-stage-arrow" aria-hidden="true">↗</span>
         </div>
-        <div class="feature-item">
-          <div class="feature-icon" style="--fa:#34d399">📄</div>
-          <div class="feature-text">
-            <span class="feature-title">DOCX 智能解析</span>
-            <span class="feature-sub">样式识别 · 目录树 · 本地解析</span>
-          </div>
-        </div>
-        <div class="feature-item">
-          <div class="feature-icon" style="--fa:#f472b6">🛠️</div>
-          <div class="feature-text">
-            <span class="feature-title">学术能力编排</span>
-            <span class="feature-sub">按写作阶段调用专业能力</span>
-          </div>
-        </div>
+        <p class="landing-truth-note">浏览阶段不会执行分析或扣费；登录后会按当前服务配置显示可用能力。</p>
       </div>
     </div>
 
@@ -532,6 +515,7 @@ window.addEventListener('DOMContentLoaded',function(){
             return;
           }
           finishAuthenticatedBootstrap(d.user);
+          if (window.maybeStartTour) window.maybeStartTour();
         } else { err.textContent = d.error; }
       }).catch(function() { err.textContent = '网络错误'; });
   };
@@ -570,6 +554,103 @@ window.addEventListener('DOMContentLoaded',function(){
     sessionStorage.removeItem('thesis_ai_admin_secret');
     location.reload();
   };
+
+  function landingModuleLabel(id){
+    var names = {
+      'topic-finder':'选题打磨','proposal':'开题方案','references':'参考文献','knowledge-graph':'研究图谱',
+      'expand':'章节扩写','data-analysis':'数据分析','proofread':'论文查错','de-duplicate':'查重降重',
+      'format-check':'格式检查','terminology':'术语分析','paragraph':'段落分析','review':'论文审阅',
+      'optimization':'优化建议','dashboard':'论文看板','en-abstract':'英文摘要','defense-ppt':'答辩材料'
+    };
+    return names[id] || id;
+  }
+  function escapeLandingHtml(value){
+    return String(value == null ? '' : value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function getLandingStages(){
+    if(window.ThesisProject && Array.isArray(ThesisProject.STAGES) && ThesisProject.STAGES.length){
+      return ThesisProject.STAGES.map(function(stage){
+        return {
+          id: stage.id, name: stage.name, icon: stage.icon || '',
+          desc: stage.desc || '', artifact: stage.artifact || '',
+          paths: stage.paths || ['idea','docx'],
+          modules: (stage.modules || []).map(landingModuleLabel)
+        };
+      });
+    }
+    return [
+      {id:'ideation',name:'想清楚',icon:'🎯',desc:'选题打磨、研究问题与开题方案',artifact:'明确选题与开题方案',paths:['idea'],modules:['选题打磨','开题方案']},
+      {id:'literature',name:'找资料',icon:'📚',desc:'文献检索、候选证据与研究脉络',artifact:'形成可核验的文献与证据地图',paths:['idea','docx'],modules:['参考文献','研究图谱']},
+      {id:'structure',name:'搭结构',icon:'🧭',desc:'论文大纲、章节计划与研究设计',artifact:'形成章节结构与研究路线',paths:['idea','docx'],modules:['开题方案']},
+      {id:'writing',name:'写出来',icon:'✍️',desc:'分章写作、数据解读与图表表达',artifact:'积累分章候选稿与分析结果',paths:['idea'],modules:['章节扩写','数据分析']},
+      {id:'polish',name:'改得好',icon:'🔍',desc:'查错、降重、格式、术语与逻辑',artifact:'得到逐项可确认的修改清单',paths:['idea','docx'],modules:['论文查错','查重降重','格式检查']},
+      {id:'review',name:'过评审',icon:'📊',desc:'综合审阅、论文看板与修改清单',artifact:'定位风险、证据缺口与优先级',paths:['idea','docx'],modules:['论文审阅','优化建议','论文看板']},
+      {id:'defense',name:'做答辩',icon:'🎤',desc:'英文摘要、答辩 PPT 与问答演练',artifact:'形成答辩结构、讲稿与问答提纲',paths:['idea','docx'],modules:['英文摘要','答辩材料']}
+    ];
+  }
+  function initLandingExplorer(){
+    var stages = getLandingStages();
+    var stageButtons = Array.prototype.slice.call(document.querySelectorAll('[data-stage]'));
+    var pathButtons = Array.prototype.slice.call(document.querySelectorAll('[data-landing-path]'));
+    if(!stageButtons.length) return;
+    var state = {path: 'idea', stage: 0};
+    function render(){
+      var stage = stages[state.stage] || stages[0];
+      pathButtons.forEach(function(btn){
+        var active = btn.getAttribute('data-landing-path') === state.path;
+        btn.classList.toggle('is-active', active);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      stageButtons.forEach(function(btn, index){
+        var stageMeta = stages[index] || {};
+        var pathOk = !stageMeta.paths || stageMeta.paths.indexOf(state.path) >= 0;
+        var active = index === state.stage;
+        btn.classList.toggle('is-active', active);
+        btn.classList.toggle('is-dimmed', !pathOk);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        btn.disabled = false;
+      });
+      var indexEl = document.getElementById('landingStageIndex');
+      var nameEl = document.getElementById('landingStageName');
+      var descEl = document.getElementById('landingStageDesc');
+      var tagsEl = document.getElementById('landingStageTags');
+      if(indexEl) indexEl.textContent = (stage.icon || stage.name || '').slice(0, 2);
+      if(nameEl) nameEl.textContent = stage.name || '';
+      if(descEl){
+        var pathHint = state.path === 'docx' ? '导入路径通常从解析与审阅切入，再回到当前阶段补强。' : '创作路径从立项开始，逐步沉淀大纲、章节与证据。';
+        descEl.textContent = (stage.desc || '') + ' ' + pathHint + (stage.artifact ? ' 产出：' + stage.artifact : '');
+      }
+      if(tagsEl){
+        tagsEl.innerHTML = (stage.modules || []).map(function(label){ return '<span>' + escapeLandingHtml(label) + '</span>'; }).join('');
+      }
+      var detail = document.querySelector('.landing-stage-detail');
+      if(detail){
+        detail.classList.remove('is-refreshing');
+        void detail.offsetWidth;
+        detail.classList.add('is-refreshing');
+      }
+    }
+    pathButtons.forEach(function(btn){
+      btn.addEventListener('click', function(){
+        state.path = btn.getAttribute('data-landing-path') || 'idea';
+        var preferred = stages.findIndex(function(stage){ return (stage.paths || []).indexOf(state.path) >= 0; });
+        if(preferred >= 0) state.stage = preferred;
+        render();
+      });
+    });
+    stageButtons.forEach(function(btn, index){
+      btn.addEventListener('click', function(){ state.stage = index; render(); });
+      btn.addEventListener('keydown', function(e){
+        if(e.key === 'ArrowRight' || e.key === 'ArrowDown'){ e.preventDefault(); state.stage = Math.min(stages.length - 1, index + 1); stageButtons[state.stage].focus(); render(); }
+        if(e.key === 'ArrowLeft' || e.key === 'ArrowUp'){ e.preventDefault(); state.stage = Math.max(0, index - 1); stageButtons[state.stage].focus(); render(); }
+        if(e.key === 'Home'){ e.preventDefault(); state.stage = 0; stageButtons[0].focus(); render(); }
+        if(e.key === 'End'){ e.preventDefault(); state.stage = stages.length - 1; stageButtons[state.stage].focus(); render(); }
+      });
+    });
+    render();
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initLandingExplorer);
+  else initLandingExplorer();
 
   // 余额更新
   window.formatPoints = function(v){
@@ -636,8 +717,8 @@ window.addEventListener('DOMContentLoaded',function(){
     var amount = Number(text);
     if (!Number.isFinite(amount)) return { error: '请输入有效金额' };
     var fen = Math.round(amount * 100);
-    if (fen < 100) return { error: '最低充值 1 元' };
-    if (fen > 500000) return { error: '单笔最高 5000 元' };
+    if (fen < 100) return { error: '充值金额低于当前最低限额' };
+    if (fen > 500000) return { error: '充值金额超过当前单笔限额' };
     return { fen: fen, yuan: fen / 100, text: (fen / 100).toFixed(2) };
   };
   function setRechargeError(message) {
@@ -651,7 +732,7 @@ window.addEventListener('DOMContentLoaded',function(){
     var inp = document.getElementById('rechargeAmountInput');
     if (inp && clearInput) inp.value = '';
     var prev = document.getElementById('rechargePointsPreview');
-    if (prev) prev.textContent = '= 0 点';
+    if (prev) prev.textContent = '所得点数按当前兑换规则计算';
     var payAmt = document.getElementById('rechargePayAmountLabel');
     if (payAmt) payAmt.textContent = '—';
     var payment = document.getElementById('rechargePayment');
@@ -670,11 +751,11 @@ window.addEventListener('DOMContentLoaded',function(){
     var parsed = parseRechargeAmountFen(inp ? inp.value : '');
     var prev = document.getElementById('rechargePointsPreview');
     if (parsed.error) {
-      if (prev) prev.textContent = '= — 点';
+      if (prev) prev.textContent = '所得点数按当前兑换规则计算';
       if (inp && inp.value.trim()) setRechargeError(parsed.error);
       return;
     }
-    if (prev) prev.textContent = '= ' + parsed.text + ' 点';
+    if (prev) prev.textContent = '所得点数按当前兑换规则计算';
     setRechargeError('');
     var btns = document.querySelectorAll('.recharge-amt-btn');
     for (var i = 0; i < btns.length; i++) {
@@ -708,7 +789,7 @@ window.addEventListener('DOMContentLoaded',function(){
     window._selectedAmount = parsed.yuan;
     if (inp) inp.value = parsed.text;
     var prev = document.getElementById('rechargePointsPreview');
-    if (prev) prev.textContent = '= ' + parsed.text + ' 点';
+    if (prev) prev.textContent = '所得点数按当前兑换规则计算';
     var payAmt = document.getElementById('rechargePayAmountLabel');
     if (payAmt) payAmt.textContent = parsed.text;
     document.getElementById('rechargePayment').style.display = '';
@@ -755,11 +836,11 @@ window.addEventListener('DOMContentLoaded',function(){
         var info = document.getElementById('rechargeOrderInfo');
         if (info) {
           info.style.display = 'block';
-          info.innerHTML = '订单 <b>#'+d.order_id+'</b> · 请转账 <b>¥'+amountText+'</b>（='+amountText+' 点）· 备注请填订单号 <b>'+d.order_id+'</b>';
+          info.innerHTML = '订单 <b>#'+d.order_id+'</b> 已创建 · 请按订单显示的金额转账 · 备注请填订单号 <b>'+d.order_id+'</b>';
         }
         var payAmt = document.getElementById('rechargePayAmountLabel');
         if (payAmt) payAmt.textContent = amountText;
-        alert('订单 #'+d.order_id+' 已创建。\n请按 ¥'+amountText+' 扫码转账，备注填写订单号 '+d.order_id+'。\n支付完成后点击「我已支付」。');
+        alert('订单 #'+d.order_id+' 已创建。\n请按订单页面显示的应付金额扫码转账，备注填写订单号 '+d.order_id+'。\n支付完成后点击「我已支付」。');
         if (btn) { btn.textContent = '我已支付，提交审核'; btn.onclick = confirmPaid; btn.disabled = false; }
         loadRechargeHistory();
       }).catch(function() { if (btn) btn.disabled = false; alert('网络错误'); });
@@ -965,20 +1046,13 @@ window.addEventListener('DOMContentLoaded',function(){
       <button onclick="hideRechargeModal()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.2rem;font-family:var(--font-sans)">&times;</button>
     </div>
     <p style="font-size:var(--font-size-md);color:var(--text-muted);margin:0 0 8px">当前余额: <strong id="rechargeBalance" style="color:var(--text-primary)">0.00</strong> 点</p>
-    <p style="font-size:.68rem;color:var(--text-muted);margin:0 0 12px;line-height:1.55">充值规则：<b>1 元 = 1 点</b>。请按您填写的金额转账；管理员按实收确认到账。</p>
+    <p style="font-size:.68rem;color:var(--text-muted);margin:0 0 12px;line-height:1.55">充值所得点数按当前兑换规则计算。请按订单显示的金额转账；管理员按实收确认到账。</p>
     <h4 style="font-size:var(--font-size-base);color:var(--text-secondary);margin:0 0 8px;font-weight:var(--font-weight-semibold)">充值金额（元）</h4>
     <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap">
-      <input type="text" inputmode="decimal" id="rechargeAmountInput" autocomplete="off" placeholder="请输入金额，如 10.00" aria-describedby="rechargePointsPreview rechargeAmountError" style="flex:1;min-width:140px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:.9rem;font-family:var(--font-sans)">
-      <span id="rechargePointsPreview" style="font-size:.78rem;color:var(--text-muted);white-space:nowrap">= 0 点</span>
+      <input type="text" inputmode="decimal" id="rechargeAmountInput" autocomplete="off" placeholder="请输入充值金额" aria-describedby="rechargePointsPreview rechargeAmountError" style="flex:1;min-width:140px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:.9rem;font-family:var(--font-sans)">
+      <span id="rechargePointsPreview" style="font-size:.78rem;color:var(--text-muted);white-space:nowrap">所得点数按当前兑换规则计算</span>
     </div>
     <div id="rechargeAmountError" aria-live="polite" style="min-height:16px;margin:-3px 0 7px;color:#ef4444;font-size:.68rem"></div>
-    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
-      <button type="button" class="recharge-amt-btn" data-amt="5" onclick="fillRechargeAmount(5)" aria-label="充值 5 元">5 元</button>
-      <button type="button" class="recharge-amt-btn" data-amt="10" onclick="fillRechargeAmount(10)" aria-label="充值 10 元">10 元</button>
-      <button type="button" class="recharge-amt-btn" data-amt="20" onclick="fillRechargeAmount(20)" aria-label="充值 20 元">20 元</button>
-      <button type="button" class="recharge-amt-btn" data-amt="50" onclick="fillRechargeAmount(50)" aria-label="充值 50 元">50 元</button>
-      <button type="button" class="recharge-amt-btn" data-amt="100" onclick="fillRechargeAmount(100)" aria-label="充值 100 元">100 元</button>
-    </div>
     <button type="button" class="ai-btn" style="width:100%;margin-bottom:12px" onclick="selectRechargeAmountFromInput()">下一步：扫码支付</button>
     <div id="rechargeOrderInfo" aria-live="polite" style="display:none;font-size:.75rem;color:var(--accent);margin:0 0 10px;padding:8px 10px;border-radius:8px;background:var(--accent-glow);border:1px solid var(--accent)"></div>
     <div id="rechargePayment" style="display:none;padding:14px;background:var(--surface-alt);border-radius:var(--radius-lg);border:1px solid var(--border);margin-bottom:12px">
@@ -1214,15 +1288,13 @@ function renderConsumptionHistory(d, fromDate, toDate){
     var m={usage:'功能消耗',recharge:'充值',gift:'赠送',refund:'退款',admin:'管理员调整',free:'体验额度'};
     return m[t]||t||'其他';
   }
-  function modLabel(m){
+  function usageModuleLabel(m){
     var map={
-      'topic-finder':'选题推荐','proposal':'开题大纲','proofread':'论文查错','de-duplicate':'查重降重',
-      'review':'论文审阅','expand':'论文扩写','defense-ppt':'答辩PPT','en-abstract':'英文摘要',
-      'format-check':'格式检查','terminology':'术语分析','paragraph':'段落分析','dashboard':'论文看板',
-      'data-analysis':'数据分析','data-ml':'数据分析','search':'文献检索','kg':'知识图谱','export-docx':'导出文档'
+      'topic-finder':'选题推荐','proposal':'开题大纲','proofread':'论文查错','de-duplicate':'查重降重','review':'论文审阅','expand':'论文扩写','chapter-expand':'论文扩写','defense-ppt':'答辩PPT','en-abstract':'英文摘要','format-check':'格式检查','terminology':'术语分析','paragraph':'段落分析','dashboard':'论文看板','data-analysis':'数据分析','data-ml':'数据分析','data-profile':'数据画像','joint-analysis':'联合分析','figure-advisor':'科研图表顾问','figure-advisor-batch':'科研图表顾问','figure-recommend':'图表推荐','figure-render-code':'图表代码生成','figure-qa':'图表规范质检','search':'文献检索','literature-search':'文献检索','kg':'知识图谱','knowledge-graph':'知识图谱','export-docx':'导出文档'
     };
-    return map[m]||m||'智能能力';
+    return map[m]||'智能能力';
   }
+  function modLabel(m){ return usageModuleLabel(m); }
   var txs=(d.transactions||[]).filter(function(t){return inRange(t.created_at);});
   var llms=(d.llm_usage||[]).filter(function(t){return inRange(t.created_at);});
   var h='';
@@ -1273,7 +1345,7 @@ function exportConsumptionHistory(){
     rows.push(['交易', t.created_at||'', t.type||'', t.points, t.points_after, '', String(t.description||'').replace(/API|api_cost|厘/gi,'')].join(','));
   });
   (d.llm_usage||[]).filter(function(t){return inRange(t.created_at);}).forEach(function(l){
-    rows.push(['智能调用', l.created_at||'', l.module||'', l.points_charged||0, '', (Number(l.prompt_tokens||0)+Number(l.completion_tokens||0)), ''].join(','));
+    rows.push(['智能调用', l.created_at||'', usageModuleLabel(l.module), l.points_charged||0, '', (Number(l.prompt_tokens||0)+Number(l.completion_tokens||0)), ''].join(','));
   });
   var blob=new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8;'});
   var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='usage_history.csv';
@@ -1289,16 +1361,16 @@ window.showPricingInfo = function(){
     h+='<p style="margin:0 0 12px;color:#64748b;font-size:.8rem">点数用于使用站内智能与分析能力。充值订单确认后入账。</p>';
     h+='<b>怎么计点</b><ul style="margin:8px 0 12px 18px;padding:0;font-size:.84rem">';
     h+='<li>写作、润色、查错等智能能力：按实际使用量计点</li>';
-    h+='<li>检索文献：每次 0.5 点</li>';
-    h+='<li>知识图谱与格式/术语等分析能力：按次计点（图谱前 2 次可体验）</li>';
+    h+='<li>文献检索、知识图谱与格式/术语等分析能力：按当前规则计点，体验额度以账户状态为准</li>';
     h+='</ul>';
-    h+='<b>部分能力参考（点）</b><div style="font-size:.84rem;margin:8px 0 12px">';
-    (d.items||[]).filter(function(it){return it.billing==='fixed' && Number(it.points)>0;}).slice(0,12).forEach(function(it){
+    h+='<b>计费方式</b><div style="font-size:.84rem;margin:8px 0 12px">';
+    (d.items||[]).slice(0,12).forEach(function(it){
       var nm=(it.name||it.key||'');
-      h+='<div style="display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-bottom:1px solid rgba(0,0,0,.06)"><span>'+nm+'</span><span>'+Number(it.points).toFixed(3)+' 点</span></div>';
+      var mode=(it.billing==='smart'||it.billing==='llm-token')?'按实际使用量计点':'按当前规则计点';
+      h+='<div style="display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-bottom:1px solid rgba(0,0,0,.06)"><span>'+nm+'</span><span>'+mode+'</span></div>';
     });
     h+='</div>';
-    h+='<div style="font-size:.78rem;color:#64748b">注册即赠 '+(d.register_bonus_points!=null?d.register_bonus_points:3)+' 点。具体以账户余额为准。</div></div>';
+    h+='<div style="font-size:.78rem;color:#64748b">注册奖励以账户实际到账为准。</div></div>';
     openAccountModal('使用说明', h);
   }).catch(function(){alert('网络错误');});
 };
@@ -1316,7 +1388,7 @@ document.getElementById('accountModalMask').addEventListener('click', function(e
 <aside class="buddy-drawer" id="buddyDrawer" aria-hidden="true" aria-label="论文搭子助手">
   <header><div><strong>论文搭子</strong><span id="buddyContext">当前项目助手</span></div><button type="button" onclick="closeBuddyAssistant()">关闭</button></header>
   <div class="buddy-body" id="buddyMessages"><div class="buddy-welcome">我会优先使用当前项目、论文版本和资料证据回答；找不到依据时会明确说明。</div></div>
-  <footer><textarea id="buddyInput" rows="3" placeholder="例如：总结当前章节；下一步做什么；资料中有哪些证据支持这个论点？"></textarea><div><span id="buddyCostHint">回答前显示预计点数</span><button type="button" onclick="askBuddyAssistant()">发送</button></div></footer>
+  <footer><textarea id="buddyInput" rows="3" placeholder="例如：总结当前章节；下一步做什么；资料中有哪些证据支持这个论点？"></textarea><div><span id="buddyCostHint">回答前确认计费方式</span><button type="button" onclick="askBuddyAssistant()">发送</button></div></footer>
 </aside>
 
 <div class="theme-studio-backdrop" id="themeStudioBackdrop" onclick="closeThemeStudio()"></div>

@@ -250,30 +250,28 @@ function tourEnd() {
   } catch (e) {}
 }
 
-// 暴露
-window.tourStart = tourStart;
-window.tourNext = tourNext;
-window.tourPrev = tourPrev;
-window.tourEnd = tourEnd;
-window.buildTourSteps = buildTourSteps;
-
-// 首次登录自动打开
-(function () {
+function maybeStartTour() {
   var seen = false;
-  try { var state=JSON.parse(localStorage.getItem(tourStorageKey())||'{}');seen = sessionStorage.getItem('thesis_ai_tour_seen') === '1' || state.completed===true; } catch (e) {}
+  try {
+    var state = JSON.parse(localStorage.getItem(tourStorageKey()) || '{}');
+    seen = sessionStorage.getItem('thesis_ai_tour_seen') === '1' || state.completed === true;
+  } catch (e) {}
   if (seen) return;
   var isLoggedIn = false;
   try {
     isLoggedIn = sessionStorage.getItem('thesis_ai_login') === 'true' || !!sessionStorage.getItem('thesis_ai_token');
   } catch (e) {}
   if (!isLoggedIn) return;
-  var checks = 0;
-  var timer = setInterval(function () {
-    checks++;
-    if (typeof tourStart === 'function') {
-      clearInterval(timer);
-      setTimeout(function () { try { tourStart(); } catch (e) {} }, 700);
-    }
-    if (checks > 60) clearInterval(timer);
-  }, 100);
-})();
+  setTimeout(function () { try { tourStart(); } catch (e) {} }, 700);
+}
+
+// 暴露
+window.tourStart = tourStart;
+window.tourNext = tourNext;
+window.tourPrev = tourPrev;
+window.tourEnd = tourEnd;
+window.buildTourSteps = buildTourSteps;
+window.maybeStartTour = maybeStartTour;
+
+// 首次登录自动打开
+maybeStartTour();

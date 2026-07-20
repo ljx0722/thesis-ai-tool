@@ -230,7 +230,7 @@
             </label>
             <button class="admin-btn admin-btn-primary" onclick="giftCredits()">确认赠送/调整</button>
           </div>
-          <p style="margin:0;font-size:.7rem;color:var(--text-muted)">单位：点（1元=1点）。赠送后用户会收到「系统管理员于…赠送了你 X 点」站内消息。也可在下方表格点用户ID快捷填入。</p>
+          <p style="margin:0;font-size:.7rem;color:var(--text-muted)">单位：点。赠送后用户会收到站内消息，也可在下方表格点击用户 ID 快捷填入。</p>
           <div id="userSearchHint" style="margin-top:8px;font-size:.72rem;color:var(--text-muted)"></div>
         </div>
         <div class="admin-flex-wrap" style="margin-bottom:10px">
@@ -303,15 +303,15 @@
       <div id="opsSection" class="section-anchor">
         <h2 class="admin-section-title">运营看板</h2>
         <div class="admin-stats" id="opsCards"></div>
-        <p style="font-size:.72rem;color:var(--text-muted)">待确认充值请在「充值订单」处理。支付自动到账可配置 webhook（默认关闭，人工确认更稳妥）。毛利口径：1 点 ≈ 1 元。</p>
+        <p style="font-size:.72rem;color:var(--text-muted)">待确认充值请在「充值订单」处理。支付自动到账可配置 webhook；人工确认更便于核对到账信息。毛利按当前兑换与计费配置计算。</p>
       </div>
       <div id="pricingScheduleSection" class="section-anchor">
         <h2 class="admin-section-title">定价排期（全局生效）</h2>
-        <p style="font-size:.72rem;color:var(--text-muted)">设置 config（键值，内部存储：1 点 = 1000（用户只看「点」））。到生效时间后自动应用。高级参数见部署配置。</p>
+        <p style="font-size:.72rem;color:var(--text-muted)">设置计费配置键值，到生效时间后自动应用。用户侧统一展示为点，高级参数见部署配置。</p>
         <div class="admin-flex-wrap" style="gap:8px;margin-bottom:8px">
           <input id="psName" class="admin-input" placeholder="方案名" style="width:140px">
           <input id="psTime" class="admin-input" type="datetime-local" style="width:210px">
-          <input id="psConfig" class="admin-input" placeholder='{"data-ml":500,"export-docx":200,"user_markup":3}' style="min-width:280px;flex:1">
+          <input id="psConfig" class="admin-input" placeholder="请输入计费配置 JSON" style="min-width:280px;flex:1">
           <button class="admin-btn admin-btn-primary" onclick="createPricingSchedule()">创建并预约生效</button>
           <button class="admin-btn" onclick="loadPricingSchedules()">刷新</button>
         </div>
@@ -324,12 +324,28 @@
       </div>
       <div id="pricingSection" class="section-anchor">
         <h2 class="admin-section-title">计费配置</h2>
-        <p style="font-size:.72rem;color:var(--text-muted);margin:0 0 10px">用户侧统一以「点」展示。*调价数值为系统内部存储（÷1000 即为点）。智能能力按用量计点，分析能力按次计点。</p>
+        <p style="font-size:.72rem;color:var(--text-muted);margin:0 0 10px">用户侧统一以「点」展示。模型费率、默认倍率和每个能力的独立倍率可分开设置；新注册能力会自动出现在下方列表。</p>
         <div id="pricingMeta" style="font-size:.72rem;color:var(--text-secondary);margin-bottom:10px"></div>
         <div class="admin-flex-wrap" style="margin-bottom:10px">
           <button class="admin-btn" onclick="loadPricing()">刷新</button>
           <button class="admin-btn admin-btn-primary" onclick="savePricing()">保存修改</button>
         </div>
+        <div class="gift-panel">
+          <h3>默认 LLM 策略</h3>
+          <div class="admin-flex-wrap">
+            <label style="font-size:.72rem">默认模型</label>
+            <input id="pricingDefaultModel" class="admin-input" style="min-width:220px">
+            <label style="font-size:.72rem">默认倍率(‰)</label>
+            <input id="pricingDefaultMultiplier" class="admin-input" type="number" style="width:120px" title="1000=1倍">
+            <label style="font-size:.72rem">默认最低扣费(厘)</label>
+            <input id="pricingDefaultMin" class="admin-input" type="number" style="width:120px">
+          </div>
+        </div>
+        <h3 style="font-size:.9rem;margin:16px 0 8px">模型费率卡</h3>
+        <table class="admin-table" id="pricingModelTable"><thead><tr><th>模型</th><th>阶层/模态</th><th>输入/百万</th><th>缓存输入/百万</th><th>输出/百万</th><th>推理/百万</th><th>启用</th></tr></thead><tbody></tbody></table>
+        <h3 style="font-size:.9rem;margin:16px 0 8px">能力独立策略</h3>
+        <table class="admin-table" id="pricingCapabilityTable"><thead><tr><th>能力</th><th>计费</th><th>模型</th><th>倍率(‰)</th><th>最低扣费(厘)</th><th>来源</th></tr></thead><tbody></tbody></table>
+        <h3 style="font-size:.9rem;margin:16px 0 8px">固定价与兼容项</h3>
         <table class="admin-table" id="pricingTable"><thead><tr><th>模块（中文名/说明）</th><th>方式</th><th>当前(点)</th><th>调价数值*</th><th></th></tr></thead><tbody></tbody></table>
         <div style="margin-top:12px" class="admin-flex-wrap">
           <label style="font-size:.72rem">注册赠送(厘)</label><input id="bonusRegister" class="admin-input" type="number" style="width:120px">
@@ -684,23 +700,23 @@ function parseAdminRechargeAmount(raw){
   var s=String(raw==null?'':raw).trim();
   if(!/^\d+(?:\.\d{1,2})?$/.test(s)) return {error:'请输入有效金额，最多保留 2 位小数'};
   var y=Number(s);
-  if(!Number.isFinite(y) || y<1 || y>5000) return {error:'实收金额须在 1～5000 元之间'};
+  if(!Number.isFinite(y) || y<1 || y>5000) return {error:'实收金额不在允许范围内'};
   var fen=Math.round(y*100);
   return {fen:fen, yuan:fen/100, text:(fen/100).toFixed(2)};
 }
 function confirmOrder(oid, declaredYuan){
   var declared=Number(declaredYuan||0);
   var defAmt=declared>0?declared.toFixed(2):'';
-  var input=prompt('请输入实际到账金额（元）。\n订单 #'+oid+(defAmt?(' 用户申报 ¥'+defAmt):'')+'\n可修改为实收金额；点取消则中止。',defAmt||'1.00');
+  var input=prompt('请输入实际到账金额（元）。\n订单 #'+oid+(defAmt?'，用户申报金额已载入':'')+'\n可修改为实收金额；点取消则中止。',defAmt);
   if(input===null) return;
   var parsed=parseAdminRechargeAmount(input);
   if(parsed.error){alert(parsed.error);return;}
   if(declared>0 && Math.round(declared*100)!==parsed.fen){
-    if(!confirm('订单申报 ¥'+declared.toFixed(2)+'，实收 ¥'+parsed.text+'。\n将按实收金额发放 '+parsed.text+' 点并回写订单金额，是否继续？')) return;
+    if(!confirm('订单申报金额与实收金额不同。\n将按实收金额和当前兑换规则发放点数并回写订单，是否继续？')) return;
   }
   fetch('/api/payment/confirm',{method:'POST',headers:authHeaders(true),body:JSON.stringify({secret:SECRET,order_id:oid,amount_yuan:parsed.text})})
     .then(r=>r.json()).then(d=>{
-      if(d.success){toast('已按 ¥'+Number(d.amount_yuan).toFixed(2)+' 到账 '+Number(d.points).toFixed(3)+' 点');loadOrders();loadDashboard(true);loadTransactions();loadTimeseries();loadAuditLogs();}
+      if(d.success){toast('订单已按实收确认，点数已发放');loadOrders();loadDashboard(true);loadTransactions();loadTimeseries();loadAuditLogs();}
       else alert(d.error);
     }).catch(function(){alert('网络错误')});
 }
@@ -891,13 +907,31 @@ function loadLlmEconomics(){
       document.querySelector('#llmEcoTable tbody').innerHTML=h||'<tr><td colspan="7">暂无数据</td></tr>';
     }).catch(function(){});
 }
+function escapeAdminHtml(value){ return String(value==null?'':value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function loadPricing(){
   if(!SECRET) return;
   fetch('/api/admin/pricing',{headers:authHeaders()})
     .then(r=>r.json()).then(d=>{
       if(!d.success) return;
       _pricingCache=d;
-      document.getElementById('pricingMeta').textContent='智能倍率×'+(d.llm_markup||3)+'，最低扣费 '+(d.llm_min_charge_points||0.02)+' 点；每日免费本地操作 '+(d.daily_free_ops!=null?d.daily_free_ops:0)+' 次（0表示本地模块也扣点）';
+      document.getElementById('pricingMeta').textContent='schema v'+(d.pricing_schema_version||1)+' · '+(d.validation&&d.validation.valid?'配置校验通过':'存在配置问题')+(d.effective_schedule?' · 当前排期：'+(d.effective_schedule.name||d.effective_schedule.id):'');
+      var defaults=(d.defaults&&d.defaults.llm)||{};
+      document.getElementById('pricingDefaultModel').value=defaults.model_ref||'';
+      document.getElementById('pricingDefaultMultiplier').value=defaults.multiplier_millis||1000;
+      document.getElementById('pricingDefaultMin').value=defaults.min_charge_milli||0;
+      var modelHtml='';
+      (d.models||[]).forEach(function(model){
+        var rates=model.rates||{};
+        function rate(k){return rates[k]&&rates[k].microyuan!=null?rates[k].microyuan:0;}
+        modelHtml+='<tr><td><b>'+escapeAdminHtml(model.ref)+'</b><div style="font-size:.65rem;color:var(--text-muted)">'+escapeAdminHtml(model.provider||'')+' · '+escapeAdminHtml(model.model||'')+'</div></td><td>'+escapeAdminHtml(model.tier||'')+' / '+escapeAdminHtml((model.supported_modalities||[]).join(', '))+'</td><td>'+rate('text_input_tokens')+'</td><td>'+rate('cached_text_input_tokens')+'</td><td>'+rate('text_output_tokens')+'</td><td>'+rate('reasoning_tokens')+'</td><td>'+(model.enabled?'启用':'停用')+'</td></tr>';
+      });
+      document.querySelector('#pricingModelTable tbody').innerHTML=modelHtml||'<tr><td colspan="7">暂无模型费率卡</td></tr>';
+      var capabilityHtml='';
+      (d.capabilities||[]).forEach(function(cap){
+        var policy=cap.override||{};
+        capabilityHtml+='<tr><td><b>'+escapeAdminHtml(cap.name||cap.id)+'</b><div style="font-size:.65rem;color:var(--text-muted)">'+escapeAdminHtml(cap.id)+' · '+escapeAdminHtml(cap.description||'')+'</div></td><td>'+escapeAdminHtml(cap.billing_kind||'')+' / '+escapeAdminHtml((cap.modalities||[]).join(', '))+'</td><td>'+escapeAdminHtml(cap.model_ref||'继承默认')+'</td><td>'+(cap.multiplier_millis||'—')+'</td><td>'+(cap.min_charge_milli==null?'—':cap.min_charge_milli)+'</td><td>'+(cap.inherited?'继承默认':'独立覆盖')+(cap.error?'<div style="color:var(--danger)">'+escapeAdminHtml(cap.error)+'</div>':'')+'</td></tr>';
+      });
+      document.querySelector('#pricingCapabilityTable tbody').innerHTML=capabilityHtml||'<tr><td colspan="6">暂无能力</td></tr>';
       var tb=document.querySelector('#pricingTable tbody'); var h='';
       (d.items||[]).forEach(function(it){
         h+='<tr><td><b>'+(it.name||it.key)+'</b><div style="font-size:.65rem;color:var(--text-muted);margin-top:2px">'+it.key+(it.desc?(' · '+it.desc):'')+'</div></td><td>'+((it.billing==='llm-token'||it.billing==='smart')?'智能用量':'按次')+'</td><td>'+Number(it.points).toFixed(3)+'</td><td><input class="admin-input price-input" data-key="'+it.key+'" type="number" value="'+it.milli_credits+'" style="width:110px" '+(it.billing==='llm-token'?'title="AI模块实际按token扣费，此值仅兼容旧接口"':'')+'></td></tr>';
@@ -915,7 +949,12 @@ function savePricing(){
   updates['register_bonus']=document.getElementById('bonusRegister').value;
   updates['invite_bonus']=document.getElementById('bonusInvite').value;
   updates['balance_refresh_seconds']=document.getElementById('balanceRefreshSeconds').value;
-  fetch('/api/admin/pricing',{method:'POST',headers:authHeaders(true),body:JSON.stringify({secret:SECRET,updates:updates})})
+  var pricing={schema_version:2,defaults:{llm:{
+    model_ref:document.getElementById('pricingDefaultModel').value.trim(),
+    multiplier_millis:Number(document.getElementById('pricingDefaultMultiplier').value),
+    min_charge_milli:Number(document.getElementById('pricingDefaultMin').value)
+  }}};
+  fetch('/api/admin/pricing',{method:'POST',headers:authHeaders(true),body:JSON.stringify({secret:SECRET,pricing:pricing,updates:updates})})
     .then(r=>r.json()).then(d=>{ if(d.success){toast('已保存 '+((d.changed||[]).length)+' 项'); loadPricing(); } else alert(d.error||'保存失败'); })
     .catch(function(){alert('网络错误')});
 }

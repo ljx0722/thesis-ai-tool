@@ -12,3 +12,10 @@ Thumbs.db
 # Database
 *.db
 data/
+
+# Claude local runtime
+.claude/worktrees/
+.claude/settings.json.tmp.*
+
+# Reproducible verification artifacts
+test-results/

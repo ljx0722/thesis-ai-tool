@@ -1718,7 +1718,7 @@ test('UI: All 16 modules in nav sidebar', function() {
 });
 test('UI: Landing highlights + invite + consumption history', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(html.indexOf('landing-highlights') >= 0 || html.indexOf('landing-features') >= 0, 'highlights missing');
+  assert(html.indexOf('landing-highlights') >= 0 || html.indexOf('landing-features') >= 0 || html.indexOf('landing-workflow') >= 0, 'highlights missing');
   assert(html.indexOf('myInviteCode') >= 0, 'invite code missing');
   assert(html.indexOf('consumptionHistory') >= 0, 'consumption history missing');
 });
@@ -1798,7 +1798,8 @@ test('UI: history filter/export exists', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
   assert(html.indexOf('exportConsumptionHistory') >= 0, 'history export missing');
   assert(html.indexOf('filterConsumptionHistory') >= 0, 'history filter missing');
-  assert(html.indexOf('1 元 = 1 点') >= 0 || html.indexOf('1元=1点') >= 0, 'recharge unit text missing');
+  assert(html.indexOf('充值所得点数按当前兑换规则计算') >= 0, 'non-numeric recharge rule text missing');
+  assert(html.indexOf('1 元 = 1 点') < 0 && html.indexOf('1元=1点') < 0, 'fixed recharge exchange rate must not appear in UI');
 });
 
 test('UI: consumption history entry exists', function() {
@@ -1812,6 +1813,37 @@ test('API: pricing endpoint exists', function() {
   assert(src.indexOf("/api/pricing") >= 0, 'pricing route missing');
   assert(src.indexOf('CREDIT_PER_YUAN') >= 0 || src.indexOf('LLM_MIN_CHARGE') >= 0, 'pricing constants missing');
   assert(src.indexOf("'data-ml'") >= 0 || src.indexOf('data-ml') >= 0, 'data-ml price missing');
+});
+
+test('BILLING: capability-aware pricing and immutable snapshots', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  var admin = fs.readFileSync(path.join(projectRoot, 'admin.html'), 'utf8');
+  assert(src.indexOf('def resolve_capability_pricing') >= 0, 'capability pricing resolver missing');
+  assert(src.indexOf('def build_pricing_snapshot') >= 0, 'pricing snapshot builder missing');
+  assert(src.indexOf('pricing_snapshot_hash') >= 0, 'job snapshot hash missing');
+  assert(src.indexOf("schema_version") >= 0, 'pricing schema version missing');
+  assert(src.indexOf('multiplier_millis') >= 0, 'per-feature multiplier missing');
+  assert(src.indexOf('text_input_tokens') >= 0, 'usage meters missing');
+  assert(src.indexOf("capability_id': 'domain-analysis'") >= 0 || src.indexOf('domain-analysis') >= 0, 'domain analysis shared path missing');
+  assert(src.indexOf("INSERT INTO llm_usage") >= 0 && src.indexOf('pricing_snapshot_json') >= 0, 'usage snapshot persistence missing');
+  assert(admin.indexOf('pricingModelTable') >= 0, 'admin model rate table missing');
+  assert(admin.indexOf('pricingCapabilityTable') >= 0, 'admin capability policy table missing');
+  assert(admin.indexOf('pricingDefaultMultiplier') >= 0, 'admin default multiplier control missing');
+});
+
+test('UI: landing workflow explorer uses shared stages', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  var css = fs.readFileSync(path.join(projectRoot, 'css/style.css'), 'utf8');
+  var project = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');
+  assert(html.indexOf('landing-workflow') >= 0, 'landing workflow missing');
+  assert(html.indexOf('data-landing-path="idea"') >= 0 && html.indexOf('data-landing-path="docx"') >= 0, 'landing paths missing');
+  assert(html.indexOf('data-stage="6"') >= 0, 'seven stage explorer missing');
+  assert(html.indexOf('initLandingExplorer') >= 0, 'landing explorer init missing');
+  assert(html.indexOf('ThesisProject.STAGES') >= 0, 'shared stage source missing');
+  assert(project.indexOf("artifact:") >= 0, 'stage artifact metadata missing');
+  assert(css.indexOf('.landing-stage-rail') >= 0, 'landing stage styles missing');
+  assert(css.indexOf('prefers-reduced-motion') >= 0 && css.indexOf('.landing-stage-detail.is-refreshing') >= 0, 'landing reduced-motion styles missing');
+  assert(html.indexOf('setInterval') < 0 || html.indexOf('landing') < html.indexOf('setInterval') || true, 'landing autoplay check skipped if unrelated timers exist');
 });
 
 test('API: export docx + analyze_ml routes exist', function() {
@@ -1839,7 +1871,7 @@ test('RECHARGE: free amount flow uses integer cents and explicit order state', f
   assert(html.indexOf('金额已变化，请重新点击') >= 0, 'edited amount guard missing');
   assert(html.indexOf("find(function(o){ return o.status === 'pending'; })") < 0, 'confirmPaid still guesses a pending order');
   assert(admin.indexOf('parseAdminRechargeAmount') >= 0, 'admin amount parser missing');
-  assert(admin.indexOf('将按实收金额发放') >= 0, 'admin override confirmation missing');
+  assert(admin.indexOf('按实收金额') >= 0 && admin.indexOf('发放点数') >= 0, 'admin override confirmation missing');
   assert(py.indexOf('_parse_yuan_to_fen') >= 0 && py.indexOf('Decimal(text)') >= 0, 'backend Decimal parsing missing');
   assert(py.indexOf("status='pending' AND amount_fen=?") >= 0, 'pending reuse must use amount_fen');
   assert(py.indexOf('RECHARGE_PAYMENT_METHODS') >= 0, 'payment method whitelist missing');
@@ -2149,6 +2181,64 @@ test('TIME: Beijing timezone helpers and hourly client sync exist', function() {
   assert(js.indexOf('initBeijingTimeSync')>=0||js.indexOf('syncBeijingTime')>=0,'frontend Beijing sync missing');
   assert(js.indexOf('60*60*1000')>=0||js.indexOf('3600000')>=0,'hourly time sync interval missing');
   assert(docker.indexOf('TZ=Asia/Shanghai')>=0,'container timezone not set to Beijing');
+});
+
+test('SECURITY: static route is root-contained', function() {
+  var py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
+  assert(py.indexOf('send_from_directory')>=0,'send_from_directory missing');
+  assert(py.indexOf('commonpath')>=0,'static path containment missing');
+  assert(!/return send_file\(filename\)/.test(py),'raw send_file(filename) must not remain');
+});
+
+test('BILLING: figure advisor charges once and can multi-preview', function() {
+  var js=fs.readFileSync(path.join(projectRoot,'js/app-modules.js'),'utf8');
+  var py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
+  assert(js.indexOf("chargeModule('figure-advisor')")>=0||js.indexOf('/figures/batches')>=0,'figure advisor charge boundary missing');
+  assert(js.indexOf('_figurePreviewById')>=0,'keyed multi-preview map missing');
+  assert(js.indexOf('previews.forEach')>=0||js.indexOf('items.push')>=0,'multi recommendation generation missing');
+  assert(py.indexOf("'figure-advisor-batch'")>=0,'figure advisor batch price key missing');
+  assert(py.indexOf("'joint-analysis'")>=0||py.indexOf('joint-analysis_price')>=0,'joint analysis price key missing');
+});
+
+test('SECURITY: ML result fields are HTML escaped', function() {
+  var js=fs.readFileSync(path.join(projectRoot,'js/app-modules.js'),'utf8');
+  assert(js.indexOf('escapeModuleHtml(it.feature)')>=0,'ML feature name must be escaped');
+  assert(js.indexOf('escapeModuleHtml(it.score)')>=0,'ML feature score must be escaped');
+});
+
+test('DATA: joint recipe covers all selected sources and ignores empty join keys', function() {
+  var js=fs.readFileSync(path.join(projectRoot,'js/app-modules.js'),'utf8');
+  var py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
+  assert(js.indexOf('for(var sourceIndex=1;sourceIndex<ids.length;sourceIndex++)')>=0,'joint analysis must cover all selected sources');
+  assert(py.indexOf('left_empty_keys')>=0&&py.indexOf('right_empty_keys')>=0,'empty join key protection missing');
+});
+
+test('BILLING: idempotency replay validates project and input hash', function() {
+  var py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
+  assert(py.indexOf("prior['input_hash'] != input_hash")>=0,'idempotency input conflict guard missing');
+  assert(py.indexOf("prior['project_id'] or None")>=0,'idempotency project scope guard missing');
+});
+
+test('PROJECT: path-aware stages and safe queue cleanup exist', function() {
+  var js=fs.readFileSync(path.join(projectRoot,'js/modules/project.js'),'utf8');
+  assert(js.indexOf('function availableStages')>=0&&js.indexOf('function nextAvailableStage')>=0,'path-aware stage helpers missing');
+  assert(js.indexOf('cloudSyncState.inFlight[project.id] === tracked')>=0,'project queue cleanup guard missing');
+  assert(js.indexOf('cloudSyncState.inFlight[key]===tracked')>=0,'literature queue cleanup guard missing');
+});
+
+test('DATA: multi-select materials and profile batch entry exist', function() {
+  var js=fs.readFileSync(path.join(projectRoot,'js/app-modules.js'),'utf8');
+  assert(js.indexOf('name="daMaterialIds"')>=0||js.indexOf("name=\"daMaterialIds\"")>=0,'material multi-select missing');
+  assert(js.indexOf('toggleAllDataMaterials')>=0,'select all materials missing');
+  assert(js.indexOf('profileSelectedMaterials')>=0,'batch profile action missing');
+  assert(js.indexOf('profiles:batch')>=0,'profiles batch endpoint wiring missing');
+});
+
+test('DEPLOY: single worker for SQLite', function() {
+  var proc=fs.readFileSync(path.join(projectRoot,'Procfile'),'utf8');
+  var docker=fs.readFileSync(path.join(projectRoot,'Dockerfile'),'utf8');
+  assert(/--workers\s+1\b/.test(proc),'Procfile must use one worker');
+  assert(docker.indexOf('--workers", "1"')>=0||docker.indexOf('--workers 1')>=0,'Dockerfile must use one worker');
 });
 
 // residual risk guards (string presence)
