@@ -4,8 +4,8 @@
     {
       "version": "0.10.0",
       "date": "2026-07-20",
-      "commit": "pending",
-      "status": "unreleased",
+      "commit": "6cc99c9",
+      "status": "released",
       "summary": "能力注册、论文拆解、引用审计、搭子会话与科研图表闭环",
       "changes": [
         "能力注册表支持 preflight：打开模块只做可用性检查，收费动作在 runCapability 边界扣点",
