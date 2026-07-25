@@ -2003,8 +2003,8 @@ test('REGRESSION: import and calibration settle safely', function() {
 
 test('REGRESSION: assets use refreshed cache version', function() {
   var html=fs.readFileSync(path.join(projectRoot,'index.html'),'utf8');
-  assert(html.indexOf('app.js?v=65')>=0,'application asset cache version was not refreshed');
-  assert(html.indexOf('app.js?v=64')<0,'stale v64 application asset remains');
+  assert(html.indexOf('app.js?v=66')>=0,'application asset cache version was not refreshed');
+  assert(html.indexOf('app.js?v=65')<0,'stale v65 application asset remains');
 });
 
 test('REGRESSION: figure advisor keeps selected material name in scope', function() {
@@ -2074,6 +2074,39 @@ test('Upload: DOCX recovery and style mapping contracts', function() {
   assert(src.indexOf("[['标题_TJ','h1'],['一级标题_TJ','h2'],['二级标题_TJ','h3'],['三级标题_TJ','h4']]")>=0,'Tongji style mapping is not a nested array');
   assert(src.indexOf('importSnapshot')>=0&&src.indexOf('rehydrateManuscriptRuntime')>=0,'upload recovery path missing');
   assert(src.indexOf('keep manuscript unstructured')>=0,'unstructured import fallback missing');
+});
+
+test('REGRESSION: DOCX paragraph alignment is monotonic and duplicate-safe', function() {
+  var src=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8');
+  var start=src.indexOf('function docxNormalizeMappingText('),end=src.indexOf('// INIT - this runs LAST',start);
+  assert(start>=0&&end>start,'DOCX alignment helpers missing');
+  var sandbox={};new Function('window',src.slice(start,end)+';window.alignDocxParagraphs=alignDocxParagraphs;window.docxNormalizeMappingText=docxNormalizeMappingText;')(sandbox);
+  function xml(text,index){return{xmlIndex:index,text:text,sourceIndex:index};}
+  function dom(text,index){return{domIndex:index,text:text,el:{id:'dom-'+index}};}
+  var duplicate=sandbox.alignDocxParagraphs(
+    [xml('目录',0),xml('研究方法',1),xml('研究方法',2),xml('结论',3)],
+    [dom('目录',0),dom('研究方法',1),dom('插入段落',2),dom('研究方法',3),dom('结论',4)]
+  );
+  assert(duplicate.matches.length===4,'duplicate headings were not all mapped');
+  assert(duplicate.matches[1].dom.domIndex===1&&duplicate.matches[2].dom.domIndex===3,'duplicate headings did not preserve occurrence order');
+  assert(duplicate.matches.every(function(match,index,list){return index===0||list[index-1].dom.domIndex<match.dom.domIndex;}),'mapping is not monotonic');
+  assert(duplicate.unmatchedDom.length===1&&duplicate.unmatchedDom[0].text==='插入段落','unclaimed DOM paragraph was not retained');
+  var fuzzy=sandbox.alignDocxParagraphs(
+    [xml('第一章 绪论',0),xml('研究设计与实施方案',1),xml('第二章 结果',2)],
+    [dom('第一章 绪论',0),dom('研究设计与实施方案（修订）',1),dom('第二章 结果',2)]
+  );
+  assert(fuzzy.matches.length===3&&fuzzy.matches[1].strategy==='fuzzy','anchored fuzzy mapping failed');
+  assert(sandbox.docxNormalizeMappingText('研究&amp;方法')==='研究&方法','XML entity normalization failed');
+});
+
+test('REGRESSION: unmatched DOCX headings support manual mapping and skip', function() {
+  var app=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8');
+  var css=fs.readFileSync(path.join(projectRoot,'css/style.css'),'utf8');
+  ['cwOpenManualMapping','cwApplyManualMapping','cwToggleSkipItem','cwReleaseHeadingElement'].forEach(function(name){assert(app.indexOf('function '+name)>=0,name+' missing');});
+  assert(app.indexOf("status:'unmapped'")>=0&&app.indexOf("status='manual'")>=0,'mapping status transitions missing');
+  assert(app.indexOf("skip.textContent=it.skipped?'恢复':'跳过该条'")>=0,'per-heading skip control missing');
+  assert(app.indexOf("candidate.owner&&candidate.owner!==state.item.key?'改派到此位置':'使用此位置'")>=0,'occupied candidate reassignment feedback missing');
+  ['.cw-manual-workspace','.cw-manual-candidate.is-selected','.cw-manual-location-focus','.cw-confirm-inline-button'].forEach(function(selector){assert(css.indexOf(selector)>=0,selector+' styles missing');});
 });
 
 test('RELEASE: ThesisBuddy platform contracts are present', function() {
