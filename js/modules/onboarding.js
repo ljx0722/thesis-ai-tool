@@ -16,7 +16,7 @@ function buildTourSteps() {
     },
     {
       title: '导入或新建论文',
-      body: '可「从想法开始」创建项目，或点「导入论文」上传 .docx。<br>上传后会校准标题样式，并自动创建论文版本、拆解章节、建立上下文索引；可在拆解清单查看进度与重试。',
+      body: '可「从想法开始」创建项目，或点「导入论文」上传 .docx。<br>上传后按 Word 样式校准章 / 节 / 小节；未自动定位的标题可手动选择正文位置，确认不需要的条目可直接跳过。',
       el: function () {
         return document.querySelector('[onclick*="triggerUpload"]')
           || document.getElementById('uploadDrop')
@@ -28,7 +28,7 @@ function buildTourSteps() {
     },
     {
       title: '目录树',
-      body: '校准完成后，这里展示章 / 节 / 小节。<br>点击可定位到中间论文区对应位置；目录树在本栏内滚动。',
+      body: '校准完成后，这里展示章 / 节 / 小节。<br>若标题显示“未自动定位”，可在样式确认窗口点“手动定位”选择对应原文；点“跳过该条”不会将它加入目录树。',
       el: function () {
         return document.getElementById('tocPanel')
           || document.getElementById('navTree')
