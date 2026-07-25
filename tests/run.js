@@ -261,11 +261,13 @@ test('EDGE: mergedRefs reset on new file upload', function() {
   assert(src.indexOf('mergedRefs=[]') >= 0, 'mergedRefs not reset on upload');
 });
 
-test('EDGE: startSearch opens audit without text and local search only with a selection', function() {
+test('EDGE: startSearch opens claim-based local search with project seeding', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
   var idx = src.indexOf('function startSearch()');
   var body = src.substring(idx, src.indexOf('function openSearchConfigModal', idx));
-  assert(body.indexOf("hasSelection?'local':'audit'") >= 0, 'startSearch must route no-selection entry to audit');
+  assert(body.indexOf("mode:'local'") >= 0, 'startSearch must open the local claim editor');
+  assert(body.indexOf('seedProject:true') >= 0, 'startSearch must seed from current project when no text is selected');
+  assert(body.indexOf("hasSelection?'local':'audit'") < 0, 'startSearch must not silently route no-selection entry to audit');
   assert(body.indexOf('LiteratureWorkbench.open') >= 0, 'startSearch must open the literature workbench');
 });
 
@@ -339,7 +341,7 @@ test('LITERATURE: workbench actions are bound once and report runtime errors', f
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/literature-workbench.js'), 'utf8');
   assert(src.indexOf("root.dataset.literatureBound==='1'") >= 0, 'Workbench binding must be idempotent');
   assert(src.indexOf('catch(err){reportSaveError(err);}') >= 0, 'Action handler errors must be visible');
-  assert(src.indexOf("state.view='audit';audit()") >= 0, 'Search without a selection must run audit instead of doing nothing');
+  assert(src.indexOf("state.claim=projectClaim()") >= 0, 'Search without a selection must create a visible project or manual claim');
   assert(src.indexOf("action.dataset.action==='cart'") >= 0, 'Cart button must have a handler');
 });
 
@@ -900,9 +902,41 @@ test('REGRESSION: Cat game starts when startSearch shows loading', function() {
   assert(src.indexOf('startSearch') >= 0, 'startSearch exists');
 });
 
-test('REGRESSION: Dashboard overlay has dark background (not light)', function() {
+test('REGRESSION: Dashboard and graph overlays use theme surfaces', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(html.indexOf("rgba(30,30,32,0.92)") >= 0 || html.indexOf("rgba(30,30,32,0.92)") >= 0, 'Dashboard overlay must use dark background');
+  var css = fs.readFileSync(path.join(projectRoot, 'css/style.css'), 'utf8');
+  assert(html.indexOf('class="workspace-modal-overlay"') >= 0, 'Dashboard and graph overlays must use shared modal styling');
+  var kgStart = html.indexOf('<!-- ====== 知识图谱弹窗 ====== -->');
+  var modalEnd = html.indexOf('<div class="overlay" id="loadOv">', kgStart);
+  var modalHtml = html.substring(kgStart, modalEnd);
+  assert(modalHtml.indexOf('background:var(--solid)') < 0, 'Theme modals must not use undefined legacy surface tokens');
+  assert(css.indexOf('background: var(--bg-overlay)') >= 0, 'Modal backdrop must use the theme overlay token');
+  assert(css.indexOf('background: var(--bg-card)') >= 0, 'Modal shell must use the theme card token');
+});
+
+test('REGRESSION: claim search supports project seeds and explicit completion states', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/literature-workbench.js'), 'utf8');
+  assert(src.indexOf('function projectClaim') >= 0, 'Literature workbench must seed a claim from the current project');
+  assert(src.indexOf("sourceType:text?'project-idea':'manual-input'") >= 0, 'Literature workbench must support a manual claim');
+  assert(src.indexOf('请先填写清晰的研究问题或待验证论点') >= 0, 'Empty claims must show validation feedback');
+  assert(src.indexOf('检索完成，未找到合适候选') >= 0, 'Zero-result searches must show an explicit completion state');
+  assert(src.indexOf('选择正文位置后可插入引用') >= 0, 'Project-level results must not imply direct citation insertion');
+});
+
+test('REGRESSION: search stays available without a manuscript', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/app-modules.js'), 'utf8');
+  var update = src.substring(src.indexOf('function updateBarActions'), src.indexOf('function resetSearch'));
+  var keyboard = src.substring(src.indexOf('// Ctrl+Enter'), src.indexOf('// Ctrl+B'));
+  assert(update.indexOf("getElementById('baSearch')") >= 0 && update.indexOf("search.removeAttribute('disabled')") >= 0, 'Search button must stay enabled');
+  assert(keyboard.indexOf("_thesisLoaded && typeof startSearch") < 0, 'Ctrl+Enter must not silently depend on manuscript state');
+  assert(keyboard.indexOf("typeof startSearch === 'function'") >= 0, 'Ctrl+Enter must call the search entry');
+});
+
+test('REGRESSION: dashboard knowledge graph action triggers once', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
+  var block = src.substring(src.indexOf('function openBoardModule'), src.indexOf('function bindDashboardActions'));
+  assert(block.indexOf("moduleId === 'knowledge-graph'") >= 0, 'Dashboard must special-case knowledge graph navigation');
+  assert(block.indexOf("switchModule('knowledge-graph')") >= 0, 'Dashboard must route graph through switchModule once');
 });
 
 test('REGRESSION: Dashboard uses dense dimension overview layout', function() {

@@ -486,7 +486,7 @@ function initKeyboard() {
     // Ctrl+Enter: 检索文献
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (_thesisLoaded && typeof startSearch === 'function') startSearch();
+      if (typeof startSearch === 'function') startSearch();
       return;
     }
 
@@ -538,7 +538,9 @@ function renderModuleTabs() {
 
 function updateBarActions() {
   _thesisLoaded = !!(typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100);
-  ['baSearch', 'baVerify'].forEach(function(id) {
+  var search = document.getElementById('baSearch');
+  if (search) search.removeAttribute('disabled');
+  ['baVerify', 'baKG'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) { if (_thesisLoaded) el.removeAttribute('disabled'); else el.setAttribute('disabled', ''); }
   });
@@ -580,7 +582,9 @@ function resetSearch() {
 
 function enableLiteratureButtons(){
   try{
-    var ids=['baSearch','baVerify','baKG'];
+    var search=document.getElementById('baSearch');
+    if(search){search.disabled=false;search.removeAttribute('disabled');}
+    var ids=['baVerify','baKG'];
     for(var i=0;i<ids.length;i++){
       var el=document.getElementById(ids[i]);
       if(!el) continue;
@@ -2011,6 +2015,7 @@ function applyPreferences(p){
   document.documentElement.style.fontSize=(15*Number(p.fontScale||1))+'px';
   var ac=BUDDY_ACCENTS[p.accentPreset]||BUDDY_ACCENTS.indigo;
   document.documentElement.style.setProperty('--accent',ac[0]);document.documentElement.style.setProperty('--accent-dark',ac[1]);document.documentElement.style.setProperty('--accent-light',ac[2]);scheduleBuddyTheme(p);
+  if(typeof refreshKnowledgeGraphTheme==='function')requestAnimationFrame(refreshKnowledgeGraphTheme);
 }
 function fillPreferenceForm(p){document.getElementById('prefColorMode').value=p.colorMode;document.getElementById('prefAccent').value=p.accentPreset;document.getElementById('prefDensity').value=p.density;document.getElementById('prefFont').value=p.fontFamily;document.getElementById('prefScale').value=String(p.fontScale);document.getElementById('prefReduceMotion').checked=!!p.reduceMotion;}
 function openThemeStudio(){var p=loadPreferences();_buddyThemePreviewBaseline=Object.assign({},p);_buddyThemeSaving=false;fillPreferenceForm(p);document.getElementById('themeStudio').classList.add('open');document.getElementById('themeStudio').setAttribute('aria-hidden','false');document.getElementById('themeStudioBackdrop').classList.add('open');}

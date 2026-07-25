@@ -281,50 +281,50 @@
 </div>
 
 <!-- ====== 知识图谱弹窗 ====== -->
-<div id="kgOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(30,30,32,0.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:99999;align-items:center;justify-content:center">
-  <div id="kgModal" style="background:var(--solid);border-radius:var(--r-xl);padding:20px;width:95%;height:90%;max-width:1600px;display:flex;flex-direction:column;box-shadow:0 25px 80px rgba(0,0,0,0.3),0 0 0 1px rgba(255,255,255,0.1);position:relative;border:1px solid rgba(255,255,255,0.08)">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0">
-      <div style="display:flex;align-items:center;gap:12px">
-        <h2 style="font-size:1.1rem;font-weight:700;color:var(--t);margin:0">🕸️ 知识图谱</h2>
-        <div id="kgTabs" style="display:flex;gap:2px;background:rgba(0,0,0,0.04);border-radius:18px;padding:2px">
-          <button onclick="switchKGView('cloud')" id="kgTabCloud" class="kg-tab active" title="概念分析：区分高频词、特色词与章节分布。共现只表示共同出现，不代表因果。">🧭 概念概览</button>
-          <button onclick="switchKGView('network')" id="kgTabNetwork" class="kg-tab" title="研究关系概览：章节、概念与文献的可追溯关系。现有共现边不自动解释为支持或因果。">🔗 研究关系</button>
-          <button onclick="switchKGView('timeline')" id="kgTabTimeline" class="kg-tab" title="文献时间线：按年份观察研究演进与来源。">📅 文献演进</button>
+<div id="kgOverlay" class="workspace-modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="kgModalTitle">
+  <div id="kgModal" class="workspace-modal kg-modal">
+    <div class="workspace-modal-head">
+      <div class="workspace-modal-title-row">
+        <h2 id="kgModalTitle">🕸️ 知识图谱</h2>
+        <div id="kgTabs" class="kg-tabs" role="tablist" aria-label="知识图谱视图">
+          <button onclick="switchKGView('cloud')" id="kgTabCloud" class="kg-tab active" role="tab" title="概念分析：区分高频词、特色词与章节分布。共现只表示共同出现，不代表因果。">🧭 概念概览</button>
+          <button onclick="switchKGView('network')" id="kgTabNetwork" class="kg-tab" role="tab" title="研究关系概览：章节、概念与文献的可追溯关系。现有共现边不自动解释为支持或因果。">🔗 研究关系</button>
+          <button onclick="switchKGView('timeline')" id="kgTabTimeline" class="kg-tab" role="tab" title="文献时间线：按年份观察研究演进与来源。">📅 文献演进</button>
         </div>
       </div>
-      <div style="display:flex;gap:6px;align-items:center">
-        <button onclick="exportReport()" style="background:var(--g);color:#fff;border:none;border-radius:18px;padding:8px 16px;cursor:pointer;font-weight:600;font-size:.72rem">📄 导出报告</button>
-        <button onclick="exportKGAsPNG()" style="background:rgba(0,0,0,0.06);color:var(--t);border:none;border-radius:18px;padding:8px 16px;cursor:pointer;font-weight:500;font-size:.72rem">🖼️ 导出PNG</button>
-        <button onclick="closeKnowledgeGraph()" style="background:rgba(0,0,0,0.06);color:var(--t);border:none;border-radius:18px;padding:8px 16px;cursor:pointer;font-weight:600;font-size:.85rem">✕ 关闭</button>
+      <div class="workspace-modal-actions">
+        <button onclick="exportReport()" class="workspace-modal-btn primary">📄 导出报告</button>
+        <button onclick="exportKGAsPNG()" class="workspace-modal-btn">🖼️ 导出 PNG</button>
+        <button onclick="closeKnowledgeGraph()" class="workspace-modal-btn">✕ 关闭</button>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;padding:8px 0 10px;font-size:.68rem;color:var(--m);flex-shrink:0"><span>当前视图为研究概览；“共同出现”不等于支持、反驳或因果关系。</span><button type="button" onclick="openConceptExplorer()" style="margin-left:auto;border:1px solid var(--border);background:var(--surface-alt);color:var(--text-secondary);border-radius:8px;padding:5px 10px;cursor:pointer">概念证据</button></div>
-    <div id="kgContent" style="flex:1;overflow:hidden;background:rgba(0,0,0,0.02);border-radius:var(--radius);position:relative;min-height:400px">
-      <div id="kgCloudPanel" style="position:absolute;top:0;left:0;width:100%;height:100%;overflow:hidden;display:none;padding:16px 20px"></div>
-      <div id="kgGraphPanel" style="position:absolute;top:0;left:0;width:100%;height:100%;overflow:hidden">
-        <div id="kgPlaceholder" style="text-align:center;padding:60px;color:var(--m);font-size:1rem;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)"><div style="font-size:2.5rem;margin-bottom:12px">🔍</div><div>正在生成知识图谱...</div></div>
-        <svg id="kgSvg" style="width:100%;height:100%;cursor:grab;display:none;overflow:visible"></svg>
-        <canvas id="kgTimelineCanvas" style="width:100%;height:100%;display:none"></canvas>
+    <div class="workspace-modal-note"><span>当前视图为研究概览；“共同出现”不等于支持、反驳或因果关系。</span><button type="button" onclick="openConceptExplorer()" class="workspace-modal-btn compact">概念证据</button></div>
+    <div id="kgContent" class="workspace-modal-content kg-content-surface">
+      <div id="kgCloudPanel" class="kg-view-panel kg-cloud-panel"></div>
+      <div id="kgGraphPanel" class="kg-view-panel kg-graph-panel">
+        <div id="kgPlaceholder" class="kg-placeholder"><div class="kg-placeholder-icon">🔍</div><div>正在生成知识图谱...</div></div>
+        <svg id="kgSvg" class="kg-svg"></svg>
+        <canvas id="kgTimelineCanvas" class="kg-timeline-canvas"></canvas>
       </div>
     </div>
   </div>
 </div>
 
 <!-- ====== 论文看板弹窗 ====== -->
-<div id="dbOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(30,30,32,0.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:99998;align-items:center;justify-content:center">
-  <div style="background:var(--solid);border-radius:var(--r-xl);padding:24px;width:95%;height:92%;max-width:1500px;display:flex;flex-direction:column;box-shadow:0 25px 80px rgba(0,0,0,0.3),0 0 0 1px rgba(255,255,255,0.1);position:relative;border:1px solid rgba(255,255,255,0.08)">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0">
+<div id="dbOverlay" class="workspace-modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="dbModalTitle">
+  <div class="workspace-modal thesis-board-modal">
+    <div class="workspace-modal-head">
       <div>
-        <h2 style="font-size:1.05rem;font-weight:700;color:var(--text-primary);margin:0;letter-spacing:-.01em">论文看板</h2>
-        <div style="font-size:.68rem;color:var(--text-muted);margin-top:2px">综合评估 · 证据说明 · 平台行动建议</div>
+        <h2 id="dbModalTitle">论文看板</h2>
+        <div class="workspace-modal-subtitle">综合评估 · 证据说明 · 平台行动建议</div>
       </div>
-      <div style="display:flex;gap:6px;align-items:center">
-        <button onclick="showDashboard()" class="thesis-board-shell-btn">刷新</button>
-        <button onclick="exportDashboardReport()" class="thesis-board-shell-btn primary">导出报告</button>
-        <button onclick="closeDashboard()" class="thesis-board-shell-btn">关闭</button>
+      <div class="workspace-modal-actions">
+        <button onclick="showDashboard()" class="workspace-modal-btn">刷新</button>
+        <button onclick="exportDashboardReport()" class="workspace-modal-btn primary">导出报告</button>
+        <button onclick="closeDashboard()" class="workspace-modal-btn">关闭</button>
       </div>
     </div>
-    <div id="dbContent" style="flex:1;overflow-y:auto;border-radius:var(--radius)"></div>
+    <div id="dbContent" class="workspace-modal-content thesis-board-modal-content"></div>
   </div>
 </div>
 

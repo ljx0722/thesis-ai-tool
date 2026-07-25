@@ -339,6 +339,10 @@ function openBoardModule(moduleId) {
     if (typeof switchModule === 'function') switchModule('references');
     return;
   }
+  if (moduleId === 'knowledge-graph') {
+    if (typeof switchModule === 'function') switchModule('knowledge-graph');
+    return;
+  }
   if (typeof MODULE_RUNNERS !== 'undefined' && MODULE_RUNNERS[moduleId] && typeof window[MODULE_RUNNERS[moduleId]] === 'function') {
     if (typeof switchModule === 'function') switchModule(moduleId);
     window[MODULE_RUNNERS[moduleId]]();

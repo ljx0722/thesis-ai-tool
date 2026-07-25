@@ -2236,9 +2236,7 @@ function startSearch(){
   try{ if(!sessionStorage.getItem('thesis_ai_token')){ alert('请先登录后再检索'); return; } }catch(eL){}
   if(searchRunning)return;
   if(window.LiteratureWorkbench&&typeof window.LiteratureWorkbench.open==='function'){
-    var selection=window.getSelection&&window.getSelection(),root=document.getElementById('paperContentRoot');
-    var hasSelection=!!(selection&&selection.rangeCount&&!selection.isCollapsed&&root&&root.contains(selection.getRangeAt(0).commonAncestorContainer));
-    window.LiteratureWorkbench.open({mode:hasSelection?'local':'audit'});return;
+    window.LiteratureWorkbench.open({mode:'local',seedProject:true});return;
   }
   alert('文献工作台尚未加载，请刷新页面后重试');
 }
@@ -4031,6 +4029,18 @@ function clearRefSentenceHighlights(){
 
 // 知识图谱
 var kgApiUrl='/kg_api/generate',kgCurrentData=null,kgCurrentView='network';
+function knowledgeGraphThemeColors(){
+  var styles=getComputedStyle(document.body);
+  function v(name,fallback){var value=styles.getPropertyValue(name);return(value&&value.trim())||fallback;}
+  return{text:v('--text-primary','#0f172a'),secondary:v('--text-secondary','#334155'),muted:v('--text-tertiary','#64748b'),border:v('--border','#e2e8f0'),strongBorder:v('--border-strong','#cbd5e1'),card:v('--bg-card','#ffffff'),surface:v('--surface-alt','#f1f5f9'),accent:v('--accent','#6366f1')};
+}
+function refreshKnowledgeGraphTheme(){
+  var overlay=document.getElementById('kgOverlay');
+  if(!overlay||overlay.style.display!=='flex'||!kgCurrentData)return;
+  if(kgCurrentView==='cloud')renderWordCloud();
+  else if(kgCurrentView==='timeline')renderTimeline();
+  else renderNetworkGraph(kgCurrentData);
+}
 function showKnowledgeGraph(){if(!manuscriptText){alert('请先上传论文');return}kgCurrentData=null;document.getElementById('kgOverlay').style.display='flex';kgCurrentView='network';generateKnowledgeGraph();}
 
 function exportKGAsPNG(){
@@ -4162,12 +4172,13 @@ var _wcScale2 = 1, _wcTx2 = 0, _wcTy2 = 0, _wcPan2 = false, _wcPx2 = 0, _wcPy2 =
 // 关键词演变渲染
 function renderKeywordEvolution(){
   var cp2=document.getElementById('kgCloudPanel');if(!cp2||kgCurrentView!=='cloud')return;
+  var theme=knowledgeGraphThemeColors();
   var tps5=paperTopics.slice(0,12);if(!tps5.length)return;
   var bcs8=(sections||[]).filter(function(s){return!/参考文献|附录|致谢|个人简历|声明|获奖|奖项|认证|荣誉|专利|攻读|在读/.test(s.name)});
-  var h5='<div style="font-size:.68rem;font-weight:600;color:#1d1d1f;margin:10px 0">📈 关键词演变（各章出现强度）</div>';
+  var h5='<div style="font-size:.68rem;font-weight:600;color:'+theme.text+';margin:10px 0">📈 关键词演变（各章出现强度）</div>';
   h5+='<div style="display:flex;flex-direction:column;gap:3px">';
-  tps5.forEach(function(t){h5+='<div style="display:flex;align-items:center;gap:4px;font-size:.6rem"><span style="min-width:50px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+t.label+'</span>';
-    bcs8.forEach(function(cs){var ct5=((cs.text||'').match(new RegExp(t.label,'g'))||[]).length;var bh=Math.min(14,Math.max(2,ct5));h5+='<div style="flex:1;height:12px;background:rgba(0,0,0,0.03);border-radius:2px;position:relative"><div style="position:absolute;bottom:0;left:0;width:100%;height:'+bh+'px;background:#0071e3;opacity:'+(0.2+Math.min(1,ct5/20)).toFixed(2)+';border-radius:2px" title="'+cs.name+': '+ct5+'次"></div></div>';});h5+='</div>';});
+  tps5.forEach(function(t){h5+='<div style="display:flex;align-items:center;gap:4px;font-size:.6rem;color:'+theme.secondary+'"><span style="min-width:50px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+t.label+'</span>';
+    bcs8.forEach(function(cs){var ct5=((cs.text||'').match(new RegExp(t.label,'g'))||[]).length;var bh=Math.min(14,Math.max(2,ct5));h5+='<div style="flex:1;height:12px;background:'+theme.border+';border-radius:2px;position:relative"><div style="position:absolute;bottom:0;left:0;width:100%;height:'+bh+'px;background:'+theme.accent+';opacity:'+(0.2+Math.min(1,ct5/20)).toFixed(2)+';border-radius:2px" title="'+cs.name+': '+ct5+'次"></div></div>';});h5+='</div>';});
   h5+='</div>';cp2.innerHTML=h5;
 }
 
@@ -4181,8 +4192,9 @@ function renderWordCloud(){
   var rl2 = (typeof mergedRefs !== 'undefined' && mergedRefs.length) ? mergedRefs : (typeof existingRefs !== 'undefined' ? existingRefs : []);
   rl2.forEach(function(r) { if (r.title) extractTitleKws(r.title).forEach(function(w) { refKws[w] = (refKws[w] || 0) + 1; }); });
   var refTopicList = Object.entries(refKws).filter(function(e) { return e[1] >= 2 && e[0].length >= 2; }).sort(function(a, b) { return b[1] - a[1]; }).slice(0, 20).map(function(e) { return { label: e[0], count: e[1] }; });
+  var theme = knowledgeGraphThemeColors();
   var topics = paperTopics.slice(0, 30).concat(refTopicList).sort(function(a, b) { return b.count - a.count; }).slice(0, 50);
-  if (!topics.length) { cp.innerHTML = '<div style="text-align:center;padding:60px;color:#86868b;font-size:.9rem">暂无主题词数据</div>'; return; }
+  if (!topics.length) { cp.innerHTML = '<div style="text-align:center;padding:60px;color:'+theme.muted+';font-size:.9rem">暂无主题词数据</div>'; return; }
 
   var maxC = topics[0].count, minC = topics[topics.length - 1].count;
   var colors = ['#0071e3','#af52de','#30d158','#ff9f0a','#ff3b30','#5ac8fa','#ff375f','#64d2ff','#32d74b','#ffd60a','#bf5af2','#ff6482','#00c7be'];
@@ -4241,19 +4253,19 @@ function renderWordCloud(){
   }
 
   // Build HTML
-  var h = '<div style="position:relative;width:100%;height:100%;overflow:hidden;cursor:grab;background:radial-gradient(ellipse at center,rgba(175,82,222,0.03) 0%,transparent 70%),rgba(0,0,0,0.01);border-radius:14px" id="wcContainer">';
+  var h = '<div style="position:relative;width:100%;height:100%;overflow:hidden;cursor:grab;background:'+theme.card+';border-radius:14px" id="wcContainer">';
   h += '<div style="position:absolute;top:14px;left:20px;right:20px;display:flex;justify-content:space-between;align-items:baseline;pointer-events:none;z-index:3">';
-  h += '<div style="font-size:.8rem;font-weight:700;color:#1d1d1f">☁️ 关键词词云 · <span style="font-weight:400;color:#86868b">' + words.length + ' 词 · ' + wordLinks.length + ' 条关联</span></div>';
-  h += '<div style="font-size:.62rem;color:#86868b">🖱 缩放 | 拖拽 | 悬停词查看关联词</div>';
+  h += '<div style="font-size:.8rem;font-weight:700;color:'+theme.text+'">☁️ 关键词词云 · <span style="font-weight:400;color:'+theme.muted+'">' + words.length + ' 词 · ' + wordLinks.length + ' 条关联</span></div>';
+  h += '<div style="font-size:.62rem;color:'+theme.muted+'">🖱 缩放 | 拖拽 | 悬停词查看关联词</div>';
   h += '</div>';
   h += '<svg id="wcSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1"><g id="wcLinkGroup"></g></svg>';
   h += '<div id="wcInner" style="position:relative;width:100%;height:100%;z-index:2">';
   words.forEach(function(w) {
     var opacity = 0.35 + w.ratio * 0.6;
-    h += '<span class="wc-word" data-idx="' + w.idx + '" data-label="' + w.label.replace(/"/g,'&quot;').replace(/'/g,'&#39;') + '" style="position:absolute;left:' + w.x + 'px;top:' + w.y + 'px;font-size:' + w.fs + 'px;font-weight:' + w.weight + ';color:' + w.color + ';opacity:' + opacity.toFixed(2) + ';white-space:nowrap;cursor:pointer;transition:transform .15s,opacity .2s;line-height:1;user-select:none;text-shadow:0 1px 3px rgba(255,255,255,.6)">' + w.label + '<sup style="font-size:.42em;font-weight:500;opacity:.75;margin-left:1px">' + w.count + '</sup></span>';
+    h += '<span class="wc-word" data-idx="' + w.idx + '" data-label="' + w.label.replace(/"/g,'&quot;').replace(/'/g,'&#39;') + '" style="position:absolute;left:' + w.x + 'px;top:' + w.y + 'px;font-size:' + w.fs + 'px;font-weight:' + w.weight + ';color:' + w.color + ';opacity:' + opacity.toFixed(2) + ';white-space:nowrap;cursor:pointer;transition:transform .15s,opacity .2s;line-height:1;user-select:none">' + w.label + '<sup style="font-size:.42em;font-weight:500;opacity:.75;margin-left:1px">' + w.count + '</sup></span>';
   });
   h += '</div>';
-  h += '<div style="position:absolute;bottom:10px;left:20px;right:20px;font-size:.6rem;color:#86868b;pointer-events:none;z-index:3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔝 ' + words.slice(0, 6).map(function(t){return '<span style="color:'+t.color+';font-weight:600">'+t.label+'('+t.count+')</span>';}).join(' · ') + '</div>';
+  h += '<div style="position:absolute;bottom:10px;left:20px;right:20px;font-size:.6rem;color:'+theme.muted+';pointer-events:none;z-index:3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔝 ' + words.slice(0, 6).map(function(t){return '<span style="color:'+t.color+';font-weight:600">'+t.label+'('+t.count+')</span>';}).join(' · ') + '</div>';
   h += '</div>';
   cp.innerHTML = h;
 
@@ -4343,7 +4355,7 @@ function renderWordCloud(){
 
 // ====== 网络图 ======
 function renderNetworkGraph(data){
-  var sv=document.getElementById('kgSvg'),ents=data.entities||[],links=data.links||[];
+  var sv=document.getElementById('kgSvg'),ents=data.entities||[],links=data.links||[],theme=knowledgeGraphThemeColors();
   sv.innerHTML='';
   var colors={keyword:'#3b82f6',chapter:'#10b981',section:'#8b5cf6',subsection:'#06b6d4',reference:'#f59e0b'};
   var lc={appears_in:'#3b82f6',has:'#94a3b8',cites:'#f59e0b',related:'#8b5cf6',in:'#3b82f6'};
@@ -4353,8 +4365,8 @@ function renderNetworkGraph(data){
   sv.appendChild(gM);gM.appendChild(gL);gM.appendChild(gN);
   var pos={};ents.forEach(function(e){pos[e.id]={x:e.x||Math.random()*1200+100,y:e.y||Math.random()*600+100};});
   links.forEach(function(l){var s=pos[l.source],t=pos[l.target];if(s&&t){var ln=document.createElementNS('http://www.w3.org/2000/svg','line');ln.setAttribute('x1',s.x);ln.setAttribute('y1',s.y);ln.setAttribute('x2',t.x);ln.setAttribute('y2',t.y);ln.setAttribute('stroke',lc[l.type]||'#cbd5e1');ln.setAttribute('stroke-width','1.5');ln.setAttribute('stroke-dasharray','4,2');ln.setAttribute('opacity','0.5');ln.id='link_'+l.id;ln.setAttribute('class','kg-link');gL.appendChild(ln);}});
-  ents.forEach(function(e){var p=pos[e.id];if(!p)return;var r=e.radius||5;var g=document.createElementNS('http://www.w3.org/2000/svg','g');g.id='node_'+e.id;g.setAttribute('class','kg-node');g.setAttribute('transform','translate('+p.x+','+p.y+')');var c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r',r);c.setAttribute('fill',colors[e.type]||'#94a3b8');c.setAttribute('opacity','0.85');c.setAttribute('cursor','pointer');c.setAttribute('stroke','#fff');c.setAttribute('stroke-width','2');g.appendChild(c);
-    var t=document.createElementNS('http://www.w3.org/2000/svg','text');var lb=e.label||(e.fullLabel||'');if(lb.length>8)lb=lb.substring(0,8)+'..';t.textContent=lb;t.setAttribute('pointer-events','none');t.setAttribute('font-weight','500');t.setAttribute('font-size','7');t.setAttribute('fill','#374151');
+  ents.forEach(function(e){var p=pos[e.id];if(!p)return;var r=e.radius||5;var g=document.createElementNS('http://www.w3.org/2000/svg','g');g.id='node_'+e.id;g.setAttribute('class','kg-node');g.setAttribute('transform','translate('+p.x+','+p.y+')');var c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r',r);c.setAttribute('fill',colors[e.type]||theme.muted);c.setAttribute('opacity','0.85');c.setAttribute('cursor','pointer');c.setAttribute('stroke',theme.card);c.setAttribute('stroke-width','2');g.appendChild(c);
+    var t=document.createElementNS('http://www.w3.org/2000/svg','text');var lb=e.label||(e.fullLabel||'');if(lb.length>8)lb=lb.substring(0,8)+'..';t.textContent=lb;t.setAttribute('pointer-events','none');t.setAttribute('font-weight','500');t.setAttribute('font-size','7');t.setAttribute('fill',theme.text);
     if(e.type==='keyword'||e.type==='chapter'){t.setAttribute('text-anchor','middle');t.setAttribute('x','0');t.setAttribute('y',r+10);}else if(e.type==='section'||e.type==='subsection'){t.setAttribute('text-anchor','start');t.setAttribute('x',r+3);t.setAttribute('y','3');}else{t.setAttribute('text-anchor','end');t.setAttribute('x',-r-3);t.setAttribute('y','3');}
     g.appendChild(t);
     g.addEventListener('mouseenter',function(ev){showNodeTooltip(e,ev);highlightKGNode(e.id,true);});
@@ -4362,9 +4374,9 @@ function renderNetworkGraph(data){
     gN.appendChild(g);
   });
   var leg=document.createElementNS('http://www.w3.org/2000/svg','g');leg.setAttribute('transform','translate(20,20)');
-  var lbg=document.createElementNS('http://www.w3.org/2000/svg','rect');lbg.setAttribute('width','150');lbg.setAttribute('height','130');lbg.setAttribute('fill','#fff');lbg.setAttribute('stroke','#e2e8f0');lbg.setAttribute('rx','8');leg.appendChild(lbg);
-  [{l:'关键词',c:colors.keyword},{l:'章节',c:colors.chapter},{l:'小节',c:colors.section},{l:'参考文献',c:colors.reference}].forEach(function(item,i){var cy=28+i*26;var c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('cx','22');c.setAttribute('cy',cy);c.setAttribute('r','8');c.setAttribute('fill',item.c);leg.appendChild(c);var tt=document.createElementNS('http://www.w3.org/2000/svg','text');tt.setAttribute('x','38');tt.setAttribute('y',cy+4);tt.setAttribute('font-size','11');tt.setAttribute('fill','#374151');tt.textContent=item.l;leg.appendChild(tt);});
-  if(data.stats){var sy=28+4*26+10;var st=document.createElementNS('http://www.w3.org/2000/svg','text');st.setAttribute('x','22');st.setAttribute('y',sy);st.setAttribute('font-size','9');st.setAttribute('fill','#94a3b8');st.textContent='节点:'+(data.stats.total_entities||0)+' 边:'+(data.stats.total_links||0);leg.appendChild(st);lbg.setAttribute('height',sy+15);}
+  var lbg=document.createElementNS('http://www.w3.org/2000/svg','rect');lbg.setAttribute('width','150');lbg.setAttribute('height','130');lbg.setAttribute('fill',theme.card);lbg.setAttribute('stroke',theme.border);lbg.setAttribute('rx','8');leg.appendChild(lbg);
+  [{l:'关键词',c:colors.keyword},{l:'章节',c:colors.chapter},{l:'小节',c:colors.section},{l:'参考文献',c:colors.reference}].forEach(function(item,i){var cy=28+i*26;var c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('cx','22');c.setAttribute('cy',cy);c.setAttribute('r','8');c.setAttribute('fill',item.c);leg.appendChild(c);var tt=document.createElementNS('http://www.w3.org/2000/svg','text');tt.setAttribute('x','38');tt.setAttribute('y',cy+4);tt.setAttribute('font-size','11');tt.setAttribute('fill',theme.text);tt.textContent=item.l;leg.appendChild(tt);});
+  if(data.stats){var sy=28+4*26+10;var st=document.createElementNS('http://www.w3.org/2000/svg','text');st.setAttribute('x','22');st.setAttribute('y',sy);st.setAttribute('font-size','9');st.setAttribute('fill',theme.muted);st.textContent='节点:'+(data.stats.total_entities||0)+' 边:'+(data.stats.total_links||0);leg.appendChild(st);lbg.setAttribute('height',sy+15);}
   sv.appendChild(leg);
   var scale=1,tx=0,ty=0,pan=false,px=0,py=0,ndid=null;
   sv.addEventListener('wheel',function(ev){ev.preventDefault();var d=ev.deltaY>0?0.9:1.1;var r=sv.getBoundingClientRect();var ns=Math.max(0.3,Math.min(3,scale*d));tx=ev.clientX-r.left-(ev.clientX-r.left-tx)*ns/scale;ty=ev.clientY-r.top-(ev.clientY-r.top-ty)*ns/scale;scale=ns;gM.setAttribute('transform','translate('+tx+','+ty+') scale('+scale+')');});
@@ -4385,6 +4397,7 @@ function renderRefNetwork(){
 function renderTimeline(){
   var tc = document.getElementById('kgTimelineCanvas');
   if (!tc || kgCurrentView !== 'timeline') return;
+  var theme = knowledgeGraphThemeColors();
   tc.style.display = 'block';
   var parent = tc.parentElement;
   var w = parent.clientWidth - 8, h = parent.clientHeight - 8;
@@ -4395,13 +4408,13 @@ function renderTimeline(){
       ch: r.ch || 1, conf: r.conf || 0, _full: r }; });
   if (!refs.length) {
     var tg = document.getElementById('kgGraphPanel');
-    if (tg) tg.innerHTML = '<div style="text-align:center;padding:60px;color:#86868b"><div style="font-size:3rem;margin-bottom:16px">📅</div><div>暂缺年份数据</div></div>';
+    if (tg) tg.innerHTML = '<div style="text-align:center;padding:60px;color:'+theme.muted+'"><div style="font-size:3rem;margin-bottom:16px">📅</div><div>暂缺年份数据</div></div>';
     return;
   }
   var svgNS = 'http://www.w3.org/2000/svg';
   var svg = document.createElementNS(svgNS, 'svg');
   svg.setAttribute('width', w); svg.setAttribute('height', h);
-  svg.setAttribute('class','tl-svg');svg.style.cssText = 'width:100%;height:100%;position:absolute;top:0;left:0;background:#1c1c1e;border-radius:12px';
+  svg.setAttribute('class','tl-svg');svg.style.cssText = 'width:100%;height:100%;position:absolute;top:0;left:0;background:'+theme.card+';border-radius:12px';
   var byYear = {}; refs.forEach(function(r) { if (!byYear[r.year]) byYear[r.year] = []; byYear[r.year].push(r); });
   var yKeys = Object.keys(byYear).map(Number).sort(function(a,b){return a-b;});
   var minY = yKeys[0], maxY = yKeys[yKeys.length-1], yRange = Math.max(1, maxY-minY);
@@ -4415,13 +4428,13 @@ function renderTimeline(){
   // Background
   var bg = document.createElementNS(svgNS, 'rect');
   bg.setAttribute('width', w); bg.setAttribute('height', h);
-  bg.setAttribute('fill', '#1c1c1e'); svg.appendChild(bg);
+  bg.setAttribute('fill', theme.card); svg.appendChild(bg);
 
   // Title
   var tEl = document.createElementNS(svgNS, 'text');
   tEl.setAttribute('x', margin.left); tEl.setAttribute('y', 26);
   tEl.setAttribute('font-size', '14'); tEl.setAttribute('font-weight', '700');
-  tEl.setAttribute('fill', '#f1f5f9'); tEl.textContent = '📅 文献时间线 ('+refs.length+'篇, '+minY+'-'+maxY+')';
+  tEl.setAttribute('fill', theme.text); tEl.textContent = '📅 文献时间线 ('+refs.length+'篇, '+minY+'-'+maxY+')';
   svg.appendChild(tEl);
 
   // Year axis line
@@ -4429,7 +4442,7 @@ function renderTimeline(){
   var axLine = document.createElementNS(svgNS, 'line');
   axLine.setAttribute('x1', margin.left); axLine.setAttribute('x2', margin.left + pw);
   axLine.setAttribute('y1', axisY); axLine.setAttribute('y2', axisY);
-  axLine.setAttribute('stroke', 'rgba(255,255,255,.15)'); axLine.setAttribute('stroke-width', '2');
+  axLine.setAttribute('stroke', theme.border); axLine.setAttribute('stroke-width', '2');
   svg.appendChild(axLine);
 
   // Year columns and dots
@@ -4440,7 +4453,7 @@ function renderTimeline(){
     var yLabel = document.createElementNS(svgNS, 'text');
     yLabel.setAttribute('x', cx); yLabel.setAttribute('y', axisY + 18);
     yLabel.setAttribute('text-anchor', 'middle'); yLabel.setAttribute('font-size', '11');
-    yLabel.setAttribute('fill', yr % 5 === 0 ? 'rgba(255,255,255,.5)' : 'rgba(255,255,255,.25)');
+    yLabel.setAttribute('fill', yr % 5 === 0 ? theme.secondary : theme.muted);
     yLabel.setAttribute('font-weight', yr % 5 === 0 ? '600' : '400');
     yLabel.textContent = yr;
     svg.appendChild(yLabel);
@@ -4449,7 +4462,7 @@ function renderTimeline(){
       var ln = document.createElementNS(svgNS, 'line');
       ln.setAttribute('x1', cx); ln.setAttribute('x2', cx);
       ln.setAttribute('y1', axisY - 4); ln.setAttribute('y2', axisY - Math.min(ph-40, 10 + count * 14));
-      ln.setAttribute('stroke', 'rgba(255,255,255,.06)'); ln.setAttribute('stroke-width', '1');
+      ln.setAttribute('stroke', theme.border); ln.setAttribute('stroke-width', '1');
       svg.appendChild(ln);
     }
     // Dots stacked vertically above axis
@@ -4462,7 +4475,7 @@ function renderTimeline(){
       dot.setAttribute('cx', cx); dot.setAttribute('cy', dy);
       dot.setAttribute('r', 4 + Math.min(6, (r.conf || 30) / 20));
       dot.setAttribute('fill', colors[r.type] || '#3b82f6');
-      dot.setAttribute('opacity', '0.85'); dot.setAttribute('stroke', '#1c1c1e');
+      dot.setAttribute('opacity', '0.85'); dot.setAttribute('stroke', theme.card);
       dot.setAttribute('stroke-width', '1.5'); dot.setAttribute('cursor', 'pointer');
       dot.setAttribute('data-yr', yr); dot.setAttribute('data-idx', ri);
       (function(r2, cx2, dy2){
@@ -4499,8 +4512,9 @@ function highlightKGNode(nodeId,on){
   if(!gN||!gL)return;
   var targetEnt=ents.find(function(e){return e.id===nodeId;});
   var cIds=new Set([nodeId]);links.forEach(function(l){if(l.source===nodeId)cIds.add(l.target);if(l.target===nodeId)cIds.add(l.source);});
-  gN.querySelectorAll('.kg-node').forEach(function(n){var nid=n.id.replace('node_',''),cr=n.querySelector('circle');if(cIds.has(nid)){cr.setAttribute('opacity',on?'1':'0.85');cr.setAttribute('stroke-width',on?'4':'2');cr.setAttribute('stroke',on?'#fbbf24':'#fff');}else{cr.setAttribute('opacity',on?'0.15':'0.85');cr.setAttribute('stroke-width','2');cr.setAttribute('stroke','#fff');}});
-  gL.querySelectorAll('.kg-link').forEach(function(l){var lid=l.id.replace('link_',''),hit=links.some(function(ll){return ll.id===lid&&(ll.source===nodeId||ll.target===nodeId);});if(hit){l.setAttribute('stroke',on?'#fbbf24':'#cbd5e1');l.setAttribute('stroke-width',on?'3':'1.5');l.setAttribute('opacity',on?'1':'0.5');}else{l.setAttribute('opacity',on?'0.08':'0.5');}});
+  var theme=knowledgeGraphThemeColors();
+  gN.querySelectorAll('.kg-node').forEach(function(n){var nid=n.id.replace('node_',''),cr=n.querySelector('circle');if(cIds.has(nid)){cr.setAttribute('opacity',on?'1':'0.85');cr.setAttribute('stroke-width',on?'4':'2');cr.setAttribute('stroke',on?'#fbbf24':theme.card);}else{cr.setAttribute('opacity',on?'0.15':'0.85');cr.setAttribute('stroke-width','2');cr.setAttribute('stroke',theme.card);}});
+  gL.querySelectorAll('.kg-link').forEach(function(l){var lid=l.id.replace('link_',''),hit=links.some(function(ll){return ll.id===lid&&(ll.source===nodeId||ll.target===nodeId);});if(hit){l.setAttribute('stroke',on?'#fbbf24':theme.strongBorder);l.setAttribute('stroke-width',on?'3':'1.5');l.setAttribute('opacity',on?'1':'0.5');}else{l.setAttribute('opacity',on?'0.08':'0.5');}});
   // Also highlight word in cloud
   if(targetEnt&&targetEnt.type==='keyword'){
     var canvas=document.querySelector('#kgCloudPanel canvas'),words=canvas&&canvas._words;
