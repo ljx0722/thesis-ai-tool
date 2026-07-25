@@ -19,11 +19,13 @@ RUN apt-get update \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=thesisbuddy:thesisbuddy . .
-RUN mkdir -p /app/data /app/static/qr && chown -R thesisbuddy:thesisbuddy /app/data /app/static
+RUN mkdir -p /app/data /app/results /app/static/qr && chown -R thesisbuddy:thesisbuddy /app/data /app/results /app/static
 ENV PORT=5000
 ENV DB_PATH=/app/data/thesis.db
 ENV MATERIALS_DIR=/app/data/materials
 ENV SNAPSHOTS_DIR=/app/data/snapshots
+ENV RESULTS_DIR=/app/results
+ENV DATASET_RESULT_MAX_BYTES=1073741824
 ENV DEEPSEEK_API_KEY=""
 USER thesisbuddy
 EXPOSE 5000

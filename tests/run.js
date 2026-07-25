@@ -2246,6 +2246,24 @@ test('DATA: joint recipe covers all selected sources and ignores empty join keys
   assert(py.indexOf('left_empty_keys')>=0&&py.indexOf('right_empty_keys')>=0,'empty join key protection missing');
 });
 
+test('DATA: joint analysis uses durable disk-backed materialization', function() {
+  var js=fs.readFileSync(path.join(projectRoot,'js/app-modules.js'),'utf8');
+  var py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
+  var deploy=fs.readFileSync(path.join(projectRoot,'.github/workflows/deploy.yml'),'utf8');
+  assert(py.indexOf("DATASET_RESULT_MAX_BYTES', '1073741824'")>=0,'exact default 1 GiB result cap missing');
+  assert(py.indexOf('class DatasetResultTooLarge')>=0&&py.indexOf("code = 'RESULT_TOO_LARGE'")>=0,'stable result-too-large error missing');
+  assert(py.indexOf('def _materialize_recipe')>=0&&py.indexOf('.work.sqlite')>=0,'disk-backed materializer missing');
+  assert(py.indexOf("status='queued'")>=0&&py.indexOf('def _claim_dataset_run')>=0&&py.indexOf('lease_expires_at')>=0,'durable queue/lease worker missing');
+  assert(py.indexOf("anchor = ids[0]")>=0&&py.indexOf('for right_id in ids[1:]')>=0,'compatibility must be N-1 anchor-to-rest');
+  assert(py.indexOf('len(sources) <= 10')<0&&py.indexOf('len(steps) > 5')<0,'fixed recipe limits must be removed');
+  assert(js.indexOf('联合样本预览完成')>=0&&js.indexOf("next.status==='queued'||next.status==='running'")>=0,'sample label or polling missing');
+  var joint=js.substring(js.indexOf('window.openJointAnalysis=function()'),js.indexOf('window.profileSelectedMaterials=function()'));
+  assert(joint.indexOf('download_token_url')>=0&&joint.indexOf('window.location.assign(d.download_url)')>=0&&joint.indexOf('.blob()')<0,'one-time non-buffering browser download missing');
+  assert(py.indexOf('attempt_token')>=0&&py.indexOf("updated.rowcount != 1")>=0,'worker lease fencing missing');
+  assert(py.indexOf('def _execute_recipe_sample')>=0&&py.indexOf('_load_material_sample')>=0,'bounded compatibility/preview sampling missing');
+  assert(deploy.indexOf('thesis-results-pvc')>=0&&deploy.indexOf('dataset-worker')>=0&&deploy.indexOf('RESULTS_DIR=/app/results')>=0,'results PVC or worker sidecar deployment missing');
+});
+
 test('BILLING: idempotency replay validates project and input hash', function() {
   var py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
   assert(py.indexOf("prior['input_hash'] != input_hash")>=0,'idempotency input conflict guard missing');

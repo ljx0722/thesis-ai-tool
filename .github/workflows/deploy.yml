@@ -109,9 +109,11 @@ jobs:
             DEEPSEEK_API_KEY="${{ secrets.DEEPSEEK_API_KEY }}" \
             DB_PATH=/app/data/thesis.db \
             MATERIALS_DIR=/app/data/materials \
-            SNAPSHOTS_DIR=/app/data/snapshots
-          kubectl patch deployment/thesis-ai-tool -n ns-mzyybqj8 --type='strategic' -p '{"spec":{"template":{"spec":{"securityContext":{"fsGroup":999},"containers":[{"name":"thesis-ai-tool","securityContext":{"runAsUser":999,"runAsGroup":999,"runAsNonRoot":true,"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}}}'
-          kubectl set image deployment/thesis-ai-tool -n ns-mzyybqj8 thesis-ai-tool=${{ env.IMAGE }}@${{ needs.build.outputs.digest }}
+            SNAPSHOTS_DIR=/app/data/snapshots \
+            RESULTS_DIR=/app/results \
+            DATASET_RESULT_MAX_BYTES=1073741824
+          kubectl patch deployment/thesis-ai-tool -n ns-mzyybqj8 --type='strategic' -p '{"spec":{"template":{"spec":{"securityContext":{"fsGroup":999},"volumes":[{"name":"db-storage","persistentVolumeClaim":{"claimName":"thesis-db-pvc"}},{"name":"results-storage","persistentVolumeClaim":{"claimName":"thesis-results-pvc"}}],"containers":[{"name":"thesis-ai-tool","securityContext":{"runAsUser":999,"runAsGroup":999,"runAsNonRoot":true,"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"volumeMounts":[{"name":"db-storage","mountPath":"/app/data"},{"name":"results-storage","mountPath":"/app/results"}]},{"name":"dataset-worker","command":["python","kg_server.py","dataset-worker"],"env":[{"name":"DB_PATH","value":"/app/data/thesis.db"},{"name":"MATERIALS_DIR","value":"/app/data/materials"},{"name":"SNAPSHOTS_DIR","value":"/app/data/snapshots"},{"name":"RESULTS_DIR","value":"/app/results"},{"name":"DATASET_RESULT_MAX_BYTES","value":"1073741824"},{"name":"ENV","value":"production"},{"name":"JWT_SECRET","value":"${{ secrets.JWT_SECRET }}"},{"name":"ADMIN_SECRET","value":"${{ secrets.ADMIN_SECRET }}"},{"name":"ADMIN_PASSWORD","value":"${{ secrets.ADMIN_PASSWORD }}"},{"name":"DEEPSEEK_API_KEY","value":"${{ secrets.DEEPSEEK_API_KEY }}"}],"securityContext":{"runAsUser":999,"runAsGroup":999,"runAsNonRoot":true,"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"volumeMounts":[{"name":"db-storage","mountPath":"/app/data"},{"name":"results-storage","mountPath":"/app/results"}]}]}}}}'
+          kubectl set image deployment/thesis-ai-tool -n ns-mzyybqj8 thesis-ai-tool=${{ env.IMAGE }}@${{ needs.build.outputs.digest }} dataset-worker=${{ env.IMAGE }}@${{ needs.build.outputs.digest }}
           kubectl rollout status deployment/thesis-ai-tool -n ns-mzyybqj8 --timeout=240s
       - name: Production smoke test
         run: |
@@ -122,13 +124,21 @@ jobs:
           POD=$(kubectl get pods -n ns-mzyybqj8 --field-selector=status.phase=Running -o json | python -c "import json,sys,os; rs=os.environ['RS']; data=json.load(sys.stdin); pods=[p for p in data['items'] if any(o.get('kind')=='ReplicaSet' and o.get('name')==rs for o in p['metadata'].get('ownerReferences',[]))]; print(pods[0]['metadata']['name'] if pods else '')")
           test -n "$POD"
           kubectl describe pod -n ns-mzyybqj8 "$POD"
-          kubectl logs -n ns-mzyybqj8 "$POD" --tail=200 || true
-          kubectl logs -n ns-mzyybqj8 "$POD" --previous --tail=200 || true
-          kubectl exec -i -n ns-mzyybqj8 "$POD" -- python - <<'PY'
+          kubectl logs -n ns-mzyybqj8 "$POD" -c thesis-ai-tool --tail=200 || true
+          kubectl logs -n ns-mzyybqj8 "$POD" -c dataset-worker --tail=200 || true
+          kubectl exec -i -n ns-mzyybqj8 "$POD" -c thesis-ai-tool -- python - <<'PY'
           import json, urllib.request
           with urllib.request.urlopen('http://127.0.0.1:5000/health/ready', timeout=5) as response:
               data = json.load(response)
               assert data['ok'] is True
               assert data['sha']
+              assert data['checks']['results_writable'] is True
               print(json.dumps(data))
+          PY
+          kubectl exec -i -n ns-mzyybqj8 "$POD" -c dataset-worker -- python - <<'PY'
+          import os, sqlite3
+          db=sqlite3.connect(os.environ['DB_PATH'])
+          db.execute('SELECT COUNT(*) FROM dataset_runs').fetchone()
+          assert os.access(os.environ['RESULTS_DIR'], os.W_OK)
+          print('dataset-worker heartbeat smoke check passed')
           PY

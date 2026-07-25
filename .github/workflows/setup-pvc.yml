@@ -10,18 +10,33 @@ jobs:
       - uses: azure/setup-kubectl@v4
         with:
           version: latest
-      - name: Create PVC and mount volume
+      - name: Create PVCs and idempotent mounts
         run: |
           mkdir -p ~/.kube
           echo "${{ secrets.SEALOS_KUBECONFIG }}" | base64 -d > ~/.kube/config
-
-          echo "Creating PersistentVolumeClaim..."
-          printf 'apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: thesis-db-pvc\n  namespace: ns-mzyybqj8\nspec:\n  accessModes:\n  - ReadWriteOnce\n  resources:\n    requests:\n      storage: 1Gi\n' | kubectl apply -f -
-
-          echo "Adding volume mount to deployment..."
-          kubectl patch deployment thesis-ai-tool -n ns-mzyybqj8 --type json -p '[{"op":"add","path":"/spec/template/spec/volumes","value":[{"name":"db-storage","persistentVolumeClaim":{"claimName":"thesis-db-pvc"}}]},{"op":"add","path":"/spec/template/spec/containers/0/volumeMounts","value":[{"name":"db-storage","mountPath":"/app/data"}]}]'
-
-          echo "Restarting deployment..."
+          cat <<'YAML' | kubectl apply -f -
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: thesis-db-pvc
+            namespace: ns-mzyybqj8
+          spec:
+            accessModes: [ReadWriteOnce]
+            resources:
+              requests:
+                storage: 1Gi
+          ---
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: thesis-results-pvc
+            namespace: ns-mzyybqj8
+          spec:
+            accessModes: [ReadWriteOnce]
+            resources:
+              requests:
+                storage: 10Gi
+          YAML
+          kubectl patch deployment thesis-ai-tool -n ns-mzyybqj8 --type='strategic' -p '{"spec":{"template":{"spec":{"volumes":[{"name":"db-storage","persistentVolumeClaim":{"claimName":"thesis-db-pvc"}},{"name":"results-storage","persistentVolumeClaim":{"claimName":"thesis-results-pvc"}}],"containers":[{"name":"thesis-ai-tool","volumeMounts":[{"name":"db-storage","mountPath":"/app/data"},{"name":"results-storage","mountPath":"/app/results"}]}]}}}}'
           kubectl rollout restart deployment/thesis-ai-tool -n ns-mzyybqj8
           kubectl rollout status deployment/thesis-ai-tool -n ns-mzyybqj8 --timeout=180s
-          echo "Done!"

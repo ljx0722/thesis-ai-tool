@@ -2,6 +2,26 @@
   "schemaVersion": 2,
   "entries": [
     {
+      "version": "0.10.3",
+      "date": "2026-07-25",
+      "commit": "pending",
+      "status": "pending",
+      "summary": "可扩展联合分析后台物化与精确 1 GiB 结果边界",
+      "changes": [
+        "移除联合分析固定资料数和步骤数上限，改用配方请求字节安全边界；兼容性检查缩减为首表到其余资料的 N-1 关系",
+        "新增持久化数据集任务队列、租约、心跳、重试、进度与幂等计费，独立 worker 在后台执行",
+        "使用每任务临时 SQLite 流式物化 select、rename、filter、join 和 union，完整合并行不再保存在 Python 列表中",
+        "生成一个可鉴权下载的 CSV 文件，逐记录精确统计 UTF-8 表头、引号、分隔符和换行，默认严格限制为 1,073,741,824 字节",
+        "分析改为读取结果文件的有界样本；前端轮询排队和运行进度，展示文件行列数、大小、SHA-256 与下载入口",
+        "Sealos 新增至少 10Gi 的 thesis-results-pvc，并在同一 Pod 中运行 dataset-worker sidecar"
+      ],
+      "migrationNotes": [
+        "启动时自动为 project_datasets 与 dataset_runs 增加物化、队列、租约、进度、冻结输入和文件元数据列",
+        "生产环境必须设置 RESULTS_DIR=/app/results，并将该目录挂载到独立持久卷",
+        "DATASET_RESULT_MAX_BYTES 默认必须保持 1073741824；仅测试环境建议注入更小值验证边界"
+      ]
+    },
+    {
       "version": "0.10.2",
       "date": "2026-07-25",
       "commit": "0da8fb1",

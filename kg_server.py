@@ -53,6 +53,14 @@ MATERIALS_DIR = os.environ.get('MATERIALS_DIR', os.path.join(os.path.dirname(os.
 os.makedirs(MATERIALS_DIR, exist_ok=True)
 SNAPSHOTS_DIR = os.environ.get('SNAPSHOTS_DIR', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'snapshots'))
 os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
+RESULTS_DIR = os.path.abspath(os.environ.get('RESULTS_DIR', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'results')))
+os.makedirs(RESULTS_DIR, exist_ok=True)
+DATASET_RESULT_MAX_BYTES = int(os.environ.get('DATASET_RESULT_MAX_BYTES', '1073741824'))
+if DATASET_RESULT_MAX_BYTES < 1:
+    raise RuntimeError('DATASET_RESULT_MAX_BYTES 必须为正整数')
+DATASET_RECIPE_MAX_BYTES = int(os.environ.get('DATASET_RECIPE_MAX_BYTES', str(1024 * 1024)))
+DATASET_WORKER_LEASE_SECONDS = max(30, int(os.environ.get('DATASET_WORKER_LEASE_SECONDS', '180')))
+DATASET_WORKER_MAX_ATTEMPTS = max(1, int(os.environ.get('DATASET_WORKER_MAX_ATTEMPTS', '3')))
 APP_VERSION = os.environ.get('APP_VERSION', '0.9.0')
 BUILD_SHA = os.environ.get('BUILD_SHA', 'dev')
 BUILD_TIME = os.environ.get('BUILD_TIME', '')
@@ -583,6 +591,34 @@ def init_db():
     except Exception as e:
         conn.close()
         raise RuntimeError(f'运营数据迁移失败: {e}')
+    try:
+        dataset_cols = [r[1] for r in conn.execute('PRAGMA table_info(project_datasets)').fetchall()]
+        dataset_additions = {
+            'last_run_id': 'TEXT', 'materialized_at': 'TEXT', 'result_status': "TEXT NOT NULL DEFAULT 'none'"
+        }
+        for col, ddl in dataset_additions.items():
+            if col not in dataset_cols:
+                conn.execute(f'ALTER TABLE project_datasets ADD COLUMN {col} {ddl}')
+        run_cols = [r[1] for r in conn.execute('PRAGMA table_info(dataset_runs)').fetchall()]
+        run_additions = {
+            'idempotency_key': 'TEXT', 'recipe_json': 'TEXT', 'frozen_inputs_json': 'TEXT',
+            'result_path': 'TEXT', 'result_filename': 'TEXT', 'result_sha256': 'TEXT',
+            'result_size_bytes': 'INTEGER', 'result_rows': 'INTEGER', 'result_columns_json': 'TEXT',
+            'progress_current': 'INTEGER NOT NULL DEFAULT 0', 'progress_total': 'INTEGER NOT NULL DEFAULT 0',
+            'progress_message': 'TEXT', 'attempts': 'INTEGER NOT NULL DEFAULT 0',
+            'lease_owner': 'TEXT', 'lease_expires_at': 'TEXT', 'heartbeat_at': 'TEXT',
+            'started_at': 'TEXT', 'updated_at': 'TEXT', 'cancel_requested': 'INTEGER NOT NULL DEFAULT 0',
+            'attempt_token': 'TEXT', 'download_token_hash': 'TEXT', 'download_token_expires_at': 'TEXT'
+        }
+        for col, ddl in run_additions.items():
+            if col not in run_cols:
+                conn.execute(f'ALTER TABLE dataset_runs ADD COLUMN {col} {ddl}')
+        conn.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_dataset_runs_capability ON dataset_runs(capability_run_id) WHERE capability_run_id IS NOT NULL')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_dataset_runs_queue ON dataset_runs(status, lease_expires_at, created_at)')
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        raise RuntimeError(f'数据集任务迁移失败: {e}')
     for idx_sql in [
         'CREATE INDEX IF NOT EXISTS idx_projects_user_updated ON projects(user_id, updated_at)',
         'CREATE INDEX IF NOT EXISTS idx_materials_project_user ON project_materials(project_id, user_id, created_at)',
@@ -1198,7 +1234,7 @@ def api_time():
 
 @app.route('/health/ready', methods=['GET'])
 def health_ready():
-    checks = {'database': False, 'materials_writable': False, 'snapshots_writable': False}
+    checks = {'database': False, 'materials_writable': False, 'snapshots_writable': False, 'results_writable': False}
     try:
         db = get_db()
         db.execute('SELECT 1').fetchone()
@@ -1206,6 +1242,7 @@ def health_ready():
         db.close()
         checks['materials_writable'] = os.access(MATERIALS_DIR, os.W_OK)
         checks['snapshots_writable'] = os.access(SNAPSHOTS_DIR, os.W_OK)
+        checks['results_writable'] = os.access(RESULTS_DIR, os.W_OK)
     except Exception as e:
         return jsonify({'ok': False, 'checks': checks, 'error': str(e), 'version': APP_VERSION, 'sha': BUILD_SHA}), 503
     ok = all(checks.values())
@@ -5504,6 +5541,7 @@ def projects_delete(project_id):
             return jsonify({'success': False, 'error': '项目不存在'}), 404
         materials = db.execute('SELECT id,storage_path FROM project_materials WHERE project_id=? AND user_id=?', (project_id, request.user_id)).fetchall()
         revisions = db.execute('SELECT id,snapshot_path FROM manuscript_revisions WHERE project_id=? AND user_id=?', (project_id, request.user_id)).fetchall()
+        result_paths = [row['result_path'] for row in db.execute('SELECT result_path FROM dataset_runs WHERE project_id=? AND user_id=? AND result_path IS NOT NULL', (project_id, request.user_id)).fetchall()]
         db.execute('DELETE FROM graph_evidence WHERE project_id=?', (project_id,))
         db.execute('DELETE FROM dataset_runs WHERE project_id=? AND user_id=?', (project_id, request.user_id))
         db.execute('DELETE FROM dataset_relationships WHERE project_id=? AND user_id=?', (project_id, request.user_id))
@@ -5526,6 +5564,7 @@ def projects_delete(project_id):
             try:
                 if path and os.path.exists(path): os.remove(path)
             except Exception: pass
+        _delete_result_files(result_paths)
         return jsonify({'success': True})
     except Exception as e:
         db.rollback()
@@ -6037,6 +6076,93 @@ def _load_material_table(db, project_id, user_id, material_id):
     return row, headers, rows, parser, content_hash
 
 
+def _inspect_material_table(db, project_id, user_id, material_id):
+    row = _owned_material(db, project_id, user_id, material_id)
+    path = _contained_regular_file(row['storage_path'])
+    if os.path.getsize(path) > _TABULAR_MAX_BYTES: raise ValueError('文件过大（上限30MB）')
+    digest = hashlib.sha256()
+    with open(path, 'rb') as source:
+        raw = source.read(_TABULAR_MAX_BYTES + 1)
+    digest.update(raw)
+    text, encoding = _decode_tabular(raw)
+    sample = text[:65536]
+    try: dialect = csv.Sniffer().sniff(sample, delimiters=',\t;')
+    except csv.Error: dialect = csv.excel_tab if str(row['filename']).lower().endswith('.tsv') else csv.excel
+    reader = csv.reader(io.StringIO(text, newline=''), dialect)
+    try: headers = next(reader)
+    except StopIteration: raise ValueError('空表格')
+    headers = [str(h).strip() or 'column_%d' % (i + 1) for i, h in enumerate(headers)]
+    if len(headers) > _TABULAR_MAX_COLUMNS: raise ValueError('列数过多（上限200）')
+    if len(set(headers)) != len(headers): raise ValueError('表头存在重复列名')
+    return row, headers, {'encoding': encoding, 'delimiter': dialect.delimiter, 'quotechar': dialect.quotechar}, digest.hexdigest()
+
+
+def _iter_material_rows(material, expected_headers=None):
+    path = _contained_regular_file(material['storage_path'])
+    parser = material.get('parser') or {}
+    encoding = parser.get('encoding') or 'utf-8'
+    delimiter = parser.get('delimiter') or ('\t' if str(material['filename']).lower().endswith('.tsv') else ',')
+    quotechar = parser.get('quotechar') or '"'
+    with open(path, 'r', encoding=encoding, newline='') as source:
+        reader = csv.reader(source, delimiter=delimiter, quotechar=quotechar)
+        try: headers = next(reader)
+        except StopIteration: raise ValueError('空表格')
+        headers = [str(h).strip() or 'column_%d' % (i + 1) for i, h in enumerate(headers)]
+        if expected_headers is not None and headers != expected_headers: raise ValueError('资料表头在任务执行前已变化')
+        for line_no, values in enumerate(reader, start=2):
+            if len(values) > len(headers): raise ValueError('第%d行列数超过表头' % line_no)
+            values += [''] * (len(headers) - len(values))
+            if any(len(str(v)) > _TABULAR_MAX_CELL_CHARS for v in values): raise ValueError('单元格内容过长')
+            yield values
+
+
+def _load_material_sample(db, project_id, user_id, material_id, limit=500):
+    material, headers, parser, content_hash = _inspect_material_table(db, project_id, user_id, material_id)
+    rows = []
+    descriptor = {'storage_path': material['storage_path'], 'filename': material['filename'], 'parser': parser}
+    for values in _iter_material_rows(descriptor, headers):
+        rows.append(dict(zip(headers, values)))
+        if len(rows) >= limit: break
+    return material, headers, rows, parser, content_hash
+
+
+def _execute_recipe_sample(db, project_id, user_id, recipe, sample_limit=100):
+    sources, _ = _validate_recipe(db, project_id, user_id, recipe)
+    tables, provenance = {}, []
+    source_limit = max(sample_limit * 5, 500)
+    for mid in sources:
+        material, headers, rows, parser, content_hash = _load_material_sample(db, project_id, user_id, mid, source_limit)
+        tables[mid] = (headers, rows); provenance.append({'material_id':mid,'filename':material['filename'],'content_hash':content_hash,'parser':parser,'sampled':True})
+    headers, rows = tables[sources[0]][0][:], [dict(r) for r in tables[sources[0]][1]]; diagnostics={'unmatched':[],'duplicates':[]}
+    for step_no, step in enumerate(recipe.get('steps') or [], 1):
+        op=step.get('op')
+        if op=='select': headers=step['columns'][:]; rows=[{c:r.get(c,'') for c in headers} for r in rows]
+        elif op=='rename':
+            mapping=step.get('mapping') or {}; rows=[{str(mapping.get(c,c))[:120]:r.get(c,'') for c in headers} for r in rows]; headers=[str(mapping.get(c,c))[:120] for c in headers]
+        elif op=='filter': rows=[r for r in rows if _filter_match(r,step.get('where'))]
+        elif op=='join':
+            rh,rr=tables[step['right_source']]; left_on,right_on=step['left_on'],step['right_on']; index={}
+            for right in rr:
+                key=str(right.get(right_on,'') or '').strip()
+                if key:index.setdefault(key,[]).append(right)
+            right_cols=[c for c in rh if c!=right_on]; rename={c:(c if c not in headers else c+'_right') for c in right_cols}; out=[]; unmatched=0
+            for left in rows:
+                matches=index.get(str(left.get(left_on,'') or '').strip(),[])
+                if not matches:
+                    unmatched+=1
+                    if (step.get('how') or 'inner')=='left':out.append({**left,**{rename[c]:'' for c in right_cols}})
+                else:
+                    for right in matches:
+                        out.append({**left,**{rename[c]:right.get(c,'') for c in right_cols}})
+                        if len(out)>=source_limit:break
+                if len(out)>=source_limit:break
+            headers+=list(rename.values());rows=out;diagnostics['unmatched'].append({'step':step_no,'count':unmatched,'sampled':True})
+        elif op=='union':
+            oh,other=tables[step['source']]; all_h=headers+[c for c in oh if c not in headers]; rows=([{c:r.get(c,'') for c in all_h} for r in rows]+[{c:r.get(c,'') for c in all_h} for r in other])[:source_limit];headers=all_h
+        if len(rows)>source_limit:rows=rows[:source_limit]
+    return headers,rows[:sample_limit],{'sources':provenance,'recipe':recipe,'diagnostics':diagnostics,'sampled':True}
+
+
 def _profile_payload(material_id, headers, rows, parser, content_hash):
     columns = _profile_rows(headers, rows)
     fingerprint = hashlib.sha256(json.dumps({'hash': content_hash, 'headers': headers, 'rows': len(rows)}, sort_keys=True).encode()).hexdigest()
@@ -6049,8 +6175,68 @@ def _source_ids(data):
     if isinstance(raw, str): raw = [raw]
     if not isinstance(raw, list): raise ValueError('material_ids 必须为数组')
     ids = list(dict.fromkeys(_safe_resource_id(v, 'material_id') for v in raw))
-    if not 1 <= len(ids) <= 10: raise ValueError('资料数量必须为1–10')
+    if not ids: raise ValueError('至少需要一个资料')
+    if len(json.dumps(ids, ensure_ascii=False).encode('utf-8')) > DATASET_RECIPE_MAX_BYTES:
+        raise ValueError('资料请求过大')
     return ids
+
+
+def _validate_recipe(db, project_id, user_id, recipe):
+    if not isinstance(recipe, dict): raise ValueError('recipe 必须为对象')
+    encoded = json.dumps(recipe, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode('utf-8')
+    if len(encoded) > DATASET_RECIPE_MAX_BYTES: raise ValueError('recipe 请求过大')
+    sources = recipe.get('sources') or recipe.get('source') or []
+    if isinstance(sources, dict): sources = sources.get('material_ids') or []
+    if isinstance(sources, str): sources = [sources]
+    if not isinstance(sources, list) or not sources: raise ValueError('recipe.sources 至少需要一个资料')
+    sources = list(dict.fromkeys(_safe_resource_id(v, 'material_id') for v in sources))
+    material_columns = {}
+    for mid in sources:
+        material, headers, _parser, _content_hash = _inspect_material_table(db, project_id, user_id, mid)
+        material_columns[mid] = headers
+    headers = material_columns[sources[0]][:]
+    steps = recipe.get('steps') or []
+    if not isinstance(steps, list): raise ValueError('steps 必须为数组')
+    for step in steps:
+        if not isinstance(step, dict): raise ValueError('step 必须为对象')
+        op = step.get('op')
+        if op == 'select':
+            cols = step.get('columns') or []
+            if not isinstance(cols, list) or any(c not in headers for c in cols): raise ValueError('select 列无效')
+            headers = cols[:]
+        elif op == 'rename':
+            mapping = step.get('mapping') or {}
+            if not isinstance(mapping, dict) or any(k not in headers for k in mapping): raise ValueError('rename 无效')
+            headers = [str(mapping.get(c, c))[:120] for c in headers]
+            if len(set(headers)) != len(headers): raise ValueError('rename 后列名重复')
+        elif op == 'filter':
+            _validate_filter_columns(step.get('where'), set(headers))
+        elif op == 'join':
+            right_id = _safe_resource_id(step.get('right_source'), 'right_source')
+            if right_id not in material_columns: raise ValueError('join 右表不在 sources 中')
+            left_on, right_on = str(step.get('left_on') or ''), str(step.get('right_on') or '')
+            if left_on not in headers or right_on not in material_columns[right_id]: raise ValueError('join key 不存在')
+            if (step.get('how') or 'inner') not in ('inner', 'left'): raise ValueError('join how 仅允许 inner/left')
+            right_cols = [c for c in material_columns[right_id] if c != right_on]
+            headers += [(c if c not in headers else c+'_right') for c in right_cols]
+        elif op == 'union':
+            other_id = _safe_resource_id(step.get('source'), 'union source')
+            if other_id not in material_columns: raise ValueError('union 表不在 sources 中')
+            if (step.get('mode') or 'by_name') != 'by_name': raise ValueError('union 仅支持 by_name')
+            headers += [c for c in material_columns[other_id] if c not in headers]
+        else: raise ValueError('recipe step 不允许: '+str(op))
+        if len(headers) > _TABULAR_MAX_COLUMNS: raise ValueError('配方结果列数过多（上限200）')
+    return sources, headers
+
+
+def _validate_filter_columns(node, headers):
+    if not isinstance(node, dict) or node.get('op') not in _FILTER_OPS: raise ValueError('filter AST 操作符不允许')
+    if node['op'] in ('and', 'or'):
+        args = node.get('args')
+        if not isinstance(args, list) or not 1 <= len(args) <= 20: raise ValueError('filter args 无效')
+        for child in args: _validate_filter_columns(child, headers)
+    elif str(node.get('column') or '') not in headers:
+        raise ValueError('filter 列不存在: '+str(node.get('column') or ''))
 
 
 def _column_summary(headers, rows):
@@ -6128,7 +6314,7 @@ def _execute_recipe(db, project_id, user_id, recipe):
     sources = recipe.get('sources') or recipe.get('source') or []
     if isinstance(sources, dict): sources = sources.get('material_ids') or []
     if isinstance(sources, str): sources = [sources]
-    if not isinstance(sources, list) or not 1 <= len(sources) <= 10: raise ValueError('recipe.sources 必须含1–10个资料')
+    if not isinstance(sources, list) or not sources: raise ValueError('recipe.sources 至少需要一个资料')
     tables, provenance = {}, []
     for mid in sources:
         material, headers, rows, parser, content_hash = _load_material_table(db, project_id, user_id, mid)
@@ -6137,7 +6323,7 @@ def _execute_recipe(db, project_id, user_id, recipe):
     current_id = sources[0]; headers, rows = tables[current_id][0][:], [dict(r) for r in tables[current_id][1]]
     diagnostics = {'unmatched': [], 'duplicates': []}
     steps = recipe.get('steps') or []
-    if not isinstance(steps, list) or len(steps) > 5: raise ValueError('steps 上限为5')
+    if not isinstance(steps, list): raise ValueError('steps 必须为数组')
     for step_no, step in enumerate(steps, 1):
         if not isinstance(step, dict): raise ValueError('step 必须为对象')
         op = step.get('op')
@@ -6202,6 +6388,135 @@ def _execute_recipe(db, project_id, user_id, recipe):
     return headers, rows, {'sources': provenance, 'recipe': recipe, 'diagnostics': diagnostics}
 
 
+class DatasetResultTooLarge(Exception):
+    code = 'RESULT_TOO_LARGE'
+
+
+def _contained_result_path(path, must_exist=True):
+    root_real = os.path.realpath(RESULTS_DIR); path_real = os.path.realpath(str(path or ''))
+    try:
+        if os.path.commonpath([root_real, path_real]) != root_real: raise ValueError('结果路径越界')
+    except (ValueError, OSError): raise ValueError('结果路径越界')
+    if must_exist and (not os.path.isfile(path_real) or os.path.islink(path_real)): raise ValueError('结果文件不存在')
+    return path_real
+
+
+def _freeze_recipe_inputs(db, project_id, user_id, recipe):
+    sources, headers = _validate_recipe(db, project_id, user_id, recipe)
+    frozen = []
+    for mid in sources:
+        material, source_headers, parser, content_hash = _inspect_material_table(db, project_id, user_id, mid)
+        frozen.append({'material_id': mid, 'filename': material['filename'], 'storage_path': material['storage_path'],
+                       'size_bytes': os.path.getsize(_contained_regular_file(material['storage_path'])),
+                       'content_hash': content_hash, 'headers': source_headers, 'parser': parser})
+    return frozen, headers
+
+
+def _sql_cols(count): return ','.join('c%d TEXT' % i for i in range(count))
+def _sql_names(count, prefix=''): return ['%sc%d' % (prefix, i) for i in range(count)]
+
+
+def _materialize_recipe(run_id, project_id, user_id, recipe, frozen_inputs, progress=None):
+    progress = progress or (lambda current, total, message: None)
+    run_id = _safe_resource_id(run_id, 'run_id')
+    temp_db = _contained_result_path(os.path.join(RESULTS_DIR, run_id+'.work.sqlite'), must_exist=False)
+    temp_csv = _contained_result_path(os.path.join(RESULTS_DIR, run_id+'.csv.tmp'), must_exist=False)
+    final_csv = _contained_result_path(os.path.join(RESULTS_DIR, run_id+'.csv'), must_exist=False)
+    for stale in (temp_db, temp_csv):
+        try: os.remove(stale)
+        except FileNotFoundError: pass
+    work = sqlite3.connect(temp_db)
+    work.execute('PRAGMA journal_mode=OFF'); work.execute('PRAGMA synchronous=OFF'); work.execute('PRAGMA temp_store=FILE')
+    diagnostics = {'unmatched': [], 'duplicates': []}; sources = [x['material_id'] for x in frozen_inputs]
+    frozen_by_id = {x['material_id']: x for x in frozen_inputs}; total_units = max(1, len(sources) + len(recipe.get('steps') or []) + 1); done = 0
+    try:
+        for source_index, mid in enumerate(sources):
+            item = frozen_by_id[mid]; material_path = _contained_regular_file(item['storage_path'])
+            with open(material_path, 'rb') as source:
+                actual_hash = hashlib.sha256(source.read()).hexdigest()
+            if actual_hash != item['content_hash']: raise ValueError('SOURCE_CHANGED: 资料在任务入队后发生变化')
+            table = 'src_%d' % source_index; headers = item['headers']
+            work.execute('CREATE TABLE %s (%s)' % (table, _sql_cols(len(headers))))
+            placeholders = ','.join('?' for _ in headers); batch = []
+            material = {'storage_path': material_path, 'filename': item['filename'], 'parser': item.get('parser') or {}}
+            for values in _iter_material_rows(material, headers):
+                batch.append(values)
+                if len(batch) >= 1000:
+                    work.executemany('INSERT INTO %s VALUES (%s)' % (table, placeholders), batch); batch = []
+            if batch: work.executemany('INSERT INTO %s VALUES (%s)' % (table, placeholders), batch)
+            work.commit(); done += 1; progress(done, total_units, '已载入资料 %d/%d' % (source_index+1, len(sources)))
+        current_table = 'src_0'; headers = frozen_by_id[sources[0]]['headers'][:]
+        for step_no, step in enumerate(recipe.get('steps') or [], 1):
+            op = step.get('op'); next_table = 'step_%d' % step_no
+            if op == 'select':
+                indices = [headers.index(c) for c in step['columns']]; new_headers = step['columns'][:]
+                work.execute('CREATE TABLE %s AS SELECT %s FROM %s' % (next_table, ','.join('c%d AS c%d' % (old, new) for new, old in enumerate(indices)), current_table))
+            elif op == 'rename':
+                new_headers = [str((step.get('mapping') or {}).get(c, c))[:120] for c in headers]
+                work.execute('CREATE TABLE %s AS SELECT * FROM %s' % (next_table, current_table))
+            elif op == 'filter':
+                new_headers = headers[:]; work.execute('CREATE TABLE %s (%s)' % (next_table, _sql_cols(len(headers))))
+                read_cursor = work.cursor(); write_cursor = work.cursor()
+                read_cursor.execute('SELECT * FROM %s' % current_table); placeholders = ','.join('?' for _ in headers); batch = []
+                for values in read_cursor:
+                    row = dict(zip(headers, values))
+                    if _filter_match(row, step.get('where')):
+                        batch.append(values)
+                        if len(batch) >= 1000: write_cursor.executemany('INSERT INTO %s VALUES (%s)' % (next_table, placeholders), batch); batch=[]
+                if batch: write_cursor.executemany('INSERT INTO %s VALUES (%s)' % (next_table, placeholders), batch)
+                read_cursor.close(); write_cursor.close()
+            elif op == 'join':
+                right_index = sources.index(step['right_source']); right_table = 'src_%d' % right_index; rh = frozen_by_id[step['right_source']]['headers']
+                li, ri = headers.index(step['left_on']), rh.index(step['right_on']); right_cols = [i for i in range(len(rh)) if i != ri]
+                right_names = [(rh[i] if rh[i] not in headers else rh[i]+'_right') for i in right_cols]; new_headers = headers + right_names
+                select_cols = ["l.c%d AS c%d" % (i, i) for i in range(len(headers))] + ["r.c%d AS c%d" % (old, len(headers)+pos) for pos, old in enumerate(right_cols)]
+                join_kind = 'LEFT JOIN' if (step.get('how') or 'inner') == 'left' else 'JOIN'
+                condition = "NULLIF(TRIM(l.c%d),'')=NULLIF(TRIM(r.c%d),'')" % (li, ri)
+                work.execute('CREATE TABLE %s AS SELECT %s FROM %s l %s %s r ON %s' % (next_table, ','.join(select_cols), current_table, join_kind, right_table, condition))
+                unmatched = work.execute("SELECT COUNT(*) FROM %s l WHERE TRIM(COALESCE(l.c%d,''))='' OR NOT EXISTS (SELECT 1 FROM %s r WHERE NULLIF(TRIM(l.c%d),'')=NULLIF(TRIM(r.c%d),''))" % (current_table, li, right_table, li, ri)).fetchone()[0]
+                duplicates = work.execute("SELECT COUNT(*) FROM (SELECT c%d FROM %s WHERE TRIM(COALESCE(c%d,''))<>'' GROUP BY c%d HAVING COUNT(*)>1)" % (ri, right_table, ri, ri)).fetchone()[0]
+                diagnostics['unmatched'].append({'step': step_no, 'count': unmatched}); diagnostics['duplicates'].append({'step': step_no, 'right_duplicate_keys': duplicates})
+            elif op == 'union':
+                other_index = sources.index(step['source']); other_table = 'src_%d' % other_index; oh = frozen_by_id[step['source']]['headers']; new_headers = headers + [c for c in oh if c not in headers]
+                work.execute('CREATE TABLE %s (%s)' % (next_table, _sql_cols(len(new_headers))))
+                left_expr = ','.join(('c%d' % headers.index(c)) if c in headers else "''" for c in new_headers)
+                right_expr = ','.join(('c%d' % oh.index(c)) if c in oh else "''" for c in new_headers)
+                work.execute('INSERT INTO %s SELECT %s FROM %s' % (next_table, left_expr, current_table)); work.execute('INSERT INTO %s SELECT %s FROM %s' % (next_table, right_expr, other_table))
+            else: raise ValueError('recipe step 不允许: '+str(op))
+            if current_table.startswith('step_'): work.execute('DROP TABLE %s' % current_table)
+            current_table, headers = next_table, new_headers; work.commit(); done += 1; progress(done, total_units, '已执行步骤 %d/%d' % (step_no, len(recipe.get('steps') or [])))
+        sha = hashlib.sha256(); byte_count = 0; row_count = 0
+        with open(temp_csv, 'wb') as output:
+            for record in ([headers] if headers else []):
+                buf = io.StringIO(newline=''); csv.writer(buf, lineterminator='\n').writerow(record); encoded = buf.getvalue().encode('utf-8')
+                if byte_count + len(encoded) > DATASET_RESULT_MAX_BYTES: raise DatasetResultTooLarge('RESULT_TOO_LARGE: 合并结果超过字节上限')
+                output.write(encoded); sha.update(encoded); byte_count += len(encoded)
+            for values in work.execute('SELECT * FROM %s' % current_table):
+                buf = io.StringIO(newline=''); csv.writer(buf, lineterminator='\n').writerow(['' if v is None else v for v in values]); encoded = buf.getvalue().encode('utf-8')
+                if byte_count + len(encoded) > DATASET_RESULT_MAX_BYTES: raise DatasetResultTooLarge('RESULT_TOO_LARGE: 合并结果超过字节上限')
+                output.write(encoded); sha.update(encoded); byte_count += len(encoded); row_count += 1
+        os.replace(temp_csv, final_csv); done += 1; progress(done, total_units, '结果文件已生成')
+        return {'path': final_csv, 'filename': run_id+'.csv', 'sha256': sha.hexdigest(), 'size_bytes': byte_count,
+                'rows': row_count, 'columns': headers, 'diagnostics': diagnostics}
+    finally:
+        work.close()
+        try: os.remove(temp_db)
+        except FileNotFoundError: pass
+        try: os.remove(temp_csv)
+        except FileNotFoundError: pass
+
+
+def _sample_result_csv(path, sample_limit=5000):
+    path = _contained_result_path(path); rows = []
+    with open(path, 'r', encoding='utf-8', newline='') as source:
+        reader = csv.DictReader(source); headers = reader.fieldnames or []
+        for index, row in enumerate(reader):
+            if index >= sample_limit: break
+            rows.append(row)
+    analysis = _basic_analysis(headers, rows); analysis['sampled'] = True; analysis['sample_size'] = len(rows); analysis['sample_limit'] = sample_limit
+    return analysis
+
+
 @app.route('/api/projects/<project_id>/data/profiles:batch', methods=['POST'])
 @require_auth
 def project_data_profiles_batch(project_id):
@@ -6211,8 +6526,8 @@ def project_data_profiles_batch(project_id):
         project_id = _safe_resource_id(project_id, 'project_id')
         if not _owned_project(db, project_id, request.user_id): return jsonify({'success': False, 'error': '项目不存在'}), 404
         if data.get('all') is True:
-            ids = [r['id'] for r in db.execute("SELECT id FROM project_materials WHERE project_id=? AND user_id=? AND (lower(filename) LIKE '%.csv' OR lower(filename) LIKE '%.tsv' OR lower(kind) IN ('csv','tsv')) ORDER BY created_at DESC LIMIT 11", (project_id, request.user_id)).fetchall()]
-            if len(ids) > 10: return jsonify({'success': False, 'error': '可剖析资料超过10个，请指定 material_ids'}), 400
+            ids = [r['id'] for r in db.execute("SELECT id FROM project_materials WHERE project_id=? AND user_id=? AND (lower(filename) LIKE '%.csv' OR lower(filename) LIKE '%.tsv' OR lower(kind) IN ('csv','tsv')) ORDER BY created_at DESC", (project_id, request.user_id)).fetchall()]
+            if not ids: return jsonify({'success': False, 'error': '没有可剖析的 CSV/TSV 资料'}), 400
         else: ids = _source_ids(data)
         results, errors = [], []
         for mid in ids:
@@ -6241,16 +6556,16 @@ def project_datasets_compatibility(project_id):
         if not _owned_project(db, project_id, request.user_id): return jsonify({'success': False, 'error': '项目不存在'}), 404
         ids = _source_ids(data)
         if len(ids) < 2: return jsonify({'success': False, 'error': '至少需要两个资料'}), 400
-        loaded = {mid: _load_material_table(db, project_id, request.user_id, mid) for mid in ids}
+        loaded = {mid: _load_material_sample(db, project_id, request.user_id, mid, 500) for mid in ids}
         pairs = []
-        for i in range(len(ids)):
-            for j in range(i+1, len(ids)):
-                a, b = loaded[ids[i]], loaded[ids[j]]
-                item = _compatibility(ids[i], a[1], a[2], ids[j], b[1], b[2]); pairs.append(item)
-                fingerprint = hashlib.sha256(json.dumps(item, sort_keys=True).encode()).hexdigest()
-                db.execute('INSERT OR REPLACE INTO dataset_relationships(id,project_id,user_id,left_source_id,right_source_id,relationship_json,fingerprint,created_at) VALUES(COALESCE((SELECT id FROM dataset_relationships WHERE project_id=? AND fingerprint=?),?),?,?,?,?,?,?,?)',
-                           (project_id, fingerprint, 'rel_'+secrets.token_hex(10), project_id, request.user_id, ids[i], ids[j], json.dumps(item, ensure_ascii=False), fingerprint, now_beijing_str()))
-        db.commit(); return jsonify({'success': True, 'schema_version': 1, 'pairs': pairs, 'deterministic': True})
+        anchor = ids[0]
+        for right_id in ids[1:]:
+            a, b = loaded[anchor], loaded[right_id]
+            item = _compatibility(anchor, a[1], a[2], right_id, b[1], b[2]); pairs.append(item)
+            fingerprint = hashlib.sha256(json.dumps(item, sort_keys=True).encode()).hexdigest()
+            db.execute('INSERT OR REPLACE INTO dataset_relationships(id,project_id,user_id,left_source_id,right_source_id,relationship_json,fingerprint,created_at) VALUES(COALESCE((SELECT id FROM dataset_relationships WHERE project_id=? AND fingerprint=?),?),?,?,?,?,?,?,?)',
+                       (project_id, fingerprint, 'rel_'+secrets.token_hex(10), project_id, request.user_id, anchor, right_id, json.dumps(item, ensure_ascii=False), fingerprint, now_beijing_str()))
+        db.commit(); return jsonify({'success': True, 'schema_version': 2, 'pairs': pairs, 'pairing': 'anchor_to_rest', 'deterministic': True})
     except (ValueError, LookupError) as exc: return jsonify({'success': False, 'error': str(exc)}), 400
     finally: db.close()
 
@@ -6262,8 +6577,9 @@ def project_datasets_preview(project_id):
     try:
         project_id = _safe_resource_id(project_id, 'project_id')
         if not _owned_project(db, project_id, request.user_id): return jsonify({'success': False, 'error': '项目不存在'}), 404
-        headers, rows, provenance = _execute_recipe(db, project_id, request.user_id, data.get('recipe') or data)
-        return jsonify({'success': True, 'schema_version': 1, 'columns': headers, 'rows': rows[:100], 'preview_count': min(100, len(rows)), 'total_count': len(rows), 'diagnostics': provenance['diagnostics'], 'provenance': provenance})
+        headers, rows, provenance = _execute_recipe_sample(db, project_id, request.user_id, data.get('recipe') or data, 100)
+        sample_rows = rows[:100]
+        return jsonify({'success': True, 'schema_version': 2, 'columns': headers, 'rows': sample_rows, 'preview_count': len(sample_rows), 'total_count': len(rows), 'sampled': True, 'approximate': True, 'sample_note': '预览仅基于有界样本，完整结果由后台任务生成', 'diagnostics': provenance['diagnostics'], 'provenance': provenance})
     except (ValueError, LookupError) as exc: return jsonify({'success': False, 'error': str(exc)}), 400
     finally: db.close()
 
@@ -6279,11 +6595,10 @@ def project_datasets(project_id):
             rows = db.execute('SELECT * FROM project_datasets WHERE project_id=? AND user_id=? ORDER BY updated_at DESC', (project_id, request.user_id)).fetchall()
             return jsonify({'success': True, 'datasets': [_dataset_dict(r) for r in rows]})
         data = request.get_json(silent=True) or {}; recipe = data.get('recipe')
-        _execute_recipe(db, project_id, request.user_id, recipe)
+        sources, schema_headers = _validate_recipe(db, project_id, request.user_id, recipe)
         did = 'ds_'+secrets.token_hex(10); now = now_beijing_str(); name = str(data.get('name') or '未命名数据集').strip()[:160]
-        sources = recipe.get('sources') or recipe.get('source') or []
         db.execute('INSERT INTO project_datasets(id,project_id,user_id,name,description,recipe_json,source_json,schema_json,row_version,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,1,?,?)',
-                   (did, project_id, request.user_id, name, str(data.get('description') or '')[:1000], json.dumps(recipe, ensure_ascii=False), json.dumps(sources, ensure_ascii=False), None, now, now))
+                   (did, project_id, request.user_id, name, str(data.get('description') or '')[:1000], json.dumps(recipe, ensure_ascii=False), json.dumps(sources, ensure_ascii=False), json.dumps({'columns': schema_headers}, ensure_ascii=False), now, now))
         db.commit(); row = db.execute('SELECT * FROM project_datasets WHERE id=?', (did,)).fetchone()
         return jsonify({'success': True, 'dataset': _dataset_dict(row)}), 201
     except (ValueError, LookupError) as exc: return jsonify({'success': False, 'error': str(exc)}), 400
@@ -6308,13 +6623,14 @@ def project_dataset_one(project_id, dataset_id):
         if not row: return jsonify({'success': False, 'error': '数据集不存在'}), 404
         if request.method == 'GET': return jsonify({'success': True, 'dataset': _dataset_dict(row)})
         if request.method == 'DELETE':
-            db.execute('DELETE FROM project_datasets WHERE id=? AND project_id=? AND user_id=?', (dataset_id, project_id, request.user_id)); db.commit(); return jsonify({'success': True})
+            result_paths=[r['result_path'] for r in db.execute('SELECT result_path FROM dataset_runs WHERE dataset_id=? AND user_id=? AND result_path IS NOT NULL',(dataset_id,request.user_id)).fetchall()]
+            db.execute('DELETE FROM project_datasets WHERE id=? AND project_id=? AND user_id=?', (dataset_id, project_id, request.user_id)); db.commit(); _delete_result_files(result_paths); return jsonify({'success': True})
         data = request.get_json(silent=True) or {}; submitted = int(data.get('row_version') or data.get('rowVersion') or 0)
         if submitted != int(row['row_version']): return jsonify({'success': False, 'code': 'DATASET_VERSION_CONFLICT', 'current': _dataset_dict(row)}), 409
         recipe = data.get('recipe') or _json_or(row['recipe_json'], {})
-        _execute_recipe(db, project_id, request.user_id, recipe)
-        db.execute('UPDATE project_datasets SET name=?,description=?,recipe_json=?,source_json=?,row_version=row_version+1,updated_at=? WHERE id=? AND user_id=? AND row_version=?',
-                   (str(data.get('name') or row['name'])[:160], str(data.get('description') if 'description' in data else row['description'])[:1000], json.dumps(recipe, ensure_ascii=False), json.dumps(recipe.get('sources') or recipe.get('source') or [], ensure_ascii=False), now_beijing_str(), dataset_id, request.user_id, submitted))
+        sources, schema_headers = _validate_recipe(db, project_id, request.user_id, recipe)
+        db.execute('UPDATE project_datasets SET name=?,description=?,recipe_json=?,source_json=?,schema_json=?,result_status=?,row_version=row_version+1,updated_at=? WHERE id=? AND user_id=? AND row_version=?',
+                   (str(data.get('name') or row['name'])[:160], str(data.get('description') if 'description' in data else row['description'])[:1000], json.dumps(recipe, ensure_ascii=False), json.dumps(sources, ensure_ascii=False), json.dumps({'columns': schema_headers}, ensure_ascii=False), 'stale', now_beijing_str(), dataset_id, request.user_id, submitted))
         db.commit(); return jsonify({'success': True, 'dataset': _dataset_dict(db.execute('SELECT * FROM project_datasets WHERE id=?', (dataset_id,)).fetchone())})
     except (ValueError, LookupError) as exc: return jsonify({'success': False, 'error': str(exc)}), 400
     finally: db.close()
@@ -6359,44 +6675,198 @@ def _basic_analysis(headers, rows):
     return {'n_rows': len(rows), 'n_columns': len(headers), 'columns': columns, 'correlations': correlations, 'group_summaries': groups}
 
 
+def _delete_result_files(paths):
+    for path in paths:
+        try:
+            if path and os.path.exists(_contained_result_path(path)): os.remove(_contained_result_path(path))
+        except Exception: pass
+
+
+def cleanup_orphan_results(max_age_seconds=86400):
+    db=get_db()
+    try: referenced={os.path.realpath(r['result_path']) for r in db.execute('SELECT result_path FROM dataset_runs WHERE result_path IS NOT NULL').fetchall()}
+    finally:db.close()
+    removed=0; cutoff=time.time()-max_age_seconds
+    for name in os.listdir(RESULTS_DIR):
+        path=os.path.realpath(os.path.join(RESULTS_DIR,name))
+        if path in referenced or not os.path.isfile(path):continue
+        if name.endswith(('.tmp','.work.sqlite')) or os.path.getmtime(path)<cutoff:
+            try:os.remove(path);removed+=1
+            except OSError:pass
+    return removed
+
+
+def _dataset_run_dict(row):
+    item = dict(row)
+    for source, target, default in [('result_json','analysis',None),('provenance_json','provenance',None),('billing_json','billing',None),('error_json','error',None),('result_columns_json','result_columns',[])]:
+        item[target] = _json_or(item.pop(source, None), default)
+    item['progress'] = {'current': item.pop('progress_current', 0) or 0, 'total': item.pop('progress_total', 0) or 0, 'message': item.pop('progress_message', None)}
+    if item.get('result_path') and item.get('status') == 'succeeded': item['download_token_url'] = '/api/projects/%s/datasets/%s/runs/%s/download-token' % (item['project_id'], item['dataset_id'], item['id'])
+    item.pop('frozen_inputs_json', None); item.pop('recipe_json', None); item.pop('lease_owner', None)
+    return item
+
+
+def _claim_dataset_run(worker_id):
+    db = get_db()
+    try:
+        db.execute('BEGIN IMMEDIATE'); now = now_beijing(); now_s = now.strftime('%Y-%m-%d %H:%M:%S'); lease = (now + timedelta(seconds=DATASET_WORKER_LEASE_SECONDS)).strftime('%Y-%m-%d %H:%M:%S')
+        row = db.execute("SELECT * FROM dataset_runs WHERE cancel_requested=0 AND attempts<? AND (status='queued' OR (status IN ('running','settling') AND (lease_expires_at IS NULL OR lease_expires_at<?))) ORDER BY created_at LIMIT 1", (DATASET_WORKER_MAX_ATTEMPTS, now_s)).fetchone()
+        if not row: db.commit(); return None
+        attempt_token = secrets.token_urlsafe(18)
+        updated = db.execute("UPDATE dataset_runs SET status='running',attempts=attempts+1,lease_owner=?,attempt_token=?,lease_expires_at=?,heartbeat_at=?,started_at=COALESCE(started_at,?),updated_at=? WHERE id=? AND (status='queued' OR lease_expires_at IS NULL OR lease_expires_at<?)", (worker_id, attempt_token, lease, now_s, now_s, now_s, row['id'], now_s))
+        if updated.rowcount != 1: db.rollback(); return None
+        db.commit(); return dict(db.execute('SELECT * FROM dataset_runs WHERE id=?', (row['id'],)).fetchone())
+    finally: db.close()
+
+
+def _heartbeat_dataset_run(run_id, worker_id, attempt_token, current, total, message):
+    db = get_db()
+    try:
+        now = now_beijing(); updated = db.execute("UPDATE dataset_runs SET progress_current=?,progress_total=?,progress_message=?,heartbeat_at=?,lease_expires_at=?,updated_at=? WHERE id=? AND lease_owner=? AND attempt_token=? AND status='running' AND lease_expires_at>=?", (current, total, str(message)[:300], now.strftime('%Y-%m-%d %H:%M:%S'), (now+timedelta(seconds=DATASET_WORKER_LEASE_SECONDS)).strftime('%Y-%m-%d %H:%M:%S'), now.strftime('%Y-%m-%d %H:%M:%S'), run_id, worker_id, attempt_token, now.strftime('%Y-%m-%d %H:%M:%S')))
+        if updated.rowcount != 1: db.rollback(); raise RuntimeError('LEASE_LOST: 数据集任务租约已失效')
+        row = db.execute('SELECT cancel_requested FROM dataset_runs WHERE id=? AND lease_owner=? AND attempt_token=?', (run_id,worker_id,attempt_token)).fetchone(); db.commit()
+        if row and row['cancel_requested']: raise RuntimeError('CANCELLED: 用户已取消任务')
+    finally: db.close()
+
+
+def _process_dataset_run(run, worker_id):
+    run_id = run['id']; capability_run_id = run['capability_run_id']; attempt_token = run['attempt_token']
+    try:
+        recipe = _json_or(run.get('recipe_json'), {}); frozen = _json_or(run.get('frozen_inputs_json'), [])
+        result_file = _materialize_recipe(run_id, run['project_id'], run['user_id'], recipe, frozen, lambda c,t,m: _heartbeat_dataset_run(run_id, worker_id, attempt_token, c,t,m))
+        analysis = _sample_result_csv(result_file['path']); analysis['n_rows'] = result_file['rows']; analysis['n_columns'] = len(result_file['columns'])
+        provenance = {'sources': frozen, 'recipe': recipe, 'diagnostics': result_file['diagnostics'], 'inputs_frozen': True}
+        billing = {'capability_run_id': capability_run_id}
+        result = {'dataset_run_id': run_id, 'dataset_id': run['dataset_id'], 'analysis': analysis, 'provenance': provenance, 'billing': billing,
+                  'result': {k: result_file[k] for k in ('filename','sha256','size_bytes','rows','columns')}}
+        settled = settle_capability_run(capability_run_id, result, {'dataset_run_id': run_id})
+        if not settled or settled.get('status') != 'succeeded': raise RuntimeError('SETTLEMENT_FAILED: 计费结算未完成')
+        billing.update({'price_credits': settled.get('price_credits'), 'transaction_id': settled.get('transaction_id')})
+        db = get_db()
+        try:
+            now = now_beijing_str(); updated = db.execute("UPDATE dataset_runs SET status='succeeded',result_json=?,provenance_json=?,billing_json=?,result_path=?,result_filename=?,result_sha256=?,result_size_bytes=?,result_rows=?,result_columns_json=?,progress_current=progress_total,progress_message='完成',lease_owner=NULL,attempt_token=NULL,lease_expires_at=NULL,updated_at=?,finished_at=? WHERE id=? AND lease_owner=? AND attempt_token=? AND status='running'", (json.dumps(analysis,ensure_ascii=False),json.dumps(provenance,ensure_ascii=False),json.dumps(billing,ensure_ascii=False),result_file['path'],result_file['filename'],result_file['sha256'],result_file['size_bytes'],result_file['rows'],json.dumps(result_file['columns'],ensure_ascii=False),now,now,run_id,worker_id,attempt_token))
+            if updated.rowcount != 1: db.rollback(); raise RuntimeError('LEASE_LOST: 发布结果前租约已失效')
+            db.execute("UPDATE project_datasets SET last_run_id=?,materialized_at=?,result_status='ready',schema_json=?,updated_at=? WHERE id=?", (run_id,now,json.dumps({'columns':result_file['columns']},ensure_ascii=False),now,run['dataset_id'])); db.commit()
+        finally: db.close()
+    except Exception as exc:
+        try:
+            final_path = _contained_result_path(os.path.join(RESULTS_DIR, run_id+'.csv'), must_exist=False)
+            if os.path.exists(final_path): os.remove(final_path)
+        except Exception: pass
+        stable_failure = isinstance(exc, DatasetResultTooLarge) or str(exc).startswith(('SOURCE_CHANGED:', 'CANCELLED:'))
+        if not stable_failure and int(run.get('attempts') or 0) < DATASET_WORKER_MAX_ATTEMPTS:
+            db = get_db()
+            try:
+                now = now_beijing_str(); updated = db.execute("UPDATE dataset_runs SET status='queued',error_json=?,progress_message=?,lease_owner=NULL,attempt_token=NULL,lease_expires_at=NULL,heartbeat_at=NULL,updated_at=? WHERE id=? AND lease_owner=? AND attempt_token=? AND status='running'", (json.dumps({'error':str(exc),'retrying':True},ensure_ascii=False),'执行失败，等待自动重试',now,run_id,worker_id,attempt_token));
+                if updated.rowcount != 1: db.rollback(); return
+                db.commit()
+            finally: db.close()
+            return
+        db = get_db()
+        try:
+            status = 'cancelled' if str(exc).startswith('CANCELLED:') else 'failed'; now = now_beijing_str(); code = getattr(exc, 'code', None)
+            updated = db.execute("UPDATE dataset_runs SET status=?,error_json=?,progress_message=?,lease_owner=NULL,attempt_token=NULL,lease_expires_at=NULL,updated_at=?,finished_at=? WHERE id=? AND lease_owner=? AND attempt_token=? AND status='running'", (status,json.dumps({'code':code,'error':str(exc)},ensure_ascii=False),str(exc)[:300],now,now,run_id,worker_id,attempt_token))
+            if updated.rowcount == 1: db.execute("UPDATE project_datasets SET result_status=? WHERE id=?", (status,run['dataset_id']))
+            db.commit()
+        finally: db.close()
+        fail_capability_run(capability_run_id, exc, {'dataset_run_id':run_id,'code':getattr(exc,'code',None)})
+
+
+def run_dataset_worker(once=False, poll_seconds=2):
+    init_db(); cleanup_orphan_results(0); worker_id = 'dataset-worker-'+secrets.token_hex(6); last_cleanup=time.time()
+    while True:
+        run = _claim_dataset_run(worker_id)
+        if run: _process_dataset_run(run, worker_id)
+        elif once: return 0
+        else:
+            if time.time()-last_cleanup>3600: cleanup_orphan_results();last_cleanup=time.time()
+            time.sleep(max(.2, poll_seconds))
+
+
 @app.route('/api/projects/<project_id>/datasets/<dataset_id>/analyze', methods=['POST'])
 @require_auth
 def project_dataset_analyze(project_id, dataset_id):
-    data = request.get_json(silent=True) or {}; idem = request.headers.get('Idempotency-Key') or data.get('idempotency_key')
-    db = get_db()
+    data = request.get_json(silent=True) or {}; idem = request.headers.get('Idempotency-Key') or data.get('idempotency_key'); db = get_db()
     try:
         project_id = _safe_resource_id(project_id, 'project_id'); dataset_id = _safe_resource_id(dataset_id, 'dataset_id')
         dataset = db.execute('SELECT * FROM project_datasets WHERE id=? AND project_id=? AND user_id=?', (dataset_id, project_id, request.user_id)).fetchone()
         if not dataset: return jsonify({'success': False, 'error': '数据集不存在'}), 404
-        recipe = _json_or(dataset['recipe_json'], {})
+        recipe = _json_or(dataset['recipe_json'], {}); frozen, _headers = _freeze_recipe_inputs(db, project_id, request.user_id, recipe)
     finally: db.close()
-    begin, err, status = begin_capability_run(request.user_id, 'joint-analysis', idem, project_id, {'dataset_id': dataset_id, 'recipe': recipe})
+    begin, err, status = begin_capability_run(request.user_id, 'joint-analysis', idem, project_id, {'dataset_id': dataset_id, 'row_version': dataset['row_version'], 'recipe': recipe})
     if err: return jsonify({'success': False, 'error': err}), status
     if begin['replayed']:
-        result = begin.get('result')
-        if result is not None: return jsonify({'success': True, 'idempotent_replay': True, **result})
-        return jsonify({'success': False, 'error': '相同幂等请求正在处理', 'run_id': begin['run']['id']}), 409
+        db = get_db()
+        try: prior = db.execute('SELECT * FROM dataset_runs WHERE capability_run_id=? AND user_id=?', (begin['run']['id'], request.user_id)).fetchone()
+        finally: db.close()
+        if prior: return jsonify({'success': True, 'idempotent_replay': True, 'run': _dataset_run_dict(prior)}), (200 if prior['status'] in ('succeeded','failed','cancelled') else 202)
+        return jsonify({'success': False, 'error': '幂等任务状态缺失'}), 409
     capability_run_id = begin['run']['id']; dataset_run_id = 'dsrun_'+secrets.token_hex(10); db = get_db()
     try:
-        now = now_beijing_str()
-        db.execute('INSERT INTO dataset_runs(id,dataset_id,project_id,user_id,capability_run_id,status,created_at) VALUES(?,?,?,?,?,?,?)',
-                   (dataset_run_id, dataset_id, project_id, request.user_id, capability_run_id, 'running', now)); db.commit()
-        headers, rows, provenance = _execute_recipe(db, project_id, request.user_id, recipe)
-        analysis = _basic_analysis(headers, rows)
-        billing = {'capability_run_id': capability_run_id, 'price_credits': begin['run']['price_credits'], 'transaction_id': begin['run']['transaction_id']}
-        result = {'dataset_run_id': dataset_run_id, 'dataset_id': dataset_id, 'analysis': analysis, 'provenance': provenance, 'billing': billing}
-        db.execute("UPDATE dataset_runs SET status='succeeded',result_json=?,provenance_json=?,billing_json=?,finished_at=? WHERE id=?",
-                   (json.dumps(analysis, ensure_ascii=False), json.dumps(provenance, ensure_ascii=False), json.dumps(billing, ensure_ascii=False), now_beijing_str(), dataset_run_id)); db.commit()
-        settle_capability_run(capability_run_id, result, {'dataset_run_id': dataset_run_id})
-        return jsonify({'success': True, **result}), 201
+        now = now_beijing_str(); db.execute('INSERT INTO dataset_runs(id,dataset_id,project_id,user_id,capability_run_id,idempotency_key,status,recipe_json,frozen_inputs_json,progress_total,progress_message,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)', (dataset_run_id,dataset_id,project_id,request.user_id,capability_run_id,str(idem), 'queued',json.dumps(recipe,ensure_ascii=False),json.dumps(frozen,ensure_ascii=False),max(1,len(frozen)+len(recipe.get('steps') or [])+1),'等待后台处理',now,now)); db.execute("UPDATE project_datasets SET last_run_id=?,result_status='queued',updated_at=? WHERE id=?",(dataset_run_id,now,dataset_id)); db.commit()
+        row=db.execute('SELECT * FROM dataset_runs WHERE id=?',(dataset_run_id,)).fetchone(); return jsonify({'success':True,'run':_dataset_run_dict(row)}),202
     except Exception as exc:
-        db.rollback()
-        try:
-            db.execute("UPDATE dataset_runs SET status='failed',error_json=?,finished_at=? WHERE id=?", (json.dumps({'error': str(exc)}, ensure_ascii=False), now_beijing_str(), dataset_run_id)); db.commit()
-        except Exception: pass
-        failed = fail_capability_run(capability_run_id, exc, {'dataset_run_id': dataset_run_id})
-        return jsonify({'success': False, 'error': str(exc), 'refunded': bool(failed and failed.get('refund_transaction_id'))}), 400
+        db.rollback(); fail_capability_run(capability_run_id,exc,{'dataset_run_id':dataset_run_id}); return jsonify({'success':False,'error':str(exc)}),500
     finally: db.close()
+
+
+@app.route('/api/projects/<project_id>/datasets/<dataset_id>/runs', methods=['GET'])
+@require_auth
+def project_dataset_runs(project_id, dataset_id):
+    db=get_db()
+    try:
+        rows=db.execute('SELECT * FROM dataset_runs WHERE project_id=? AND dataset_id=? AND user_id=? ORDER BY created_at DESC LIMIT 50',(project_id,dataset_id,request.user_id)).fetchall(); return jsonify({'success':True,'runs':[_dataset_run_dict(r) for r in rows]})
+    finally: db.close()
+
+
+@app.route('/api/projects/<project_id>/datasets/<dataset_id>/runs/<run_id>', methods=['GET','DELETE'])
+@require_auth
+def project_dataset_run_detail(project_id,dataset_id,run_id):
+    db=get_db()
+    try:
+        row=db.execute('SELECT * FROM dataset_runs WHERE id=? AND project_id=? AND dataset_id=? AND user_id=?',(run_id,project_id,dataset_id,request.user_id)).fetchone()
+        if not row:return jsonify({'success':False,'error':'任务不存在'}),404
+        if request.method=='DELETE':
+            if row['status'] not in ('queued','running'):return jsonify({'success':False,'error':'任务已结束，无法取消'}),409
+            db.execute('UPDATE dataset_runs SET cancel_requested=1,progress_message=?,updated_at=? WHERE id=?',('正在取消',now_beijing_str(),run_id));db.commit();row=db.execute('SELECT * FROM dataset_runs WHERE id=?',(run_id,)).fetchone()
+        return jsonify({'success':True,'run':_dataset_run_dict(row)})
+    finally:db.close()
+
+
+@app.route('/api/projects/<project_id>/datasets/<dataset_id>/runs/<run_id>/download-token', methods=['POST'])
+@require_auth
+def project_dataset_run_download_token(project_id,dataset_id,run_id):
+    token=secrets.token_urlsafe(32); token_hash=hashlib.sha256(token.encode()).hexdigest(); expires=(now_beijing()+timedelta(minutes=2)).strftime('%Y-%m-%d %H:%M:%S'); db=get_db()
+    try:
+        updated=db.execute("UPDATE dataset_runs SET download_token_hash=?,download_token_expires_at=? WHERE id=? AND project_id=? AND dataset_id=? AND user_id=? AND status='succeeded' AND result_path IS NOT NULL",(token_hash,expires,run_id,project_id,dataset_id,request.user_id))
+        if updated.rowcount!=1:db.rollback();return jsonify({'success':False,'error':'结果不存在或无权下载'}),404
+        db.commit();return jsonify({'success':True,'download_url':'/api/dataset-results/'+run_id+'/download?token='+token,'expires_at':expires})
+    finally:db.close()
+
+
+@app.route('/api/dataset-results/<run_id>/download', methods=['GET'])
+def dataset_result_token_download(run_id):
+    token=str(request.args.get('token') or ''); token_hash=hashlib.sha256(token.encode()).hexdigest(); now=now_beijing_str(); db=get_db()
+    try:
+        db.execute('BEGIN IMMEDIATE'); row=db.execute("SELECT * FROM dataset_runs WHERE id=? AND status='succeeded' AND download_token_hash=? AND download_token_expires_at>=?",(run_id,token_hash,now)).fetchone()
+        if not row:db.rollback();return jsonify({'success':False,'error':'下载链接无效或已过期'}),403
+        db.execute('UPDATE dataset_runs SET download_token_hash=NULL,download_token_expires_at=NULL WHERE id=? AND download_token_hash=?',(run_id,token_hash));db.commit()
+    finally:db.close()
+    try:path=_contained_result_path(row['result_path'])
+    except ValueError as exc:return jsonify({'success':False,'error':str(exc)}),404
+    return send_file(path,as_attachment=True,download_name=row['result_filename'] or (run_id+'.csv'),mimetype='text/csv; charset=utf-8',conditional=True)
+
+
+@app.route('/api/projects/<project_id>/datasets/<dataset_id>/runs/<run_id>/download', methods=['GET'])
+@require_auth
+def project_dataset_run_download(project_id,dataset_id,run_id):
+    db=get_db()
+    try: row=db.execute("SELECT * FROM dataset_runs WHERE id=? AND project_id=? AND dataset_id=? AND user_id=? AND status='succeeded'",(run_id,project_id,dataset_id,request.user_id)).fetchone()
+    finally:db.close()
+    if not row:return jsonify({'success':False,'error':'结果不存在或无权下载'}),404
+    try:path=_contained_result_path(row['result_path'])
+    except ValueError as exc:return jsonify({'success':False,'error':str(exc)}),404
+    return send_file(path,as_attachment=True,download_name=row['result_filename'] or (run_id+'.csv'),mimetype='text/csv; charset=utf-8',conditional=True)
 
 
 # ========== Approved overhaul: profiling and safe figure contracts ==========
@@ -6709,6 +7179,9 @@ def figure_qa():
 
 
 if __name__ == '__main__':
+    if len(os.sys.argv) > 1 and os.sys.argv[1] == 'dataset-worker':
+        once = '--once' in os.sys.argv[2:]
+        raise SystemExit(run_dataset_worker(once=once, poll_seconds=float(os.environ.get('DATASET_WORKER_POLL_SECONDS', '2'))))
     print('=' * 50)
     print('论文搭子 ThesisBuddy - Python 服务')
     print('=' * 50)

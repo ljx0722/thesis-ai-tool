@@ -2258,7 +2258,7 @@ window.openJointAnalysis=function(){
     var pr=ctx.preview,diag=pr.diagnostics||{},warnings=[];
     (diag.unmatched||[]).forEach(function(x){if(x.count)warnings.push('未匹配 '+x.count+' 行');});
     (diag.duplicates||[]).forEach(function(x){if(x.right_duplicate_keys)warnings.push('右表存在 '+x.right_duplicate_keys+' 个重复连接键');});
-    host.innerHTML='<div class="finding ok"><b>联合预览完成</b><br>'+escapeModuleHtml(ctx.mode)+' · '+pr.total_count+' 行 · '+(pr.columns||[]).length+' 列</div>'+
+    host.innerHTML='<div class="finding ok"><b>联合样本预览完成</b><br>'+escapeModuleHtml(ctx.mode)+' · 样本 '+pr.preview_count+' 行 · '+(pr.columns||[]).length+' 列<br><span style="opacity:.75">'+escapeModuleHtml(pr.sample_note||'预览为近似样本，完整结果由后台生成')+'</span></div>'+
       (warnings.length?'<div class="finding warn">'+warnings.map(escapeModuleHtml).join('<br>')+'</div>':'')+
       '<div style="overflow:auto"><table style="border-collapse:collapse;font-size:.68rem;min-width:100%"><tr>'+(pr.columns||[]).map(function(c){return'<th style="padding:5px;border:1px solid var(--border)">'+escapeModuleHtml(c)+'</th>';}).join('')+'</tr>'+(pr.rows||[]).slice(0,8).map(function(row){return'<tr>'+(pr.columns||[]).map(function(c){return'<td style="padding:5px;border:1px solid var(--border)">'+escapeModuleHtml(row[c])+'</td>';}).join('')+'</tr>';}).join('')+'</table></div>'+
       '<div class="ai-actions"><button type="button" class="ai-btn" id="daRunJointAnalysis">确认并运行联合分析</button></div>';
@@ -2266,13 +2266,24 @@ window.openJointAnalysis=function(){
     btn.onclick=function(){
       btn.disabled=true;btn.textContent='正在创建数据集…';
       fetch('/api/projects/'+encodeURIComponent(p.id)+'/datasets',{method:'POST',headers:auth,body:JSON.stringify({name:'联合分析 '+new Date().toLocaleString(),recipe:ctx.recipe})}).then(function(r){return r.json().then(function(d){if(!r.ok||d.success===false)throw new Error(d.error||'数据集创建失败');return d.dataset;});}).then(function(dataset){
-        btn.textContent='正在分析…';var key='joint-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
-        return fetch('/api/projects/'+encodeURIComponent(p.id)+'/datasets/'+encodeURIComponent(dataset.id)+'/analyze',{method:'POST',headers:Object.assign({},auth,{'Idempotency-Key':key}),body:'{}'});
-      }).then(function(r){return r.json().then(function(d){if(!r.ok||d.success===false)throw new Error(d.error||'联合分析失败');return d;});}).then(function(d){
-        var a=d.analysis||{},bill=d.billing||{};
-        host.innerHTML='<div class="finding ok"><b>联合分析完成</b><br>'+a.n_rows+' 行 · '+a.n_columns+' 列 · 相关关系 '+(a.correlations||[]).length+' 组 · 分组汇总 '+(a.group_summaries||[]).length+' 组<br>本次使用已按当前规则计费</div>'+
-          '<div class="finding info"><b>相关性摘要</b><br>'+((a.correlations||[]).slice(0,8).map(function(x){return escapeModuleHtml(x.x+' × '+x.y+'：r='+x.pearson+' (n='+x.n+')');}).join('<br>')||'暂无可计算的数值列关系')+'</div>';
-        if(typeof updateBalanceDisplay==='function')updateBalanceDisplay();
+        btn.textContent='正在加入后台队列…';var key='joint-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
+        return fetch('/api/projects/'+encodeURIComponent(p.id)+'/datasets/'+encodeURIComponent(dataset.id)+'/analyze',{method:'POST',headers:Object.assign({},auth,{'Idempotency-Key':key}),body:'{}'}).then(function(r){return r.json().then(function(d){if(!r.ok||d.success===false)throw new Error(d.error||'联合分析入队失败');return{dataset:dataset,run:d.run};});});
+      }).then(function(ctx){
+        function poll(delay){
+          var run=ctx.run||{},progress=run.progress||{},total=progress.total||1,pct=Math.min(99,Math.round((progress.current||0)*100/total));
+          host.innerHTML='<div class="finding info"><b>联合分析后台处理中</b><br>'+escapeModuleHtml(progress.message||run.status||'排队中')+' · '+pct+'%</div>';
+          return new Promise(function(resolve){setTimeout(resolve,delay);}).then(function(){return fetch('/api/projects/'+encodeURIComponent(p.id)+'/datasets/'+encodeURIComponent(ctx.dataset.id)+'/runs/'+encodeURIComponent(run.id),{headers:{'Authorization':'Bearer '+token}});}).then(function(r){return r.json().then(function(d){if(!r.ok||d.success===false)throw new Error(d.error||'读取任务状态失败');ctx.run=d.run;return d.run;});}).then(function(next){
+            if(next.status==='queued'||next.status==='running')return poll(Math.min(10000,Math.round(delay*1.5)));
+            if(next.status!=='succeeded'){var detail=next.error&&next.error.error;throw new Error(detail||'联合分析失败');}
+            var a=next.analysis||{},size=Number(next.result_size_bytes||0),downloadToken=next.download_token_url||'';
+            host.innerHTML='<div class="finding ok"><b>联合分析完成</b><br>'+Number(next.result_rows||a.n_rows||0).toLocaleString()+' 行 · '+(next.result_columns||[]).length+' 列 · '+(size/1024/1024).toFixed(2)+' MiB · SHA-256 '+escapeModuleHtml(next.result_sha256||'')+'</div>'+
+              '<div class="finding info"><b>样本分析（最多 '+(a.sample_limit||5000)+' 行）</b><br>'+((a.correlations||[]).slice(0,8).map(function(x){return escapeModuleHtml(x.x+' × '+x.y+'：r='+x.pearson+' (n='+x.n+')');}).join('<br>')||'暂无可计算的数值列关系')+'</div>'+
+              '<div class="ai-actions"><button type="button" class="ai-btn" id="daDownloadJoint">下载完整合并 CSV</button></div>';
+            var dl=document.getElementById('daDownloadJoint');if(dl)dl.onclick=function(){dl.disabled=true;dl.textContent='正在生成安全下载链接…';fetch(downloadToken,{method:'POST',headers:{'Authorization':'Bearer '+token}}).then(function(r){return r.json().then(function(d){if(!r.ok||d.success===false)throw new Error(d.error||'下载授权失败');return d;});}).then(function(d){window.location.assign(d.download_url);}).catch(function(e){alert(e.message||'下载失败');}).finally(function(){dl.disabled=false;dl.textContent='下载完整合并 CSV';});};
+            if(typeof updateBalanceDisplay==='function')updateBalanceDisplay();
+          });
+        }
+        return poll(800);
       }).catch(function(err){btn.disabled=false;btn.textContent='确认并运行联合分析';host.insertAdjacentHTML('afterbegin','<div class="finding err">'+escapeModuleHtml(err.message||'联合分析失败')+'</div>');});
     };
   }).catch(function(err){host.innerHTML='<div class="finding err">'+escapeModuleHtml(err.message||'联合分析失败')+'</div>';});
