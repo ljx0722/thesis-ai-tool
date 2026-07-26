@@ -106,7 +106,12 @@
     <button id="projectTitleChip" class="project-chip" onclick="openIdeaWizard()" title="创建或查看项目">未创建项目</button>
     <span id="projectProgressChip" class="project-progress-chip">创建项目后显示进度</span>
   </div>
-  <div class="bar-tabs" id="barTabs"><span class="bar-context-label">六个工作区贯穿论文全流程</span></div>
+  <div class="bar-tabs" id="barTabs">
+    <button class="bar-tab active" data-view="workspace" onclick="switchView('workspace')">总览</button>
+    <button class="bar-tab" data-view="refs" onclick="switchModule('references')">📚 参考文献</button>
+    <button class="bar-tab" data-view="tools" onclick="openToolHome()">工具台</button>
+    <button class="bar-tab" data-view="dashboard" onclick="showDashboard()">看板</button>
+  </div>
   <div class="bar-right">
     <button class="workspace-drawer-btn" onclick="toggleToolPanel()" title="打开工具台">工具</button>
     <span id="statusBar" style="font-size:.62rem;color:var(--m)">等待上传...</span>
@@ -154,11 +159,16 @@
       <button onclick="openImportDialog('new')" class="nav-upload-btn">📎 导入论文</button>
     </div>
 
-    <div class="nav-section-label">工作区</div>
-    <div id="stageNav" class="stage-nav workspace-nav"></div>
+    <div class="nav-section-label">主线进度</div>
+    <div id="stageNav" class="stage-nav"></div>
 
-    <div class="nav-section-label">项目</div>
-    <button class="nav-linkish" onclick="openMaterialsLibrary()">项目资料</button>
+    <div class="nav-section-label">百宝箱
+      <button class="nav-mini-btn" onclick="openToolboxPicker()" title="自定义快捷入口">⚙</button>
+    </div>
+    <div id="toolboxFavorites" class="toolbox-favs"></div>
+    <button class="nav-linkish" onclick="openToolboxPicker()">＋ 添加快捷功能</button>
+    <button class="nav-linkish" onclick="openMaterialsLibrary()">📁 项目资料库</button>
+    <button class="nav-linkish" onclick="openFeatureCatalog()">☰ 全部功能目录</button>
   </div>
 
   <div class="resizer" id="navResizer"></div>
@@ -196,6 +206,9 @@
         <span id="zoomLabel">100%</span>
         <button class="bar-mini" onclick="zoomThesis(0.1)">+</button>
         <button class="bar-mini" onclick="zoomThesis(0,1)">↺</button>
+        <button class="ba-btn ba-search" id="baSearch" onclick="startSearch()">🔍 检索</button>
+        <button class="ba-btn" id="baKG" onclick="showKnowledgeGraph()" title="知识图谱">🕸️ 图谱</button>
+        <button class="ba-btn ba-verify" id="baVerify" onclick="batchVerify()">✅ 校验</button>
       </div>
     </div>
     <div class="thesis-box" id="thesisBox">
@@ -210,15 +223,19 @@
   <div class="ref-panel tool-panel" id="refPanel">
     <div class="tool-panel-head">
       <div>
-        <div class="tool-panel-title" id="toolPanelTitle">规划</div>
-        <div class="tool-panel-sub" id="toolPanelSub">选择左侧工作区后，这里只显示当前任务</div>
+        <div class="tool-panel-title" id="toolPanelTitle">工具台</div>
+        <div class="tool-panel-sub" id="toolPanelSub">选择功能后在此操作；论文与目录始终在左侧可见</div>
+      </div>
+      <div class="tool-panel-tabs">
+        <button class="tool-tab active" data-tooltab="home" onclick="openToolHome()">功能</button>
+        <button class="tool-tab" data-tooltab="refs" onclick="switchModule('references')">📚 参考文献</button>
       </div>
     </div>
-    <div id="workspaceModeTabs" class="workspace-mode-tabs" role="tablist" aria-label="当前工作区模式"></div>
 
-    <div id="toolHome" class="tool-home" style="display:none">
-      <div class="tool-home-hint">当前工作区的操作会显示在这里。</div>
+    <div id="toolHome" class="tool-home">
+      <div class="tool-home-hint">不导入论文也能先用这些：</div>
       <div class="tool-home-grid" id="toolHomeGrid"></div>
+      <div class="tool-home-hint" style="margin-top:14px">需要论文后才能发挥的：</div>
       <div class="tool-home-grid muted" id="toolHomeGridThesis"></div>
     </div>
 

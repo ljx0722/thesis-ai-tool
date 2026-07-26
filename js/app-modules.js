@@ -275,68 +275,6 @@ function setToolPanelHeader(name, sub){
 }
 
 
-var APP_WORKSPACES = [
-  {id:'plan',name:'规划',icon:'◇',desc:'研究方向、开题与论文结构',stageIds:['ideation','structure'],defaultMode:'topic'},
-  {id:'evidence',name:'证据',icon:'◆',desc:'文献、引用审计与研究图谱',stageIds:['literature'],defaultMode:'literature'},
-  {id:'write',name:'写作',icon:'✎',desc:'章节草稿、扩写与数据图表',stageIds:['writing'],defaultMode:'chapters'},
-  {id:'polish',name:'打磨',icon:'✓',desc:'格式、表达、术语与改写',stageIds:['polish'],defaultMode:'format'},
-  {id:'review',name:'评审',icon:'◎',desc:'综合评分、诊断与行动清单',stageIds:['review'],defaultMode:'overview'},
-  {id:'deliver',name:'交付',icon:'□',desc:'摘要、答辩、预览与导出',stageIds:['defense'],defaultMode:'abstract'}
-];
-var MODULE_UI_MAP = {
-  'topic-finder':{workspaceId:'plan',modeId:'topic'},proposal:{workspaceId:'plan',modeId:'proposal'},
-  references:{workspaceId:'evidence',modeId:'literature'},'knowledge-graph':{workspaceId:'evidence',modeId:'graph'},
-  expand:{workspaceId:'write',modeId:'chapters'},'data-analysis':{workspaceId:'write',modeId:'data'},
-  'format-check':{workspaceId:'polish',modeId:'format'},paragraph:{workspaceId:'polish',modeId:'readability'},terminology:{workspaceId:'polish',modeId:'terminology'},proofread:{workspaceId:'polish',modeId:'proofread'},'de-duplicate':{workspaceId:'polish',modeId:'deduplicate'},
-  dashboard:{workspaceId:'review',modeId:'overview'},review:{workspaceId:'review',modeId:'ai-review'},optimization:{workspaceId:'review',modeId:'diagnostics'},
-  'en-abstract':{workspaceId:'deliver',modeId:'abstract'},'defense-ppt':{workspaceId:'deliver',modeId:'defense'}
-};
-var WORKSPACE_MODES = {
-  plan:[{id:'topic',label:'研究方向',moduleId:'topic-finder'},{id:'proposal',label:'开题方案',moduleId:'proposal'},{id:'outline',label:'论文结构',action:'outline'}],
-  evidence:[{id:'literature',label:'文献工作台',moduleId:'references'},{id:'audit',label:'引用审计',moduleId:'references',literatureMode:'audit'},{id:'annotations',label:'阅读批注',moduleId:'references',literatureMode:'annotations'},{id:'graph',label:'研究图谱',moduleId:'knowledge-graph'}],
-  write:[{id:'chapters',label:'章节写作',action:'chapters'},{id:'expand',label:'扩写',moduleId:'expand'},{id:'data',label:'数据与图表',moduleId:'data-analysis'}],
-  polish:[{id:'format',label:'格式规范',moduleId:'format-check'},{id:'readability',label:'段落与可读性',moduleId:'paragraph'},{id:'terminology',label:'术语一致性',moduleId:'terminology'},{id:'proofread',label:'校对润色',moduleId:'proofread'},{id:'deduplicate',label:'降重改写',moduleId:'de-duplicate'}],
-  review:[{id:'overview',label:'综合评审',moduleId:'dashboard'},{id:'diagnostics',label:'诊断建议',moduleId:'optimization'},{id:'ai-review',label:'AI 审阅',moduleId:'review'}],
-  deliver:[{id:'abstract',label:'英文摘要',moduleId:'en-abstract'},{id:'defense',label:'答辩材料',moduleId:'defense-ppt'},{id:'preview',label:'预览与导出',action:'preview'}]
-};
-var _activeWorkspace='plan',_activeWorkspaceMode='topic';
-function workspaceById(id){return APP_WORKSPACES.find(function(item){return item.id===id;})||APP_WORKSPACES[0];}
-function workspaceMode(workspaceId,modeId){var modes=WORKSPACE_MODES[workspaceId]||[];return modes.find(function(item){return item.id===modeId;})||modes[0]||null;}
-function moduleUI(moduleId){return MODULE_UI_MAP[moduleId]||null;}
-function resolveAppRoute(value){
-  var raw=String(value||'').replace(/^#\/?/,'').replace(/^\//,'');
-  var parts=raw.split('/').filter(Boolean);
-  if(parts[0]==='workspace'&&workspaceById(parts[1]).id===parts[1])return{workspaceId:parts[1],modeId:(workspaceMode(parts[1],parts[2])||{}).id||workspaceById(parts[1]).defaultMode,moduleId:null,legacy:false};
-  var legacy=moduleUI(parts[0]);return legacy?{workspaceId:legacy.workspaceId,modeId:legacy.modeId,moduleId:parts[0],legacy:true}:null;
-}
-function workspaceRoute(workspaceId,modeId){return'#/workspace/'+workspaceId+'/'+modeId;}
-function renderWorkspaceModes(){
-  var host=document.getElementById('workspaceModeTabs');if(!host)return;
-  host.innerHTML=(WORKSPACE_MODES[_activeWorkspace]||[]).map(function(mode){return'<button type="button" class="workspace-mode-tab'+(mode.id===_activeWorkspaceMode?' active':'')+'" onclick="openWorkspace(\''+_activeWorkspace+'\',\''+mode.id+'\')">'+mode.label+'</button>';}).join('');
-}
-function executeWorkspaceMode(mode,legacyModuleId){
-  if(!mode)return;
-  if(mode.action==='outline'){if(window.ThesisProject&&ThesisProject.openOutlineEditor)ThesisProject.openOutlineEditor();else if(typeof openOutlineEditor==='function')openOutlineEditor();return;}
-  if(mode.action==='chapters'){if(window.ThesisProject&&ThesisProject.openChapterBoard)ThesisProject.openChapterBoard();else if(typeof openChapterBoard==='function')openChapterBoard();return;}
-  if(mode.action==='preview'){if(typeof openFullPaperPreview==='function')openFullPaperPreview();return;}
-  var moduleId=legacyModuleId||mode.moduleId;if(!moduleId)return;
-  if(moduleId==='references'&&mode.literatureMode&&window.LiteratureWorkbench){LiteratureWorkbench.open({mode:mode.literatureMode});return;}
-  activateLegacyModule(moduleId);
-}
-function openWorkspace(workspaceId,modeId,legacyModuleId,options){
-  options=options||{};var workspace=workspaceById(workspaceId),mode=workspaceMode(workspace.id,modeId||workspace.defaultMode);
-  _activeWorkspace=workspace.id;_activeWorkspaceMode=mode?mode.id:workspace.defaultMode;
-  document.body.dataset.workspace=_activeWorkspace;document.body.dataset.workspaceMode=_activeWorkspaceMode;
-  document.querySelectorAll('[data-workspace]').forEach(function(el){el.classList.toggle('active',el.getAttribute('data-workspace')===_activeWorkspace);});
-  renderWorkspaceModes();setToolPanelHeader(workspace.icon+' '+workspace.name,workspace.desc);
-  if(options.execute!==false)executeWorkspaceMode(mode,legacyModuleId);
-  try{localStorage.setItem(buddyUserKey('thesisbuddy_workspace_ui_v1'),JSON.stringify({workspaceId:_activeWorkspace,modeId:_activeWorkspaceMode}));}catch(e){}
-  if(options.history!==false)try{history.pushState({workspace:_activeWorkspace,mode:_activeWorkspaceMode,module:legacyModuleId||mode&&mode.moduleId||null},'',workspaceRoute(_activeWorkspace,_activeWorkspaceMode));}catch(e2){}
-  if(window.innerWidth<1024)toggleToolPanel(true);
-}
-function launchCapability(moduleId,options){var mapped=moduleUI(moduleId);if(mapped)return openWorkspace(mapped.workspaceId,mapped.modeId,moduleId,options);return activateLegacyModule(moduleId);}
-window.APP_WORKSPACES=APP_WORKSPACES;window.MODULE_UI_MAP=MODULE_UI_MAP;window.resolveAppRoute=resolveAppRoute;window.openWorkspace=openWorkspace;window.launchCapability=launchCapability;window.renderWorkspaceModes=renderWorkspaceModes;
-
 var APP_MODULES = [
   // 选题阶段 — 无需论文, AI驱动
   { id: 'topic-finder',    name: '选题推荐',   icon: '💡', requiresThesis: false, aiDriven: true },
@@ -585,13 +523,28 @@ function initKeyboard() {
 function renderModuleTabs() {
   var container = document.getElementById('barTabs');
   if (!container) return;
-  container.innerHTML='<span class="bar-context-label">六个工作区贯穿论文全流程</span>';
+  _thesisLoaded = !!(typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100);
+  var activeView = 'workspace';
+  if (_activeModule === 'references') activeView = 'refs';
+  else if (_activeModule === 'dashboard') activeView = 'dashboard';
+  else if (_activeModule && _activeModule !== 'workspace') {
+    // 在能力模块中时，高亮工作台（中间编辑区）
+    activeView = 'workspace';
+  }
+  container.innerHTML =
+    '<button class="bar-tab' + (activeView === 'workspace' ? ' active' : '') + '" data-view="workspace" onclick="switchView(\'workspace\')">工作台</button>' +
+    '<button class="bar-tab' + (activeView === 'refs' ? ' active' : '') + '" data-view="refs" onclick="switchView(\'references\')">参考文献</button>' +
+    '<button class="bar-tab' + (activeView === 'dashboard' ? ' active' : '') + '" data-view="dashboard" onclick="showDashboard()">论文看板</button>';
 }
 
 function updateBarActions() {
   _thesisLoaded = !!(typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100);
   var search = document.getElementById('baSearch');
   if (search) search.removeAttribute('disabled');
+  ['baVerify', 'baKG'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { if (_thesisLoaded) el.removeAttribute('disabled'); else el.setAttribute('disabled', ''); }
+  });
 }
 
 function resetSearch() {
@@ -629,38 +582,50 @@ function resetSearch() {
 // ==================== 模块切换（带 pushState） ====================
 
 function enableLiteratureButtons(){
-  return true;
+  try{
+    var search=document.getElementById('baSearch');
+    if(search){search.disabled=false;search.removeAttribute('disabled');}
+    var ids=['baVerify','baKG'];
+    for(var i=0;i<ids.length;i++){
+      var el=document.getElementById(ids[i]);
+      if(!el) continue;
+      if(typeof _thesisLoaded!=='undefined' && _thesisLoaded){ el.disabled=false; el.removeAttribute('disabled'); }
+      else { el.disabled=true; }
+    }
+  }catch(e){}
 }
-function activateLegacyModule(moduleId) {
+function switchModule(moduleId) {
   var _mod0 = APP_MODULES.find(function(x){return x.id===moduleId;});
   if (_mod0 && (_mod0.aiDriven || _mod0.localCharge || _mod0.serverFixed)) {
     if (!ensureLoggedIn('登录后即可使用该功能')) return;
   }
   if (typeof searchRunning !== 'undefined' && searchRunning) { ttp('检索进行中，请等待完成'); return; }
   _activeModule = moduleId;
-  var mapped=moduleUI(moduleId);if(mapped){_activeWorkspace=mapped.workspaceId;_activeWorkspaceMode=mapped.modeId;document.body.dataset.workspace=_activeWorkspace;document.body.dataset.workspaceMode=_activeWorkspaceMode;renderWorkspaceModes();}
   var home=document.getElementById('toolHome'); if(home) home.style.display='none';
   document.querySelectorAll('.tool-tab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-tooltab')==='refs' && moduleId==='references'); });
   var meta = (APP_MODULES||[]).find(function(m){return m.id===moduleId;});
-  var workspace=mapped&&workspaceById(mapped.workspaceId);
-  setToolPanelHeader(workspace ? (workspace.icon+' '+workspace.name) : (meta ? (meta.icon+' '+meta.name) : moduleId),workspace?workspace.desc:(meta&&meta.requiresThesis?'基于论文内容；左侧正文/目录保持可见':'可直接使用'));
-  document.querySelectorAll('.nav-item').forEach(function(n) {n.classList.toggle('active', n.getAttribute('data-module') === moduleId);});
-  document.querySelectorAll('[data-workspace]').forEach(function(n){n.classList.toggle('active',mapped&&n.getAttribute('data-workspace')===mapped.workspaceId);});
-  var tabs = document.querySelectorAll('.module-tab');for (var i = 0; i < tabs.length; i++) tabs[i].classList.toggle('active', tabs[i].getAttribute('data-module') === moduleId);
+  setToolPanelHeader(meta ? (meta.icon+' '+meta.name) : moduleId, meta && meta.requiresThesis ? '基于论文内容；左侧正文/目录保持可见' : '可直接使用');
+
+  // Highlight nav items
+  document.querySelectorAll('.nav-item').forEach(function(n) {
+    n.classList.toggle('active', n.getAttribute('data-module') === moduleId);
+  });
+  var tabs = document.querySelectorAll('.module-tab');
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.toggle('active', tabs[i].getAttribute('data-module') === moduleId);
+
   switchPanel(moduleId);
+
   if (moduleId === 'knowledge-graph' && _thesisLoaded) showKnowledgeGraph();
-}
-function switchModule(moduleId) {
-  var mapped=moduleUI(moduleId);
-  if(mapped){openWorkspace(mapped.workspaceId,mapped.modeId,moduleId);return;}
-  activateLegacyModule(moduleId);
+
+  // pushState for back button
   try { history.pushState({ module: moduleId }, '', '#/' + moduleId); } catch (e) {}
 }
 
 window.addEventListener('popstate', function(e) {
-  var route=e.state&&e.state.workspace?{workspaceId:e.state.workspace,modeId:e.state.mode,moduleId:e.state.module}:resolveAppRoute(location.hash);
-  if(route){openWorkspace(route.workspaceId,route.modeId,route.moduleId,{history:false});return;}
-  if (e.state && e.state.module) activateLegacyModule(e.state.module);
+  if (e.state && e.state.module) {
+    var m = APP_MODULES.find(function(x) { return x.id === e.state.module; });
+    if (m && (!m.requiresThesis || _thesisLoaded)) switchModule(e.state.module);
+  }
 });
 
 function switchPanel(moduleId) {
@@ -2159,14 +2124,7 @@ window.exportMlFeatures=function(){
   downloadText('feature_scores.csv', rows.join('\n'));
 };
 
-try{
-  renderToolboxFavorites();renderModuleTabs();
-  var initialRoute=resolveAppRoute(location.hash),savedWorkspace=null;
-  try{savedWorkspace=JSON.parse(localStorage.getItem(buddyUserKey('thesisbuddy_workspace_ui_v1'))||'null');}catch(e2){}
-  if(initialRoute)openWorkspace(initialRoute.workspaceId,initialRoute.modeId,initialRoute.moduleId,{history:false});
-  else if(savedWorkspace)openWorkspace(savedWorkspace.workspaceId,savedWorkspace.modeId,null,{history:false,execute:false});
-  else openWorkspace('plan','topic',null,{history:false,execute:false});
-}catch(e){}
+try{ renderToolboxFavorites(); openToolHome(); }catch(e){}
 
 function updateDaMatCountBadge(n, total, selected){
   var badge=document.getElementById('daMatCountBadge');
