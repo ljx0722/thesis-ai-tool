@@ -606,6 +606,48 @@ body.admin-page {
 .literature-empty button, .literature-section-head button { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-secondary); padding: 6px 10px; font: inherit; font-size: var(--font-size-xs); cursor: pointer; }
 .literature-claim { display: flex; flex-direction: column; gap: 9px; }
 .literature-source-quote { padding: 9px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-alt); color: var(--text-secondary); font-size: var(--font-size-sm); line-height: 1.65; }
+.literature-annotation-editor { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-alt); }
+.literature-annotation-editor label { display: flex; flex-direction: column; gap: 4px; color: var(--text-tertiary); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); }
+.literature-annotation-editor input, .literature-annotation-editor select, .literature-annotation-editor textarea { width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text-primary); padding: 7px 8px; font: inherit; font-size: var(--font-size-sm); }
+.literature-annotation-editor textarea { min-height: 92px; resize: vertical; line-height: 1.6; }
+.literature-annotation-editor-actions, .literature-annotation-actions { display: flex; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
+.literature-annotation-editor-actions button, .literature-annotation-actions button { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-secondary); padding: 5px 8px; font: inherit; font-size: var(--font-size-xs); cursor: pointer; }
+.literature-annotation-actions button:disabled { cursor: not-allowed; opacity: .48; }
+.literature-annotation-filters { display: flex; gap: 5px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 2px; }
+.literature-annotation-filters button { flex: 0 0 auto; border: 1px solid var(--border); border-radius: var(--radius-full); background: var(--bg-card); color: var(--text-tertiary); padding: 5px 8px; font: inherit; font-size: var(--font-size-xs); cursor: pointer; }
+.literature-annotation-filters button.active { border-color: var(--accent); background: var(--accent-glow); color: var(--accent-dark); }
+.literature-annotation-filters b { font-weight: var(--font-weight-semibold); }
+.literature-annotation-list { display: flex; flex-direction: column; gap: 8px; }
+.literature-annotation-item { --annotation-color: #64748b; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card); padding: 10px; box-shadow: inset 3px 0 0 var(--annotation-color); }
+.literature-annotation-item.type-core-point { --annotation-color: #d97706; }
+.literature-annotation-item.type-terminology { --annotation-color: #7c3aed; }
+.literature-annotation-item.type-method { --annotation-color: #2563eb; }
+.literature-annotation-item.type-evidence { --annotation-color: #059669; }
+.literature-annotation-item.type-limitation { --annotation-color: #dc2626; }
+.literature-annotation-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.literature-annotation-type { color: var(--annotation-color); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); }
+.literature-annotation-status { border-radius: var(--radius-full); padding: 2px 6px; background: var(--success-bg); color: #047857; font-size: var(--font-size-xs); }
+.literature-annotation-status.status-stale, .literature-annotation-status.status-ambiguous { background: var(--warning-bg); color: #a16207; }
+.literature-annotation-status.status-unlocated { background: var(--danger-bg); color: #b91c1c; }
+.literature-annotation-item h4 { margin: 7px 0 4px; color: var(--text-primary); font-size: var(--font-size-sm); line-height: 1.45; text-wrap: pretty; }
+.literature-annotation-quote, .literature-annotation-note { margin: 0; color: var(--text-secondary); font-size: var(--font-size-xs); line-height: 1.6; }
+.literature-annotation-quote { padding-left: 8px; border-left: 1px solid var(--border-strong); }
+.literature-annotation-note { margin-top: 7px; }
+.literature-annotation-focus { animation: literature-annotation-focus 1.6s ease-out; }
+::highlight(literature-annotation-core-point) { background-color: rgba(245, 158, 11, .28); text-decoration: underline 1px rgba(180, 83, 9, .72); text-underline-offset: 2px; }
+::highlight(literature-annotation-terminology) { background-color: rgba(139, 92, 246, .22); text-decoration: underline 1px rgba(109, 40, 217, .68); text-underline-offset: 2px; }
+::highlight(literature-annotation-method) { background-color: rgba(59, 130, 246, .22); text-decoration: underline 1px rgba(29, 78, 216, .68); text-underline-offset: 2px; }
+::highlight(literature-annotation-evidence) { background-color: rgba(16, 185, 129, .22); text-decoration: underline 1px rgba(4, 120, 87, .68); text-underline-offset: 2px; }
+::highlight(literature-annotation-limitation) { background-color: rgba(239, 68, 68, .2); text-decoration: underline 1px rgba(185, 28, 28, .68); text-underline-offset: 2px; }
+::highlight(literature-annotation-note) { background-color: rgba(100, 116, 139, .2); text-decoration: underline 1px rgba(71, 85, 105, .6); text-underline-offset: 2px; }
+.literature-annotation-fallback { border-radius: 2px; color: inherit; }
+.literature-annotation-fallback.type-core-point { background: rgba(245, 158, 11, .28); }
+.literature-annotation-fallback.type-terminology { background: rgba(139, 92, 246, .22); }
+.literature-annotation-fallback.type-method { background: rgba(59, 130, 246, .22); }
+.literature-annotation-fallback.type-evidence { background: rgba(16, 185, 129, .22); }
+.literature-annotation-fallback.type-limitation { background: rgba(239, 68, 68, .2); }
+.literature-annotation-fallback.type-note { background: rgba(100, 116, 139, .2); }
+@keyframes literature-annotation-focus { 0%, 100% { outline-color: transparent; background-color: transparent; } 18% { outline: 2px solid var(--accent); outline-offset: 4px; background-color: var(--accent-glow); } }
 .literature-claim label, .format-style { display: flex; flex-direction: column; gap: 4px; color: var(--text-tertiary); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); }
 .literature-claim textarea, .literature-claim input, .literature-claim select, .format-style select, .evidence-actions select { width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text-primary); padding: 7px 8px; font: inherit; font-size: var(--font-size-sm); }
 .literature-claim textarea { min-height: 76px; resize: vertical; line-height: 1.55; }
@@ -717,6 +759,9 @@ body.admin-page {
 .relation-method, .relation-definition, .relation-evidence { background: var(--info-bg); color: #1d4ed8; }
 .format-preview { display: flex; flex-direction: column; gap: 7px; margin: 10px 0; padding: 9px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-alt); color: var(--text-secondary); font-size: var(--font-size-xs); line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
 
+@media (prefers-reduced-motion: reduce) {
+  .literature-annotation-focus { animation: none; outline: 2px solid var(--accent); outline-offset: 4px; background-color: var(--accent-glow); }
+}
 @media (max-width: 767px) {
   .literature-selection-bar { max-width: calc(100vw - 24px); overflow-x: auto; }
   .literature-form-row { flex-direction: column; }

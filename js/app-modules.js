@@ -86,6 +86,7 @@ function getSessionScope(){
 function manuscriptBackupKey(kind){return 'thesis_backup_'+kind+'_'+getSessionScope();}
 function legacyBackupKey(kind){return 'thesis_backup_'+kind;}
 function clearManuscriptRuntime(){
+  if(window.LiteratureWorkbench&&typeof LiteratureWorkbench.resetRuntime==='function')LiteratureWorkbench.resetRuntime();
   existingRefs=[];mergedRefs=[];manuscriptText='';manuscriptHTML='';paperTopics=[];sections=[];
   _treeIndex={chapters:[],sections:[],subs:[],paragraphs:[],sentences:[]};
   _thesisLoaded=false;_analysisCache={};kgCurrentData=null;

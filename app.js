@@ -128,7 +128,7 @@ function getManuscriptScope(){
     var root=document.getElementById('paperContentRoot'),blocks=root?leafCitationBlocks(root):[];
     paragraphs=blocks.map(function(el,index){var text=citationPlainText(el).trim();return{paragraphId:'flat-para-'+index+'-'+simpleTextHash(text),text:text,textHash:simpleTextHash(text),structuralPath:{chapter:0,section:'',subsection:'',paragraph:index},sentences:splitCitationSentences(text).map(function(s){return{sentenceId:'flat-para-'+index+'-sent-'+s.index,text:s.text,start:s.start,end:s.end,textHash:simpleTextHash(s.text)};})};});
   }
-  return{revisionId:manuscriptRevisionId(),structured:!!(window._thesisStructured&&(_treeIndex&&_treeIndex.chapters||[]).length),paragraphs:paragraphs.map(function(p){return{paragraphId:p.paragraphId,text:p.text,textHash:p.textHash,structuralPath:p.structuralPath,occurrences:(p.occurrences||[]).map(function(o){return{occurrenceId:o.id||o.occurrenceId,referenceNo:o.rawNumber||o.displayNumber,confidence:o.confidence,source:o.source,reasons:o.reason?[o.reason]:(o.reasons||[]),charOffset:o.charOffset};}),sentences:(p.sentences||[]).map(function(s){return{sentenceId:s.sentenceId,text:s.text,start:s.start,end:s.end,textHash:s.textHash};})};})};
+  return{revisionId:manuscriptRevisionId(),structured:!!(window._thesisStructured&&(_treeIndex&&_treeIndex.chapters||[]).length),paragraphs:paragraphs.map(function(entry){var p=entry.node||entry;return{paragraphId:p.paragraphId,text:p.text,textHash:p.textHash,structuralPath:p.structuralPath,occurrences:(p.occurrences||[]).map(function(o){return{occurrenceId:o.id||o.occurrenceId,referenceNo:o.rawNumber||o.displayNumber,confidence:o.confidence,source:o.source,reasons:o.reason?[o.reason]:(o.reasons||[]),charOffset:o.charOffset};}),sentences:(p.sentences||[]).map(function(s){return{sentenceId:s.sentenceId,text:s.text,start:s.start,end:s.end,textHash:s.textHash};})};})};
 }
 function rangeOffsetWithinElement(el,container,offset){
   var range=document.createRange();range.selectNodeContents(el);range.setEnd(container,offset);
@@ -173,7 +173,15 @@ function commitCitationOccurrence(draft){
   var occurrence={id:'occ-'+paperId+'-'+simpleTextHash(draft.anchor.paragraphId+':'+resolved.end+':'+Date.now()),paperId:paperId,referenceNo:number,anchor:draft.anchor,relationIds:draft.relationIds||[],origin:'user-confirmed',status:'resolved',rawMarker:span.textContent,confirmedAt:new Date().toISOString()};
   return{success:true,occurrence:occurrence,markerEl:span};
 }
-window.getManuscriptScope=getManuscriptScope;window.createTextAnchor=createTextAnchor;window.resolveTextAnchor=resolveTextAnchor;window.previewCitationInsertion=previewCitationInsertion;window.commitCitationOccurrence=commitCitationOccurrence;
+function annotationRangeFromResolution(resolved){
+  if(!resolved||resolved.status!=='resolved'||!resolved.el)return null;
+  var start=domPointAtPlainOffset(resolved.el,resolved.start),end=domPointAtPlainOffset(resolved.el,resolved.end),range=document.createRange();
+  try{range.setStart(start.node,start.offset);range.setEnd(end.node,end.offset);return range;}catch(e){return null;}
+}
+function manuscriptRuntimeReady(){
+  try{window.dispatchEvent(new CustomEvent('manuscript-runtime-ready',{detail:{revisionId:manuscriptRevisionId()}}));}catch(e){}
+}
+window.getManuscriptScope=getManuscriptScope;window.createTextAnchor=createTextAnchor;window.resolveTextAnchor=resolveTextAnchor;window.annotationRangeFromResolution=annotationRangeFromResolution;window.previewCitationInsertion=previewCitationInsertion;window.commitCitationOccurrence=commitCitationOccurrence;window.manuscriptRuntimeReady=manuscriptRuntimeReady;
 
 function markCiteSentences(){
   try{
@@ -2889,6 +2897,7 @@ function buildFullTree(box, allHeadings, bodyStartIdx, refBound){
   }
   for(var ti=0;ti<tree.length;ti++)indexNode(tree[ti],0,null,null,null,null);
   ensureTreeStableIds();
+  manuscriptRuntimeReady();
   console.log('[tree] Built:',tree.length,'ch,',_treeIndex.sections.length,'sec,',_treeIndex.subs.length,'sub,',_treeIndex.paragraphs.length,'paras,',_treeIndex.sentences.length,'sents');
   return tree;
 }
@@ -3737,6 +3746,7 @@ function alignDocxParagraphs(xmlEntries,domEntries){
 
     // 通知模块系统：论文已加载
     if(typeof onThesisLoaded==='function')onThesisLoaded();
+    manuscriptRuntimeReady();
     // 会话持久化：备份基础数据防刷新丢失
     try{
       var textKey=typeof manuscriptBackupKey==='function'?manuscriptBackupKey('text'):'thesis_backup_text';

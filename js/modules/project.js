@@ -285,7 +285,7 @@
       revisionId: '',
       manuscriptFingerprint: '',
       settings: { citationStyle: 'gbt7714-numeric', sourcePolicy: {}, defaultFilters: {} },
-      claims: {}, papers: {}, evidenceLinks: {}, occurrences: {}, audits: {}, searchRuns: {},
+      claims: {}, papers: {}, evidenceLinks: {}, occurrences: {}, audits: {}, searchRuns: {}, annotations: {},
       cart: { paperIds: [], selections: {} },
       bibliography: { includedPaperIds: [], manualOrder: [], lastExport: null },
       migration: { legacyImportedAt: null, warnings: [] }
@@ -296,7 +296,7 @@
     var lit = value && typeof value === 'object' ? value : createLiteratureArtifact();
     if (!lit.schemaVersion) lit.schemaVersion = 1;
     if (!lit.version) lit.version = 1;
-    ['claims','papers','evidenceLinks','occurrences','audits','searchRuns'].forEach(function(k){ if(!lit[k]||typeof lit[k]!=='object')lit[k]={}; });
+    ['claims','papers','evidenceLinks','occurrences','audits','searchRuns','annotations'].forEach(function(k){ if(!lit[k]||typeof lit[k]!=='object')lit[k]={}; });
     if(!lit.settings)lit.settings={citationStyle:'gbt7714-numeric',sourcePolicy:{},defaultFilters:{}};
     if(!lit.settings.citationStyle)lit.settings.citationStyle='gbt7714-numeric';
     if(!lit.cart)lit.cart={paperIds:[],selections:{}};
