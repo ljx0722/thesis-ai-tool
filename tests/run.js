@@ -1996,19 +1996,38 @@ test('PROJECT: pipeline/defense/refnorm exist', function() {
   assert(src.indexOf('function normalizeRefsGBT7714') >= 0, 'ref normalize missing');
   assert(src.indexOf('function submitIdeaWizard') >= 0, 'idea wizard missing');
 });
-test('UI: four-column layout + toolbox + tool home', function() {
+test('UI: six workspace registry preserves legacy module routing', function() {
+  var am = fs.readFileSync(path.join(projectRoot, 'js/app-modules.js'), 'utf8');
+  var pm = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');
+  assert(am.indexOf('var APP_WORKSPACES') >= 0, 'workspace registry missing');
+  assert(am.indexOf('var MODULE_UI_MAP') >= 0, 'module UI map missing');
+  assert(am.indexOf('function resolveAppRoute') >= 0, 'workspace route resolver missing');
+  assert(am.indexOf('function openWorkspace') >= 0, 'workspace opener missing');
+  ['plan','evidence','write','polish','review','deliver'].forEach(function(id){ assert(am.indexOf("id:'"+id+"'") >= 0, id+' workspace missing'); });
+  ['references','format-check','dashboard','en-abstract'].forEach(function(id){ assert(am.indexOf(id+':{workspaceId:') >= 0 || am.indexOf("'"+id+"':{workspaceId:") >= 0, id+' legacy mapping missing'); });
+  assert(pm.indexOf('workspace-nav-item') >= 0, 'project navigation is not workspace-based');
+});
+
+test('ROUTING: workspace and legacy hashes resolve without running capability', function() {
+  var am = fs.readFileSync(path.join(projectRoot, 'js/app-modules.js'), 'utf8');
+  assert(am.indexOf("workspaceRoute(workspaceId,modeId)") >= 0, 'workspace route builder missing');
+  assert(am.indexOf("legacy:true") >= 0, 'legacy route marker missing');
+  assert(am.indexOf("history.pushState({workspace:") >= 0, 'workspace history state missing');
+});
+
+test('UI: four-column layout keeps contextual workspace panel', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
   assert(html.indexOf('id="tocPanel"') >= 0, 'toc column missing');
-  assert(html.indexOf('id="toolHome"') >= 0, 'tool home missing');
-  assert(html.indexOf('toolboxFavorites') >= 0, 'toolbox missing');
+  assert(html.indexOf('id="workspaceModeTabs"') >= 0, 'workspace mode tabs missing');
+  assert(html.indexOf('workspace-nav') >= 0, 'workspace navigation missing');
   var am = fs.readFileSync(path.join(projectRoot, 'js/app-modules.js'), 'utf8');
   assert(am.indexOf('analyzeSelectedMaterial') >= 0, 'materials-to-analysis missing');
-  assert(am.indexOf('openToolHome') >= 0, 'openToolHome missing');
+  assert(am.indexOf('renderWorkspaceModes') >= 0, 'contextual mode renderer missing');
 });
-test('UI: simplified sidebar has TOC wrap', function() {
+test('UI: simplified sidebar has TOC and workspace navigation', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
   assert(html.indexOf('tocPanel') >= 0 || html.indexOf('nav-tree') >= 0, 'toc area missing');
-  assert(html.indexOf('toolboxFavorites') >= 0 || html.indexOf('toolHome') >= 0, 'toolbox/tool home missing');
+  assert(html.indexOf('workspace-nav') >= 0 && html.indexOf('workspaceModeTabs') >= 0, 'workspace navigation missing');
 });
 
 test('REGRESSION: app runtime declarations do not abort upload initialization', function() {

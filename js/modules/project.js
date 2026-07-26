@@ -1178,25 +1178,13 @@
               '<div class="home-choice-next">下一步：上传 .docx → 查看目录树</div>' +
             '</button>' +
           '</div>' +
-          '<div class="home-help-note">左侧上方是主线阶段，中间大区域是目录树，底部“全部工具”按需展开。登录后项目自动云同步。</div>' +
+          '<div class="home-help-note">左侧六个工作区对应论文全流程；目录与正文会随着项目内容逐步生长。</div>' +
         '</div>';
     }
 
     try { project = autoSyncStageProgress(project) || project; } catch (e) {}
     var prog = calcProgress(project);
     var next = nextAction(project);
-
-    var stagesHtml = STAGES.map(function (s) {
-      var st = (project.stageStatus || {})[s.id] || 'todo';
-      var ev = evaluateStage(project, s.id);
-      var cls = 'project-stage-card is-' + st + (s.id === project.currentStage ? ' is-current' : '');
-      return '<div class="' + cls + '" onclick="openProjectStage(\'' + s.id + '\')">' +
-        '<div class="project-stage-status">' + (st === 'done' ? '已完成' : (st === 'active' ? '进行中' : '未开始')) +
-          (ev.total ? ' · ' + ev.passed + '/' + ev.total : '') + '</div>' +
-        '<div class="project-stage-name">' + s.icon + ' ' + s.name + '</div>' +
-        '<div class="project-stage-desc">' + s.desc + '</div>' +
-      '</div>';
-    }).join('');
 
     var secAction = next.secondary
       ? '<button class="ai-btn-clear" onclick="runProjectAction(\'' + next.secondary.action + '\',\'' + (next.secondary.stageId || '') + '\',\'' + (next.secondary.moduleId || '') + '\')">' + next.secondary.label + '</button>'
@@ -1231,21 +1219,6 @@
         renderChapterBoardInline(project) +
         renderSkillLogInline(project) +
         renderExportHistoryInline(project) +
-        '<details class="project-more-tools"><summary>更多工具</summary><div class="project-tools-row">' +
-          '<button class="ai-btn-clear" onclick="runOneClickPipeline()">一键流水线</button>' +
-          '<button class="ai-btn-clear" onclick="openDefensePack()">答辩材料包</button>' +
-          '<button class="ai-btn-clear" onclick="normalizeRefsGBT7714()">文献规范化</button>' +
-          '<button class="ai-btn-clear" onclick="openMaterialsLibrary()">资料库</button>' +
-          '<button class="ai-btn-clear" onclick="openOutlineEditor()">大纲</button>' +
-          '<button class="ai-btn-clear" onclick="openChapterBoard()">分章草稿</button>' +
-          '<button class="ai-btn-clear" onclick="openFullPaperPreview()">完整预览</button>' +
-          '<button class="ai-btn-clear" onclick="mergeDraftsIntoThesis()">合并到正文</button>' +
-          '<button class="ai-btn-clear" onclick="openTemplateChooser()">学校模板</button>' +
-          '<button class="ai-btn-clear" onclick="openProjectSettings()">设置</button>' +
-          '<button class="ai-btn-clear" onclick="openExportHistory()">导出历史</button>' +
-          '<button class="ai-btn-clear" onclick="exportFullPaperDocx()">导出DOCX</button>' +
-        '</div></details>' +
-        '<div class="project-stage-grid">' + stagesHtml + '</div>' +
       '</div>';
   }
 
@@ -1394,23 +1367,26 @@
       try { project = autoSyncStageProgress(project) || project; } catch (e) {}
     }
     var html = '';
-    var stages = project ? availableStages(project) : STAGES;
-    stages.forEach(function (s, idx) {
-      var st = project ? ((project.stageStatus || {})[s.id] || 'todo') : 'todo';
-      var cur = project && project.currentStage === s.id;
-      var meta = '';
+    (window.APP_WORKSPACES || []).forEach(function (workspace) {
+      var statuses = (workspace.stageIds || []).map(function (id) { return project ? ((project.stageStatus || {})[id] || 'todo') : 'todo'; });
+      var status = statuses.indexOf('active') >= 0 ? 'active' : (statuses.length && statuses.every(function (value) { return value === 'done'; }) ? 'done' : 'todo');
+      var current = project && workspace.stageIds.indexOf(project.currentStage) >= 0;
+      var progress = '';
       if (project) {
-        try {
-          var ev = evaluateStage(project, s.id);
-          if (ev.total) meta = ' · ' + ev.passed + '/' + ev.total;
-        } catch (e) {}
+        var passed = 0, total = 0;
+        (workspace.stageIds || []).forEach(function (id) {
+          try { var ev = evaluateStage(project, id); passed += ev.passed || 0; total += ev.total || 0; } catch (e2) {}
+        });
+        if (total) progress = ' · ' + passed + '/' + total;
       }
-      html += '<div class="stage-nav-item' + (cur ? ' active' : '') + ' is-' + st + '" onclick="openProjectStage(\'' + s.id + '\')">' +
-        '<span class="stage-nav-idx">' + (idx + 1) + '</span>' +
-        '<span class="stage-nav-text"><b>' + s.name + '</b><i>' + s.desc + meta + '</i></span>' +
-      '</div>';
+      html += '<button type="button" class="stage-nav-item workspace-nav-item' + (current ? ' active' : '') + ' is-' + status + '" data-workspace="' + workspace.id + '" onclick="openWorkspace(\'' + workspace.id + '\')">' +
+        '<span class="stage-nav-icon" aria-hidden="true">' + workspace.icon + '</span>' +
+        '<span class="stage-nav-text"><b>' + escapeHtml(workspace.name) + '</b><i>' + escapeHtml(workspace.desc) + progress + '</i></span>' +
+        '<span class="workspace-nav-state">' + (status === 'done' ? '已完成' : (status === 'active' ? '进行中' : '未开始')) + '</span>' +
+      '</button>';
     });
-    host.innerHTML = html;
+    host.innerHTML = html || '<div class="stage-nav-empty">创建项目后显示工作区</div>';
+    if (window.renderWorkspaceModes) window.renderWorkspaceModes();
   }
 
   function openProjectStage(stageId, moduleId) {

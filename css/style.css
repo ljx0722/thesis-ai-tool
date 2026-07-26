@@ -1127,6 +1127,17 @@ body.is-resizing, body.is-resizing * { cursor: col-resize !important; user-selec
 .stage-nav-text{display:flex;flex-direction:column;gap:2px;min-width:0}
 .stage-nav-text b{font-size:.68rem;font-weight:700}
 .stage-nav-text i{font-style:normal;font-size:.58rem;opacity:.65;line-height:1.35}
+.workspace-nav{max-height:none;overflow:visible;gap:6px}
+.workspace-nav-item{width:100%;font:inherit;text-align:left;background:transparent}
+.stage-nav-icon{width:24px;height:24px;border-radius:7px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:inherit;font-size:.72rem}
+.workspace-nav-state{margin-left:auto;align-self:center;white-space:nowrap;font-size:.52rem;opacity:.55}
+.workspace-nav-item.is-done .stage-nav-icon{background:rgba(16,185,129,.18);color:#6ee7b7}
+.workspace-mode-tabs{display:flex;gap:4px;padding:8px 10px;border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0;background:var(--bg-card)}
+.workspace-mode-tab{flex:0 0 auto;border:1px solid transparent;border-radius:var(--radius-sm);background:transparent;color:var(--text-tertiary);padding:6px 9px;font:inherit;font-size:var(--font-size-xs);cursor:pointer}
+.workspace-mode-tab:hover{background:var(--bg-card-hover);color:var(--text-primary)}
+.workspace-mode-tab.active{border-color:var(--border);background:var(--accent-glow);color:var(--accent-dark);font-weight:var(--font-weight-semibold)}
+.bar-context-label{color:rgba(255,255,255,.5);font-size:.62rem;white-space:nowrap}
+.stage-nav-empty{padding:10px;color:var(--text-sidebar-muted);font-size:.62rem}
 .project-overview{width:100%;max-width:920px;padding:12px 8px 28px;text-align:left}
 .project-overview-head{margin-bottom:16px}
 .project-badge{
