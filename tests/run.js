@@ -51,7 +51,8 @@ test('All JS files parse without syntax errors', function() {
     'js/modules/topic-finder.js', 'js/modules/proposal.js',
     'js/modules/proofread.js', 'js/modules/de-duplicate.js',
     'js/modules/defense-ppt.js', 'js/modules/en-abstract.js',
-    'js/modules/dashboard.js'
+    'js/modules/dashboard.js', 'js/modules/literature-search-modal.js',
+    'js/modules/literature-workbench.js'
   ];
   files.forEach(function(f) {
     var src = fs.readFileSync(path.join(projectRoot, f), 'utf8');
@@ -68,7 +69,8 @@ test('All JS files have balanced braces', function() {
     'js/modules/topic-finder.js', 'js/modules/proposal.js',
     'js/modules/proofread.js', 'js/modules/de-duplicate.js',
     'js/modules/defense-ppt.js', 'js/modules/en-abstract.js',
-    'js/modules/dashboard.js'
+    'js/modules/dashboard.js', 'js/modules/literature-search-modal.js',
+    'js/modules/literature-workbench.js'
   ];
   files.forEach(function(f) {
     var src = fs.readFileSync(path.join(projectRoot, f), 'utf8');
@@ -362,6 +364,74 @@ test('LITERATURE: imported references have a visible workbench view', function()
   assert(src.indexOf('persist(function(next)') >= 0, 'Migration must use persist mutator');
   assert(src.indexOf('return next;') >= 0, 'Migration must write the cloned artifact');
   assert(src.indexOf('function show()') >= 0, 'Workbench must expose show() for module switch path');
+});
+
+test('LITERATURE: audit persists sentenceIndex and chapterScores', function() {
+  var workbench = fs.readFileSync(path.join(projectRoot, 'js/modules/literature-workbench.js'), 'utf8');
+  var project = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');
+  assert(project.indexOf('sentenceIndex: {}') >= 0 && project.indexOf('chapterScores: {}') >= 0, 'Literature artifact shape must include sentence evidence structures');
+  assert(workbench.indexOf('function computeChapterScores') >= 0, 'Workbench must compute chapter evidence scores');
+  assert(workbench.indexOf('lit.sentenceIndex=built.sentenceIndex') >= 0, 'Audit must persist sentenceIndex from existing sentence ids');
+  assert(workbench.indexOf('lit.chapterScores=computeChapterScores') >= 0, 'Audit must persist chapterScores');
+});
+
+test('LITERATURE: sentence evidence Phase 2 structures are wired', function() {
+  var workbench = fs.readFileSync(path.join(projectRoot, 'js/modules/literature-workbench.js'), 'utf8');
+  var project = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');
+  assert(project.indexOf('sentenceCandidates: {}') >= 0, 'sentenceCandidates artifact shape missing');
+  assert(project.indexOf('rewriteSuggestions: {}') >= 0, 'rewriteSuggestions artifact shape missing');
+  assert(project.indexOf('insertionOpportunities: {}') >= 0, 'insertionOpportunities artifact shape missing');
+  assert(workbench.indexOf('function buildSentenceIndexFromScope') >= 0, 'Sentence index builder missing');
+  assert(workbench.indexOf('function classifySentenceCitationNeed') >= 0, 'Sentence citation classifier missing');
+  assert(workbench.indexOf('function scoreSentenceCandidate') >= 0, 'Sentence candidate scorer missing');
+  assert(workbench.indexOf('sentenceCandidates[id]') >= 0, 'Audit must write sentence-level candidates');
+});
+
+test('LITERATURE: sentence drawer and LLM actions are explicit', function() {
+  var workbench = fs.readFileSync(path.join(projectRoot, 'js/modules/literature-workbench.js'), 'utf8');
+  assert(workbench.indexOf('function sentenceDrawer') >= 0, 'Sentence evidence drawer missing');
+  assert(workbench.indexOf('data-sentence-search') >= 0, 'Sentence search action missing');
+  assert(workbench.indexOf("runSentenceCapability(sentenceAudit.dataset.sentenceLlmAudit,'sentence-evidence-audit')") >= 0, 'Deep audit capability action missing');
+  assert(workbench.indexOf("runSentenceCapability(sentenceRewrite.dataset.sentenceRewrite,'sentence-grounded-rewrite')") >= 0, 'Grounded rewrite capability action missing');
+  assert(workbench.indexOf("capability_id:capability") >= 0, 'Sentence LLM actions must use /api/llm/analyze capability id');
+});
+
+test('LITERATURE: workbench defaults to evidence board and sentence queue', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/literature-workbench.js'), 'utf8');
+  assert(src.indexOf("view:'board'") >= 0, 'Workbench must default to evidence board');
+  assert(src.indexOf("['board','证据看板']") >= 0, 'Evidence board tab missing');
+  assert(src.indexOf("['audit','句子队列']") >= 0, 'Sentence queue tab missing');
+  assert(src.indexOf('function boardView') >= 0 && src.indexOf('function sentenceQueue') >= 0, 'Board and queue renderers missing');
+  assert(src.indexOf('data-sentence-filter') >= 0, 'Sentence queue filters missing');
+});
+
+test('PROJECT: overview surfaces chapter evidence score next action', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');
+  assert(src.indexOf('function literatureEvidenceSummary') >= 0, 'Project overview must summarize literature evidence');
+  assert(src.indexOf('补齐章节证据缺口') >= 0, 'Next action must prioritize evidence gaps');
+  assert(src.indexOf('function renderEvidenceScoreInline') >= 0, 'Project overview evidence score panel missing');
+  assert(src.indexOf('renderEvidenceScoreInline(project)') >= 0, 'Evidence score panel must be rendered on overview');
+  assert(src.indexOf('var stagesForProject = availableStages(project)') >= 0, 'Overview stage grid must respect project path');
+  assert(src.indexOf('function ensureIdeaEvidenceOpportunities') >= 0, 'Idea-first flow must generate evidence opportunities');
+});
+
+test('LITERATURE: sentence sourceContext and capabilities are registered', function() {
+  var modal = fs.readFileSync(path.join(projectRoot, 'js/modules/literature-search-modal.js'), 'utf8');
+  var server = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  assert(modal.indexOf('sentenceId:options.sentenceId') >= 0, 'Search modal sourceContext must carry sentenceId');
+  assert(modal.indexOf("s.sourceContext&&s.sourceContext.type==='sentence'") >= 0, 'Search apply must detect sentence context');
+  assert(modal.indexOf('latest.sentenceCandidates[s.sourceContext.sentenceId]') >= 0, 'Search apply must write sentenceCandidates');
+  assert(server.indexOf("'sentence-evidence-audit'") >= 0, 'sentence-evidence-audit capability missing');
+  assert(server.indexOf("'sentence-grounded-rewrite'") >= 0, 'sentence-grounded-rewrite capability missing');
+  assert(server.indexOf('不得编造文献、DOI') >= 0, 'Grounded prompts must ban fabricated citations');
+});
+
+test('LITERATURE: sentence highlights are safe and state-driven', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/literature-workbench.js'), 'utf8');
+  assert(src.indexOf('function renderSentenceEvidenceHighlights') >= 0, 'Sentence evidence highlight renderer missing');
+  assert(src.indexOf("resolved.status!=='resolved'") >= 0, 'Highlighting must skip stale/ambiguous/unlocated anchors');
+  assert(src.indexOf('sentence-evidence-pending') >= 0, 'Pending evidence marker missing');
+  assert(src.indexOf('sentence-evidence-ai-risk') >= 0, 'AI risk marker missing');
 });
 
 test('DASHBOARD: scores come from thesis-review dimensions with real weights', function() {

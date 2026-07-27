@@ -359,7 +359,7 @@
       revisionId: '',
       manuscriptFingerprint: '',
       settings: { citationStyle: 'gbt7714-numeric', sourcePolicy: {}, defaultFilters: {} },
-      claims: {}, papers: {}, evidenceLinks: {}, occurrences: {}, audits: {}, searchRuns: {}, searchSessions: {}, chapterAssignments: {}, annotations: {},
+      claims: {}, papers: {}, evidenceLinks: {}, occurrences: {}, audits: {}, sentenceIndex: {}, sentenceCandidates: {}, chapterScores: {}, rewriteSuggestions: {}, insertionOpportunities: {}, searchRuns: {}, searchSessions: {}, chapterAssignments: {}, annotations: {},
       cart: { paperIds: [], selections: {} },
       bibliography: { includedPaperIds: [], manualOrder: [], lastExport: null },
       migration: { legacyImportedAt: null, warnings: [] }
@@ -370,7 +370,7 @@
     var lit = value && typeof value === 'object' ? value : createLiteratureArtifact();
     if (!lit.schemaVersion || lit.schemaVersion < 2) lit.schemaVersion = 2;
     if (!lit.version) lit.version = 1;
-    ['claims','papers','evidenceLinks','occurrences','audits','searchRuns','searchSessions','chapterAssignments','annotations'].forEach(function(k){ if(!lit[k]||typeof lit[k]!=='object')lit[k]={}; });
+    ['claims','papers','evidenceLinks','occurrences','audits','sentenceIndex','sentenceCandidates','chapterScores','rewriteSuggestions','insertionOpportunities','searchRuns','searchSessions','chapterAssignments','annotations'].forEach(function(k){ if(!lit[k]||typeof lit[k]!=='object')lit[k]={}; });
     if(!lit.settings)lit.settings={citationStyle:'gbt7714-numeric',sourcePolicy:{},defaultFilters:{}};
     if(!lit.settings.citationStyle)lit.settings.citationStyle='gbt7714-numeric';
     if(!lit.cart)lit.cart={paperIds:[],selections:{}};
@@ -881,6 +881,33 @@
     };
   }
 
+  function ensureIdeaEvidenceOpportunities(project) {
+    if (!project || project.hasManuscript) return null;
+    var outline = getOutline && getOutline();
+    if (!outline || !outline.chapters || !outline.chapters.length) return null;
+    var lit = ensureArtifacts(project).literature;
+    lit.insertionOpportunities = lit.insertionOpportunities || {};
+    var changed = false;
+    outline.chapters.forEach(function(ch, idx){
+      var key = 'idea-evidence-' + idx;
+      if (!lit.insertionOpportunities[key]) {
+        lit.insertionOpportunities[key] = { id: key, chapterId: String(idx + 1), chapterTitle: ch.title || ('第' + (idx + 1) + '章'), afterSentenceId: '', suggestedText: '为「' + (ch.title || '本章') + '」补充一条有真实文献依据的背景、定义或方法句。', relatedPaperIds: [], status: 'planned', createdAt: nowISO(), updatedAt: nowISO() };
+        changed = true;
+      }
+    });
+    if (changed) { project.updatedAt = nowISO(); upsertLocal(project); }
+    return lit;
+  }
+
+  function literatureEvidenceSummary(project) {
+    var lit=project&&project.artifacts&&project.artifacts.literature;if(!lit)return null;
+    if(!project.hasManuscript)lit=ensureIdeaEvidenceOpportunities(project)||lit;
+    var chapters=Object.keys(lit.chapterScores||{}).map(function(k){return lit.chapterScores[k];});
+    if(!chapters.length){var opps=Object.keys(lit.insertionOpportunities||{}).map(function(k){return lit.insertionOpportunities[k];}).filter(function(x){return x.status!=='accepted'&&x.status!=='dismissed';});return opps.length?{avg:0,pending:opps.length,chapters:opps.length,weak:{label:opps[0].chapterTitle||'待写章节'},nextAction:'先为 '+(opps[0].chapterTitle||'低证据章节')+' 准备真实文献依据'}:null;}
+    var pending=chapters.reduce(function(n,c){return n+Number(c.pending||0);},0),avg=Math.round(chapters.reduce(function(n,c){return n+Number(c.score||0);},0)/chapters.length),weak=chapters.slice().sort(function(a,b){return Number(a.score||0)-Number(b.score||0)||Number(b.pending||0)-Number(a.pending||0);})[0];
+    return{avg:avg,pending:pending,chapters:chapters.length,weak:weak,nextAction:pending?'处理 '+(weak&&weak.label||'低分章节')+' 的缺引句':'抽查已接受证据关系'};
+  }
+
   function nextAction(project) {
     if (!project) {
       return {
@@ -892,6 +919,10 @@
     }
     try { project = autoSyncStageProgress(project) || project; } catch (e) {}
     var sig = paperSignals(project);
+    var evidence = literatureEvidenceSummary(project);
+    if (evidence && evidence.pending > 0 && (project.currentStage === 'literature' || project.currentStage === 'review')) {
+      return { title: '补齐章节证据缺口', desc: '章节证据评分 ' + evidence.avg + ' 分；' + evidence.nextAction + '，共 ' + evidence.pending + ' 句待处理。', primary: { label: '打开证据看板', action: 'open-stage', stageId: 'literature', moduleId: 'references' }, secondary: { label: '运行论文看板', action: 'open-stage', stageId: 'review', moduleId: 'dashboard' } };
+    }
     if (sig.hasPaper && !sig.chCount && !sig.hasOutline) {
       return { title: '目录树还没识别出来', desc: '先看左侧底部目录；若为空，请重新上传论文。', primary: { label: '重新上传论文', action: 'upload' }, secondary: { label: '打开参考文献', action: 'open-stage', stageId: 'literature', moduleId: 'references' } };
     }
@@ -1260,7 +1291,8 @@
     var prog = calcProgress(project);
     var next = nextAction(project);
 
-    var stagesHtml = STAGES.map(function (s) {
+    var stagesForProject = availableStages(project);
+    var stagesHtml = stagesForProject.map(function (s) {
       var st = (project.stageStatus || {})[s.id] || 'todo';
       var ev = evaluateStage(project, s.id);
       var cls = 'project-stage-card is-' + st + (s.id === project.currentStage ? ' is-current' : '');
@@ -1302,6 +1334,7 @@
         renderStageCriteriaHTML(project) +
         renderImportChecklist(project) +
         renderSmartTips(project) +
+        renderEvidenceScoreInline(project) +
         renderChapterBoardInline(project) +
         renderSkillLogInline(project) +
         renderExportHistoryInline(project) +
@@ -1321,6 +1354,26 @@
         '</div></details>' +
         '<div class="project-stage-grid">' + stagesHtml + '</div>' +
       '</div>';
+  }
+
+  function renderEvidenceScoreInline(project) {
+    var summary=literatureEvidenceSummary(project);
+    if(!summary)return'';
+    var tone=summary.avg>=80?'ok':(summary.avg>=60?'info':(summary.avg>=40?'warn':'bad'));
+    var weak=summary.weak||{};
+    return '<div class="project-panel-card project-evidence-panel tone-'+tone+'">' +
+      '<div class="project-panel-head"><strong>📚 证据增强总览</strong><span>'+summary.avg+'/100 · '+summary.chapters+' 章</span></div>' +
+      '<div class="project-evidence-score-row"><b>'+summary.avg+'</b><div><p>'+escapeHtml(summary.nextAction)+'</p><small>'+(summary.pending?('待处理 '+summary.pending+' 项 · 最弱 '+escapeHtml(weak.label||'未定位章节')):'暂无待补证据，建议抽查引用关系')+'</small></div></div>' +
+      renderEvidenceChapterGrid(project) +
+      '<button class="ai-btn-clear" onclick="runProjectAction(\'open-stage\',\'literature\',\'references\')">打开证据与引用</button>' +
+    '</div>';
+  }
+
+  function renderEvidenceChapterGrid(project) {
+    var lit=project&&project.artifacts&&project.artifacts.literature;if(!lit)return'';
+    var chapters=Object.keys(lit.chapterScores||{}).map(function(k){return lit.chapterScores[k];}).sort(function(a,b){return Number(a.chapter||99)-Number(b.chapter||99);});
+    if(!chapters.length){var opps=Object.keys(lit.insertionOpportunities||{}).map(function(k){return lit.insertionOpportunities[k];});if(!opps.length)return'';return '<div class="project-evidence-mini-grid">'+opps.slice(0,6).map(function(o){return '<span>'+escapeHtml(o.chapterTitle||'待写章节')+' · 需证据</span>';}).join('')+'</div>';}
+    return '<div class="project-evidence-mini-grid">'+chapters.slice(0,6).map(function(c){return '<span>'+escapeHtml(c.label||('第'+c.chapter+'章'))+' · '+Number(c.score||0)+'分 · '+Number(c.pending||0)+'待</span>';}).join('')+'</div>';
   }
 
   function renderChapterBoardInline(project) {
@@ -2530,13 +2583,13 @@ function closeChapterOverlays() {
     var p = getCurrentProject();
     if (!p) return null;
     var outline = getOutline();
-    var refs = getRefLibrary();
+    var refs = getRefLibrary(), lit = p.artifacts && p.artifacts.literature || {}, template = SCHOOL_TEMPLATES.filter(function(t){return t.id===(p.schoolTemplate||'generic');})[0] || SCHOOL_TEMPLATES[SCHOOL_TEMPLATES.length-1];
     var chapters = [];
     if (outline && outline.chapters) {
       outline.chapters.forEach(function(ch, idx) {
         var key = chapterKey(ch.title, idx);
-        var d = getChapterDraft(key) || {};
-        chapters.push({ title: ch.title, sections: ch.sections || [], content: d.content || '' });
+        var d = getChapterDraft(key) || {}, score=(lit.chapterScores||{})[String(idx+1)]||{};
+        chapters.push({ title: ch.title, sections: ch.sections || [], content: d.content || '', evidenceScore: score.score, pendingEvidence: score.pending||0, candidateReady: score.candidateReady||0 });
       });
     }
     return {
@@ -2544,10 +2597,15 @@ function closeChapterOverlays() {
       field: p.field || '',
       degree: p.degree || '',
       idea: p.idea || '',
+      schoolTemplate: p.schoolTemplate || 'generic',
+      styleNotes: template.styleNotes || '',
+      headingMap: template.headingMap || {},
+      citationStyle: (lit.settings||{}).citationStyle || 'gbt7714-numeric',
+      evidenceSummary: literatureEvidenceSummary(p),
       chapters: chapters,
-      references: refs.map(function(r, i) {
+      references: ((lit.bibliography&&lit.bibliography.includedPaperIds||[]).length?(lit.bibliography.includedPaperIds||[]).map(function(id,i){var paper=(lit.papers||{})[id]||{};return{num:paper.referenceNo||i+1,text:(paper.authors||'')+'. '+(paper.title||'')+'. '+(paper.journal||'')+', '+(paper.year||'')}}):refs.map(function(r, i) {
         return { num: normalizeRefNum(r, i), text: (r.ci || r.title || '').replace(/<[^>]+>/g, '') };
-      })
+      }) )
     };
   }
 
@@ -2555,6 +2613,8 @@ function closeChapterOverlays() {
     var payload = buildPaperPayload();
     if (!payload) { alert('请先创建项目'); return; }
     if (!payload.chapters.length) { alert('请先编辑大纲/分章草稿'); return; }
+    var weak=(payload.chapters||[]).filter(function(ch){return Number(ch.evidenceScore||100)<60||Number(ch.pendingEvidence||0)>0;});
+    if(weak.length&&!confirm('仍有 '+weak.length+' 章证据评分偏低或存在待补证据，仍要导出 DOCX 吗？'))return;
     var token = sessionStorage.getItem('thesis_ai_token');
     if (!token) { alert('请先登录后再导出'); return; }
     if (typeof showLoad === 'function') showLoad('正在导出 DOCX...', 20, payload.title);

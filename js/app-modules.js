@@ -133,7 +133,7 @@ function isBodyChapter(s) {
 // ===== Tool dock (right panel home) + favorites =====
 var TOOLBOX_KEY = 'thesis_ai_toolbox_favs_v1';
 function toolboxStorageKey(){try{var u=JSON.parse(sessionStorage.getItem('thesis_ai_user')||'{}');return TOOLBOX_KEY+'_u'+(u.id!=null?u.id:'guest');}catch(e){return TOOLBOX_KEY+'_guest';}}
-var DEFAULT_FAVS = ['data-analysis','topic-finder','proofread','defense-ppt','materials','pipeline'];
+var DEFAULT_FAVS = ['references','proofread','format-check','data-analysis'];
 
 function loadToolboxFavs(){
   try{
@@ -241,18 +241,24 @@ function renderToolHome(){
   if(!freeHost||!thesisHost) return;
   var free=[], need=[];
   (APP_MODULES||[]).forEach(function(m){ (m.requiresThesis?need:free).push(m); });
-  // ensure data-analysis highlighted
-  freeHost.innerHTML = free.map(function(m){
+  var taskGroups=[
+    {title:'证据与引用',desc:'逐句补真实文献、确认引用',action:"launchTool('references')"},
+    {title:'句子改写 / 降 AI 味',desc:'查错、降重、长句与口语化处理',action:"launchTool('proofread')"},
+    {title:'格式与导出',desc:'格式检查、预览、DOCX 导出',action:"launchTool('format-check')"},
+    {title:'数据与图表',desc:'资料库、数据分析、科研图表',action:"launchTool('data-analysis')"}
+  ];
+  freeHost.innerHTML = taskGroups.map(function(g){return '<button class="tool-card task-card" onclick="'+g.action+'"><b>'+g.title+'</b><span>'+g.desc+'</span></button>';}).join('') +
+  '<details class="tool-more"><summary>更多工具</summary><div class="tool-more-grid">'+free.map(function(m){
     var billing = m.aiDriven ? '智能辅助 · 按用量计点' : (m.localCharge ? '分析能力 · 按次计点' : (m.serverFixed ? '分析能力 · 按次计点' : '可用'));
     return '<button class="tool-card" onclick="launchTool(\''+m.id+'\')"><b>'+m.icon+' '+m.name+'</b><span>'+billing+'</span></button>';
   }).join('') +
   '<button class="tool-card" onclick="launchTool(\'materials\')"><b>📁 资料库</b><span>上传 CSV 等，供分析模块复用</span></button>'+
   '<button class="tool-card" onclick="launchTool(\'pipeline\')"><b>⚡ 一键流水线</b><span>大纲+章节骨架</span></button>'+
-  '<button class="tool-card" onclick="launchTool(\'defense-pack\')"><b>🎤 答辩材料包</b><span>讲稿/问答/PPT结构</span></button>';
-  thesisHost.innerHTML = need.map(function(m){
+  '<button class="tool-card" onclick="launchTool(\'defense-pack\')"><b>🎤 答辩材料包</b><span>讲稿/问答/PPT结构</span></button></div></details>';
+  thesisHost.innerHTML = '<details class="tool-more" open><summary>基于论文的传统模块</summary><div class="tool-more-grid">' + need.map(function(m){
     var billing = m.aiDriven ? '智能辅助' : (m.localCharge ? '按次计点' : '');
     return '<button class="tool-card" onclick="launchTool(\''+m.id+'\')"><b>'+m.icon+' '+m.name+'</b><span>基于论文内容分析'+(billing?' · '+billing:'')+'</span><div class="need-tag">建议先有论文/草稿</div></button>';
-  }).join('');
+  }).join('') + '</div></details>';
 }
 function toggleTocPanel(){
   var p=document.getElementById('tocPanel'); if(!p) return;
