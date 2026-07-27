@@ -337,6 +337,15 @@ test('IMPORT: dependency failure is non-blocking and recoverable', function() {
   assert(dependency.indexOf('项目进度未受影响') >= 0, 'Dependency error must explain that progress is preserved');
 });
 
+test('IMPORT: DOCX without title styles falls back to non-blocking full-text mode', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('window._docxImportPlainMode') >= 0, 'Plain-mode import fallback missing');
+  assert(src.indexOf("txt:'全文'") >= 0, 'Full-text synthetic heading missing');
+  assert(src.indexOf('已按全文模式导入') >= 0, 'Plain-mode user message missing');
+  assert(src.indexOf("throw new Error('未检测到可用标题样式") < 0, 'No-title DOCX must not throw a blocking parse error');
+  assert(src.indexOf("alert((cancelled?'已取消导入") < 0, 'Parse recovery must not use blocking alert');
+});
+
 test('LITERATURE: workbench actions are bound once and report runtime errors', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/literature-workbench.js'), 'utf8');
   assert(src.indexOf("root.dataset.literatureBound==='1'") >= 0, 'Workbench binding must be idempotent');
@@ -1864,6 +1873,18 @@ test('DATA: analysis has overview + significance + AI summary', function() {
   assert(src.indexOf('pearsonCorr') >= 0, 'correlation missing');
 });
 
+test('IMPORT: visual typography can infer headings without Word heading styles', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(src.indexOf('function inferDocxVisualHeadings') >= 0, 'visual heading inference helper missing');
+  assert(src.indexOf('function docxVisualHeadingLevel') >= 0, 'visual heading level classifier missing');
+  assert(src.indexOf('window._docxVisualParagraphs') >= 0, 'visual paragraph capture missing');
+  assert(src.indexOf('boldRatio') >= 0 && src.indexOf('alignment') >= 0 && src.indexOf('maxSize') >= 0, 'visual features must include size, bold ratio and alignment');
+  assert(src.indexOf('visual-heading-inference') >= 0, 'visual heading inference user state missing');
+  var visualClassifier = src.substring(src.indexOf('function docxVisualHeadingLevel'), src.indexOf('function inferDocxVisualHeadings'));
+  assert(visualClassifier.indexOf('detectHeadingLevel') < 0, 'visual heading classifier must not rely on numbering text patterns');
+  assert(src.indexOf('startInlineCalibration(box, allHeadings)') > src.indexOf('window._docxVisualHeadingInference&&window._docxVisualHeadingInference.count'), 'visual heading inference must still enter title calibration');
+});
+
 test('IMPORT: heading style patterns cover custom TJ styles', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
   assert(src.indexOf('一级标题') >= 0, '一级标题 pattern missing');
@@ -2091,7 +2112,7 @@ test('REGRESSION: import and calibration settle safely', function() {
   var src=fs.readFileSync(path.join(projectRoot,'app.js'),'utf8');
   assert(src.indexOf('var importRunning=false')>=0&&src.indexOf('finally{')>=0,'import lock/finally cleanup missing');
   assert(src.indexOf('function settleCalibration')>=0,'calibration settle-once helper missing');
-  assert(src.indexOf("alert('请先选择并确认至少一个章标题样式。')")>=0,'chapter calibration guard missing');
+  assert(src.indexOf("请先选择并确认至少一个章标题样式；如果文档没有标题样式")>=0,'chapter calibration non-blocking guard missing');
 });
 
 test('REGRESSION: assets use refreshed cache version', function() {
@@ -2395,6 +2416,40 @@ test('DATA: multi-select materials and profile batch entry exist', function() {
   assert(js.indexOf('toggleAllDataMaterials')>=0,'select all materials missing');
   assert(js.indexOf('profileSelectedMaterials')>=0,'batch profile action missing');
   assert(js.indexOf('profiles:batch')>=0,'profiles batch endpoint wiring missing');
+});
+
+test('LITERATURE: five-stage search task modal and resumable sessions exist', function() {
+  var html=fs.readFileSync(path.join(projectRoot,'index.html'),'utf8');
+  var modal=fs.readFileSync(path.join(projectRoot,'js/modules/literature-search-modal.js'),'utf8');
+  var project=fs.readFileSync(path.join(projectRoot,'js/modules/project.js'),'utf8');
+  assert(html.indexOf('literatureSearchOverlay')>=0&&html.indexOf('literature-search-modal.js')>=0,'literature task modal host or script missing');
+  ['intent','strategy','search','review','apply'].forEach(function(stage){assert(modal.indexOf("id:'"+stage+"'")>=0,'literature stage missing: '+stage);});
+  assert(modal.indexOf('focusables')>=0&&modal.indexOf("event.key==='Escape'")>=0&&modal.indexOf('previousFocus')>=0,'modal focus trap, Escape, or focus restore missing');
+  assert(project.indexOf('searchSessions')>=0&&project.indexOf('chapterAssignments')>=0,'resumable literature session schema missing');
+});
+
+test('LITERATURE: search filters, source progress and constraint summaries are server-backed', function() {
+  var py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
+  assert(py.indexOf('def _filter_literature_papers')>=0,'literature filter helper missing');
+  assert(py.indexOf('def _literature_constraint_summary')>=0,'literature constraint summary missing');
+  assert(py.indexOf("'sourceProgress': source_progress")>=0,'source progress response missing');
+  assert(py.indexOf("'filterSummary': filter_summary")>=0&&py.indexOf("'constraintSummary': constraint_summary")>=0,'filter or constraint response missing');
+});
+
+test('LITERATURE: LLM planning and evidence analysis degrade safely', function() {
+  var py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
+  var modal=fs.readFileSync(path.join(projectRoot,'js/modules/literature-search-modal.js'),'utf8');
+  assert(py.indexOf("'literature-query-plan'")>=0&&py.indexOf("'literature-evidence-analysis'")>=0,'literature LLM capabilities missing');
+  assert(py.indexOf('不得虚构文献')>=0&&py.indexOf('evidenceSpans 必须为空')>=0,'literature LLM grounding prompts missing');
+  assert(modal.indexOf("status:'fallback'")>=0&&modal.indexOf('智能分析不可用')>=0,'frontend LLM fallback missing');
+  assert(modal.indexOf('requiredOutput')>=0&&modal.indexOf('parseJsonContent')>=0,'structured LLM output handling missing');
+});
+
+test('LITERATURE: deterministic application keeps citation and version safeguards', function() {
+  var modal=fs.readFileSync(path.join(projectRoot,'js/modules/literature-search-modal.js'),'utf8');
+  assert(modal.indexOf('previewCitationInsertion')>=0&&modal.indexOf('commitCitationOccurrence')>=0,'safe citation preview/commit missing');
+  assert(modal.indexOf('LITERATURE_VERSION_CONFLICT')>=0,'literature version conflict handling missing');
+  assert(modal.indexOf('calculateAssignments')>=0&&modal.indexOf('constraintSummary')>=0,'deterministic assignment or constraint logic missing');
 });
 
 test('DEPLOY: single worker for SQLite', function() {

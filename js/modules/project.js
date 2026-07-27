@@ -354,12 +354,12 @@
 
   function createLiteratureArtifact() {
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       version: 1,
       revisionId: '',
       manuscriptFingerprint: '',
       settings: { citationStyle: 'gbt7714-numeric', sourcePolicy: {}, defaultFilters: {} },
-      claims: {}, papers: {}, evidenceLinks: {}, occurrences: {}, audits: {}, searchRuns: {}, annotations: {},
+      claims: {}, papers: {}, evidenceLinks: {}, occurrences: {}, audits: {}, searchRuns: {}, searchSessions: {}, chapterAssignments: {}, annotations: {},
       cart: { paperIds: [], selections: {} },
       bibliography: { includedPaperIds: [], manualOrder: [], lastExport: null },
       migration: { legacyImportedAt: null, warnings: [] }
@@ -368,9 +368,9 @@
 
   function ensureLiteratureShape(value) {
     var lit = value && typeof value === 'object' ? value : createLiteratureArtifact();
-    if (!lit.schemaVersion) lit.schemaVersion = 1;
+    if (!lit.schemaVersion || lit.schemaVersion < 2) lit.schemaVersion = 2;
     if (!lit.version) lit.version = 1;
-    ['claims','papers','evidenceLinks','occurrences','audits','searchRuns','annotations'].forEach(function(k){ if(!lit[k]||typeof lit[k]!=='object')lit[k]={}; });
+    ['claims','papers','evidenceLinks','occurrences','audits','searchRuns','searchSessions','chapterAssignments','annotations'].forEach(function(k){ if(!lit[k]||typeof lit[k]!=='object')lit[k]={}; });
     if(!lit.settings)lit.settings={citationStyle:'gbt7714-numeric',sourcePolicy:{},defaultFilters:{}};
     if(!lit.settings.citationStyle)lit.settings.citationStyle='gbt7714-numeric';
     if(!lit.cart)lit.cart={paperIds:[],selections:{}};

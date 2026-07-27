@@ -280,6 +280,33 @@
   </div>
 </div>
 
+<!-- ====== 智能文献检索任务弹窗 ====== -->
+<div id="literatureSearchOverlay" class="workspace-modal-overlay literature-search-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="literatureSearchTitle" aria-describedby="literatureSearchSubtitle">
+  <div id="literatureSearchModal" class="workspace-modal literature-search-modal" tabindex="-1">
+    <div class="workspace-modal-head literature-search-head">
+      <div>
+        <h2 id="literatureSearchTitle">智能文献检索</h2>
+        <div id="literatureSearchSubtitle" class="workspace-modal-subtitle">从研究意图到证据应用，所有结果均需人工确认</div>
+      </div>
+      <div class="workspace-modal-actions">
+        <span id="literatureSearchSaveState" class="literature-search-save-state">未保存</span>
+        <button type="button" id="literatureSearchClose" class="workspace-modal-btn" aria-label="关闭智能文献检索">关闭</button>
+      </div>
+    </div>
+    <nav id="literatureSearchSteps" class="literature-search-steps" aria-label="文献检索步骤"></nav>
+    <div id="literatureSearchStatus" class="literature-search-status" role="status" aria-live="polite"></div>
+    <div id="literatureSearchContent" class="workspace-modal-content literature-search-content"></div>
+    <div id="literatureSearchExitConfirm" class="literature-search-exit-confirm" hidden>
+      <div><strong>检索任务尚未完成</strong><span>可以保存进度后退出，下次从文献工作台继续。</span></div>
+      <div>
+        <button type="button" class="workspace-modal-btn" data-search-exit="stay">继续任务</button>
+        <button type="button" class="workspace-modal-btn primary" data-search-exit="save">保存并退出</button>
+      </div>
+    </div>
+    <footer id="literatureSearchFooter" class="literature-search-footer"></footer>
+  </div>
+</div>
+
 <!-- ====== 知识图谱弹窗 ====== -->
 <div id="kgOverlay" class="workspace-modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="kgModalTitle">
   <div id="kgModal" class="workspace-modal kg-modal">
@@ -416,7 +443,8 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <script defer src="js/modules/defense-ppt.js?v=65"></script>
 <script defer src="js/modules/en-abstract.js?v=65"></script>
 <script defer src="js/modules/project.js?v=65"></script>
-<script defer src="js/modules/literature-workbench.js?v=66"></script>
+<script defer src="js/modules/literature-workbench.js?v=67"></script>
+<script defer src="js/modules/literature-search-modal.js?v=67"></script>
 <script defer src="js/app-modules.js?v=66"></script>
 <script>
 window.addEventListener('DOMContentLoaded',function(){

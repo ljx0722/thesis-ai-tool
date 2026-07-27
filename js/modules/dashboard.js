@@ -87,6 +87,12 @@ function escBoard(value) {
   });
 }
 
+function boardCharLabel(chars) {
+  chars = Math.max(0, Number(chars) || 0);
+  if (chars >= 10000) return (chars / 10000).toFixed(chars >= 100000 ? 0 : 1) + ' 万字';
+  return chars.toLocaleString('zh-CN') + ' 字';
+}
+
 function boardThemeColors() {
   var styles = getComputedStyle(document.body);
   function v(name, fallback) {
@@ -261,7 +267,7 @@ function buildDashboardHTML() {
   h += '</section>';
   h += '<section class="thesis-board-card"><div class="thesis-board-card-title">十维雷达</div><canvas id="dbRadar" class="thesis-board-canvas radar"></canvas></section>';
   h += '<section class="thesis-board-card"><div class="thesis-board-card-title">关键信号</div><div class="thesis-board-signals">';
-  h += signalRow('总字数', Math.round(s.totalChars / 1000) + 'k 字', s.totalChars > 30000 ? 'ok' : (s.totalChars > 15000 ? 'info' : 'warn'));
+  h += signalRow('总字数', boardCharLabel(s.totalChars), s.totalChars > 30000 ? 'ok' : (s.totalChars > 15000 ? 'info' : 'warn'));
   h += signalRow('正文章节', s.chapters + ' 章', s.chapters >= 5 ? 'ok' : (s.chapters >= 3 ? 'info' : 'bad'));
   h += signalRow('参考文献', s.totalRefs + ' 条', s.totalRefs >= 30 ? 'ok' : (s.totalRefs >= 15 ? 'info' : 'bad'));
   h += signalRow('中外比例', '中 ' + s.cnRefs + ' / 英 ' + s.enRefs, s.enRate >= 30 ? 'ok' : (s.enRate >= 15 ? 'warn' : 'bad'));
@@ -430,7 +436,6 @@ function drawChapterChart() {
   if (!canvas || !window._dbBodyChs) return;
   var bodyChs = window._dbBodyChs;
   var theme = boardThemeColors();
-  var tc = manuscriptText ? manuscriptText.length : 1;
   var w = Math.max(220, (canvas.parentElement.clientWidth || 280) - 24);
   var h = 110;
   canvas.width = w;
@@ -438,21 +443,26 @@ function drawChapterChart() {
   var ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, w, h);
   if (!bodyChs.length) return;
-  var barCnt = bodyChs.length, bg = 12, bw = (w - bg * (barCnt + 1)) / barCnt;
+  var barCnt = bodyChs.length, bg = 10, chartTop = 12, chartBottom = 30, bw = Math.max(10, (w - bg * (barCnt + 1)) / barCnt);
   var colors = [theme.accent, theme.success, theme.info, theme.warning, theme.danger, '#8b5cf6', '#06b6d4', '#f97316'];
-  var maxPct = 0;
-  bodyChs.forEach(function (c) { var p = (c.text || '').length / tc * 100; if (p > maxPct) maxPct = p; });
+  var maxChars = 0, totalBodyChars = 0;
+  bodyChs.forEach(function (c) { var len = (c.text || '').length; totalBodyChars += len; if (len > maxChars) maxChars = len; });
   bodyChs.forEach(function (cs, i) {
-    var pct = (cs.text || '').length / tc * 100;
-    var bh = (pct / Math.max(1, maxPct)) * (h - 28);
+    var chars = (cs.text || '').length;
+    var pct = chars / Math.max(1, totalBodyChars) * 100;
+    var bh = (chars / Math.max(1, maxChars)) * (h - chartTop - chartBottom);
+    var x = bg + i * (bw + bg), y = h - chartBottom - bh;
     ctx.fillStyle = colors[i % colors.length];
-    ctx.fillRect(bg + i * (bw + bg), h - bh - 12, bw, bh);
+    ctx.globalAlpha = 0.88;
+    ctx.fillRect(x, y, bw, bh);
+    ctx.globalAlpha = 1;
     ctx.fillStyle = theme.text;
     ctx.font = '10px system-ui,sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(Math.round(pct) + '%', bg + i * (bw + bg) + bw / 2, h - bh - 16);
+    ctx.fillText(boardCharLabel(chars).replace(' 字', ''), x + bw / 2, Math.max(10, y - 5));
     ctx.fillStyle = theme.muted;
-    ctx.fillText((cs.name || '').replace('第', '').substring(0, 4), bg + i * (bw + bg) + bw / 2, h - 2);
+    ctx.fillText(Math.round(pct) + '%', x + bw / 2, h - 16);
+    ctx.fillText((cs.name || '').replace(/^第/, '').substring(0, 4), x + bw / 2, h - 3);
   });
 }
 
@@ -518,7 +528,7 @@ function exportDashboardReport() {
   });
   lines.push('');
   lines.push('=== 基础统计 ===');
-  lines.push('总字数: ' + Math.round(s.totalChars / 1000) + 'k');
+  lines.push('总字数: ' + boardCharLabel(s.totalChars));
   lines.push('正文章节: ' + s.chapters + ' · 小节: ' + s.sections);
   lines.push('参考文献: ' + s.totalRefs + '（中文 ' + s.cnRefs + ' / 英文 ' + s.enRefs + '）');
   lines.push('近五年文献: ' + s.recentRate + '% · DOI: ' + s.doiRate + '%');

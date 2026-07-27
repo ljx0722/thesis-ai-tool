@@ -136,6 +136,14 @@
     font-size: .75rem; font-weight: 600;
   }
 .admin-pager{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:10px;font-size:.72rem;color:var(--text-muted)}.admin-pager select{border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);border-radius:6px;padding:5px 8px}.admin-pager button:disabled{opacity:.45;cursor:not-allowed}
+.pricing-help{margin:0 0 10px;color:var(--text-muted);font-size:.72rem;line-height:1.6}
+.pricing-quick-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-top:12px}
+.pricing-quick-card{border:1px solid var(--border);border-radius:10px;background:var(--bg-card);padding:10px}
+.pricing-quick-card b{display:block;font-size:.76rem;color:var(--text-primary);margin-bottom:3px}
+.pricing-quick-card span{display:block;font-size:.66rem;color:var(--text-muted);line-height:1.45;margin-bottom:8px}
+.pricing-quick-card input{width:100%}
+.pricing-advanced{margin-top:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-card);padding:10px 12px}
+.pricing-advanced summary{cursor:pointer;color:var(--text-secondary);font-size:.78rem;font-weight:700}
 </style></head><body class="admin-page">
 <div class="admin-layout">
   <div id="loginBox" class="admin-login">
@@ -330,21 +338,25 @@
           <button class="admin-btn" onclick="loadPricing()">刷新</button>
           <button class="admin-btn admin-btn-primary" onclick="savePricing()">保存修改</button>
         </div>
-        <div class="gift-panel">
-          <h3>默认 LLM 策略</h3>
+        <div class="gift-panel pricing-quick-panel">
+          <h3>常用计费策略</h3>
+          <p class="pricing-help">只改这里即可完成日常调价：默认模型、统一倍率、最低扣费和本地固定价。模型费率卡与能力覆盖保留在高级配置中。</p>
           <div class="admin-flex-wrap">
             <label style="font-size:.72rem">默认模型</label>
             <input id="pricingDefaultModel" class="admin-input" style="min-width:220px">
-            <label style="font-size:.72rem">默认倍率(‰)</label>
+            <label style="font-size:.72rem">统一倍率(‰)</label>
             <input id="pricingDefaultMultiplier" class="admin-input" type="number" style="width:120px" title="1000=1倍">
-            <label style="font-size:.72rem">默认最低扣费(厘)</label>
+            <label style="font-size:.72rem">最低扣费(厘)</label>
             <input id="pricingDefaultMin" class="admin-input" type="number" style="width:120px">
           </div>
+          <div class="pricing-quick-grid" id="pricingQuickGrid"></div>
         </div>
-        <h3 style="font-size:.9rem;margin:16px 0 8px">模型费率卡</h3>
-        <table class="admin-table" id="pricingModelTable"><thead><tr><th>模型</th><th>阶层/模态</th><th>输入/百万</th><th>缓存输入/百万</th><th>输出/百万</th><th>推理/百万</th><th>启用</th></tr></thead><tbody></tbody></table>
-        <h3 style="font-size:.9rem;margin:16px 0 8px">能力独立策略</h3>
-        <table class="admin-table" id="pricingCapabilityTable"><thead><tr><th>能力</th><th>计费</th><th>模型</th><th>倍率(‰)</th><th>最低扣费(厘)</th><th>来源</th></tr></thead><tbody></tbody></table>
+        <details class="pricing-advanced"><summary>高级：模型费率卡与能力独立策略</summary>
+          <h3 style="font-size:.9rem;margin:12px 0 8px">模型费率卡</h3>
+          <table class="admin-table" id="pricingModelTable"><thead><tr><th>模型</th><th>阶层/模态</th><th>输入/百万</th><th>缓存输入/百万</th><th>输出/百万</th><th>推理/百万</th><th>启用</th></tr></thead><tbody></tbody></table>
+          <h3 style="font-size:.9rem;margin:16px 0 8px">能力独立策略</h3>
+          <table class="admin-table" id="pricingCapabilityTable"><thead><tr><th>能力</th><th>计费</th><th>模型</th><th>倍率(‰)</th><th>最低扣费(厘)</th><th>来源</th></tr></thead><tbody></tbody></table>
+        </details>
         <h3 style="font-size:.9rem;margin:16px 0 8px">固定价与兼容项</h3>
         <table class="admin-table" id="pricingTable"><thead><tr><th>模块（中文名/说明）</th><th>方式</th><th>当前(点)</th><th>调价数值*</th><th></th></tr></thead><tbody></tbody></table>
         <div style="margin-top:12px" class="admin-flex-wrap">
@@ -932,9 +944,17 @@ function loadPricing(){
         capabilityHtml+='<tr><td><b>'+escapeAdminHtml(cap.name||cap.id)+'</b><div style="font-size:.65rem;color:var(--text-muted)">'+escapeAdminHtml(cap.id)+' · '+escapeAdminHtml(cap.description||'')+'</div></td><td>'+escapeAdminHtml(cap.billing_kind||'')+' / '+escapeAdminHtml((cap.modalities||[]).join(', '))+'</td><td>'+escapeAdminHtml(cap.model_ref||'继承默认')+'</td><td>'+(cap.multiplier_millis||'—')+'</td><td>'+(cap.min_charge_milli==null?'—':cap.min_charge_milli)+'</td><td>'+(cap.inherited?'继承默认':'独立覆盖')+(cap.error?'<div style="color:var(--danger)">'+escapeAdminHtml(cap.error)+'</div>':'')+'</td></tr>';
       });
       document.querySelector('#pricingCapabilityTable tbody').innerHTML=capabilityHtml||'<tr><td colspan="6">暂无能力</td></tr>';
+      var quickKeys=['search','kg','format-check','terminology','paragraph','dashboard','optimization','data-analysis','data-ml','export-docx'];
+      var quickHtml='';
+      (d.items||[]).forEach(function(it){
+        if(quickKeys.indexOf(it.key)<0) return;
+        quickHtml+='<label class="pricing-quick-card"><b>'+escapeAdminHtml(it.name||it.key)+'</b><span>'+escapeAdminHtml(it.billing==='llm-token'||it.billing==='smart'?'智能用量/兼容项':'按次固定价')+' · 当前 '+Number(it.points).toFixed(3)+' 点</span><input class="admin-input price-input" data-key="'+escapeAdminHtml(it.key)+'" type="number" value="'+escapeAdminHtml(it.milli_credits)+'"></label>';
+      });
+      document.getElementById('pricingQuickGrid').innerHTML=quickHtml;
       var tb=document.querySelector('#pricingTable tbody'); var h='';
       (d.items||[]).forEach(function(it){
-        h+='<tr><td><b>'+(it.name||it.key)+'</b><div style="font-size:.65rem;color:var(--text-muted);margin-top:2px">'+it.key+(it.desc?(' · '+it.desc):'')+'</div></td><td>'+((it.billing==='llm-token'||it.billing==='smart')?'智能用量':'按次')+'</td><td>'+Number(it.points).toFixed(3)+'</td><td><input class="admin-input price-input" data-key="'+it.key+'" type="number" value="'+it.milli_credits+'" style="width:110px" '+(it.billing==='llm-token'?'title="AI模块实际按token扣费，此值仅兼容旧接口"':'')+'></td></tr>';
+        var hidden=quickKeys.indexOf(it.key)>=0?' style="display:none"':'';
+        h+='<tr'+hidden+'><td><b>'+escapeAdminHtml(it.name||it.key)+'</b><div style="font-size:.65rem;color:var(--text-muted);margin-top:2px">'+escapeAdminHtml(it.key)+(it.desc?(' · '+escapeAdminHtml(it.desc)):'')+'</div></td><td>'+((it.billing==='llm-token'||it.billing==='smart')?'智能用量':'按次')+'</td><td>'+Number(it.points).toFixed(3)+'</td><td><input class="admin-input price-input" data-key="'+escapeAdminHtml(it.key)+'" type="number" value="'+escapeAdminHtml(it.milli_credits)+'" style="width:110px" '+(quickKeys.indexOf(it.key)>=0?'disabled ':'')+(it.billing==='llm-token'?'title="AI模块实际按token扣费，此值仅兼容旧接口"':'')+'></td></tr>';
       });
       tb.innerHTML=h;
       document.getElementById('bonusRegister').value=(d.bonuses&&d.bonuses.register_bonus)||3000;
