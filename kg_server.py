@@ -5470,12 +5470,17 @@ def projects_upsert():
                 current_row = db.execute('SELECT * FROM projects WHERE id=? AND user_id=?', (pid, request.user_id)).fetchone()
                 current_art = db.execute('SELECT * FROM project_artifacts WHERE project_id=?', (pid,)).fetchone()
                 return jsonify({'success': False, 'code': 'PROJECT_VERSION_CONFLICT', 'error': '云端项目已被其他会话更新', 'submittedRowVersion': submitted_version, 'currentRowVersion': current_version, 'serverProject': _project_row_to_dict(current_row, current_art)}), 409
-            db.execute(
+            cursor = db.execute(
                 "UPDATE projects SET title=?, idea=?, field=?, keywords=?, degree=?, goal_words=?, current_stage=?, mode=?, "
                 "has_manuscript=?, stage_status=?, school_template=?, notes=?, updated_at=?, row_version=row_version+1 "
                 "WHERE id=? AND user_id=? AND row_version=?",
                 payload + (current_version,)
             )
+            if cursor.rowcount != 1:
+                current_row = db.execute('SELECT * FROM projects WHERE id=? AND user_id=?', (pid, request.user_id)).fetchone()
+                current_art = db.execute('SELECT * FROM project_artifacts WHERE project_id=?', (pid,)).fetchone()
+                latest_version = int(current_row['row_version'] or 1) if current_row else current_version
+                return jsonify({'success': False, 'code': 'PROJECT_VERSION_CONFLICT', 'error': '云端项目已被其他会话更新', 'submittedRowVersion': submitted_version, 'currentRowVersion': latest_version, 'serverProject': _project_row_to_dict(current_row, current_art) if current_row else None}), 409
         else:
             db.execute(
                 "INSERT INTO projects "

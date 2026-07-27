@@ -107,6 +107,48 @@
 
   function projectStorageKey() { return scopedKey(STORAGE_KEY); }
   function currentProjectKey() { return scopedKey(CURRENT_KEY); }
+  function syncMetaKey() { return scopedKey('thesis_ai_project_sync_v1'); }
+
+  function cloneValue(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+
+  function loadSyncMeta() {
+    try {
+      var parsed = JSON.parse(localStorage.getItem(syncMetaKey()) || '{}');
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (e) { return {}; }
+  }
+
+  function saveSyncMeta(meta) {
+    try { localStorage.setItem(syncMetaKey(), JSON.stringify(meta || {})); } catch (e) {}
+  }
+
+  function syncedBaseline(projectId) {
+    var entry = loadSyncMeta()[projectId];
+    return entry && entry.baseline ? entry.baseline : null;
+  }
+
+  function rememberSyncedProject(project) {
+    if (!project || !project.id) return;
+    var meta = loadSyncMeta();
+    meta[project.id] = { baseline: cloneValue(project), blockedRowVersion: null, dirty: false, updatedAt: nowISO() };
+    saveSyncMeta(meta);
+  }
+
+  function rememberDirtyProject(projectId, blockedRowVersion) {
+    if (!projectId) return;
+    var meta = loadSyncMeta(), entry = meta[projectId] || {};
+    entry.dirty = true;
+    if (blockedRowVersion != null) entry.blockedRowVersion = Number(blockedRowVersion);
+    entry.updatedAt = nowISO();meta[projectId] = entry;saveSyncMeta(meta);
+  }
+
+  function clearProjectSyncBlock(projectId) {
+    var meta = loadSyncMeta(), entry = meta[projectId];
+    if (!entry) return;
+    entry.blockedRowVersion = null;entry.dirty = true;entry.updatedAt = nowISO();saveSyncMeta(meta);
+  }
 
   function uid() {
     return 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -154,54 +196,87 @@
     setCurrentId(project.id);
     return project;
   }
-  var cloudSyncState = { inFlight: {}, dirty: {}, lastSavedAt: {}, lastError: {} };
-  function syncProjectToCloud(project, cb) {
+  var cloudSyncState = { inFlight: {}, dirty: {}, lastSavedAt: {}, lastError: {}, conflict: {} };
+  var PROJECT_SERVER_FIELDS = ['title','idea','field','keywords','degree','goalWords','currentStage','mode','hasManuscript','stageStatus','schoolTemplate','notes','artifacts'];
+  function projectChangedFields(base, value) {
+    var changed = {};
+    PROJECT_SERVER_FIELDS.forEach(function(key){
+      if (JSON.stringify(base && base[key]) !== JSON.stringify(value && value[key])) changed[key] = true;
+    });
+    return changed;
+  }
+  function mergeProjectConflict(base, local, server) {
+    base = base || server || {};local = local || {};server = server || {};
+    var localChanged = projectChangedFields(base, local), serverChanged = projectChangedFields(base, server), conflicts = [];
+    var merged = cloneValue(server) || {};
+    PROJECT_SERVER_FIELDS.forEach(function(key){
+      if (localChanged[key] && serverChanged[key] && JSON.stringify(local[key]) !== JSON.stringify(server[key])) conflicts.push(key);
+      else if (localChanged[key]) merged[key] = cloneValue(local[key]);
+    });
+    merged.id = server.id || local.id;merged.rowVersion = server.rowVersion;merged.updatedAt = local.updatedAt || nowISO();
+    return { project: merged, conflicts: conflicts };
+  }
+  function syncProjectToCloud(project, cb, options) {
+    options = options || {};
     if (!cloudEnabled() || !project) { if (cb) cb(null); return Promise.resolve(null); }
-    cloudSyncState.dirty[project.id] = true;
-    var previous = cloudSyncState.inFlight[project.id] || Promise.resolve();
+    var projectId = project.id, submitted = cloneValue(project), submittedVersion = Number(submitted.rowVersion || 1);
+    var syncMeta = loadSyncMeta(), metaEntry = syncMeta[projectId] || {};
+    if (!options.allowBlocked && metaEntry.blockedRowVersion === submittedVersion) {
+      var blocked = new Error('项目版本冲突待处理');blocked.code='PROJECT_VERSION_CONFLICT';blocked.data=cloudSyncState.lastError[projectId]||{error:'项目版本冲突待处理'};return Promise.reject(blocked);
+    }
+    cloudSyncState.dirty[projectId] = true;rememberDirtyProject(projectId);
+    var previous = options.bypassQueue ? Promise.resolve() : (cloudSyncState.inFlight[projectId] || Promise.resolve());
     var request = previous.catch(function(){}).then(function(){
-      return fetch('/api/projects', {
-        method: 'POST', headers: authHeaders(), body: JSON.stringify({ project: project })
-      }).then(function(r){
+      return fetch('/api/projects', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ project: submitted }) }).then(function(r){
         return r.json().catch(function(){ return {}; }).then(function(d){
           if (r.status === 409) {
-            cloudSyncState.lastError[project.id] = d;
-            var err = new Error(d.error || '项目版本冲突'); err.code='PROJECT_VERSION_CONFLICT'; err.data=d; throw err;
+            var server = d.serverProject;
+            if (!server) { var missing = new Error(d.error || '项目版本冲突');missing.code='PROJECT_VERSION_CONFLICT';missing.data=d;throw missing; }
+            var latestLocal = loadAll().filter(function(item){return item.id===projectId;})[0] || submitted;
+            var base = syncedBaseline(projectId) || submitted;
+            var resolution = mergeProjectConflict(base, latestLocal, server);
+            if (resolution.conflicts.length || options.conflictRetry) {
+              d.conflictFields = resolution.conflicts;cloudSyncState.conflict[projectId] = d;cloudSyncState.lastError[projectId] = d;rememberDirtyProject(projectId, submittedVersion);
+              var conflict = new Error(d.error || '项目版本冲突');conflict.code='PROJECT_VERSION_CONFLICT';conflict.data=d;throw conflict;
+            }
+            resolution.project.rowVersion = Number(d.currentRowVersion || server.rowVersion || 1);
+            upsertLocal(resolution.project);clearProjectSyncBlock(projectId);
+            return syncProjectToCloud(resolution.project, cb, { conflictRetry: true, allowBlocked: true, bypassQueue: true });
           }
           if (!r.ok || !d.success || !d.project) throw new Error(d.error || ('云端同步失败 '+r.status));
-          upsertLocal(d.project);
-          cloudSyncState.dirty[project.id] = false;
-          cloudSyncState.lastSavedAt[project.id] = new Date().toISOString();
-          cloudSyncState.lastError[project.id] = null;
-          if (cb) cb(d.project);
-          return d.project;
+          upsertLocal(d.project);rememberSyncedProject(d.project);cloudSyncState.dirty[projectId] = false;cloudSyncState.lastSavedAt[projectId] = new Date().toISOString();cloudSyncState.lastError[projectId] = null;cloudSyncState.conflict[projectId] = null;
+          if (cb) cb(d.project);return d.project;
         });
       });
-    }).catch(function(err){ cloudSyncState.lastError[project.id]=err.data||{error:err.message}; if(cb)cb(null); throw err; });
-    var tracked = request.finally(function(){ if (cloudSyncState.inFlight[project.id] === tracked) delete cloudSyncState.inFlight[project.id]; });
-    cloudSyncState.inFlight[project.id] = tracked;
-    return tracked;
+    }).catch(function(err){ cloudSyncState.lastError[projectId]=err.data||{error:err.message};rememberDirtyProject(projectId, err.code==='PROJECT_VERSION_CONFLICT'?submittedVersion:null);if(cb)cb(null);throw err; });
+    var tracked = request.finally(function(){ if (cloudSyncState.inFlight[projectId] === tracked) delete cloudSyncState.inFlight[projectId]; });
+    cloudSyncState.inFlight[projectId] = tracked;return tracked;
   }
   function flushAllDirty(options){
-    options=options||{};var ps=[];
-    loadAll().forEach(function(p){if(cloudSyncState.dirty[p.id]||options.force)ps.push(syncProjectToCloud(p));var key='literature:'+p.id;if(cloudSyncState.inFlight[key])ps.push(cloudSyncState.inFlight[key]);});
+    options=options||{};var ps=[],meta=loadSyncMeta();
+    loadAll().forEach(function(p){
+      var entry=meta[p.id]||{},blocked=entry.blockedRowVersion!=null&&Number(entry.blockedRowVersion)===Number(p.rowVersion||1);
+      if((cloudSyncState.dirty[p.id]||entry.dirty||options.force)&&!blocked)ps.push(syncProjectToCloud(p));
+      var key='literature:'+p.id;if(cloudSyncState.inFlight[key])ps.push(cloudSyncState.inFlight[key]);
+    });
     return Promise.allSettled(ps).then(function(results){
       var failed=results.filter(function(r){return r.status==='rejected';});
       return {success:failed.length===0,failed:failed.length,results:results};
     });
   }
-  function getSaveState(projectId){return{dirty:!!cloudSyncState.dirty[projectId],saving:!!cloudSyncState.inFlight[projectId],lastSavedAt:cloudSyncState.lastSavedAt[projectId]||'',lastError:cloudSyncState.lastError[projectId]||null};}
+  function getSaveState(projectId){
+    var entry=loadSyncMeta()[projectId]||{};
+    return{dirty:!!cloudSyncState.dirty[projectId]||!!entry.dirty,saving:!!cloudSyncState.inFlight[projectId],lastSavedAt:cloudSyncState.lastSavedAt[projectId]||'',lastError:cloudSyncState.lastError[projectId]||null,conflict:cloudSyncState.conflict[projectId]||null,blockedRowVersion:entry.blockedRowVersion};
+  }
   function pullCloudProjects(cb) {
-    if (!cloudEnabled()) { if (cb) cb([]); return; }
-    fetch('/api/projects', { headers: authHeaders() })
-      .then(function(r){ return r.json(); })
+    if (!cloudEnabled()) { if (cb) cb([], null); return Promise.resolve([]); }
+    return fetch('/api/projects', { headers: authHeaders() })
+      .then(function(r){ return r.json().catch(function(){return{};}).then(function(d){if(!r.ok||!d.success){var err=new Error(d.error||('云端项目加载失败 '+r.status));err.data=d;throw err;}return d;}); })
       .then(function(d){
-        if (!d || !d.success) { if (cb) cb([]); return; }
-        var remote = d.projects || [];
-        // merge remote over local by updatedAt
-        var map = {};
+        var remote = d.projects || [], map = {};
         loadAll().forEach(function(p){ map[p.id] = p; });
         remote.forEach(function(rp){
+          rememberSyncedProject(rp);
           var lp = map[rp.id];
           if (!lp) map[rp.id] = rp;
           else {
@@ -212,9 +287,8 @@
         });
         var merged = Object.keys(map).map(function(k){ return map[k]; });
         merged.sort(function(a,b){ return Date.parse(b.updatedAt||0) - Date.parse(a.updatedAt||0); });
-        saveAll(merged);
-        if (cb) cb(merged);
-      }).catch(function(){ if (cb) cb([]); });
+        saveAll(merged);if (cb) cb(merged, null);return merged;
+      }).catch(function(err){ if (cb) cb(null, err);throw err; });
   }
 
 
@@ -1643,7 +1717,13 @@
   }
 
   function bootstrapAuthenticatedUser() {
-    return new Promise(function(resolve){pullCloudProjects(function(list){var current=getCurrentProject();if(!current&&list&&list.length){setCurrentId(list[0].id);current=list[0];}if(current&&current.activeRevisionId){hydrateRevision(current.id,current.activeRevisionId).catch(function(){unloadProjectRuntime();}).finally(function(){restoreImportDecomposition(current);renderProjectChrome();if(typeof switchView==='function')switchView('workspace');resolve(current);});}else{unloadProjectRuntime();restoreImportDecomposition(current);renderProjectChrome();if(typeof switchView==='function')switchView('workspace');resolve(current);}});});
+    return pullCloudProjects().then(function(list){
+      var current=getCurrentProject();if(!current&&list&&list.length){setCurrentId(list[0].id);current=list[0];}
+      if(current&&current.activeRevisionId){return hydrateRevision(current.id,current.activeRevisionId).catch(function(){unloadProjectRuntime();}).then(function(){restoreImportDecomposition(current);renderProjectChrome();if(typeof switchView==='function')switchView('workspace');return current;});}
+      unloadProjectRuntime();restoreImportDecomposition(current);renderProjectChrome();if(typeof switchView==='function')switchView('workspace');return current;
+    }).catch(function(err){
+      console.warn('[project-cloud-pull]',err);var current=getCurrentProject();unloadProjectRuntime();restoreImportDecomposition(current);renderProjectChrome();if(typeof switchView==='function')switchView('workspace');if(typeof ttp==='function')ttp('云端项目加载失败，已使用本地数据');return current;
+    });
   }
 
   function onManuscriptReady() {

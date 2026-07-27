@@ -5,6 +5,20 @@
  */
 var thesisReview = null;
 
+function reviewDocumentTitle() {
+  var project = window.ThesisProject && ThesisProject.getCurrentProject ? ThesisProject.getCurrentProject() : null;
+  if (project && project.title && project.title !== '未命名论文项目' && project.title !== '导入论文项目') return String(project.title).trim();
+  var root = document.getElementById('paperContentRoot') || document.getElementById('thesisBox');
+  if (root) {
+    var candidates = root.querySelectorAll('h1,.title,.paper-title,[data-document-title]');
+    for (var i = 0; i < candidates.length; i++) {
+      var value = (candidates[i].textContent || '').trim();
+      if (value.length >= 5 && !/^第[一二三四五六七八九十\d]+章/.test(value)) return value;
+    }
+  }
+  return '';
+}
+
 function computeThesisReview() {
   var text = manuscriptText || '';
   var secs = sections || [];
@@ -23,8 +37,9 @@ function computeThesisReview() {
   if (totalChars > 40000) dim1.score += 8; else dim1.subItems.push({ t: '📝 篇幅', d: '建议充实研究内容，达到专业硕士论文最低篇幅要求', s: 60, auto: true });
   if (bodyChs.length >= 5) dim1.score += 5;
   // Title check
-  var title = (bodyChs[0] && bodyChs[0].name) || '';
-  if (title.length > 30) dim1.subItems.push({ t: '⚠ 题目', d: '标题偏长(' + title.length + '字)，建议精简至25字以内', s: 60, auto: true });
+  var title = reviewDocumentTitle();
+  if (!title) dim1.subItems.push({ t: '⚠ 题目', d: '未识别到论文题目，请在项目设置或文档标题中补充', s: 50, auto: true });
+  else if (title.length > 30) dim1.subItems.push({ t: '⚠ 题目', d: '标题偏长(' + title.length + '字)，建议精简至25字以内', s: 60, auto: true });
   else if (title.length > 5) dim1.score += 5;
   dim1.subItems.push({ t: '题目评估', d: '需要人工判断：是否贴合专业培养目标、学科研究方向；题目宽窄是否适配', s: null, auto: false });
   dim1.subItems.push({ t: '价值评估', d: '需要人工判断：现实应用价值、理论学术价值、时代/政策契合性', s: null, auto: false });

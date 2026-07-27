@@ -287,9 +287,9 @@
       <div class="workspace-modal-title-row">
         <h2 id="kgModalTitle">🕸️ 知识图谱</h2>
         <div id="kgTabs" class="kg-tabs" role="tablist" aria-label="知识图谱视图">
-          <button onclick="switchKGView('cloud')" id="kgTabCloud" class="kg-tab active" role="tab" title="概念分析：区分高频词、特色词与章节分布。共现只表示共同出现，不代表因果。">🧭 概念概览</button>
-          <button onclick="switchKGView('network')" id="kgTabNetwork" class="kg-tab" role="tab" title="研究关系概览：章节、概念与文献的可追溯关系。现有共现边不自动解释为支持或因果。">🔗 研究关系</button>
-          <button onclick="switchKGView('timeline')" id="kgTabTimeline" class="kg-tab" role="tab" title="文献时间线：按年份观察研究演进与来源。">📅 文献演进</button>
+          <button onclick="switchKGView('cloud')" onkeydown="handleKGTabKeydown(event)" id="kgTabCloud" class="kg-tab" role="tab" aria-selected="false" tabindex="-1" title="概念分析：区分高频词、特色词与章节分布。共现只表示共同出现，不代表因果。">🧭 概念概览</button>
+          <button onclick="switchKGView('network')" onkeydown="handleKGTabKeydown(event)" id="kgTabNetwork" class="kg-tab active" role="tab" aria-selected="true" tabindex="0" title="研究关系概览：章节、概念与文献的可追溯关系。现有共现边不自动解释为支持或因果。">🔗 研究关系</button>
+          <button onclick="switchKGView('timeline')" onkeydown="handleKGTabKeydown(event)" id="kgTabTimeline" class="kg-tab" role="tab" aria-selected="false" tabindex="-1" title="文献时间线：按年份观察研究演进与来源。">📅 文献演进</button>
         </div>
       </div>
       <div class="workspace-modal-actions">
@@ -302,9 +302,9 @@
     <div id="kgContent" class="workspace-modal-content kg-content-surface">
       <div id="kgCloudPanel" class="kg-view-panel kg-cloud-panel"></div>
       <div id="kgGraphPanel" class="kg-view-panel kg-graph-panel">
-        <div id="kgPlaceholder" class="kg-placeholder"><div class="kg-placeholder-icon">🔍</div><div>正在生成知识图谱...</div></div>
-        <svg id="kgSvg" class="kg-svg"></svg>
-        <canvas id="kgTimelineCanvas" class="kg-timeline-canvas"></canvas>
+        <div id="kgPlaceholder" class="kg-placeholder" role="status" aria-live="polite"><div class="kg-placeholder-icon">🔍</div><div class="kg-placeholder-message">正在生成知识图谱...</div></div>
+        <svg id="kgSvg" class="kg-svg" role="img" aria-label="研究关系知识图谱" preserveAspectRatio="xMidYMid meet"></svg>
+        <div id="kgTimelinePanel" class="kg-timeline-panel"></div>
       </div>
     </div>
   </div>

@@ -15,12 +15,19 @@ function runTopicFinder(container) {
 }
 
 window.runTopicFinderAI = function() {
-  var domain = document.getElementById('topicDomain').value.trim();
-  var keywords = document.getElementById('topicKeywords').value.trim();
-  if (!domain || domain.length < 2) { alert('请输入研究领域'); return; }
+  var domainEl = document.getElementById('topicDomain');
+  var keywordsEl = document.getElementById('topicKeywords');
   var out = document.getElementById('topicOutput');
-  out.innerHTML = '<div class="ai-loading">⏳ AI 正在分析"' + domain + '"领域的研究趋势...</div>';
-  var token = sessionStorage.getItem('thesis_ai_token');
+  var button = document.querySelector('button[onclick="runTopicFinderAI()"]');
+  if (!domainEl || !keywordsEl || !out) return;
+  var domain = domainEl.value.trim();
+  var keywords = keywordsEl.value.trim();
+  if (!domain || domain.length < 2) { alert('请输入研究领域'); return; }
+  if (button && button.disabled) return;
+  out.innerHTML = '';
+  var loading = document.createElement('div');loading.className = 'ai-loading';loading.textContent = 'AI 正在分析“' + domain + '”领域的研究趋势...';out.appendChild(loading);
+  if (button) { button.disabled = true; button.textContent = '分析中...'; }
+  var token = sessionStorage.getItem('thesis_ai_token') || '';
 
   fetch('/api/llm/analyze', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
@@ -29,12 +36,20 @@ window.runTopicFinderAI = function() {
       input: '研究领域：' + domain + (keywords ? '\n关键词：' + keywords : '') + '\n\n请完成以下任务：\n1. 该领域近3年研究热点（100字）\n2. 研究空白与机会点（80字）\n3. 推荐5个论文题目（每个题目附50字简介 + 3-5个大纲方向）\n4. 每个题目建议3个最有价值的参考文献检索方向\n\n请按编号清晰列出。',
       max_tokens: 3000
     })
-  }).then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (d.success) {
-        out.innerHTML = '<div class="ai-output">' + d.content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
-        if (window.ThesisProject && ThesisProject.logSkillRun) ThesisProject.logSkillRun({ moduleId: 'topic-finder', title: '选题推荐', summary: domain });
-        if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
-      } else { out.innerHTML = '<div class="ai-output-error">❌ ' + d.error + '</div>'; }
+  }).then(function(r) {
+    return r.json().catch(function(){ throw new Error('服务返回了无法解析的响应'); }).then(function(d){
+      if (!r.ok || !d.success) throw new Error(d.error || ('选题推荐失败 (' + r.status + ')'));
+      return d;
     });
+  }).then(function(d) {
+    out.innerHTML = '';
+    var result = document.createElement('div');result.className = 'ai-output';result.textContent = d.content || '服务未返回推荐内容';out.appendChild(result);
+    if (window.ThesisProject && ThesisProject.logSkillRun) ThesisProject.logSkillRun({ moduleId: 'topic-finder', title: '选题推荐', summary: domain });
+    if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
+  }).catch(function(error) {
+    out.innerHTML = '';
+    var errorEl = document.createElement('div');errorEl.className = 'ai-output-error';errorEl.textContent = error.message || '网络错误，请稍后重试';out.appendChild(errorEl);
+  }).finally(function() {
+    if (button) { button.disabled = false; button.textContent = '开始推荐'; }
+  });
 };

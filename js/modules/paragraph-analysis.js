@@ -31,7 +31,7 @@ function runParagraphAnalysis(container) {
       var sents = pt.split(/[。！？\.\?\!]/).filter(function(s){return s.trim().length>0;});
       ts += sents.length;
       var lsc = sents.filter(function(s){return s.trim().length>100;}).length;
-      paraData.push({ el: paras[pi], len: pt.length, sents: sents.length, longSents: lsc, text: pt.substring(0,60) });
+      paraData.push({ el: paras[pi], sourceIndex: paraData.length, len: pt.length, sents: sents.length, longSents: lsc, text: pt.substring(0,60) });
       if (pt.length > 800) stats.longParas++;
       if (pt.length < 30) stats.shortParas++;
       // 检测 mammoth 标题拆分残留：纯编号段落或孤立短文本
@@ -132,10 +132,10 @@ function runParagraphAnalysis(container) {
     h += '<h4>⚠ 需关注的段落</h4>';
     var pp2 = paraData.filter(function(p){return p.len > 800 || p.longSents > 3;}).slice(0, 8);
     if (pp2.length) {
-      pp2.forEach(function(p, i) {
+      pp2.forEach(function(p) {
         var reason = p.len > 800 ? '过长(' + p.len + '字)' : '';
         if (p.longSents > 3) reason += (reason?', ':'') + p.longSents + '个长句';
-        h += '<div class="finding warn" onclick="jumpToParagraph(' + i + ')" style="cursor:pointer">⚠ ' + reason + '：「' + p.text + '...」</div>';
+        h += '<div class="finding warn" onclick="jumpToParagraph(' + p.sourceIndex + ')" style="cursor:pointer">⚠ ' + reason + '：「' + p.text + '...」</div>';
       });
     } else {
       h += '<div class="finding ok">✅ 段落结构良好，未发现突出问题</div>';

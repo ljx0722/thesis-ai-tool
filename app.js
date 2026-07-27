@@ -4039,10 +4039,81 @@ function clearRefSentenceHighlights(){
 
 // 知识图谱
 var kgApiUrl='/kg_api/generate',kgCurrentData=null,kgCurrentView='network';
+var kgPreviousFocus=null,kgModalKeydown=null,kgResizeObserver=null,kgResizeFrame=0,kgNetworkViewBox=null;
 function knowledgeGraphThemeColors(){
   var styles=getComputedStyle(document.body);
   function v(name,fallback){var value=styles.getPropertyValue(name);return(value&&value.trim())||fallback;}
   return{text:v('--text-primary','#0f172a'),secondary:v('--text-secondary','#334155'),muted:v('--text-tertiary','#64748b'),border:v('--border','#e2e8f0'),strongBorder:v('--border-strong','#cbd5e1'),card:v('--bg-card','#ffffff'),surface:v('--surface-alt','#f1f5f9'),accent:v('--accent','#6366f1')};
+}
+function ensureKnowledgeGraphDOM(){
+  var gp=document.getElementById('kgGraphPanel');
+  if(!gp)return null;
+  var ph=document.getElementById('kgPlaceholder');
+  if(!ph){
+    ph=document.createElement('div');ph.id='kgPlaceholder';ph.className='kg-placeholder';ph.setAttribute('role','status');ph.setAttribute('aria-live','polite');gp.appendChild(ph);
+  }
+  var sv=document.getElementById('kgSvg');
+  if(!sv){
+    sv=document.createElementNS('http://www.w3.org/2000/svg','svg');sv.id='kgSvg';sv.setAttribute('class','kg-svg');sv.setAttribute('role','img');sv.setAttribute('aria-label','研究关系知识图谱');sv.setAttribute('preserveAspectRatio','xMidYMid meet');gp.appendChild(sv);
+  }
+  var timeline=document.getElementById('kgTimelinePanel');
+  if(!timeline){timeline=document.createElement('div');timeline.id='kgTimelinePanel';timeline.className='kg-timeline-panel';gp.appendChild(timeline);}
+  var controls=gp.querySelector('.kg-graph-controls');
+  if(!controls){
+    controls=document.createElement('div');controls.className='kg-graph-controls';
+    var fit=document.createElement('button');fit.type='button';fit.className='kg-graph-control';fit.textContent='适合窗口';fit.onclick=fitKnowledgeGraphToView;
+    var reset=document.createElement('button');reset.type='button';reset.className='kg-graph-control';reset.textContent='重置视图';reset.onclick=fitKnowledgeGraphToView;
+    controls.appendChild(fit);controls.appendChild(reset);gp.appendChild(controls);
+  }
+  return{panel:gp,placeholder:ph,svg:sv,timeline:timeline,controls:controls};
+}
+function setKnowledgeGraphStatus(icon,message,actions){
+  var dom=ensureKnowledgeGraphDOM();if(!dom)return;
+  dom.placeholder.innerHTML='';
+  var iconEl=document.createElement('div');iconEl.className='kg-placeholder-icon';iconEl.textContent=icon;
+  var messageEl=document.createElement('div');messageEl.className='kg-placeholder-message';messageEl.textContent=message;
+  dom.placeholder.appendChild(iconEl);dom.placeholder.appendChild(messageEl);
+  if(actions&&actions.length){
+    var actionWrap=document.createElement('div');actionWrap.className='kg-placeholder-actions';
+    actions.forEach(function(action){var button=document.createElement('button');button.type='button';button.className=action.primary?'ai-btn':'ai-btn-clear';button.textContent=action.label;button.onclick=action.onClick;actionWrap.appendChild(button);});
+    dom.placeholder.appendChild(actionWrap);
+  }
+  dom.placeholder.style.display='block';
+}
+function clearKnowledgeGraphStatus(){var dom=ensureKnowledgeGraphDOM();if(dom)dom.placeholder.style.display='none';}
+function setKnowledgeGraphTabs(view){
+  ['cloud','network','timeline'].forEach(function(v){
+    var el=document.getElementById('kgTab'+v.charAt(0).toUpperCase()+v.slice(1));if(!el)return;
+    var active=v===view;el.classList.toggle('active',active);el.setAttribute('aria-selected',active?'true':'false');el.tabIndex=active?0:-1;
+  });
+}
+function handleKGTabKeydown(event){
+  if(event.key!=='ArrowLeft'&&event.key!=='ArrowRight'&&event.key!=='Home'&&event.key!=='End')return;
+  event.preventDefault();var views=['cloud','network','timeline'],current=views.indexOf(kgCurrentView),next=current;
+  if(event.key==='ArrowLeft')next=(current+views.length-1)%views.length;
+  else if(event.key==='ArrowRight')next=(current+1)%views.length;
+  else if(event.key==='Home')next=0;else next=views.length-1;
+  switchKGView(views[next]);var tab=document.getElementById('kgTab'+views[next].charAt(0).toUpperCase()+views[next].slice(1));if(tab)tab.focus();
+}
+window.handleKGTabKeydown=handleKGTabKeydown;
+function bindKnowledgeGraphDialog(){
+  var overlay=document.getElementById('kgOverlay'),modal=document.getElementById('kgModal');if(!overlay||!modal)return;
+  if(kgModalKeydown)document.removeEventListener('keydown',kgModalKeydown);
+  kgModalKeydown=function(event){
+    if(event.key==='Escape'){event.preventDefault();closeKnowledgeGraph();return;}
+    if(event.key!=='Tab')return;
+    var focusable=modal.querySelectorAll('button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');if(!focusable.length)return;
+    var first=focusable[0],last=focusable[focusable.length-1];
+    if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+    else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+  };
+  document.addEventListener('keydown',kgModalKeydown);
+}
+function observeKnowledgeGraphSize(){
+  var dom=ensureKnowledgeGraphDOM();if(!dom||typeof ResizeObserver==='undefined')return;
+  if(kgResizeObserver)kgResizeObserver.disconnect();
+  kgResizeObserver=new ResizeObserver(function(){if(kgResizeFrame)cancelAnimationFrame(kgResizeFrame);kgResizeFrame=requestAnimationFrame(function(){kgResizeFrame=0;if(kgCurrentView==='network'&&kgCurrentData)fitKnowledgeGraphToView();});});
+  kgResizeObserver.observe(dom.panel);
 }
 function refreshKnowledgeGraphTheme(){
   var overlay=document.getElementById('kgOverlay');
@@ -4051,7 +4122,13 @@ function refreshKnowledgeGraphTheme(){
   else if(kgCurrentView==='timeline')renderTimeline();
   else renderNetworkGraph(kgCurrentData);
 }
-function showKnowledgeGraph(){if(!manuscriptText){alert('请先上传论文');return}kgCurrentData=null;document.getElementById('kgOverlay').style.display='flex';kgCurrentView='network';generateKnowledgeGraph();}
+function showKnowledgeGraph(){
+  if(!manuscriptText){alert('请先上传论文');return;}
+  var overlay=document.getElementById('kgOverlay'),dom=ensureKnowledgeGraphDOM();if(!overlay||!dom)return;
+  kgPreviousFocus=document.activeElement;kgCurrentData=null;kgCurrentView='network';overlay.style.display='flex';setKnowledgeGraphTabs('network');bindKnowledgeGraphDialog();observeKnowledgeGraphSize();
+  var networkTab=document.getElementById('kgTabNetwork');if(networkTab)networkTab.focus();
+  generateKnowledgeGraph();
+}
 
 function exportKGAsPNG(){
   var svg=document.getElementById('kgSvg');
@@ -4082,65 +4159,45 @@ function openConceptExplorer(){
 function confirmProjectConcept(label){try{var p=window.ThesisProject&&ThesisProject.getCurrentProject?ThesisProject.getCurrentProject():null;if(!p)throw new Error('请先创建项目');var arr=String(p.keywords||'').split(/[,，]/).map(function(x){return x.trim();}).filter(Boolean);if(arr.indexOf(label)<0)arr.push(label);ThesisProject.updateCurrent({keywords:arr.join(', ')});if(typeof ttp==='function')ttp('已加入项目关键词：'+label);}catch(e){alert(e.message);}}
 window.openConceptExplorer=openConceptExplorer;window.confirmProjectConcept=confirmProjectConcept;
 
-function closeKnowledgeGraph(){document.getElementById('kgOverlay').style.display='none';kgCurrentData=null;}
+function closeKnowledgeGraph(){
+  var overlay=document.getElementById('kgOverlay');if(overlay)overlay.style.display='none';
+  kgCurrentData=null;
+  if(kgModalKeydown){document.removeEventListener('keydown',kgModalKeydown);kgModalKeydown=null;}
+  if(kgResizeObserver){kgResizeObserver.disconnect();kgResizeObserver=null;}
+  if(kgResizeFrame){cancelAnimationFrame(kgResizeFrame);kgResizeFrame=0;}
+  var previous=kgPreviousFocus;kgPreviousFocus=null;if(previous&&typeof previous.focus==='function'&&document.contains(previous))previous.focus();
+}
 function switchKGView(view){
-  kgCurrentView=view;
-  ['cloud','network','timeline'].forEach(function(v){var el=document.getElementById('kgTab'+v.charAt(0).toUpperCase()+v.slice(1));if(el)el.classList.toggle('active',v===view);});
-  var cp=document.getElementById('kgCloudPanel'),sv=document.getElementById('kgSvg'),tc=document.getElementById('kgTimelineCanvas');
-  var gp=document.getElementById('kgGraphPanel'),ph=document.getElementById('kgPlaceholder');
-  if(view==='cloud'){
-    if(cp)cp.style.display='block';
-    if(gp)gp.style.display='none';
-    if(ph)ph.style.display='none';
-    renderWordCloud();
-  }else if(view==='timeline'){
-    if(cp)cp.style.display='none';
-    if(gp)gp.style.display='block';
-    if(sv)sv.style.display='none';
-    if(tc)tc.style.display='none';
-    if(ph)ph.style.display='none';
-    var tlSvg2=document.querySelector('#kgGraphPanel > svg.tl-svg');
-    if(tlSvg2)tlSvg2.parentElement.removeChild(tlSvg2);
-    renderTimeline();
-  }else{
-    if(cp)cp.style.display='none';
-    if(gp)gp.style.display='block';
-    if(sv)sv.style.display='block';
-    if(tc)tc.style.display='none';
-    if(ph)ph.style.display='none';
-    var tlSvg3=document.querySelector('#kgGraphPanel > svg.tl-svg');
-    if(tlSvg3)tlSvg3.style.display='none';
-  }
+  var dom=ensureKnowledgeGraphDOM();if(!dom)return;
+  kgCurrentView=view;setKnowledgeGraphTabs(view);
+  var cp=document.getElementById('kgCloudPanel');dom.panel.classList.toggle('is-network',view==='network');
+  if(cp)cp.style.display=view==='cloud'?'block':'none';
+  dom.panel.style.display=view==='cloud'?'none':'block';
+  dom.svg.style.display='none';dom.timeline.style.display='none';clearKnowledgeGraphStatus();
+  if(view==='cloud'){renderWordCloud();return;}
+  if(view==='timeline'){renderTimeline();return;}
+  if(kgCurrentData&&(kgCurrentData.entities||[]).length){dom.svg.style.display='block';renderNetworkGraph(kgCurrentData);}
+  else setKnowledgeGraphStatus('🔗','研究关系数据尚未生成。',[{label:'重新生成',primary:true,onClick:generateKnowledgeGraph}]);
 }
 
 async function generateKnowledgeGraph(){
-  var ph=document.getElementById('kgPlaceholder'),sv=document.getElementById('kgSvg');
-  ph.style.display='block';sv.style.display='none';sv.innerHTML='';
-  var cp=document.getElementById('kgCloudPanel');if(cp)cp.style.display='none';
-  var tc=document.getElementById('kgTimelineCanvas');if(tc)tc.style.display='none';
-  document.getElementById('kgTabCloud').classList.remove('active');document.getElementById('kgTabNetwork').classList.add('active');
-  document.getElementById('kgTabTimeline').classList.remove('active');
-  ph.innerHTML='<div style="font-size:2.5rem;margin-bottom:16px">⚙️</div><div>正在调用服务生成知识图谱...</div>';
+  var dom=ensureKnowledgeGraphDOM();if(!dom)return;
+  kgCurrentView='network';setKnowledgeGraphTabs('network');dom.panel.classList.add('is-network');
+  var cp=document.getElementById('kgCloudPanel');if(cp)cp.style.display='none';dom.panel.style.display='block';dom.svg.style.display='none';dom.timeline.style.display='none';dom.svg.innerHTML='';dom.timeline.innerHTML='';
+  setKnowledgeGraphStatus('⚙','正在调用服务生成知识图谱...');
   var req={paper_topics:paperTopics,sections:sections,merged_refs:mergedRefs.map(function(r){return{title:r.title||'',journal:r.journal||'',year:r.year||'',ch:r.ch||1,conf:r.conf||0,displayNum:r.displayNum||0}}),manuscript_text:manuscriptText};
   try{
     var resp=await fetch(kgApiUrl,{method:'POST',headers:apiAuthHeaders(true),body:JSON.stringify(req)});
     var r=null;try{r=await resp.json();}catch(eJson){r=null;}
-    if(resp.status===401){
-      ph.innerHTML='<div style="font-size:2.5rem;margin-bottom:12px">🔐</div><div style="margin-bottom:12px">请先登录后再生成知识图谱</div>';
-      if(typeof ttp==='function')ttp('请先登录');
-      return;
-    }
+    if(resp.status===401){setKnowledgeGraphStatus('🔐','请先登录后再生成知识图谱。');if(typeof ttp==='function')ttp('请先登录');return;}
     if(resp.status===402){
-      ph.innerHTML='<div style="font-size:2.5rem;margin-bottom:12px">💳</div><div style="margin-bottom:12px">点数不足，请查看账户计费说明或充值后重试</div>'+(typeof showRechargeModal==='function'?'<button class="ai-btn" onclick="showRechargeModal()">去充值</button>':'');
-      if(typeof updateBalanceDisplay==='function')updateBalanceDisplay();
-      if(typeof ttp==='function')ttp((r&&r.error)||'点数不足');
-      return;
+      var actions=typeof showRechargeModal==='function'?[{label:'去充值',primary:true,onClick:showRechargeModal}]:[];
+      setKnowledgeGraphStatus('💳','点数不足，请查看账户计费说明或充值后重试。',actions);
+      if(typeof updateBalanceDisplay==='function')updateBalanceDisplay();if(typeof ttp==='function')ttp((r&&r.error)||'点数不足');return;
     }
     if(!resp.ok||!r||!r.success){
-      var msg=(r&&r.error)||('服务暂不可用'+(resp.status?(' ('+resp.status+')'):''));
-      ph.innerHTML='<div style="font-size:2.5rem;margin-bottom:12px">⚠️</div><div style="margin-bottom:12px">'+msg+'</div><div style="color:var(--text-muted);font-size:.75rem;margin-bottom:12px">为避免未扣点使用，已禁用离线免费图谱回退。</div><button class="ai-btn" onclick="generateKnowledgeGraph()">重试</button>';
-      if(typeof ttp==='function')ttp(msg);
-      return;
+      var msg=(r&&r.error)||('服务暂不可用'+(resp.status?(' ('+resp.status+')'):'')+'。');
+      setKnowledgeGraphStatus('⚠',msg,[{label:'重试',primary:true,onClick:generateKnowledgeGraph}]);if(typeof ttp==='function')ttp(msg);return;
     }
     kgCurrentData=r.data;renderKnowledgeGraph(r.data);
     try{
@@ -4149,33 +4206,18 @@ async function generateKnowledgeGraph(){
       if(typeof updateBalanceDisplay==='function')updateBalanceDisplay();
     }catch(eU){}
   }catch(e){
-    console.warn('[KG] failed:',e);
-    ph.innerHTML='<div style="font-size:2.5rem;margin-bottom:12px">⚠️</div><div style="margin-bottom:12px">知识图谱生成失败，请稍后重试</div><button class="ai-btn" onclick="generateKnowledgeGraph()">重试</button>';
-    if(typeof ttp==='function')ttp('知识图谱生成失败');
+    console.warn('[KG] failed:',e);setKnowledgeGraphStatus('⚠','知识图谱生成失败，请检查网络后重试。',[{label:'重试',primary:true,onClick:generateKnowledgeGraph}]);if(typeof ttp==='function')ttp('知识图谱生成失败');
   }
 }
 function generateKnowledgeGraphJS(){
-  // Offline preview disabled for billing integrity. Keep symbol for legacy callers.
-  var ph=document.getElementById('kgPlaceholder');
-  if(ph)ph.innerHTML='<div style="font-size:2.5rem;margin-bottom:12px">💳</div><div>离线免费图谱已停用，请通过服务生成（按次计点/每日免费额度）。</div><button class="ai-btn" onclick="generateKnowledgeGraph()">通过服务生成</button>';
-  kgCurrentData=null;
+  setKnowledgeGraphStatus('💳','离线免费图谱已停用，请通过服务生成。',[{label:'通过服务生成',primary:true,onClick:generateKnowledgeGraph}]);kgCurrentData=null;
 }
 function renderKnowledgeGraph(data){
-  var ph=document.getElementById('kgPlaceholder'),sv=document.getElementById('kgSvg');
-  ph.style.display='none';sv.style.display='block';sv.innerHTML='';
-  var ents=data.entities||[],links=data.links||[];
-  if(!ents.length){ph.style.display='block';sv.style.display='none';ph.innerHTML='<div style="font-size:3rem;margin-bottom:16px">📄</div><div>暂无数据</div>';return;}
-  kgCurrentData=data;
-  // Reset tabs to network
-  document.getElementById('kgTabCloud').classList.remove('active');document.getElementById('kgTabNetwork').classList.add('active');
-  document.getElementById('kgTabTimeline').classList.remove('active');
-  var cp=document.getElementById('kgCloudPanel');if(cp)cp.style.display='none';
-  var tc=document.getElementById('kgTimelineCanvas');if(tc)tc.style.display='none';
-  sv.style.display='block';
-  // Render network
-  renderNetworkGraph(data);
-  // Pre-render word cloud data
-  renderWordCloud();
+  var dom=ensureKnowledgeGraphDOM();if(!dom)return;
+  var ents=data&&data.entities||[];
+  if(!ents.length){kgCurrentData=data||null;dom.svg.style.display='none';setKnowledgeGraphStatus('📄','暂无可展示的研究关系数据。');return;}
+  kgCurrentData=data;kgCurrentView='network';setKnowledgeGraphTabs('network');dom.panel.classList.add('is-network');clearKnowledgeGraphStatus();
+  var cp=document.getElementById('kgCloudPanel');if(cp)cp.style.display='none';dom.panel.style.display='block';dom.timeline.style.display='none';dom.svg.style.display='block';renderNetworkGraph(data);
 }
 // ====== 交互式词云（全屏，带频次+关联线） ======
 var _wcScale2 = 1, _wcTx2 = 0, _wcTy2 = 0, _wcPan2 = false, _wcPx2 = 0, _wcPy2 = 0;
@@ -4364,63 +4406,77 @@ function renderWordCloud(){
 }
 
 // ====== 网络图 ======
+function knowledgeGraphBounds(entities){
+  if(!entities||!entities.length)return{x:0,y:0,width:1200,height:700};
+  var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  entities.forEach(function(entity){
+    var x=Number(entity.x),y=Number(entity.y),radius=Math.max(8,Number(entity.radius)||5),label=String(entity.label||entity.fullLabel||''),labelWidth=Math.min(140,Math.max(24,label.length*9));
+    if(!Number.isFinite(x)||!Number.isFinite(y))return;
+    minX=Math.min(minX,x-radius-labelWidth);maxX=Math.max(maxX,x+radius+labelWidth);minY=Math.min(minY,y-radius-20);maxY=Math.max(maxY,y+radius+28);
+  });
+  if(!Number.isFinite(minX))return{x:0,y:0,width:1200,height:700};
+  var padding=70;return{x:minX-padding,y:minY-padding,width:Math.max(240,maxX-minX+padding*2),height:Math.max(180,maxY-minY+padding*2)};
+}
+function applyKnowledgeGraphViewBox(bounds){
+  var sv=document.getElementById('kgSvg');if(!sv||!bounds)return;
+  kgNetworkViewBox=bounds;sv.setAttribute('viewBox',[bounds.x,bounds.y,bounds.width,bounds.height].join(' '));sv.setAttribute('preserveAspectRatio','xMidYMid meet');
+}
+function fitKnowledgeGraphToView(){
+  var sv=document.getElementById('kgSvg');if(!sv)return;
+  var main=sv.querySelector('#kg-main');if(main)main.removeAttribute('transform');
+  if(kgNetworkViewBox)applyKnowledgeGraphViewBox(kgNetworkViewBox);
+}
+window.fitKnowledgeGraphToView=fitKnowledgeGraphToView;
 function renderNetworkGraph(data){
-  var sv=document.getElementById('kgSvg'),ents=data.entities||[],links=data.links||[],theme=knowledgeGraphThemeColors();
-  sv.innerHTML='';
+  var dom=ensureKnowledgeGraphDOM();if(!dom||!data)return;
+  var sv=dom.svg,ents=data.entities||[],links=data.links||[],theme=knowledgeGraphThemeColors();sv.innerHTML='';
   var colors={keyword:'#3b82f6',chapter:'#10b981',section:'#8b5cf6',subsection:'#06b6d4',reference:'#f59e0b'};
   var lc={appears_in:'#3b82f6',has:'#94a3b8',cites:'#f59e0b',related:'#8b5cf6',in:'#3b82f6'};
   var gM=document.createElementNS('http://www.w3.org/2000/svg','g');gM.id='kg-main';
   var gL=document.createElementNS('http://www.w3.org/2000/svg','g');gL.id='kg-links';
-  var gN=document.createElementNS('http://www.w3.org/2000/svg','g');gN.id='kg-nodes';
-  sv.appendChild(gM);gM.appendChild(gL);gM.appendChild(gN);
-  var pos={};ents.forEach(function(e){pos[e.id]={x:e.x||Math.random()*1200+100,y:e.y||Math.random()*600+100};});
-  links.forEach(function(l){var s=pos[l.source],t=pos[l.target];if(s&&t){var ln=document.createElementNS('http://www.w3.org/2000/svg','line');ln.setAttribute('x1',s.x);ln.setAttribute('y1',s.y);ln.setAttribute('x2',t.x);ln.setAttribute('y2',t.y);ln.setAttribute('stroke',lc[l.type]||'#cbd5e1');ln.setAttribute('stroke-width','1.5');ln.setAttribute('stroke-dasharray','4,2');ln.setAttribute('opacity','0.5');ln.id='link_'+l.id;ln.setAttribute('class','kg-link');gL.appendChild(ln);}});
+  var gN=document.createElementNS('http://www.w3.org/2000/svg','g');gN.id='kg-nodes';sv.appendChild(gM);gM.appendChild(gL);gM.appendChild(gN);
+  var pos={};ents.forEach(function(e,index){var x=Number(e.x),y=Number(e.y);pos[e.id]={x:Number.isFinite(x)?x:140+(index%8)*130,y:Number.isFinite(y)?y:100+Math.floor(index/8)*100};});
+  links.forEach(function(l){var s=pos[l.source],t=pos[l.target];if(s&&t){var ln=document.createElementNS('http://www.w3.org/2000/svg','line');ln.setAttribute('x1',s.x);ln.setAttribute('y1',s.y);ln.setAttribute('x2',t.x);ln.setAttribute('y2',t.y);ln.setAttribute('stroke',lc[l.type]||theme.strongBorder);ln.setAttribute('stroke-width','1.5');ln.setAttribute('stroke-dasharray','4,2');ln.setAttribute('opacity','0.5');ln.id='link_'+l.id;ln.setAttribute('class','kg-link');gL.appendChild(ln);}});
   ents.forEach(function(e){var p=pos[e.id];if(!p)return;var r=e.radius||5;var g=document.createElementNS('http://www.w3.org/2000/svg','g');g.id='node_'+e.id;g.setAttribute('class','kg-node');g.setAttribute('transform','translate('+p.x+','+p.y+')');var c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r',r);c.setAttribute('fill',colors[e.type]||theme.muted);c.setAttribute('opacity','0.85');c.setAttribute('cursor','pointer');c.setAttribute('stroke',theme.card);c.setAttribute('stroke-width','2');g.appendChild(c);
-    var t=document.createElementNS('http://www.w3.org/2000/svg','text');var lb=e.label||(e.fullLabel||'');if(lb.length>8)lb=lb.substring(0,8)+'..';t.textContent=lb;t.setAttribute('pointer-events','none');t.setAttribute('font-weight','500');t.setAttribute('font-size','7');t.setAttribute('fill',theme.text);
-    if(e.type==='keyword'||e.type==='chapter'){t.setAttribute('text-anchor','middle');t.setAttribute('x','0');t.setAttribute('y',r+10);}else if(e.type==='section'||e.type==='subsection'){t.setAttribute('text-anchor','start');t.setAttribute('x',r+3);t.setAttribute('y','3');}else{t.setAttribute('text-anchor','end');t.setAttribute('x',-r-3);t.setAttribute('y','3');}
-    g.appendChild(t);
-    g.addEventListener('mouseenter',function(ev){showNodeTooltip(e,ev);highlightKGNode(e.id,true);});
-    g.addEventListener('mouseleave',function(){hideNodeTooltip();highlightKGNode(e.id,false);});
-    gN.appendChild(g);
+    var t=document.createElementNS('http://www.w3.org/2000/svg','text');var lb=e.label||(e.fullLabel||'');if(lb.length>8)lb=lb.substring(0,8)+'..';t.textContent=lb;t.setAttribute('pointer-events','none');t.setAttribute('font-weight','500');t.setAttribute('font-size','9');t.setAttribute('fill',theme.text);
+    if(e.type==='keyword'||e.type==='chapter'){t.setAttribute('text-anchor','middle');t.setAttribute('x','0');t.setAttribute('y',r+13);}else if(e.type==='section'||e.type==='subsection'){t.setAttribute('text-anchor','start');t.setAttribute('x',r+4);t.setAttribute('y','3');}else{t.setAttribute('text-anchor','end');t.setAttribute('x',-r-4);t.setAttribute('y','3');}
+    g.appendChild(t);g.addEventListener('mouseenter',function(ev){showNodeTooltip(e,ev);highlightKGNode(e.id,true);});g.addEventListener('mouseleave',function(){hideNodeTooltip();highlightKGNode(e.id,false);});gN.appendChild(g);
   });
-  var leg=document.createElementNS('http://www.w3.org/2000/svg','g');leg.setAttribute('transform','translate(20,20)');
+  var boundsEntities=ents.map(function(e){var p=pos[e.id]||{};return Object.assign({},e,{x:p.x,y:p.y});});applyKnowledgeGraphViewBox(knowledgeGraphBounds(boundsEntities));
+  var leg=document.createElementNS('http://www.w3.org/2000/svg','g');leg.setAttribute('class','kg-legend');leg.setAttribute('transform','translate('+(kgNetworkViewBox.x+20)+','+(kgNetworkViewBox.y+20)+')');
   var lbg=document.createElementNS('http://www.w3.org/2000/svg','rect');lbg.setAttribute('width','150');lbg.setAttribute('height','130');lbg.setAttribute('fill',theme.card);lbg.setAttribute('stroke',theme.border);lbg.setAttribute('rx','8');leg.appendChild(lbg);
   [{l:'关键词',c:colors.keyword},{l:'章节',c:colors.chapter},{l:'小节',c:colors.section},{l:'参考文献',c:colors.reference}].forEach(function(item,i){var cy=28+i*26;var c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('cx','22');c.setAttribute('cy',cy);c.setAttribute('r','8');c.setAttribute('fill',item.c);leg.appendChild(c);var tt=document.createElementNS('http://www.w3.org/2000/svg','text');tt.setAttribute('x','38');tt.setAttribute('y',cy+4);tt.setAttribute('font-size','11');tt.setAttribute('fill',theme.text);tt.textContent=item.l;leg.appendChild(tt);});
-  if(data.stats){var sy=28+4*26+10;var st=document.createElementNS('http://www.w3.org/2000/svg','text');st.setAttribute('x','22');st.setAttribute('y',sy);st.setAttribute('font-size','9');st.setAttribute('fill',theme.muted);st.textContent='节点:'+(data.stats.total_entities||0)+' 边:'+(data.stats.total_links||0);leg.appendChild(st);lbg.setAttribute('height',sy+15);}
-  sv.appendChild(leg);
+  if(data.stats){var sy=28+4*26+10;var st=document.createElementNS('http://www.w3.org/2000/svg','text');st.setAttribute('x','22');st.setAttribute('y',sy);st.setAttribute('font-size','9');st.setAttribute('fill',theme.muted);st.textContent='节点:'+(data.stats.total_entities||ents.length)+' 边:'+(data.stats.total_links||links.length);leg.appendChild(st);lbg.setAttribute('height',sy+15);}sv.appendChild(leg);
   var scale=1,tx=0,ty=0,pan=false,px=0,py=0,ndid=null;
-  sv.addEventListener('wheel',function(ev){ev.preventDefault();var d=ev.deltaY>0?0.9:1.1;var r=sv.getBoundingClientRect();var ns=Math.max(0.3,Math.min(3,scale*d));tx=ev.clientX-r.left-(ev.clientX-r.left-tx)*ns/scale;ty=ev.clientY-r.top-(ev.clientY-r.top-ty)*ns/scale;scale=ns;gM.setAttribute('transform','translate('+tx+','+ty+') scale('+scale+')');});
-  sv.addEventListener('mousedown',function(ev){if(ev.button===0&&ev.target===sv){pan=true;px=ev.clientX-tx;py=ev.clientY-ty;}});
-  sv.addEventListener('mousemove',function(ev){if(pan){tx=ev.clientX-px;ty=ev.clientY-py;gM.setAttribute('transform','translate('+tx+','+ty+') scale('+scale+')');}if(ndid&&pos[ndid]){var r2=sv.getBoundingClientRect();var nx=(ev.clientX-r2.left-tx)/scale,ny=(ev.clientY-r2.top-ty)/scale;pos[ndid].x=nx;pos[ndid].y=ny;var nG=document.getElementById('node_'+ndid);if(nG)nG.setAttribute('transform','translate('+nx+','+ny+')');links.forEach(function(l){if(l.source===ndid||l.target===ndid){var ln=document.getElementById('link_'+l.id);if(ln){if(l.source===ndid){ln.setAttribute('x1',nx);ln.setAttribute('y1',ny);}else{ln.setAttribute('x2',nx);ln.setAttribute('y2',ny);}}}});}});
-  sv.addEventListener('mouseup',function(){pan=false;ndid=null;});sv.addEventListener('mouseleave',function(){pan=false;ndid=null;});
-  gN.querySelectorAll('.kg-node').forEach(function(nG){nG.addEventListener('mousedown',function(ev){if(ev.button===0){ndid=this.id.replace('node_','');ev.stopPropagation();}});});
+  sv.onwheel=function(ev){ev.preventDefault();var d=ev.deltaY>0?0.9:1.1,rct=sv.getBoundingClientRect(),ns=Math.max(0.3,Math.min(3,scale*d));tx=ev.clientX-rct.left-(ev.clientX-rct.left-tx)*ns/scale;ty=ev.clientY-rct.top-(ev.clientY-rct.top-ty)*ns/scale;scale=ns;gM.setAttribute('transform','translate('+tx+','+ty+') scale('+scale+')');};
+  sv.onpointerdown=function(ev){if(ev.button!==0)return;sv.setPointerCapture(ev.pointerId);if(ev.target===sv){pan=true;px=ev.clientX-tx;py=ev.clientY-ty;sv.classList.add('is-grabbing');}else{var node=ev.target.closest&&ev.target.closest('.kg-node');if(node){ndid=node.id.replace('node_','');ev.stopPropagation();}}};
+  sv.onpointermove=function(ev){if(pan){tx=ev.clientX-px;ty=ev.clientY-py;gM.setAttribute('transform','translate('+tx+','+ty+') scale('+scale+')');}if(ndid&&pos[ndid]){var pt=sv.createSVGPoint();pt.x=ev.clientX;pt.y=ev.clientY;var local=pt.matrixTransform(gM.getScreenCTM().inverse());pos[ndid].x=local.x;pos[ndid].y=local.y;var nodeEl=document.getElementById('node_'+ndid);if(nodeEl)nodeEl.setAttribute('transform','translate('+local.x+','+local.y+')');links.forEach(function(l){if(l.source===ndid||l.target===ndid){var ln=document.getElementById('link_'+l.id);if(ln){if(l.source===ndid){ln.setAttribute('x1',local.x);ln.setAttribute('y1',local.y);}else{ln.setAttribute('x2',local.x);ln.setAttribute('y2',local.y);}}}});}};
+  sv.onpointerup=sv.onpointercancel=function(ev){pan=false;ndid=null;sv.classList.remove('is-grabbing');if(sv.hasPointerCapture&&sv.hasPointerCapture(ev.pointerId))sv.releasePointerCapture(ev.pointerId);};
+  sv.style.display='block';clearKnowledgeGraphStatus();
 }
 // ====== 文献引用网络（引用关系可视化） ======
 function renderRefNetwork(){
-  var tc=document.getElementById('kgTimelineCanvas');
-  if(!tc||kgCurrentView!=='timeline')return;
-  // Placeholder for future citation network graph
-  // Current implementation uses the timeline view canvas
+  var timeline=document.getElementById('kgTimelinePanel');
+  if(!timeline||kgCurrentView!=='timeline')return;
 }
 // ====== 交互式时间线（SVG，论文散点+标题悬停） ======
 // ====== 交互式时间线（重新设计：水平行布局，按年份分列，悬停详情） ======
 function renderTimeline(){
-  var tc = document.getElementById('kgTimelineCanvas');
-  if (!tc || kgCurrentView !== 'timeline') return;
-  var theme = knowledgeGraphThemeColors();
-  tc.style.display = 'block';
-  var parent = tc.parentElement;
-  var w = parent.clientWidth - 8, h = parent.clientHeight - 8;
+  var dom=ensureKnowledgeGraphDOM();
+  if(!dom||kgCurrentView!=='timeline')return;
+  var timeline=dom.timeline,theme=knowledgeGraphThemeColors();timeline.innerHTML='';timeline.style.display='block';dom.svg.style.display='none';
+  var parent=dom.panel,w=Math.max(320,parent.clientWidth-8),h=Math.max(280,parent.clientHeight-8);
   var refs = (typeof mergedRefs !== 'undefined' && mergedRefs.length ? mergedRefs : (typeof existingRefs !== 'undefined' ? existingRefs : []))
     .filter(function(r) { return r.year && parseInt(r.year) >= 1990; })
     .map(function(r) { return { year: parseInt(r.year), title: (r.title || r.ci || '').substring(0, 60),
       journal: r.journal || '', type: r.subType || 'existing', displayNum: r.displayNum || 0,
       ch: r.ch || 1, conf: r.conf || 0, _full: r }; });
   if (!refs.length) {
-    var tg = document.getElementById('kgGraphPanel');
-    if (tg) tg.innerHTML = '<div style="text-align:center;padding:60px;color:'+theme.muted+'"><div style="font-size:3rem;margin-bottom:16px">📅</div><div>暂缺年份数据</div></div>';
+    timeline.style.display='none';
+    setKnowledgeGraphStatus('📅','暂缺年份数据。为文献补充出版年份后，可在这里查看研究演进。');
     return;
   }
+  clearKnowledgeGraphStatus();
   var svgNS = 'http://www.w3.org/2000/svg';
   var svg = document.createElementNS(svgNS, 'svg');
   svg.setAttribute('width', w); svg.setAttribute('height', h);
@@ -4507,13 +4563,8 @@ function renderTimeline(){
     }
   });
 
-  // Clean up and insert
-  var oldTl = document.querySelector('#kgGraphPanel > svg.tl-svg');
-  if (oldTl) oldTl.parentElement.removeChild(oldTl);
-  var svEl = document.getElementById('kgSvg'); if (svEl) svEl.style.display = 'none';
-  var ph2 = document.getElementById('kgPlaceholder'); if (ph2) ph2.style.display = 'none';
-  tc.style.display = 'none';
-  var tg2 = document.getElementById('kgGraphPanel'); if (tg2) tg2.appendChild(svg);
+  timeline.innerHTML='';
+  timeline.appendChild(svg);
 }
 function highlightKGNode(nodeId,on){
   var sv=document.getElementById('kgSvg'),data=kgCurrentData;

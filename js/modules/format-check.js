@@ -257,16 +257,9 @@ function runFormatCheck(container) {
   if(hasHeader||hasPageNum)h+='<div class="finding ok">✅ 检测到可能的页眉/页脚内容</div>';
   else h+='<div class="finding info">📌 未检测到页眉/页脚，建议添加学校名称和页码</div>';
 
-  h = '<div class="module-panel">';
-  h += '<h4>\ud83d\udcca 格式统计</h4>';
-  h += '<div class="dash-row">';
-  h += '<div class="dash-item"><div class="dv">' + stats.chapters + '</div><div class="dl">章节</div></div>';
-  h += '<div class="dash-item"><div class="dv">' + stats.sections + '</div><div class="dl">小节</div></div>';
-  h += '<div class="dash-item"><div class="dv">' + stats.figCount + '</div><div class="dl">图片</div></div>';
-  h += '<div class="dash-item"><div class="dv">' + stats.tblCount + '</div><div class="dl">表格</div></div>';
-  h += '<div class="dash-item"><div class="dv">' + stats.words + 'k</div><div class="dl">字数</div></div>';
-  h += '</div>';
-
+  var summary = '<div class="module-panel">';
+  summary += '<h4>📊 格式统计</h4><div class="dash-row"><div class="dash-item"><div class="dv">' + stats.chapters + '</div><div class="dl">章节</div></div><div class="dash-item"><div class="dv">' + stats.sections + '</div><div class="dl">小节</div></div><div class="dash-item"><div class="dv">' + stats.figCount + '</div><div class="dl">图片</div></div><div class="dash-item"><div class="dv">' + stats.tblCount + '</div><div class="dl">表格</div></div><div class="dash-item"><div class="dv">' + stats.words + 'k</div><div class="dl">字数</div></div></div>';
+  h = summary + h;
   var totalIssues = issues.errors.length + issues.warnings.length;
   h += '<div style="margin:8px 0;font-weight:600;font-size:.8rem;color:' + (totalIssues ? '#ef4444' : '#10b981') + '">' + (totalIssues === 0 ? '\ud83c\udf89 未发现问题' : '发现 ' + issues.errors.length + ' 个错误，' + issues.warnings.length + ' 个警告') + '</div>';
 

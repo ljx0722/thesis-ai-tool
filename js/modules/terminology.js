@@ -45,8 +45,9 @@ function runTerminology(container) {
   h+='<h4>🔄 术语演变检测</h4>';
   var bodyChs3=(sections||[]).filter(isBodyChapter);
   var evolveIssues=0;
-  var trackPairs=[{a:'机器学习',b:'机械学习'},{a:'深度学习',b:'深层学习'},{a:'特征提取',b:'特征抽取'},{a:'数据预处理',b:'数据预处理'}];
+  var trackPairs=[{a:'机器学习',b:'机械学习'},{a:'深度学习',b:'深层学习'},{a:'特征提取',b:'特征抽取'}];
   trackPairs.forEach(function(p){
+    if(p.a===p.b)return;
     var chsA=[],chsB=[];
     bodyChs3.forEach(function(cs,i){if((cs.text||'').indexOf(p.a)>=0)chsA.push(i+1);if((cs.text||'').indexOf(p.b)>=0)chsB.push(i+1);});
     if(chsA.length&&chsB.length){evolveIssues++;h+='<div class="finding warn">⚠ '+p.a+'（第'+chsA.join(',')+'章） vs '+p.b+'（第'+chsB.join(',')+'章），表述不一致</div>';}

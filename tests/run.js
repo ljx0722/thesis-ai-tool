@@ -1152,11 +1152,70 @@ test('OPT: Chapter structure comparison exists', function() { var src = fs.readF
 
 test('KG: Chapter correlation matrix exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8'); assert(src.indexOf('computeChapterCorrelation') >= 0, 'Missing chapter correlation matrix'); });
 
+test('KG: timeline empty state preserves fixed graph DOM', function() {
+  var app = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  var timeline = app.substring(app.indexOf('function renderTimeline'), app.indexOf('function highlightKGNode'));
+  assert(html.indexOf('id="kgSvg"') >= 0 && html.indexOf('id="kgTimelinePanel"') >= 0 && html.indexOf('id="kgPlaceholder"') >= 0, 'Knowledge graph fixed DOM hosts are missing');
+  assert(timeline.indexOf("document.getElementById('kgGraphPanel')") < 0, 'Timeline must not replace the graph panel');
+  assert(timeline.indexOf('setKnowledgeGraphStatus') >= 0, 'Timeline empty state must use the shared status layer');
+});
 
-// ============================================================
-// SECTION 20: Audit Regression
-// ============================================================
-console.log('\n=== Section 20: Audit Regression ===');
+test('KG: network view rerenders current data and fits a viewBox', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  var switchBlock = src.substring(src.indexOf('function switchKGView'), src.indexOf('async function generateKnowledgeGraph'));
+  var renderBlock = src.substring(src.indexOf('function knowledgeGraphBounds'), src.indexOf('function renderRefNetwork'));
+  assert(switchBlock.indexOf('renderNetworkGraph(kgCurrentData)') >= 0, 'Network tab must recover by rerendering current data');
+  assert(renderBlock.indexOf("setAttribute('viewBox'") >= 0, 'Network graph must set an SVG viewBox');
+  assert(renderBlock.indexOf('knowledgeGraphBounds') >= 0, 'Network graph must calculate content bounds');
+  assert(renderBlock.indexOf('Math.random') < 0, 'Network fallback positions must be deterministic');
+});
+
+test('KG: tabs expose selected state and keyboard navigation', function() {
+  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
+  assert(html.indexOf('aria-selected="true"') >= 0 && html.indexOf('onkeydown="handleKGTabKeydown(event)"') >= 0, 'Knowledge graph tabs need accessible selection and keyboard handling');
+  assert(src.indexOf('function handleKGTabKeydown') >= 0, 'Knowledge graph keyboard handler missing');
+  assert(src.indexOf('function bindKnowledgeGraphDialog') >= 0, 'Knowledge graph dialog focus handling missing');
+});
+
+
+test('AUDIT: format-check preserves detailed findings before summary', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
+  var block = src.substring(src.indexOf('function runFormatCheck'), src.indexOf('container.innerHTML = h'));
+  assert(block.indexOf('h = summary + h') >= 0, 'Format summary must prepend instead of replacing detailed findings');
+  assert(block.indexOf("h = '<div class=\"module-panel\">'") < 0, 'Format findings must not be reset before render');
+  assert(block.indexOf('标题样式质量') < block.indexOf('h = summary + h'), 'Detailed checks must be generated before summary is prepended');
+});
+
+test('AUDIT: paragraph findings preserve original source indexes', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/paragraph-analysis.js'), 'utf8');
+  assert(src.indexOf('sourceIndex: paraData.length') >= 0, 'Paragraph data must preserve the navigable source index');
+  assert(src.indexOf("jumpToParagraph(' + p.sourceIndex + ')") >= 0, 'Filtered findings must navigate with sourceIndex');
+});
+
+test('AUDIT: terminology evolution never compares a term with itself', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/terminology.js'), 'utf8');
+  assert(src.indexOf("{a:'数据预处理',b:'数据预处理'}") < 0, 'Self-comparison terminology false positive remains');
+  assert(src.indexOf('if(p.a===p.b)return') >= 0, 'Terminology evolution needs a generic self-comparison guard');
+});
+
+test('AUDIT: thesis review uses project or document title', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
+  assert(src.indexOf('function reviewDocumentTitle') >= 0, 'Review title resolver missing');
+  assert(src.indexOf('var title = reviewDocumentTitle()') >= 0, 'Review must use the resolved document title');
+  assert(src.indexOf("var title = (bodyChs[0] && bodyChs[0].name)") < 0, 'First body chapter must not be treated as thesis title');
+});
+
+test('SECURITY: topic finder renders user and API text safely', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/topic-finder.js'), 'utf8');
+  var block = src.substring(src.indexOf('window.runTopicFinderAI'), src.length);
+  assert(block.indexOf('loading.textContent') >= 0 && block.indexOf('result.textContent') >= 0 && block.indexOf('errorEl.textContent') >= 0, 'Topic finder must render dynamic values as text');
+  assert(block.indexOf("out.innerHTML = '<div class=\"ai-loading\"") < 0, 'Topic finder loading state still interpolates user input into HTML');
+  assert(block.indexOf('.catch(function(error)') >= 0 && block.indexOf('.finally(function()') >= 0, 'Topic finder must terminate loading on failures');
+  assert(block.indexOf('button.disabled = true') >= 0 && block.indexOf('button.disabled = false') >= 0, 'Topic finder must prevent duplicate submissions and restore controls');
+});
+
 
 test('AUDIT: renderRefNetwork function exists', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'app.js'), 'utf8');
@@ -2079,6 +2138,25 @@ test('PROJECT: merge/preview/cloud helpers exist', function() {
   assert(src.indexOf('function syncProjectToCloud') >= 0, 'cloud sync missing');
   assert(src.indexOf('function pullCloudProjects') >= 0, 'cloud pull missing');
 });
+test('PROJECT: 409 conflicts reconcile once and block stale retries', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');
+  assert(src.indexOf('function mergeProjectConflict') >= 0, 'Project conflict merge helper missing');
+  assert(src.indexOf('conflictRetry: true') >= 0, 'Project conflict must retry at most once');
+  assert(src.indexOf('blockedRowVersion') >= 0, 'Stale project versions must be blocked from repeated sync');
+  assert(src.indexOf('conflictFields') >= 0, 'Same-field conflicts must remain explicit');
+});
+test('PROJECT: cloud pull failures are distinguishable from empty projects', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');
+  var block = src.substring(src.indexOf('function pullCloudProjects'), src.indexOf('function getCurrentId'));
+  assert(block.indexOf('cb(null, err)') >= 0, 'Cloud pull errors must not return an empty success list');
+  assert(block.indexOf('throw err') >= 0, 'Cloud pull failures must reject for caller recovery');
+});
+test('API: project optimistic-lock update verifies affected rows', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
+  var block = src.substring(src.indexOf('def projects_upsert'), src.indexOf("@app.route('/api/projects/<project_id>', methods=['DELETE'])"));
+  assert(block.indexOf('cursor.rowcount != 1') >= 0, 'Project update must verify optimistic-lock affected rows');
+  assert(block.indexOf("'serverProject'") >= 0 && block.indexOf("'currentRowVersion'") >= 0, 'Conflict response must include the latest server project');
+});
 test('PROJECT: citation closed loop + import sync helpers', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');
   assert(src.indexOf('function insertCiteMarkers') >= 0, 'insertCiteMarkers missing');
@@ -2307,7 +2385,7 @@ test('BILLING: idempotency replay validates project and input hash', function() 
 test('PROJECT: path-aware stages and safe queue cleanup exist', function() {
   var js=fs.readFileSync(path.join(projectRoot,'js/modules/project.js'),'utf8');
   assert(js.indexOf('function availableStages')>=0&&js.indexOf('function nextAvailableStage')>=0,'path-aware stage helpers missing');
-  assert(js.indexOf('cloudSyncState.inFlight[project.id] === tracked')>=0,'project queue cleanup guard missing');
+  assert(js.indexOf('cloudSyncState.inFlight[projectId] === tracked')>=0,'project queue cleanup guard missing');
   assert(js.indexOf('cloudSyncState.inFlight[key]===tracked')>=0,'literature queue cleanup guard missing');
 });
 
