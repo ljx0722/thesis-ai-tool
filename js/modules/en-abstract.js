@@ -1,14 +1,18 @@
-/** 英文摘要润色翻译 */
+/** 英文摘要润色翻译 — 自动提取论文摘要 */
 function runEnAbstract(container) {
   var c = container || document.querySelector('.module-panel');
   if (!c) return;
+  var hasManuscript = typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 30;
   c.innerHTML = '<div class="module-panel module-panel-content">' +
     '<h4>🌐 英文摘要润色</h4>' +
-    '<div class="ai-desc">支持两种模式：<br><b>翻译模式：</b>中文摘要 → 学术英文摘要<br><b>润色模式：</b>已有英文 → AI润色优化（语法/用词/流畅度）</div>' +
+    '<div class="ai-desc">支持两种模式：<br><b>翻译模式：</b>中文摘要 → 学术英文摘要<br><b>润色模式：</b>已有英文 → AI润色优化</div>' +
     '<div style="display:flex;gap:8px;margin-bottom:12px">' +
     '<button onclick="setEnMode(\'translate\')" id="enBtnTranslate" class="ai-btn" style="flex:1;padding:8px 12px;font-size:var(--font-size-sm)">翻译模式</button>' +
     '<button onclick="setEnMode(\'polish\')" id="enBtnPolish" class="ai-btn-clear" style="flex:1">润色模式</button></div>' +
-    '<textarea id="enInput" class="ai-textarea" placeholder="翻译模式：粘贴中文摘要&#10;润色模式：粘贴英文摘要" style="height:160px;margin-bottom:0"></textarea>' +
+    (hasManuscript
+      ? '<div style="padding:10px 14px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;margin-bottom:8px;font-size:12px;color:#0369a1">📄 将从论文中提取摘要内容（共' + manuscriptText.length + '字）</div>' +
+        '<textarea id="enInput" class="ai-textarea" placeholder="论文内容已自动加载。也可以手动粘贴..." style="height:160px;margin-bottom:0">' + (typeof manuscriptText !== 'undefined' ? manuscriptText.substring(0, 2000) : '') + '</textarea>'
+      : '<textarea id="enInput" class="ai-textarea" placeholder="翻译模式：粘贴中文摘要&#10;润色模式：粘贴英文摘要" style="height:160px;margin-bottom:0"></textarea>') +
     '<div class="ai-actions-full"><button onclick="runEnAI()" class="ai-btn">🤖 开始处理</button></div>' +
     '<div id="enOutput" style="min-height:200px"></div>' +
   '</div>';

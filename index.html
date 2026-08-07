@@ -133,7 +133,7 @@
   var _phase='setup';
   function el(id){return document.getElementById(id);}
 
-  // ── 阶段1：立项 ──
+  // ── 阶段1：立项（3步向导 + AI辅助）──
   function mountSetup(mc){
     var hasProj=window.ThesisProject&&ThesisProject.getCurrentProject&&ThesisProject.getCurrentProject();
     if(hasProj){
@@ -141,26 +141,78 @@
       setTimeout(function(){if(typeof window.renderWorkspaceHero==='function')try{window.renderWorkspaceHero()}catch(e){}},50);
       return;
     }
-    mc.innerHTML='<div style="max-width:560px;margin:80px auto;text-align:center;padding:0 20px">'+
-      '<div style="font-size:56px;margin-bottom:16px">🎓</div>'+
-      '<h2 style="font-size:22px;font-weight:700;margin-bottom:4px">论文搭子 ThesisBuddy</h2>'+
-      '<p style="color:#94a3b8;font-size:14px;margin-bottom:40px">AI 论文全流程工作台 — 从想法到答辩通关</p>'+
-      '<div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:48px">'+
-        '<div onclick="typeof openIdeaWizard===\'function\'&&openIdeaWizard()" style="flex:1;min-width:200px;max-width:260px;padding:28px 20px;background:#fff;border:2px solid #4f46e5;border-radius:16px;cursor:pointer;transition:all .15s" onmouseenter="this.style.boxShadow=\'0 8px 30px rgba(79,70,229,.15)\'" onmouseleave="this.style.boxShadow=\'none\'">'+
-          '<div style="font-size:36px;margin-bottom:12px">💡</div>'+
-          '<div style="font-size:16px;font-weight:700;color:#111;margin-bottom:4px">从想法开始</div>'+
-          '<div style="font-size:12px;color:#94a3b8">选题 → 大纲 → 分章写作</div>'+
+    var step=0, ideaText='', topics=[], outline='';
+    function esc(s){return String(s||'').replace(/[&<>\"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c];});}
+    function render(){
+      var h='';
+      // Progress bar
+      h+='<div style="display:flex;gap:4px;margin-bottom:24px;justify-content:center">'+[1,2,3].map(function(i){return'<div style="width:80px;height:4px;border-radius:2px;background:'+(i<=step+1?'var(--accent,#4f46e5)':'#e2e8f0')+'"></div>';}).join('')+'</div>';
+
+      if(step===0){
+        // Step 1: Research idea
+        h+='<div style="max-width:560px;margin:0 auto">'+
+          '<h2 style="font-size:20px;font-weight:700;margin-bottom:4px">第1步：描述你的研究方向</h2>'+
+          '<p style="color:#94a3b8;font-size:13px;margin-bottom:20px">用一两句话描述你想研究什么，AI 会帮你分析选题方向</p>'+
+          '<textarea id="wizIdea" class="ai-textarea" style="height:100px;margin-bottom:12px" placeholder="例如：研究海绵城市在南方多雨地区的应用效果，分析其对城市内涝防治的影响">'+esc(ideaText)+'</textarea>'+
+          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+            '<button class="btn btn-primary" onclick="(function(){var el=document.getElementById(\'wizIdea\');var v=el?el.value.trim():\'\';if(v.length<8){alert(\'请至少用8个字描述你的研究方向\');return;}ideaText=v;step=1;render();if(v.length>30){var btn=document.getElementById(\'wizAnalyzeBtn\');if(btn)btn.click();}})()">下一步 →</button>'+
+            '<button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="typeof openImportDialog===\'function\'?openImportDialog(\'new\'):null">或者直接导入论文</button>'+
+          '</div>'+
+        '</div>';
+      } else if(step===1){
+        // Step 2: AI topic analysis + outline
+        h+='<div style="max-width:600px;margin:0 auto">'+
+          '<h2 style="font-size:20px;font-weight:700;margin-bottom:4px">第2步：AI 选题分析</h2>'+
+          '<p style="color:#94a3b8;font-size:13px;margin-bottom:16px">基于你的研究方向，AI 正在分析...</p>';
+        if(topics.length){
+          h+='<div style="margin-bottom:16px"><b style="font-size:14px">推荐选题方向：</b></div>';
+          topics.forEach(function(t,i){
+            h+='<div class="card" style="margin-bottom:8px;cursor:pointer;padding:14px" onclick="(function(){document.getElementById(\'wizTitle\').value=\''+esc(t.replace(/'/g,\"\\\\'\")).replace(/\"/g,'&quot;')+'\';var el=document.getElementById(\'wizTitle\');if(el)el.focus();})()">'+
+              '<div style="font-size:14px;font-weight:600">'+(i+1)+'. '+esc(t)+'</div>'+
+              '<div style="font-size:11px;color:#94a3b8;margin-top:2px">点击选用此题目</div></div>';
+          });
+        } else {
+          h+='<div class="card" style="text-align:center;padding:24px">'+
+            '<div class="loading-spinner" style="margin:0 auto 12px"></div>'+
+            '<p style="font-size:13px;color:#94a3b8">正在通过 AI 分析你的研究方向...</p>'+
+            '<button id="wizAnalyzeBtn" class="btn btn-primary btn-sm" style="margin-top:12px" '+
+              'onclick="var self=this;self.disabled=true;self.textContent=\'分析中...\';var idea=ideaText;var t=sessionStorage.getItem(\'thesis_ai_token\');'+
+              'fetch(\'/api/llm/analyze\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\',\'Authorization\':\'Bearer \'+t},body:JSON.stringify({capability_id:\'topic-finder\',input:\'研究方向：\'+idea+\'。请给出3-5个具体的论文选题建议，每个一行，不要编号以外的文字。\',max_tokens:800})})'+
+              '.then(function(r){return r.json()}).then(function(d){if(d.success){var arr=d.content.split(/\\n/).filter(function(l){return /^\\d/.test(l.trim())}).map(function(l){return l.replace(/^\\d+[\\.\\、\\s]+/,\'\').trim()}).filter(Boolean);if(!arr.length)arr=[d.content.substring(0,80)];topics=arr;render();}else{alert(d.error||\'AI分析失败，请手动输入题目\');}})'+
+              '.catch(function(){alert(\'网络错误，请手动输入题目\')})">🤖 AI 分析选题</button>'+
+          '</div>';
+        }
+        h+='<div style="margin-top:16px"><label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">论文题目（可修改）</label>'+
+          '<input id="wizTitle" class="input" style="margin-bottom:8px" placeholder="输入或点击上方推荐题目" value="'+esc(ideaText.length>30?ideaText.substring(0,30)+'…的研究':ideaText)+'">'+
+          '<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">关键词（逗号分隔）</label>'+
+          '<input id="wizKeywords" class="input" style="margin-bottom:8px" placeholder="例如：海绵城市, 内涝防治, SWMM">'+
+          '<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">学科领域</label>'+
+          '<input id="wizField" class="input" style="margin-bottom:16px" placeholder="如：土木工程 / 环境科学 / 人工智能">'+
         '</div>'+
-        '<div onclick="typeof openImportDialog===\'function\'?openImportDialog(\'new\'):null" style="flex:1;min-width:200px;max-width:260px;padding:28px 20px;background:#fff;border:2px solid #e2e8f0;border-radius:16px;cursor:pointer;transition:all .15s" onmouseenter="this.style.borderColor=\'#4f46e5\';this.style.boxShadow=\'0 8px 30px rgba(79,70,229,.1)\'" onmouseleave="this.style.borderColor=\'#e2e8f0\';this.style.boxShadow=\'none\'">'+
-          '<div style="font-size:36px;margin-bottom:12px">📄</div>'+
-          '<div style="font-size:16px;font-weight:700;color:#111;margin-bottom:4px">导入论文</div>'+
-          '<div style="font-size:12px;color:#94a3b8">解析 DOCX → 审阅 → 导出</div>'+
-        '</div>'+
-      '</div>'+
-      '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">'+
-        [{i:'🎯',t:'想清楚',d:'选题打磨'},{i:'📚',t:'找资料',d:'文献检索'},{i:'🧭',t:'搭结构',d:'开题大纲'},{i:'✍️',t:'写出来',d:'章节扩写'},{i:'🎤',t:'答辩',d:'PPT+摘要'}].map(function(s){return'<div style="padding:12px 8px;text-align:center;background:#fff;border:1px solid #f1f5f9;border-radius:10px"><div style="font-size:20px;margin-bottom:2px">'+s.i+'</div><div style="font-size:12px;font-weight:600">'+s.t+'</div><div style="font-size:10px;color:#94a3b8">'+s.d+'</div></div>';}).join('')+
-      '</div>'+
-    '</div>';
+        '<div style="display:flex;gap:8px">'+
+          '<button class="btn btn-ghost" onclick="step=0;render()">← 上一步</button>'+
+          '<button class="btn btn-primary" onclick="(function(){var title=document.getElementById(\'wizTitle\');var t=title?title.value.trim():\'\';if(!t||t.length<4){alert(\'请输入论文题目（至少4个字）\');return;}step=2;render();var btn=document.getElementById(\'wizCreateBtn\');if(btn)btn.click();})()">创建项目 →</button>'+
+        '</div>';
+      } else {
+        // Step 3: Project created
+        h+='<div style="max-width:500px;margin:0 auto;text-align:center">'+
+          '<div style="font-size:48px;margin-bottom:12px">🎉</div>'+
+          '<h2 style="font-size:20px;font-weight:700;margin-bottom:4px">论文项目已创建！</h2>'+
+          '<p style="color:#94a3b8;font-size:13px;margin-bottom:24px">下一步做什么？</p>'+
+          '<div style="display:flex;flex-direction:column;gap:10px;text-align:left;max-width:340px;margin:0 auto">'+
+            '<div class="card" style="cursor:pointer;padding:16px;display:flex;align-items:center;gap:12px" onclick="navigateTo(\'literature\')">'+
+              '<div style="font-size:28px">📚</div><div><div style="font-weight:700;font-size:14px">检索文献</div><div style="font-size:12px;color:#94a3b8">搜索和引用相关论文</div></div></div>'+
+            '<div class="card" style="cursor:pointer;padding:16px;display:flex;align-items:center;gap:12px" onclick="navigateTo(\'writing\')">'+
+              '<div style="font-size:28px">✍️</div><div><div style="font-weight:700;font-size:14px">开始写作</div><div style="font-size:12px;color:#94a3b8">按章节撰写论文初稿</div></div></div>'+
+            '<div class="card" style="cursor:pointer;padding:16px;display:flex;align-items:center;gap:12px" onclick="navigateTo(\'review\')">'+
+              '<div style="font-size:28px">🔍</div><div><div style="font-weight:700;font-size:14px">审阅打磨</div><div style="font-size:12px;color:#94a3b8">检查格式、术语和逻辑</div></div></div>'+
+          '</div>'+
+          '<button id="wizCreateBtn" style="display:none" onclick="(function(){var title=document.getElementById(\'wizTitle\');var kw=document.getElementById(\'wizKeywords\');var fd=document.getElementById(\'wizField\');var t=(title?title.value.trim():\'\')||ideaText.substring(0,24);if(typeof ThesisProject!==\'undefined\'&&ThesisProject.createProject){var p=ThesisProject.createProject({title:t,idea:ideaText,keywords:kw?kw.value.trim():\'\',field:fd?fd.value.trim():\'\',degree:\'本科\',mode:\'create\',currentStage:\'ideation\',schoolTemplate:\'generic\'});try{ThesisProject.applySchoolTemplate(\'generic\')}catch(e){}ThesisProject.renderProjectChrome();}};navigateTo(\'setup\')">创建</button>'+
+        '</div>';
+      }
+      mc.innerHTML='<div style="padding:40px 20px">'+h+'</div>';
+    }
+    render();
   }
 
   // ── 阶段2：文献 ──
