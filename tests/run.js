@@ -110,12 +110,17 @@ test('HTML has all required ' + '<script>' + ' tags in correct order', function(
   var required = ['mammoth.browser.min.js', 'jszip.min.js', 'app.js',
     'js/modules/optimization.js', 'js/modules/format-check.js',
     'js/modules/terminology.js', 'js/modules/paragraph-analysis.js',
-    'js/modules/onboarding.js', 'js/app-modules.js'];
+    'js/modules/onboarding.js', 'js/modules/project.js',
+    'js/app-modules.js',
+    'js/core/utils.js', 'js/core/api.js', 'js/core/state.js',
+    'js/core/events.js', 'js/core/ui.js'];
   required.forEach(function(r) {
     assert(paths.indexOf(r) >= 0, 'Missing script: ' + r);
   });
-  // app-modules.js must be last
-  assert(paths.indexOf('js/app-modules.js') === paths.length - 1, 'app-modules.js must be loaded last');
+  // js/core/app.js must be loaded last (new modular architecture)
+  var appJsIdx = paths.indexOf('js/core/app.js');
+  assert(appJsIdx >= 0, 'Missing script: js/core/app.js');
+  assert(appJsIdx === paths.length - 1, 'js/core/app.js must be loaded last');
 });
 
 // ============================================================
