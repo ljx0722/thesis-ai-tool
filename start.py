@@ -33,7 +33,7 @@ def main():
     if os.name == 'nt':
         kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
-    flask_proc = subprocess.Popen([sys.executable, "kg_server.py"], **kwargs)
+    flask_proc = subprocess.Popen([sys.executable, "run.py"], **kwargs)
     time.sleep(2)
 
     webbrowser.open("http://localhost:5000")

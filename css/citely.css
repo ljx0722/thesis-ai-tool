@@ -1,0 +1,115 @@
+/* ====== Citely 文献管理模块样式 ====== */
+
+.citely-root { display:flex; flex-direction:column; height:100%; }
+
+/* Tabs */
+.citely-tabs { display:flex; gap:0; border-bottom:2px solid var(--border,#e5e7eb); padding:0 16px; flex-shrink:0; }
+.citely-tab {
+  padding:10px 18px; border:none; background:none; font-size:.78rem; font-weight:600;
+  color:var(--text-muted,#888); cursor:pointer; border-bottom:2px solid transparent;
+  margin-bottom:-2px; transition:all .15s; display:flex; align-items:center; gap:6px;
+  font-family:inherit;
+}
+.citely-tab:hover { color:var(--text-primary,#111); }
+.citely-tab.active { color:var(--accent,#4f46e5); border-bottom-color:var(--accent,#4f46e5); }
+.citely-badge { background:var(--accent,#4f46e5); color:#fff; font-size:.62rem; padding:1px 7px; border-radius:10px; font-weight:700; min-width:18px; text-align:center; }
+
+/* Content */
+.citely-content { flex:1; overflow-y:auto; padding:16px; }
+
+/* Search */
+.citely-search-area { margin-bottom:16px; }
+.citely-search-bar { display:flex; gap:8px; align-items:center; }
+.citely-search-input {
+  flex:1; padding:10px 14px; border:1.5px solid var(--border,#d1d5db); border-radius:10px;
+  font-size:.85rem; outline:none; transition:border-color .2s;
+  background:var(--bg-input,#fff); color:var(--text-primary,#111); font-family:inherit;
+}
+.citely-search-input:focus { border-color:var(--accent,#4f46e5); box-shadow:0 0 0 3px rgba(79,70,229,.1); }
+.citely-search-input::placeholder { color:var(--text-muted,#9ca3af); }
+
+.citely-btn {
+  display:inline-flex; align-items:center; gap:4px; padding:10px 18px; border:none; border-radius:10px;
+  font-size:.8rem; font-weight:600; cursor:pointer; transition:all .15s; white-space:nowrap; font-family:inherit;
+}
+.citely-btn-primary { background:var(--accent,#4f46e5); color:#fff; }
+.citely-btn-primary:hover { filter:brightness(1.1); }
+.citely-btn-ghost { background:var(--bg-elevated,#f3f4f6); color:var(--text-secondary,#555); }
+.citely-btn-ghost:hover { background:var(--border,#e5e7eb); }
+.citely-btn-sm { padding:6px 12px; font-size:.72rem; border-radius:8px; background:var(--bg-elevated,#f3f4f6); color:var(--text-secondary,#555); }
+.citely-btn-sm:hover { background:var(--border,#e5e7eb); }
+.citely-input-sm { padding:5px 8px; border:1px solid var(--border,#d1d5db); border-radius:6px; font-size:.72rem; outline:none; background:var(--bg-input,#fff); color:var(--text-primary,#111); font-family:inherit; }
+.citely-select-sm { padding:5px 8px; border:1px solid var(--border,#d1d5db); border-radius:6px; font-size:.72rem; outline:none; background:var(--bg-input,#fff); color:var(--text-primary,#111); cursor:pointer; font-family:inherit; }
+
+.citely-filters { margin-top:10px; padding:12px 14px; background:var(--bg-elevated,#f8fafc); border-radius:10px; border:1px solid var(--border,#e5e7eb); }
+.citely-filter-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.citely-filter-row label { font-size:.72rem; color:var(--text-muted,#888); display:flex; align-items:center; gap:4px; }
+
+.citely-keywords { margin-top:10px; font-size:.72rem; color:var(--text-muted,#888); }
+.citely-kw-tags { display:inline-flex; gap:4px; flex-wrap:wrap; }
+.citely-kw-tag { font-size:.68rem; padding:3px 10px; border:1px solid var(--accent,#4f46e5); color:var(--accent,#4f46e5); background:rgba(79,70,229,.06); border-radius:14px; cursor:pointer; transition:all .15s; font-family:inherit; }
+.citely-kw-tag:hover { background:var(--accent,#4f46e5); color:#fff; }
+
+/* Result meta */
+.citely-result-meta { font-size:.7rem; color:var(--text-muted,#888); margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border,#f3f4f6); display:flex; align-items:center; justify-content:space-between; }
+
+/* Cards */
+.citely-card {
+  background:var(--bg-card,#fff); border:1px solid var(--border,#e5e7eb); border-radius:12px; padding:14px 16px;
+  margin-bottom:10px; transition:all .15s;
+}
+.citely-card:hover { border-color:var(--accent,#4f46e5); box-shadow:0 2px 12px rgba(0,0,0,.06); }
+.citely-card.is-saved { background:linear-gradient(to right, rgba(16,185,129,.04), transparent); }
+.citely-card-body { margin-bottom:10px; }
+.citely-card-title { font-size:.85rem; font-weight:700; color:var(--text-primary,#111); line-height:1.45; margin-bottom:4px; }
+.citely-doi-link { text-decoration:none; margin-right:2px; }
+.citely-year-badge { display:inline-block; padding:1px 7px; border-radius:8px; color:#fff; font-size:.65rem; font-weight:600; vertical-align:middle; margin-left:4px; }
+.citely-card-authors { font-size:.72rem; color:var(--text-secondary,#555); margin-bottom:2px; }
+.citely-card-meta { font-size:.68rem; color:var(--text-muted,#888); display:flex; gap:12px; flex-wrap:wrap; margin-bottom:4px; }
+.citely-card-sources { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:4px; }
+.citely-source-badge { font-size:.58rem; padding:1px 7px; border-radius:6px; color:#fff; font-weight:600; }
+.citely-cite-count { font-size:.62rem; color:var(--text-muted,#888); }
+.citely-card-abstract { font-size:.7rem; color:var(--text-muted,#888); line-height:1.5; margin-top:6px; }
+
+.citely-card-actions { display:flex; gap:8px; align-items:center; border-top:1px solid var(--border,#f3f4f6); padding-top:8px; }
+.citely-action-btn {
+  display:inline-flex; align-items:center; gap:3px; padding:5px 12px; border:1px solid var(--border,#d1d5db);
+  border-radius:8px; font-size:.7rem; font-weight:600; cursor:pointer; transition:all .15s;
+  background:var(--bg-card,#fff); color:var(--text-secondary,#555); font-family:inherit;
+}
+.citely-action-btn:hover { background:var(--bg-elevated,#f3f4f6); }
+.citely-save { border-color:#10b981; color:#10b981; }
+.citely-save:hover { background:#10b981; color:#fff; }
+.citely-saved-badge { font-size:.7rem; color:#10b981; font-weight:600; }
+.citely-cite-group { display:flex; align-items:center; gap:4px; margin-left:auto; }
+.citely-cite-select { font-size:.68rem; padding:5px 8px; border:1px solid var(--border,#d1d5db); border-radius:8px; background:var(--bg-input,#fff); color:var(--text-primary,#111); cursor:pointer; max-width:180px; font-family:inherit; outline:none; }
+
+/* Citation map */
+.citely-citation-map { display:flex; flex-direction:column; gap:12px; }
+.citely-citation-chapter { background:var(--bg-card,#fff); border:1px solid var(--border,#e5e7eb); border-radius:10px; padding:12px 14px; }
+.citely-citation-chapter-title { font-size:.82rem; font-weight:700; color:var(--text-primary,#111); margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+.citely-cite-count-sm { font-size:.65rem; color:var(--accent,#4f46e5); font-weight:600; }
+.citely-citation-item { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border,#f3f4f6); font-size:.75rem; color:var(--text-secondary,#555); }
+.citely-remove-cite { background:none; border:none; color:var(--text-muted,#999); cursor:pointer; font-size:.8rem; padding:2px 6px; border-radius:4px; }
+.citely-remove-cite:hover { color:#ef4444; background:rgba(239,68,68,.08); }
+
+.citely-export-bar { margin-top:16px; text-align:right; }
+
+/* Empty & loading */
+.citely-empty { text-align:center; padding:40px 20px; color:var(--text-muted,#888); }
+.citely-empty-icon { font-size:2.5rem; margin-bottom:10px; }
+.citely-empty p { margin:4px 0; font-size:.82rem; }
+.citely-empty-hint { font-size:.72rem; color:var(--text-muted,#9ca3af); }
+.citely-loading { text-align:center; padding:40px 20px; }
+.citely-spinner { width:32px; height:32px; border:3px solid var(--border,#e5e7eb); border-top-color:var(--accent,#4f46e5); border-radius:50%; animation:citelySpin .8s linear infinite; margin:0 auto 12px; }
+@keyframes citelySpin { to { transform:rotate(360deg); } }
+.citely-loading span { font-size:.78rem; color:var(--text-muted,#888); }
+
+/* Toast */
+.citely-toast {
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:100000;
+  background:#1f2937; color:#fff; padding:10px 24px; border-radius:10px; font-size:.78rem;
+  font-weight:600; opacity:0; transition:opacity .3s; pointer-events:none; font-family:inherit;
+  box-shadow:0 8px 30px rgba(0,0,0,.2);
+}
+.citely-toast.show { opacity:1; }
