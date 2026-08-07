@@ -1,4 +1,5 @@
 <!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>论文搭子 ThesisBuddy — AI 论文全流程工作台</title>
+
 <meta property="og:title" content="论文搭子 ThesisBuddy — AI 论文全流程工作台">
 <meta property="og:description" content="从一个想法到答辩通关，你的AI论文搭子，陪你搞定论文全流程">
 <meta property="og:type" content="website">
@@ -6,181 +7,456 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>">
-<link rel="stylesheet" href="css/tokens.css?v=80">
 <link rel="stylesheet" href="css/reset.css?v=80">
+<link rel="stylesheet" href="css/tokens.css?v=70">
+<link rel="stylesheet" href="css/style.css?v=66">
 <link rel="stylesheet" href="css/shell.css?v=80">
-<link rel="stylesheet" href="css/components.css?v=80">
-<link rel="stylesheet" href="css/style.css?v=66"></head><body class="app-shell">
-
-<!-- 服务升级横幅 -->
-<div id="serviceUpgradeBanner" class="service-upgrade-banner" hidden>
+<link rel="stylesheet" href="css/components.css?v=70"></head><body class="app-shell">
+<div id="serviceUpgradeBanner" class="service-upgrade-banner" role="status" aria-live="assertive" hidden>
   <div><strong id="serviceUpgradeTitle">服务即将升级</strong><span id="serviceUpgradeMessage">请尽快保存当前内容</span></div>
-  <div class="service-upgrade-actions"><span id="serviceUpgradeCountdown">--:--</span><button id="serviceUpgradeSave">保存</button></div>
+  <div class="service-upgrade-actions"><span id="serviceUpgradeCountdown">--:--</span><button type="button" id="serviceUpgradeSave">立即保存</button></div>
 </div>
-
 <!-- ====== 登录页 ====== -->
 <div id="loginOverlay">
-  <div class="login-bg"><div class="login-bg-grid"></div></div>
+  <div class="login-bg">
+    <div class="login-bg-grid"></div>
+  </div>
+
   <div class="landing-container">
+    <!-- Left: Hero + Feature Grid -->
     <div class="landing-hero">
       <div class="landing-brand">
         <h1 class="landing-title">论文搭子<br><span>ThesisBuddy</span></h1>
         <p class="landing-desc">从一个想法到答辩通关，你的AI论文搭子，陪你搞定论文全流程</p>
       </div>
-      <div class="landing-workflow">
-        <h2>论文全流程工作台 — 七个阶段</h2>
-        <div class="landing-stage-rail">
-          <span class="landing-stage">🎯 想清楚</span><span class="landing-stage">📚 找资料</span>
-          <span class="landing-stage">🧭 搭结构</span><span class="landing-stage">✍️ 写出来</span>
-          <span class="landing-stage">🔍 改得好</span><span class="landing-stage">📊 过评审</span>
-          <span class="landing-stage">🎤 做答辩</span>
+
+      <div class="landing-workflow" aria-labelledby="landingWorkflowTitle">
+        <div class="landing-workflow-head">
+          <div>
+            <span class="landing-kicker">论文全流程工作台</span>
+            <h2 id="landingWorkflowTitle">一条主线，七个论文阶段</h2>
+          </div>
+          <span class="landing-live-note"><i></i>按阶段推进，不堆工具</span>
         </div>
+        <div class="landing-paths" role="tablist" aria-label="开始路径">
+          <button type="button" class="landing-path is-active" role="tab" aria-selected="true" data-landing-path="idea">💡 从想法开始<span>立项 → 大纲 → 分章写作</span></button>
+          <button type="button" class="landing-path" role="tab" aria-selected="false" data-landing-path="docx">📄 导入已有论文<span>解析 DOCX → 审阅 → 导出</span></button>
+        </div>
+        <div class="landing-stage-rail" role="tablist" aria-label="论文阶段">
+          <button type="button" class="landing-stage is-active" role="tab" aria-selected="true" data-stage="0"><b>·</b><span>想清楚</span></button>
+          <button type="button" class="landing-stage" role="tab" aria-selected="false" data-stage="1"><b>·</b><span>找资料</span></button>
+          <button type="button" class="landing-stage" role="tab" aria-selected="false" data-stage="2"><b>·</b><span>搭结构</span></button>
+          <button type="button" class="landing-stage" role="tab" aria-selected="false" data-stage="3"><b>·</b><span>写出来</span></button>
+          <button type="button" class="landing-stage" role="tab" aria-selected="false" data-stage="4"><b>·</b><span>改得好</span></button>
+          <button type="button" class="landing-stage" role="tab" aria-selected="false" data-stage="5"><b>·</b><span>过评审</span></button>
+          <button type="button" class="landing-stage" role="tab" aria-selected="false" data-stage="6"><b>·</b><span>做答辩</span></button>
+        </div>
+        <div class="landing-stage-detail" role="tabpanel" aria-live="polite" aria-labelledby="landingStageName">
+          <div class="landing-stage-index" id="landingStageIndex" aria-hidden="true">想</div>
+          <div><h3 id="landingStageName">想清楚</h3><p id="landingStageDesc">把模糊想法变成可研究的问题、选题方向和开题方案。</p><div class="landing-stage-tags" id="landingStageTags"><span>选题打磨</span><span>开题方案</span></div></div>
+          <span class="landing-stage-arrow" aria-hidden="true">↗</span>
+        </div>
+        <p class="landing-truth-note">浏览阶段不会执行分析或扣费；登录后会按当前服务配置显示可用能力。</p>
       </div>
     </div>
+
+    <!-- Right: Login Card -->
     <div class="landing-login">
-      <div class="login-card">
-        <h3 id="loginCardTitle">登录系统</h3>
+      <div class="login-card-v2">
+        <h3 class="login-card-title" id="loginCardTitle">登录系统</h3>
         <div class="login-form">
-          <input type="text" id="loginUsername" placeholder="用户名" autocomplete="username" autofocus>
-          <input type="password" id="loginPassword" placeholder="密码" autocomplete="current-password">
-          <input type="password" id="regConfirmPassword" placeholder="确认密码" style="display:none">
+          <div class="login-field">
+            <svg class="login-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+            <input type="text" id="loginUsername" placeholder="用户名" autocomplete="username" autofocus>
+          </div>
+          <div class="login-field">
+            <svg class="login-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input type="password" id="loginPassword" placeholder="密码" autocomplete="current-password">
+          </div>
+          <div class="login-field" id="regConfirmField" style="display:none">
+            <svg class="login-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input type="password" id="regConfirmPassword" placeholder="确认密码">
+          </div>
           <div class="login-error" id="loginError"></div>
           <button class="login-btn" id="loginBtn" onclick="doLogin()">
             <span id="loginBtnText">登 录</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </button>
         </div>
         <div class="login-switch">
           <span id="loginSwitchText">还没有账号？</span>
+          <div class="login-invite-row">
+            <input type="text" id="regInviteCode" placeholder="邀请码（选填）">
+          </div>
           <a href="javascript:void(0)" id="loginSwitchLink" onclick="toggleRegMode()">立即注册</a>
         </div>
       </div>
     </div>
   </div>
 </div>
-<script>
-document.getElementById('loginUsername')&&document.getElementById('loginUsername').addEventListener('keydown',function(e){if(e.key==='Enter'){var p=document.getElementById('loginPassword');if(p)p.focus()}});
-document.getElementById('loginPassword')&&document.getElementById('loginPassword').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()});
-</script>
 
-<!-- ====== 应用壳层 ====== -->
 <div id="appShell" style="display:none">
-  <!-- 顶栏 -->
-  <div class="bar">
-    <div class="bar-left">
-      <h1>论文搭子 <span>ThesisBuddy</span></h1>
-      <span id="projectTitleChip" class="project-chip" onclick="typeof openIdeaWizard==='function'&&openIdeaWizard()" title="项目">未创建项目</span>
-    </div>
-    <div class="bar-center" id="barTabs">
-      <button class="bar-tab active" data-nav="workspace">总览</button>
-      <button class="bar-tab" data-nav="literature">📚 文献</button>
-      <button class="bar-tab" data-nav="writing">✍️ 写作</button>
-      <button class="bar-tab" data-nav="review">🔍 审阅</button>
-      <button class="bar-tab" data-nav="dashboard">📊 看板</button>
-      <button class="bar-tab" data-nav="defense">🎤 答辩</button>
-    </div>
-    <div class="bar-right">
-      <span id="statusBar" style="font-size:11px;opacity:.5">就绪</span>
-      <span id="balanceBar" onclick="TB.events.emit('recharge:open')" style="cursor:pointer;background:rgba(255,255,255,.06);padding:3px 10px;border-radius:10px;font-size:12px">✨ <b id="balanceAmount">0</b> 点</span>
-      <button id="notifyBellBtn" onclick="TB.events.emit('notifications:toggle')" class="bar-btn">🔔<span id="notifyBadge" style="display:none;position:absolute;top:-3px;right:-2px;min-width:14px;height:14px;padding:0 3px;border-radius:8px;background:#ef4444;color:#fff;font-size:10px;line-height:14px;font-weight:700">0</span></button>
-      <button onclick="TB.events.emit('account:open')" class="bar-btn">账户</button>
-      <button onclick="window.location.href='/admin.html'" class="bar-btn" id="adminPanelBtn" style="display:none">⚙️</button>
-      <button onclick="typeof doLogout==='function'&&doLogout()" class="bar-btn">登出</button>
-    </div>
+<div id="fileBlock"><b>⚠️ 请通过 HTTP 访问</b><br><br>本页面需要调用外部API检索文献，无法从 file:// 协议使用。<br><br><button onclick="window.open('http://localhost:5000/','_self')" style="font-size:1rem;padding:10px 30px;background:#0071e3;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700">🔗 一键跳转 HTTP</button><br><br><small style="color:var(--m)">或双击运行 <b>启动.bat</b> 后点击上方按钮</small></div>
+<script>if(window.location.protocol==='file:'){document.getElementById('fileBlock').style.display='block';document.querySelector('.main')&&(document.querySelector('.main').style.display='none');document.querySelector('.bar')&&(document.querySelector('.bar').style.display='none');fetch('http://localhost:5000/',{mode:'no-cors'}).then(function(r){window.location.href='http://localhost:5000/'}).catch(function(){});}</script>
+
+<!-- ====== 快捷键提示条 ====== -->
+<div class="kb-hint" id="kbHint" style="display:none">⌨ Ctrl+1~6 切换模块 | Ctrl+Enter 检索 | Ctrl+O 换论文 | Esc 关闭弹窗</div>
+
+<!-- ====== 顶栏 ====== -->
+<div class="bar">
+  <div class="bar-left">
+    <button class="workspace-drawer-btn" onclick="toggleTocPanel()" title="打开目录">目录</button>
+    <h1>论文搭子 <span class="brand-en">ThesisBuddy</span></h1>
+    <button id="projectTitleChip" class="project-chip" onclick="openIdeaWizard()" title="创建或查看项目">未创建项目</button>
+    <span id="projectProgressChip" class="project-progress-chip">创建项目后显示进度</span>
   </div>
-
-  <!-- 两栏主布局 -->
-  <div class="main">
-    <!-- 左侧导航轨 -->
-    <div class="nav-sidebar" id="navSidebar">
-      <div class="nav-brand">论文阶段</div>
-      <div id="stageNav"></div>
-      <div class="nav-divider"></div>
-      <div class="nav-section">快捷入口</div>
-      <button class="nav-item" onclick="typeof openIdeaWizard==='function'&&openIdeaWizard()"><span class="icon">💡</span>从想法开始</button>
-      <button class="nav-item" onclick="typeof openImportDialog==='function'?openImportDialog('new'):typeof PaperImport!=='undefined'?PaperImport.open('new'):null"><span class="icon">📎</span>导入论文</button>
-      <button class="nav-item" onclick="typeof openMaterialsLibrary==='function'&&openMaterialsLibrary()"><span class="icon">📁</span>资料库</button>
-      <div id="toolboxFavorites" class="toolbox-favs"></div>
-    </div>
-
-    <!-- 主内容区 — 唯一挂载点 -->
-    <div class="main-content" id="mainContent">
-      <div id="workspaceContent"></div>
-    </div>
+  <div class="bar-tabs" id="barTabs">
+    <button class="bar-tab active" data-view="workspace" onclick="switchView('workspace')">总览</button>
+    <button class="bar-tab" data-view="refs" onclick="switchModule('references')">📚 参考文献</button>
+    <button class="bar-tab" data-view="tools" onclick="openToolHome()">工具台</button>
+    <button class="bar-tab" data-view="dashboard" onclick="showDashboard()">看板</button>
+  </div>
+  <div class="bar-right">
+    <button class="workspace-drawer-btn" onclick="toggleToolPanel()" title="打开工具台">工具</button>
+    <span id="statusBar" style="font-size:.62rem;color:var(--m)">等待上传...</span>
+    <span id="balanceBar" style="font-size:.65rem;color:rgba(255,255,255,.4);cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.06);padding:3px 10px;border-radius:12px;margin-left:6px" onclick="showRechargeModal()" title="点击充值">✨ <strong id="balanceAmount" style="color:inherit;font-weight:700">0.000</strong> 点 <span id="freeQuotaChip" style="display:none;font-size:.5rem;color:rgba(255,255,255,.35);margin-left:2px"></span> <span style="font-size:.5rem;color:rgba(255,255,255,.3)">+</span></span>
+    <button id="notifyBellBtn" onclick="toggleNotifyPanel()" style="position:relative;background:rgba(255,255,255,.06);color:rgba(255,255,255,.55);border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.62rem;margin-left:4px" title="消息中心">🔔<span id="notifyBadge" style="display:none;position:absolute;top:-3px;right:-2px;min-width:14px;height:14px;padding:0 3px;border-radius:8px;background:#ef4444;color:#fff;font-size:.5rem;line-height:14px;font-weight:700">0</span></button>
+    <button onclick="openAccountCenter()" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.55);border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:4px" title="账户中心">账户</button>
+    <button onclick="window.location.href='/admin.html'" style="background:rgba(99,102,241,.15);color:#c7d2fe;border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:4px;display:none" id="adminPanelBtn" title="管理员看板">⚙️</button><button onclick="showConsumptionHistory()" style="background:transparent;color:rgba(255,255,255,.35);border:none;border-radius:12px;padding:4px 8px;cursor:pointer;font-size:.58rem;margin-left:2px" title="消费明细">明细</button><button onclick="showPricingInfo()" style="background:transparent;color:rgba(255,255,255,.35);border:none;border-radius:12px;padding:4px 8px;cursor:pointer;font-size:.58rem;margin-left:2px" title="使用说明">说明</button><button id="changelogLink" onclick="toggleChangelog()" style="background:transparent;color:rgba(255,255,255,.35);border:none;border-radius:12px;padding:4px 8px;cursor:pointer;font-size:.58rem;margin-left:4px" title="更新日志">日志</button><button onclick="doLogout()" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-radius:12px;padding:4px 10px;cursor:pointer;font-size:.6rem;margin-left:6px">登出</button>
+    
   </div>
 </div>
-
-<!-- 动态弹窗容器 -->
-<div id="modalRoot"></div>
-<div class="toast-container" id="toastRoot"></div>
-
-<!-- 加载覆盖层 -->
-<div id="loadOv" class="loading-overlay hidden">
-  <div class="loading-spinner"></div>
-  <div class="loading-msg" id="loadMsg"></div>
-  <div class="loading-pct" id="loadPct" style="display:none">0%</div>
-  <div class="loading-bar"><div class="loading-bar-fill" id="loadBar" style="width:0%"></div></div>
-  <div class="loading-msg" id="loadDetail" style="font-size:12px;opacity:.5;margin-top:8px"></div>
-</div>
-
-<div id="notifyPanel" style="display:none;position:fixed;top:52px;right:12px;width:360px;max-height:70vh;overflow:hidden;background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.22);z-index:100060">
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border)">
-    <b style="font-size:14px">消息中心</b>
-    <button onclick="typeof markAllNotificationsRead==='function'&&markAllNotificationsRead()" style="color:var(--accent);font-size:11px;font-weight:600;border:none;background:none;cursor:pointer">全部已读</button>
+<!-- ====== 更新日志按钮 ====== -->
+<div id="changelogBtn" onclick="toggleChangelog()" title="更新日志" style="display:none;position:fixed;top:52px;right:12px;z-index:1000;font-size:.62rem;color:#0071e3;cursor:pointer;background:rgba(0,113,227,.08);padding:3px 10px;border-radius:12px;border:1px solid rgba(0,113,227,.2);transition:all .2s;font-weight:600" onmouseenter="this.style.background='rgba(0,113,227,.15)'" onmouseleave="this.style.background='rgba(0,113,227,.08)'">📜 更新日志</div>
+<div id="changelogPanel" style="display:none;position:fixed;top:88px;right:12px;width:340px;max-height:70vh;overflow-y:auto;background:#fff;border-radius:12px;padding:16px;box-shadow:0 8px 40px rgba(0,0,0,.15);z-index:1001;font-size:.68rem;line-height:1.7;color:#333;border:1px solid #e5e7eb">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-size:.8rem">📜 功能更新日志</b><span onclick="document.getElementById('changelogPanel').style.display='none'" style="cursor:pointer;font-size:.7rem;color:#999">✕</span></div>
+  <div style="border-left:2px solid #0071e3;padding-left:10px">
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-22</b> 模块重构：论文审阅（三合一）+ 论文扩写 + 数据分析 + 会话持久化</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-21</b> 文献检索结果确认区增加文献显示量控制与自动补充机制</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-20</b> Word样式名称识别：自动解析docx内标题样式并校准层级</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-19</b> 5层全文树结构（章→节→小节→段落→句子）+ 全局索引</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-18</b> 交互式文献检索：两步确认流程（文献确认 → 分配策略）</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-17</b> 标题层级校准（分步向导）：用户手动确认章/节/小节对应样式</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-15</b> 目录树解析重构：TOC跳过 + 页码过滤 + 多级标题合并</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-14</b> 格式检查增强：标题样式质量、章节内容缺失、图表标题格式</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-13</b> 术语一致性分析：拼写检查词典扩展至15对常见学术易错词</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-12</b> 15项模块增强 + 215条自动化回归测试</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-10</b> 段落分析模块：标题拆分残留检测 + 逻辑连贯性分析</div>
+    <div style="margin-bottom:8px"><b style="color:#0071e3">2026-07-08</b> 优化建议模块：目录结构对比 + 空章节警告</div>
+    <div style="color:#999">2026-07-14 平台架构升级：16个模块覆盖选题→答辩全流程，统一AI定价，自动时间主题
+2026-07-13 支付系统 + 邀请码 + 点数体系 + 充值自动到账 + 4个新AI模块
+2026-07-12 用户注册登录 + JWT认证 + SQLite持久化 + 知识图谱时间线
+2026-07-10 知识图谱三视图 + 文献时间线 + 交互式词云 + 选题推荐
+2026-07-08 DOCX校准向导 + 五层目录树 + Word样式识别 + 前端架构重组
+2026-07-05 初版发布：DOCX解析 / 多源文献检索 / 知识图谱</div>
   </div>
-  <div id="notifyList" style="max-height:56vh;overflow-y:auto;padding:6px 0"></div>
 </div>
+<script>function toggleChangelog(){var p=document.getElementById('changelogPanel');var opening=p.style.display==='none';p.style.display=opening?'block':'none';if(!opening)return;fetch('/static/changelog.json').then(function(r){return r.json();}).then(function(d){var entries=(d.entries||[]).filter(function(e){return e.status==='released'&&e.commit;});var body=entries.map(function(e){return'<section style="padding:10px 0;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between;gap:10px"><b>'+e.version+' · '+e.summary+'</b><span style="color:var(--text-muted)">'+e.date+'</span></div><ul style="margin:7px 0 0 18px">'+(e.changes||[]).map(function(c){return'<li>'+c+'</li>';}).join('')+'</ul></section>';}).join('');p.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>功能更新日志</b><button onclick="toggleChangelog()" style="border:0;background:transparent;color:var(--text-muted);cursor:pointer">关闭</button></div>'+body;}).catch(function(){p.innerHTML='<div style="padding:16px">更新日志加载失败，请稍后重试。</div>';});}</script>
 
-<!-- ====== 保持兼容的旧版弹窗（逐步迁移至动态modal） ====== -->
-<div id="kgOverlay" class="workspace-modal-overlay" style="display:none">
-  <div id="kgModal" class="workspace-modal kg-modal">
-    <div class="workspace-modal-head">
-      <h2 id="kgModalTitle">🕸️ 知识图谱</h2>
-      <div class="workspace-modal-actions">
-        <button onclick="typeof exportReport==='function'&&exportReport()" class="workspace-modal-btn primary">📄 导出报告</button>
-        <button onclick="typeof exportKGAsPNG==='function'&&exportKGAsPNG()" class="workspace-modal-btn">🖼️ 导出PNG</button>
-        <button onclick="typeof closeKnowledgeGraph==='function'&&closeKnowledgeGraph()" class="workspace-modal-btn">关闭</button>
+<!-- ====== 两栏工作台：导航 | 主内容 ====== -->
+<div class="main" id="mainLayout">
+  <!-- 左侧导航轨 -->
+  <div class="nav-sidebar" id="navSidebar">
+    <div class="nav-brand-mini">ThesisBuddy</div>
+    <div class="nav-upload" id="navUpload">
+      <button onclick="openIdeaWizard()" class="nav-upload-btn primary">💡 从想法开始</button>
+      <button onclick="openImportDialog('new')" class="nav-upload-btn">📎 导入论文</button>
+    </div>
+
+    <div class="nav-section-label">主线进度</div>
+    <div id="stageNav" class="stage-nav"></div>
+
+    <div class="nav-section-label">百宝箱
+      <button class="nav-mini-btn" onclick="openToolboxPicker()" title="自定义快捷入口">⚙</button>
+    </div>
+    <div id="toolboxFavorites" class="toolbox-favs"></div>
+    <button class="nav-linkish" onclick="openToolboxPicker()">＋ 添加快捷功能</button>
+    <button class="nav-linkish" onclick="openMaterialsLibrary()">📁 项目资料库</button>
+    <button class="nav-linkish" onclick="openFeatureCatalog()">☰ 全部功能目录</button>
+
+    <!-- 目录树（在导航轨内折叠显示） -->
+    <div class="nav-section-label" style="margin-top:12px">📑 目录树
+      <button class="nav-mini-btn" onclick="toggleTocPanel()" title="折叠/展开">‹</button>
+    </div>
+    <div class="toc-panel" id="tocPanel">
+      <div class="toc-panel-head">
+        <div class="toc-panel-sub" id="navTreeMeta">论文生长过程中会逐步出现章节</div>
+      </div>
+      <div class="nav-tree" id="navTree">
+        <div class="tree-empty">
+          <div class="tree-empty-title">目录还是空的</div>
+          <div class="tree-empty-desc">从想法创建大纲，或导入 DOCX 后，这里会显示全文结构。点击可跳转正文。</div>
+          <button class="tree-empty-btn" onclick="openIdeaWizard()">从想法开始</button>
+          <button class="tree-empty-btn" onclick="triggerUpload()">导入论文</button>
+        </div>
       </div>
     </div>
-    <div id="kgContent" class="workspace-modal-content kg-content-surface"></div>
   </div>
-</div>
 
-<!-- 上传覆盖层（兼容旧app.js流程） -->
-<div class="upload-overlay" id="uploadOverlay" style="display:none">
-  <div class="upload-card"><div class="upload-icon">📄</div>
-    <h2>上传论文</h2><p>支持 <b>.docx</b>（推荐）与 <b>.doc</b></p>
-    <div class="upload-drop" id="uploadDrop" onclick="document.getElementById('fileInput').click()">拖拽文件到此处或点击选择</div>
-    <button onclick="document.getElementById('fileInput').click()" style="margin-top:12px;padding:8px 20px;border:1px solid var(--border);border-radius:10px;background:var(--bg-surface);color:var(--text-muted);cursor:pointer">选择文件</button>
-    <button onclick="document.getElementById('uploadOverlay').classList.remove('show');document.getElementById('uploadOverlay').style.display='none'" style="margin-top:8px;padding:8px 20px;border:none;background:transparent;color:var(--text-muted);cursor:pointer">取消</button>
+  <!-- 主内容区（论文 + 模块共用） -->
+  <div class="main-content" id="mainContent">
+    <!-- 论文全貌 -->
+    <div class="thesis-panel" id="thesisPanel">
+      <div class="thesis-bar">
+        <h3>📄 论文全貌 <span id="upStatus" style="font-size:.68rem;color:var(--m);font-weight:400">尚未生长内容</span></h3>
+        <div class="thesis-bar-actions">
+          <button class="bar-mini" onclick="openImportDialog('replace')">导入/换论文</button>
+          <button class="bar-mini" onclick="openFullPaperPreview()">预览</button>
+          <button class="bar-mini" onclick="mergeDraftsIntoThesis()">合并草稿</button>
+          <button class="bar-mini" onclick="zoomThesis(-0.1)">-</button>
+          <span id="zoomLabel">100%</span>
+          <button class="bar-mini" onclick="zoomThesis(0.1)">+</button>
+          <button class="bar-mini" onclick="zoomThesis(0,1)">↺</button>
+          <button class="ba-btn ba-search" id="baSearch" onclick="startSearch()">🔍 检索</button>
+          <button class="ba-btn" id="baKG" onclick="showKnowledgeGraph()" title="知识图谱">🕸️ 图谱</button>
+          <button class="ba-btn ba-verify" id="baVerify" onclick="batchVerify()">✅ 校验</button>
+        </div>
+      </div>
+      <div class="thesis-box" id="thesisBox">
+        <div id="workspaceContent" class="workspace-content"><!-- project home / growing paper --></div>
+      </div>
+      <div class="skeleton-full" id="thesisSkeleton" style="display:none"><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-block"></div><div class="skeleton skeleton-line"></div></div>
+    </div>
+
+    <!-- 工具台（与论文同在主内容区） -->
+    <div class="ref-panel tool-panel" id="refPanel">
+      <div class="tool-panel-head">
+        <div>
+          <div class="tool-panel-title" id="toolPanelTitle">工具台</div>
+          <div class="tool-panel-sub" id="toolPanelSub">选择功能后在此操作</div>
+        </div>
+        <div class="tool-panel-tabs">
+          <button class="tool-tab active" data-tooltab="home" onclick="openToolHome()">功能</button>
+          <button class="tool-tab" data-tooltab="refs" onclick="switchModule('references')">📚 参考文献</button>
+        </div>
+      </div>
+
+      <div id="toolHome" class="tool-home">
+        <div class="tool-home-hint">不导入论文也能先用这些：</div>
+        <div class="tool-home-grid" id="toolHomeGrid"></div>
+        <div class="tool-home-hint" style="margin-top:14px">需要论文后才能发挥的：</div>
+        <div class="tool-home-grid muted" id="toolHomeGridThesis"></div>
+      </div>
+
+      <div class="kw-bar ref-only" id="kwBar" style="display:none"><h4>🔑 论文主题词</h4><div class="kw-tags" id="kwTags"></div></div>
+      <div class="dashboard ref-only" id="dashboard" style="display:none"><div class="dash-card"><div class="dv" id="dashTotal">0</div><div class="dl">总文献</div></div><div class="dash-card"><div class="dv" id="dashCN">0</div><div class="dl">中文</div></div><div class="dash-card"><div class="dv" id="dashEN">0</div><div class="dl">英文</div></div><div class="dash-card"><div class="dv" id="dash3Y">0</div><div class="dl">3年内</div></div><div class="dash-card"><div class="dv" id="dash5Y">0</div><div class="dl">5年内</div></div></div>
+      <div id="searchParamStore" style="display:none!important" aria-hidden="true">
+        <input type="hidden" id="fTotal" value="20">
+        <input type="hidden" id="fCN" value="45">
+        <input type="hidden" id="fEN" value="30">
+        <input type="hidden" id="fY3" value="50">
+        <input type="hidden" id="fY5" value="75">
+        <input type="hidden" id="fDist" value="auto">
+      </div>
+      <div id="literatureWorkbench" class="literature-workbench ref-only" style="display:none"></div>
+      <div class="ref-list ref-only" id="refs" style="display:none"><div class="panel-empty">导入论文或检索后，文献会出现在这里</div></div>
+    </div>
   </div>
 </div>
 <input type="file" id="fileInput" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none">
-<script>window._pendingFile=null;window._importIntent='new';window.openImportDialog=function(intent){window._importIntent=intent||'new';var el=document.getElementById('uploadOverlay');if(el){el.style.display='flex';el.classList.add('show');}};window.triggerUpload=function(){window.openImportDialog('new');};window.showUploadOverlay=function(){var el=document.getElementById('uploadOverlay');if(el){el.style.display='flex';el.classList.add('show');}};
-if(window.location.protocol==='file:'){document.getElementById('appShell').innerHTML='<div style="text-align:center;padding:100px 20px"><b>请通过 HTTP 访问</b><br><button onclick="window.open(\'http://localhost:5000/\',\'_self\')" style="font-size:1rem;padding:10px 30px;background:#0071e3;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;margin-top:16px">一键跳转 HTTP</button></div>';}</script>
+    <script>window._pendingFile=null;window._importIntent='new';window.openImportDialog=function(intent){window._importIntent=intent||'new';if(typeof showUploadOverlay==='function')showUploadOverlay();else document.getElementById('uploadOverlay').classList.add('show');};window.triggerUpload=function(){window.openImportDialog('new');};</script>
 
-<!-- ====== JS 加载 ====== -->
-<script>window.domReady=true;window.hasMammoth=typeof mammoth!=='undefined';window.hasJSZip=typeof JSZip!=='undefined';</script>
+<!-- ====== 上传弹窗 ====== -->
+<div class="upload-overlay" id="uploadOverlay">
+  <div class="upload-card">
+    <div class="upload-icon">📄</div>
+    <h2>上传论文</h2>
+    <p>支持 <b>.docx</b>（推荐）与 <b>.doc</b>。docx 本地解析可保留样式；doc 会先转换。</p>
+    <div class="upload-drop" id="uploadDrop" onclick="document.getElementById('fileInput').click()">
+      拖拽文件到此处或点击选择
+    </div>
+    <div class="upload-recovery" id="uploadRecovery" role="status" aria-live="polite" hidden></div>
+    <section class="upload-decomposition" id="uploadDecomposition" aria-live="polite" hidden>
+      <div class="upload-decomposition-head"><strong>论文拆解进度</strong><span id="uploadDecompositionState">等待提交</span></div>
+      <div class="upload-decomposition-bar"><span id="uploadDecompositionProgress"></span></div>
+      <div class="import-checklist" id="uploadDecompositionChecklist"></div>
+      <div class="upload-decomposition-actions">
+        <button type="button" class="ai-btn-clear" id="uploadDecompositionRetry" hidden>重试拆解</button>
+        <button type="button" class="ai-btn-clear" id="uploadDecompositionNavigate" hidden>查看项目章节</button>
+      </div>
+    </section>
+    <button onclick="hideUploadOverlay()" style="margin-top:16px;padding:8px 20px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface-alt);color:var(--text-muted);cursor:pointer;font-size:var(--font-size-sm);font-family:var(--font-sans)">取消</button>
+  </div>
+</div>
+
+<!-- ====== 智能文献检索任务弹窗 ====== -->
+<div id="literatureSearchOverlay" class="workspace-modal-overlay literature-search-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="literatureSearchTitle" aria-describedby="literatureSearchSubtitle">
+  <div id="literatureSearchModal" class="workspace-modal literature-search-modal" tabindex="-1">
+    <div class="workspace-modal-head literature-search-head">
+      <div>
+        <h2 id="literatureSearchTitle">智能文献检索</h2>
+        <div id="literatureSearchSubtitle" class="workspace-modal-subtitle">从研究意图到证据应用，所有结果均需人工确认</div>
+      </div>
+      <div class="workspace-modal-actions">
+        <span id="literatureSearchSaveState" class="literature-search-save-state">未保存</span>
+        <button type="button" id="literatureSearchClose" class="workspace-modal-btn" aria-label="关闭智能文献检索">关闭</button>
+      </div>
+    </div>
+    <nav id="literatureSearchSteps" class="literature-search-steps" aria-label="文献检索步骤"></nav>
+    <div id="literatureSearchStatus" class="literature-search-status" role="status" aria-live="polite"></div>
+    <div id="literatureSearchContent" class="workspace-modal-content literature-search-content"></div>
+    <div id="literatureSearchExitConfirm" class="literature-search-exit-confirm" hidden>
+      <div><strong>检索任务尚未完成</strong><span>可以保存进度后退出，下次从文献工作台继续。</span></div>
+      <div>
+        <button type="button" class="workspace-modal-btn" data-search-exit="stay">继续任务</button>
+        <button type="button" class="workspace-modal-btn primary" data-search-exit="save">保存并退出</button>
+      </div>
+    </div>
+    <footer id="literatureSearchFooter" class="literature-search-footer"></footer>
+  </div>
+</div>
+
+<!-- ====== 知识图谱弹窗 ====== -->
+<div id="kgOverlay" class="workspace-modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="kgModalTitle">
+  <div id="kgModal" class="workspace-modal kg-modal">
+    <div class="workspace-modal-head">
+      <div class="workspace-modal-title-row">
+        <h2 id="kgModalTitle">🕸️ 知识图谱</h2>
+        <div id="kgTabs" class="kg-tabs" role="tablist" aria-label="知识图谱视图">
+          <button onclick="switchKGView('cloud')" onkeydown="handleKGTabKeydown(event)" id="kgTabCloud" class="kg-tab" role="tab" aria-selected="false" tabindex="-1" title="概念分析：区分高频词、特色词与章节分布。共现只表示共同出现，不代表因果。">🧭 概念概览</button>
+          <button onclick="switchKGView('network')" onkeydown="handleKGTabKeydown(event)" id="kgTabNetwork" class="kg-tab active" role="tab" aria-selected="true" tabindex="0" title="研究关系概览：章节、概念与文献的可追溯关系。现有共现边不自动解释为支持或因果。">🔗 研究关系</button>
+          <button onclick="switchKGView('timeline')" onkeydown="handleKGTabKeydown(event)" id="kgTabTimeline" class="kg-tab" role="tab" aria-selected="false" tabindex="-1" title="文献时间线：按年份观察研究演进与来源。">📅 文献演进</button>
+        </div>
+      </div>
+      <div class="workspace-modal-actions">
+        <button onclick="exportReport()" class="workspace-modal-btn primary">📄 导出报告</button>
+        <button onclick="exportKGAsPNG()" class="workspace-modal-btn">🖼️ 导出 PNG</button>
+        <button onclick="closeKnowledgeGraph()" class="workspace-modal-btn">✕ 关闭</button>
+      </div>
+    </div>
+    <div class="workspace-modal-note"><span>当前视图为研究概览；“共同出现”不等于支持、反驳或因果关系。</span><button type="button" onclick="openConceptExplorer()" class="workspace-modal-btn compact">概念证据</button></div>
+    <div id="kgContent" class="workspace-modal-content kg-content-surface">
+      <div id="kgCloudPanel" class="kg-view-panel kg-cloud-panel"></div>
+      <div id="kgGraphPanel" class="kg-view-panel kg-graph-panel">
+        <div id="kgPlaceholder" class="kg-placeholder" role="status" aria-live="polite"><div class="kg-placeholder-icon">🔍</div><div class="kg-placeholder-message">正在生成知识图谱...</div></div>
+        <svg id="kgSvg" class="kg-svg" role="img" aria-label="研究关系知识图谱" preserveAspectRatio="xMidYMid meet"></svg>
+        <div id="kgTimelinePanel" class="kg-timeline-panel"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 论文看板弹窗 ====== -->
+<div id="dbOverlay" class="workspace-modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="dbModalTitle">
+  <div class="workspace-modal thesis-board-modal">
+    <div class="workspace-modal-head">
+      <div>
+        <h2 id="dbModalTitle">论文看板</h2>
+        <div class="workspace-modal-subtitle">综合评估 · 证据说明 · 平台行动建议</div>
+      </div>
+      <div class="workspace-modal-actions">
+        <button onclick="showDashboard()" class="workspace-modal-btn">刷新</button>
+        <button onclick="exportDashboardReport()" class="workspace-modal-btn primary">导出报告</button>
+        <button onclick="closeDashboard()" class="workspace-modal-btn">关闭</button>
+      </div>
+    </div>
+    <div id="dbContent" class="workspace-modal-content thesis-board-modal-content"></div>
+  </div>
+</div>
+
+<div class="overlay" id="loadOv">
+  <div class="obox" style="max-width:600px">
+    <div class="spinner"></div>
+    <div class="msg" id="loadMsg"></div>
+    <div class="pct" id="loadPct" style="display:none">0%</div>
+    <div class="pbar"><div class="pfill" id="loadBar"></div></div>
+    <div class="detail" id="loadDetail"></div>
+    <div class="sr-progress" id="srProgress" style="display:none"><div style="font-size:.55rem;color:var(--m1);margin-bottom:6px;text-align:center">📡 每词查询 3 个学术数据库（OpenAlex + Crossref + Semantic Scholar），并发执行</div></div>
+  </div>
+  <div class="ambient-tips" id="ambientTips"></div>
+</div>
+
+<!-- ====== 弹窗①: 检索结果确认 ====== -->
+<div id="rcOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(30,30,32,0.92);backdrop-filter:blur(12px);z-index:99997;align-items:center;justify-content:center">
+  <div style="background:var(--solid);border-radius:var(--r-xl);padding:20px 24px;width:95%;height:92%;max-width:1400px;display:flex;flex-direction:column;box-shadow:0 25px 80px rgba(0,0,0,0.3);position:relative;border:1px solid rgba(255,255,255,0.08)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0">
+      <div>
+        <h2 style="font-size:1.1rem;font-weight:700;color:var(--t);margin:0">📚 检索结果确认 <span style="font-size:.72rem;color:var(--m);font-weight:400" id="rcStepLabel">第 1/2 步</span></h2>
+        <div style="font-size:.68rem;color:var(--m);margin-top:2px" id="rcSummary">选择你认可的文献，或直接点击"下一步"使用推荐结果</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button id="rcSkipBtn" onclick="rcFinish()" style="background:var(--g);color:#fff;border:none;border-radius:18px;padding:8px 18px;cursor:pointer;font-weight:600;font-size:.75rem">✅ 下一步</button>
+        <button onclick="rcClose()" style="background:rgba(0,0,0,0.06);color:var(--t);border:none;border-radius:18px;padding:8px 16px;cursor:pointer;font-weight:600;font-size:.8rem">✕ 取消</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-shrink:0;flex-wrap:wrap;align-items:center">
+      <button onclick="rcSelectAll()" style="background:rgba(0,0,0,0.05);color:var(--t);border:none;border-radius:12px;padding:4px 12px;cursor:pointer;font-size:.65rem;font-weight:500">全选</button>
+      <button onclick="rcSelectNone()" style="background:rgba(0,0,0,0.05);color:var(--t);border:none;border-radius:12px;padding:4px 12px;cursor:pointer;font-size:.65rem;font-weight:500">反选</button>
+      <span style="color:var(--bd);font-size:.6rem">|</span>
+      <button onclick="rcFilter('cn')" style="background:rgba(0,113,227,0.08);color:#0071e3;border:none;border-radius:12px;padding:4px 12px;cursor:pointer;font-size:.65rem;font-weight:500">仅中文</button>
+      <button onclick="rcFilter('en')" style="background:rgba(0,113,227,0.08);color:#0071e3;border:none;border-radius:12px;padding:4px 12px;cursor:pointer;font-size:.65rem;font-weight:500">仅英文</button>
+      <button onclick="rcFilter('relevant')" style="background:rgba(48,209,88,0.08);color:#30d158;border:none;border-radius:12px;padding:4px 12px;cursor:pointer;font-size:.65rem;font-weight:500">🎯 本领域</button>
+      <button onclick="rcFilter('recent')" style="background:rgba(0,113,227,0.08);color:#0071e3;border:none;border-radius:12px;padding:4px 12px;cursor:pointer;font-size:.65rem;font-weight:500">近5年高置信</button>
+      <button onclick="rcFilter('all')" style="background:rgba(0,113,227,0.08);color:#0071e3;border:none;border-radius:12px;padding:4px 12px;cursor:pointer;font-size:.65rem;font-weight:500">全部显示</button>
+      <span style="margin-left:auto;font-size:.62rem;color:var(--m)" id="rcCount">已选 0/0</span>
+    </div>
+    <div id="rcList" style="flex:1;overflow-y:auto;border-radius:var(--radius);background:rgba(0,0,0,0.02);padding:4px 6px"></div>
+  </div>
+</div>
+
+<!-- ====== 弹窗②: 分配策略确认 ====== -->
+<div id="asOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(30,30,32,0.92);backdrop-filter:blur(12px);z-index:99997;align-items:center;justify-content:center">
+  <div style="background:var(--solid);border-radius:var(--r-xl);padding:20px 24px;width:95%;height:92%;max-width:1200px;display:flex;flex-direction:column;box-shadow:0 25px 80px rgba(0,0,0,0.3);position:relative;border:1px solid rgba(255,255,255,0.08)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0">
+      <div>
+        <h2 style="font-size:1.1rem;font-weight:700;color:var(--t);margin:0">📂 分配策略确认 <span style="font-size:.72rem;color:var(--m);font-weight:400">第 2/2 步</span></h2>
+        <div style="font-size:.68rem;color:var(--m);margin-top:2px">确认每章分配的文献，点击章节可展开/折叠详情，拖动文献可改归属</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <select id="asMode" onchange="asRebuild()" style="border:1px solid var(--bd);border-radius:14px;padding:5px 12px;font-size:.68rem;background:var(--solid);color:var(--t);cursor:pointer">
+          <option value="auto">自动分配（默认）</option>
+          <option value="uniform">按章节平均</option>
+          <option value="weighted">按内容多少</option>
+        </select>
+        <button onclick="asFinish()" style="background:var(--g);color:#fff;border:none;border-radius:18px;padding:8px 18px;cursor:pointer;font-weight:600;font-size:.75rem">✅ 确认生成</button>
+        <button onclick="asSkip()" style="background:rgba(0,0,0,0.06);color:var(--t);border:none;border-radius:18px;padding:8px 16px;cursor:pointer;font-weight:600;font-size:.8rem">跳过</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-shrink:0;font-size:.65rem;color:var(--m)" id="asSummary"></div>
+    <div id="asList" style="flex:1;overflow-y:auto;border-radius:var(--radius);background:rgba(0,0,0,0.02);padding:4px 6px"></div>
+  </div>
+</div>
+
+<div class="ttp" id="ttp"></div>
+
+<script>
+window.domReady=true;window.hasMammoth=typeof mammoth!=='undefined';window.hasJSZip=typeof JSZip!=='undefined';
+window._ambientTips=['参考文献最好近3年的占一半以上','英文文献不能太少，至少30%','摘要部分一般不需要引用','绪论里的文献综述要覆盖这个领域主要流派','每个章节至少引用1-2条文献支撑','数据和方法的描述通常需要引文献佐证','图表如果引用了别人的要标注来源','结语和展望里可以少放一些引用','期刊论文比学位论文更适合做参考文献','别在目录和附录附近插引用标记','GB/T 7714 不要漏了DOI','文献标题大小写要保持一致','引用年份越近说明研究越前沿','大数据加小样本，贝叶斯方法很有用'];
+</script>
+
+<!-- ====== Core 基础设施（模块化架构） ====== -->
+<script defer src="js/core/utils.js?v=70"></script>
+<script defer src="js/core/api.js?v=70"></script>
+<script defer src="js/core/state.js?v=70"></script>
+<script defer src="js/core/events.js?v=70"></script>
+<script defer src="js/core/ui.js?v=70"></script>
+
+<!-- ====== 第三方库 ====== -->
 <script defer src="mammoth.browser.min.js?v=65"></script>
 <script defer src="jszip.min.js?v=65"></script>
-<script defer src="js/core/utils.js?v=80"></script>
-<script defer src="js/core/api.js?v=80"></script>
-<script defer src="js/core/state.js?v=80"></script>
-<script defer src="js/core/events.js?v=80"></script>
-<script defer src="js/core/ui.js?v=80"></script>
-<script defer src="js/core/nav.js?v=80"></script>
-<script defer src="app.js?v=80"></script>
-<script defer src="js/modules/project.js?v=80"></script>
-<script defer src="js/modules/login/login.js?v=80"></script>
-<script defer src="js/modules/account/account.js?v=80"></script>
-<script defer src="js/modules/account/notifications.js?v=80"></script>
-<script defer src="js/modules/paper-import.js?v=80"></script>
-<link rel="stylesheet" href="css/citely.css?v=80">
-<link rel="stylesheet" href="css/modules/review.css?v=80">
-<link rel="stylesheet" href="css/modules/writing.css?v=80">
-<script defer src="js/modules/citely.js?v=80"></script>
-<script defer src="js/modules/review/review.js?v=80"></script>
-<script defer src="js/modules/writing/writing.js?v=80"></script>
-<!-- 旧模块保持兼容 -->
+
+<!-- ====== 核心应用（旧） + 模块 ====== -->
+<script defer src="app.js?v=66"></script>
+<script defer src="js/modules/project.js?v=65"></script>
+
+<!-- ====== 新模块系统 ====== -->
+<script defer src="js/modules/login/login.js?v=70"></script>
+<script defer src="js/modules/account/account.js?v=70"></script>
+<script defer src="js/modules/account/notifications.js?v=70"></script>
+<script defer src="js/modules/paper-import.js?v=70"></script>
+
+<!-- ====== Citely 文献模块（替代旧文献模块） ====== -->
+<link rel="stylesheet" href="css/citely.css?v=70">
+<script defer src="js/modules/citely.js?v=70"></script>
+
+<!-- ====== 审阅模块 ====== -->
+<link rel="stylesheet" href="css/modules/review.css?v=70">
+<script defer src="js/modules/review/review.js?v=70"></script>
+
+<!-- ====== 写作模块 ====== -->
+<script defer src="js/modules/writing/writing.js?v=70"></script>
+
+<!-- ====== 旧模块（逐步废弃中） ====== -->
 <script defer src="js/modules/optimization.js?v=65"></script>
 <script defer src="js/modules/format-check.js?v=65"></script>
 <script defer src="js/modules/terminology.js?v=65"></script>
@@ -194,29 +470,1017 @@ if(window.location.protocol==='file:'){document.getElementById('appShell').inner
 <script defer src="js/modules/de-duplicate.js?v=65"></script>
 <script defer src="js/modules/defense-ppt.js?v=65"></script>
 <script defer src="js/modules/en-abstract.js?v=65"></script>
+<!-- literature-workbench.js + literature-search-modal.js 由 Citely 替代，保留作为回退 -->
 <script defer src="js/modules/literature-workbench.js?v=67"></script>
 <script defer src="js/modules/literature-search-modal.js?v=67"></script>
 <script defer src="js/app-modules.js?v=66"></script>
 
+<!-- ====== Shell 初始化（最后执行） ====== -->
+<script defer src="js/core/app.js?v=70"></script>
+
 <script>
 window.addEventListener('DOMContentLoaded',function(){
-  if(typeof LoginModule!=='undefined')LoginModule.init();
-  if(typeof AccountModule!=='undefined')AccountModule.init();
-  if(typeof NotifyModule!=='undefined')NotifyModule.init();
-  if(typeof PaperImport!=='undefined')PaperImport.init();
-  if(typeof Nav!=='undefined')Nav.init();
-  // 旧代码兼容：初始化后的回调
-  if(typeof window.renderWorkspaceHero==='function'){try{window.renderWorkspaceHero()}catch(e){}}
-  // 拖放上传
-  var drop=document.getElementById('uploadDrop');
-  if(drop){['dragenter','dragover'].forEach(function(e){drop.addEventListener(e,function(ev){ev.preventDefault();drop.classList.add('dragover')})});['dragleave','drop'].forEach(function(e){drop.addEventListener(e,function(ev){ev.preventDefault();drop.classList.remove('dragover');if(ev.dataTransfer&&ev.dataTransfer.files&&ev.dataTransfer.files.length&&typeof beginImportFile==='function')beginImportFile(ev.dataTransfer.files[0],window._importIntent||'new').catch(function(){})})})}
-  // 文件输入
-  var fi=document.getElementById('fileInput');
-  if(fi)fi.addEventListener('change',function(){var file=fi.files[0];if(file&&typeof beginImportFile==='function')beginImportFile(file,window._importIntent||'new').catch(function(){console.error('[import]',arguments)})});
-  // 自动检查登录
-  var token=sessionStorage.getItem('thesis_ai_token');
-  if(token){fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+token}}).then(function(r){return r.json()}).then(function(d){if(d.success){document.getElementById('loginOverlay').style.display='none';document.getElementById('appShell').style.display='';if(window.TB&&TB.state)TB.state.setUser(d.user);if(window.TB&&TB.api)TB.api.startBalancePolling(30000);if(window.ThesisProject&&ThesisProject.bootstrapAuthenticatedUser)ThesisProject.bootstrapAuthenticatedUser().catch(function(e){console.warn('[bootstrap]',e)})}})};
-  window.dispatchEvent(new Event('resize'));
+  // 初始化新模块
+  if (typeof LoginModule !== 'undefined') LoginModule.init();
+  if (typeof AccountModule !== 'undefined') AccountModule.init();
+  if (typeof NotifyModule !== 'undefined') NotifyModule.init();
+  if (typeof PaperImport !== 'undefined') PaperImport.init();
+
+  var ov=document.getElementById('loadOv'),tips=document.getElementById('ambientTips');
+  if(!ov||!tips)return;var timer=null,spawned=[];
+  function clearAll(){spawned.forEach(function(t){t.remove()});spawned=[];clearInterval(timer);timer=null}
+  function spawnOne(){
+    if(!ov.classList.contains('show'))return;
+    var pool=window._ambientTips||['文献质量比数量更重要'];
+    var el=document.createElement('div');el.className='tip-bubble';el.textContent='💡 '+pool[Math.floor(Math.random()*pool.length)];el.style.left=(50+Math.random()*(window.innerWidth-300))+'px';el.style.top=(20+Math.random()*(window.innerHeight-100))+'px';tips.appendChild(el);spawned.push(el);
+    requestAnimationFrame(function(){el.classList.add('show')});
+    var ft=setTimeout(function(){el.classList.remove('show');setTimeout(function(){el.remove();var i=spawned.indexOf(el);if(i>=0)spawned.splice(i,1)},600)},3000);
+    el.addEventListener('mouseenter',function(){clearTimeout(ft)});
+    el.addEventListener('mouseleave',function(){ft=setTimeout(function(){el.classList.remove('show');setTimeout(function(){el.remove();var i=spawned.indexOf(el);if(i>=0)spawned.splice(i,1)},600)},1000)});
+  }
+  var _origShow=showLoad;showLoad=function(m,p,d){_origShow(m,p,d);
+    clearAll();
+    if(typeof startCatGame==='function'&&m&&(m.indexOf('检索')>=0||m.indexOf('搜索')>=0)){
+      setTimeout(function(){startCatGame();},600);
+    }else{timer=setInterval(spawnOne,1800);spawnOne();}
+  };
+  var _origHide=hideLoad;hideLoad=function(){clearAll();if(typeof stopCatGame==='function')stopCatGame();_origHide();};
+  // 拖拽上传：仅投放区接收文件，所有入口走统一 fileInput
+  var drop=document.getElementById('uploadDrop');if(drop){['dragenter','dragover'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();drop.classList.add('dragover');},false);});['dragleave','drop'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();drop.classList.remove('dragover');},false);});drop.addEventListener('drop',function(e){var files=e.dataTransfer.files;if(files.length&&typeof beginImportFile==='function')beginImportFile(files[0],window._importIntent||'new').catch(function(err){console.error('[import drop]',err);});});}
 });
 </script>
+</div>
+<!-- 主题由账号级外观设置统一管理。 -->
+
+<script>
+// ====== 登录/注册逻辑 ======
+(function(){
+  var TOKEN_KEY = 'thesis_ai_token';
+  var USER_KEY = 'thesis_ai_user';
+  var isRegMode = false;
+  var loginOverlay = document.getElementById('loginOverlay');
+  var appShell = document.getElementById('appShell');
+
+  function finishAuthenticatedBootstrap(user) {
+    if(user)sessionStorage.setItem(USER_KEY,JSON.stringify(user));
+    hideLogin();updateBalanceDisplay();if(window.reloadBuddyPreferences)window.reloadBuddyPreferences();if(window.pollNotifications)window.pollNotifications();
+    if(window.ThesisProject&&ThesisProject.bootstrapAuthenticatedUser){ThesisProject.bootstrapAuthenticatedUser().catch(function(e){console.warn('[bootstrap]',e);});}
+    else if(window.restoreScopedSession)window.restoreScopedSession();
+  }
+
+  // Check existing token
+  var savedToken = sessionStorage.getItem(TOKEN_KEY);
+  if (savedToken) {
+    fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + savedToken } })
+      .then(function(r) { if(!r.ok)throw new Error('expired');return r.json(); })
+      .then(function(d){if(!d.success)throw new Error('expired');finishAuthenticatedBootstrap(d.user);})
+      .catch(function() { sessionStorage.removeItem(TOKEN_KEY);sessionStorage.removeItem(USER_KEY);if(window.clearManuscriptRuntime)window.clearManuscriptRuntime(); });
+  }
+
+  if(loginOverlay) loginOverlay.style.display = 'flex';
+
+  window.doLogin = function() {
+    var u = document.getElementById('loginUsername').value.trim();
+    var p = document.getElementById('loginPassword').value;
+    var err = document.getElementById('loginError');
+    if (!u) { err.textContent = '请输入用户名'; return; }
+    if (!p) { err.textContent = '请输入密码'; return; }
+
+    if (isRegMode) {
+      var cp = document.getElementById('regConfirmPassword').value;
+      if (p !== cp) { err.textContent = '两次密码不一致'; return; }
+      fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: u, password: p, invite_code: document.getElementById('regInviteCode').value.trim() })
+      }).then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.success) {
+            err.style.color = '#10b981';
+            err.textContent = '注册成功！请登录';
+            window.toggleRegMode();
+          } else { err.textContent = d.error; }
+        }).catch(function() { err.textContent = '网络错误'; });
+      return;
+    }
+
+    fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p, invite_code: document.getElementById('regInviteCode').value.trim() })
+    }).then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.success) {
+          sessionStorage.setItem(TOKEN_KEY, d.token);
+          sessionStorage.setItem(USER_KEY, JSON.stringify(d.user));
+          sessionStorage.setItem('thesis_ai_login', 'true'); // 启用引导教程
+          if (d.user.is_admin) {
+            // Admin: redirect to admin dashboard
+            sessionStorage.setItem('thesis_ai_admin_secret', d.token);
+            window.location.href = '/admin.html';
+            return;
+          }
+          finishAuthenticatedBootstrap(d.user);
+          if (window.maybeStartTour) window.maybeStartTour();
+        } else { err.textContent = d.error; }
+      }).catch(function() { err.textContent = '网络错误'; });
+  };
+
+  window.toggleRegMode = function() {
+    isRegMode = !isRegMode;
+    document.getElementById('regConfirmField').style.display = isRegMode ? '' : 'none';
+    document.getElementById('loginCardTitle').textContent = isRegMode ? '注册账号' : '登录系统';
+    document.getElementById('loginBtnText').textContent = isRegMode ? '注 册' : '登 录';
+    document.getElementById('loginSwitchText').textContent = isRegMode ? '已有账号？' : '还没有账号？';
+    document.getElementById('loginSwitchLink').textContent = isRegMode ? '去登录' : '立即注册';
+    document.getElementById('loginError').textContent = '';
+  };
+
+  document.getElementById('loginPassword').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLogin();
+  });
+  document.getElementById('loginUsername').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { document.getElementById('loginPassword').focus(); }
+  });
+
+  function hideLogin() {
+    if (loginOverlay) {
+      loginOverlay.style.opacity = '0';
+      loginOverlay.style.transition = 'opacity .4s';
+      setTimeout(function() { loginOverlay.style.display = 'none'; }, 400);
+    }
+    if (appShell) appShell.style.display = '';
+    window.dispatchEvent(new Event('resize'));
+  }
+
+  window.doLogout = function() {
+    if(window.clearManuscriptRuntime)window.clearManuscriptRuntime();
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(USER_KEY);
+    sessionStorage.removeItem('thesis_ai_admin_secret');
+    location.reload();
+  };
+
+  function landingModuleLabel(id){
+    var names = {
+      'topic-finder':'选题打磨','proposal':'开题方案','references':'参考文献','knowledge-graph':'研究图谱',
+      'expand':'章节扩写','data-analysis':'数据分析','proofread':'论文查错','de-duplicate':'查重降重',
+      'format-check':'格式检查','terminology':'术语分析','paragraph':'段落分析','review':'论文审阅',
+      'optimization':'优化建议','dashboard':'论文看板','en-abstract':'英文摘要','defense-ppt':'答辩材料'
+    };
+    return names[id] || id;
+  }
+  function escapeLandingHtml(value){
+    return String(value == null ? '' : value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function getLandingStages(){
+    if(window.ThesisProject && Array.isArray(ThesisProject.STAGES) && ThesisProject.STAGES.length){
+      return ThesisProject.STAGES.map(function(stage){
+        return {
+          id: stage.id, name: stage.name, icon: stage.icon || '',
+          desc: stage.desc || '', artifact: stage.artifact || '',
+          paths: stage.paths || ['idea','docx'],
+          modules: (stage.modules || []).map(landingModuleLabel)
+        };
+      });
+    }
+    return [
+      {id:'ideation',name:'想清楚',icon:'🎯',desc:'选题打磨、研究问题与开题方案',artifact:'明确选题与开题方案',paths:['idea'],modules:['选题打磨','开题方案']},
+      {id:'literature',name:'找资料',icon:'📚',desc:'文献检索、候选证据与研究脉络',artifact:'形成可核验的文献与证据地图',paths:['idea','docx'],modules:['参考文献','研究图谱']},
+      {id:'structure',name:'搭结构',icon:'🧭',desc:'论文大纲、章节计划与研究设计',artifact:'形成章节结构与研究路线',paths:['idea','docx'],modules:['开题方案']},
+      {id:'writing',name:'写出来',icon:'✍️',desc:'分章写作、数据解读与图表表达',artifact:'积累分章候选稿与分析结果',paths:['idea'],modules:['章节扩写','数据分析']},
+      {id:'polish',name:'改得好',icon:'🔍',desc:'查错、降重、格式、术语与逻辑',artifact:'得到逐项可确认的修改清单',paths:['idea','docx'],modules:['论文查错','查重降重','格式检查']},
+      {id:'review',name:'过评审',icon:'📊',desc:'综合审阅、论文看板与修改清单',artifact:'定位风险、证据缺口与优先级',paths:['idea','docx'],modules:['论文审阅','优化建议','论文看板']},
+      {id:'defense',name:'做答辩',icon:'🎤',desc:'英文摘要、答辩 PPT 与问答演练',artifact:'形成答辩结构、讲稿与问答提纲',paths:['idea','docx'],modules:['英文摘要','答辩材料']}
+    ];
+  }
+  function initLandingExplorer(){
+    var stages = getLandingStages();
+    var stageButtons = Array.prototype.slice.call(document.querySelectorAll('[data-stage]'));
+    var pathButtons = Array.prototype.slice.call(document.querySelectorAll('[data-landing-path]'));
+    if(!stageButtons.length) return;
+    var state = {path: 'idea', stage: 0};
+    function render(){
+      var stage = stages[state.stage] || stages[0];
+      pathButtons.forEach(function(btn){
+        var active = btn.getAttribute('data-landing-path') === state.path;
+        btn.classList.toggle('is-active', active);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      stageButtons.forEach(function(btn, index){
+        var stageMeta = stages[index] || {};
+        var pathOk = !stageMeta.paths || stageMeta.paths.indexOf(state.path) >= 0;
+        var active = index === state.stage;
+        btn.classList.toggle('is-active', active);
+        btn.classList.toggle('is-dimmed', !pathOk);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        btn.disabled = false;
+      });
+      var indexEl = document.getElementById('landingStageIndex');
+      var nameEl = document.getElementById('landingStageName');
+      var descEl = document.getElementById('landingStageDesc');
+      var tagsEl = document.getElementById('landingStageTags');
+      if(indexEl) indexEl.textContent = (stage.icon || stage.name || '').slice(0, 2);
+      if(nameEl) nameEl.textContent = stage.name || '';
+      if(descEl){
+        var pathHint = state.path === 'docx' ? '导入路径通常从解析与审阅切入，再回到当前阶段补强。' : '创作路径从立项开始，逐步沉淀大纲、章节与证据。';
+        descEl.textContent = (stage.desc || '') + ' ' + pathHint + (stage.artifact ? ' 产出：' + stage.artifact : '');
+      }
+      if(tagsEl){
+        tagsEl.innerHTML = (stage.modules || []).map(function(label){ return '<span>' + escapeLandingHtml(label) + '</span>'; }).join('');
+      }
+      var detail = document.querySelector('.landing-stage-detail');
+      if(detail){
+        detail.classList.remove('is-refreshing');
+        void detail.offsetWidth;
+        detail.classList.add('is-refreshing');
+      }
+    }
+    pathButtons.forEach(function(btn){
+      btn.addEventListener('click', function(){
+        state.path = btn.getAttribute('data-landing-path') || 'idea';
+        var preferred = stages.findIndex(function(stage){ return (stage.paths || []).indexOf(state.path) >= 0; });
+        if(preferred >= 0) state.stage = preferred;
+        render();
+      });
+    });
+    stageButtons.forEach(function(btn, index){
+      btn.addEventListener('click', function(){ state.stage = index; render(); });
+      btn.addEventListener('keydown', function(e){
+        if(e.key === 'ArrowRight' || e.key === 'ArrowDown'){ e.preventDefault(); state.stage = Math.min(stages.length - 1, index + 1); stageButtons[state.stage].focus(); render(); }
+        if(e.key === 'ArrowLeft' || e.key === 'ArrowUp'){ e.preventDefault(); state.stage = Math.max(0, index - 1); stageButtons[state.stage].focus(); render(); }
+        if(e.key === 'Home'){ e.preventDefault(); state.stage = 0; stageButtons[0].focus(); render(); }
+        if(e.key === 'End'){ e.preventDefault(); state.stage = stages.length - 1; stageButtons[state.stage].focus(); render(); }
+      });
+    });
+    render();
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initLandingExplorer);
+  else initLandingExplorer();
+
+  // 余额更新
+  window.formatPoints = function(v){
+    var n = Number(v);
+    if (!isFinite(n)) n = 0;
+    // 用户侧统一按“点”展示，固定 6 位小数；不暴露
+    return n.toFixed(3);
+  };
+  window.formatPoints=function(p){ p=Number(p||0); if(!isFinite(p)) p=0; return p.toFixed(3); }
+  var _balanceRefreshTimer=null,_balanceRefreshInFlight=false,_balanceRefreshMs=5000;
+  window.setBalanceDisplay=function(points){
+    var balEl=document.getElementById('balanceAmount');if(!balEl)return;
+    var pts=Number(points||0);if(!isFinite(pts))pts=0;
+    balEl.textContent=pts.toFixed(3);balEl.style.color=pts>=1?'#10b981':(pts>0?'#f59e0b':'#f87171');
+  };
+  function scheduleBalanceRefresh(delay){
+    if(_balanceRefreshTimer)clearTimeout(_balanceRefreshTimer);
+    if(!sessionStorage.getItem(TOKEN_KEY))return;
+    _balanceRefreshTimer=setTimeout(function(){updateBalanceDisplay();},delay==null?_balanceRefreshMs:delay);
+  }
+  window.requestBalanceRefreshSoon=function(){scheduleBalanceRefresh(400);};
+  updateBalanceDisplay = function() {
+    var userData = null;
+    try { userData = JSON.parse(sessionStorage.getItem('thesis_ai_user')||'{}'); } catch(e) {}
+    if (userData && userData.is_admin) {
+      var adminBtn = document.getElementById('adminPanelBtn');
+      if (adminBtn) adminBtn.style.display = '';
+    }
+    var token = sessionStorage.getItem(TOKEN_KEY);
+    if (!token || _balanceRefreshInFlight) return Promise.resolve();
+    _balanceRefreshInFlight=true;
+    return fetch('/api/payment/balance', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    }).then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.success) {
+          setBalanceDisplay(d.points!=null?d.points:(d.credits!=null?d.credits/1000:0));
+          if(d.refresh_interval_seconds!=null){var seconds=Number(d.refresh_interval_seconds);if(isFinite(seconds))_balanceRefreshMs=Math.max(2000,Math.min(60000,seconds*1000));}
+          var fq = document.getElementById('freeQuotaChip');
+          if (fq) {
+            if (d.free_remaining_today != null && d.free_limit_today != null) {
+              fq.style.display='none'; fq.textContent='';
+              fq.title = '今日本地模块免费剩余 ' + d.free_remaining_today + ' / ' + d.free_limit_today;
+              fq.style.color = d.free_remaining_today > 0 ? 'rgba(52,211,153,.85)' : 'rgba(255,255,255,.3)';
+            } else {
+              fq.style.display='none'; fq.textContent='';
+            }
+          }
+        }
+      }).catch(function() {}).finally(function(){_balanceRefreshInFlight=false;scheduleBalanceRefresh();});
+  };
+
+  // 充值弹窗
+  window._selectedAmount = 0;
+  window._selectedAmountFen = null;
+  window._selectedPayment = 'alipay';
+  window._pendingOrderId = null;
+  window.parseRechargeAmountFen = function(raw) {
+    var text = String(raw == null ? '' : raw).trim();
+    if (!text) return { error: '请输入充值金额' };
+    if (!/^\d+(?:\.\d{1,2})?$/.test(text)) {
+      return { error: /^\d+\.\d{3,}$/.test(text) ? '金额最多保留 2 位小数' : '请输入有效金额' };
+    }
+    var amount = Number(text);
+    if (!Number.isFinite(amount)) return { error: '请输入有效金额' };
+    var fen = Math.round(amount * 100);
+    if (fen < 100) return { error: '充值金额低于当前最低限额' };
+    if (fen > 500000) return { error: '充值金额超过当前单笔限额' };
+    return { fen: fen, yuan: fen / 100, text: (fen / 100).toFixed(2) };
+  };
+  function setRechargeError(message) {
+    var el = document.getElementById('rechargeAmountError');
+    if (el) el.textContent = message || '';
+  }
+  function resetRechargePaymentStep(clearInput) {
+    window._selectedAmount = 0;
+    window._selectedAmountFen = null;
+    window._pendingOrderId = null;
+    var inp = document.getElementById('rechargeAmountInput');
+    if (inp && clearInput) inp.value = '';
+    var prev = document.getElementById('rechargePointsPreview');
+    if (prev) prev.textContent = '所得点数按当前兑换规则计算';
+    var payAmt = document.getElementById('rechargePayAmountLabel');
+    if (payAmt) payAmt.textContent = '—';
+    var payment = document.getElementById('rechargePayment');
+    if (payment) payment.style.display = 'none';
+    var info = document.getElementById('rechargeOrderInfo');
+    if (info) { info.style.display = 'none'; info.textContent = ''; }
+    var btns = document.querySelectorAll('.recharge-amt-btn');
+    for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+    var btn = document.getElementById('rechargeSubmitBtn');
+    if (btn) { btn.textContent = '创建订单并显示支付说明'; btn.disabled = false; btn.onclick = submitRecharge; }
+    setRechargeError('');
+  }
+  window.onRechargeAmountEdited = function() {
+    resetRechargePaymentStep(false);
+    var inp = document.getElementById('rechargeAmountInput');
+    var parsed = parseRechargeAmountFen(inp ? inp.value : '');
+    var prev = document.getElementById('rechargePointsPreview');
+    if (parsed.error) {
+      if (prev) prev.textContent = '所得点数按当前兑换规则计算';
+      if (inp && inp.value.trim()) setRechargeError(parsed.error);
+      return;
+    }
+    if (prev) prev.textContent = '所得点数按当前兑换规则计算';
+    setRechargeError('');
+    var btns = document.querySelectorAll('.recharge-amt-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', Number(btns[i].getAttribute('data-amt')) * 100 === parsed.fen);
+    }
+  };
+  window.showRechargeModal = function() {
+    resetRechargePaymentStep(true);
+    var el = document.getElementById('rechargeModal');
+    if (el) el.style.display = 'flex';
+    if (!window._selectedPayment) window._selectedPayment = 'alipay';
+    updateRechargeBalance();
+    loadRechargeHistory();
+    try { switchQR(window._selectedPayment || 'alipay'); } catch (e) {}
+  };
+  window.hideRechargeModal = function() {
+    var el = document.getElementById('rechargeModal');
+    if (el) el.style.display = 'none';
+    resetRechargePaymentStep(true);
+  };
+  window.fillRechargeAmount = function(amount) {
+    var inp = document.getElementById('rechargeAmountInput');
+    if (inp) inp.value = String(amount);
+    onRechargeAmountEdited();
+  };
+  window.selectRechargeAmountFromInput = function() {
+    var inp = document.getElementById('rechargeAmountInput');
+    var parsed = parseRechargeAmountFen(inp ? inp.value : '');
+    if (parsed.error) { setRechargeError(parsed.error); if (inp) inp.focus(); return; }
+    window._selectedAmountFen = parsed.fen;
+    window._selectedAmount = parsed.yuan;
+    if (inp) inp.value = parsed.text;
+    var prev = document.getElementById('rechargePointsPreview');
+    if (prev) prev.textContent = '所得点数按当前兑换规则计算';
+    var payAmt = document.getElementById('rechargePayAmountLabel');
+    if (payAmt) payAmt.textContent = parsed.text;
+    document.getElementById('rechargePayment').style.display = '';
+    setRechargeError('');
+    try { switchQR(window._selectedPayment || 'alipay'); } catch (e) {}
+  };
+  window.switchQR = function(method) {
+    window._selectedPayment = method || 'alipay';
+    var cards = document.querySelectorAll('.recharge-qr-card');
+    for (var i = 0; i < cards.length; i++) {
+      var active = cards[i].getAttribute('data-method') === window._selectedPayment;
+      cards[i].style.borderColor = active ? 'var(--accent)' : 'transparent';
+      cards[i].style.boxShadow = active ? '0 0 0 1px var(--accent)' : 'none';
+    }
+    var lab = document.getElementById('rechargePayMethodLabel');
+    if (lab) lab.textContent = window._selectedPayment === 'wechat' ? '微信' : '支付宝';
+  };
+  window.submitRecharge = function() {
+    var inp = document.getElementById('rechargeAmountInput');
+    var parsed = parseRechargeAmountFen(inp ? inp.value : '');
+    if (parsed.error) { setRechargeError(parsed.error); return; }
+    if (parsed.fen !== window._selectedAmountFen) {
+      onRechargeAmountEdited();
+      setRechargeError('金额已变化，请重新点击“下一步：扫码支付”');
+      return;
+    }
+    var btn = document.getElementById('rechargeSubmitBtn');
+    if (btn) btn.disabled = true;
+    var token = sessionStorage.getItem(TOKEN_KEY);
+    fetch('/api/payment/recharge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ amount_yuan: parsed.text, payment_method: window._selectedPayment })
+    }).then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (!d.success) { if (btn) btn.disabled = false; alert(d.error || '创建订单失败'); return; }
+        var responseFen = Number(d.amount_fen);
+        if (!Number.isInteger(responseFen)) responseFen = Math.round(Number(d.amount_yuan) * 100);
+        window._selectedAmountFen = responseFen;
+        window._selectedAmount = responseFen / 100;
+        window._pendingOrderId = d.order_id || null;
+        var amountText = (responseFen / 100).toFixed(2);
+        if (inp) inp.value = amountText;
+        var info = document.getElementById('rechargeOrderInfo');
+        if (info) {
+          info.style.display = 'block';
+          info.innerHTML = '订单 <b>#'+d.order_id+'</b> 已创建 · 请按订单显示的金额转账 · 备注请填订单号 <b>'+d.order_id+'</b>';
+        }
+        var payAmt = document.getElementById('rechargePayAmountLabel');
+        if (payAmt) payAmt.textContent = amountText;
+        alert('订单 #'+d.order_id+' 已创建。\n请按订单页面显示的应付金额扫码转账，备注填写订单号 '+d.order_id+'。\n支付完成后点击「我已支付」。');
+        if (btn) { btn.textContent = '我已支付，提交审核'; btn.onclick = confirmPaid; btn.disabled = false; }
+        loadRechargeHistory();
+      }).catch(function() { if (btn) btn.disabled = false; alert('网络错误'); });
+  };
+  window.confirmPaid = function() {
+    if (!window._pendingOrderId) {
+      alert('当前支付订单信息已失效，请按原金额重新创建或获取订单');
+      return;
+    }
+    var orderId = window._pendingOrderId;
+    var btn = document.getElementById('rechargeSubmitBtn');
+    if (btn) btn.disabled = true;
+    var token = sessionStorage.getItem(TOKEN_KEY);
+    fetch('/api/payment/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ order_id: orderId })
+    }).then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (!d.success) { if (btn) btn.disabled = false; alert(d.error || '提交失败'); return; }
+        alert(d.message || '已提交审核，请等待管理员确认到账');
+        loadRechargeHistory();
+        if (window.pollNotifications) window.pollNotifications();
+        if (btn) { btn.textContent = '已提交，等待确认'; btn.disabled = true; }
+        window._pendingOrderId = null;
+      }).catch(function() { if (btn) btn.disabled = false; alert('网络错误'); });
+  };
+  function updateRechargeBalance() {
+    var token = sessionStorage.getItem(TOKEN_KEY);
+    fetch('/api/payment/balance', { headers: { 'Authorization': 'Bearer ' + token } })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.success) { var el=document.getElementById('rechargeBalance'); if(el) el.textContent=Number(d.points!=null?d.points:((d.credits||0)/1000)).toFixed(3); }
+      });
+  }
+  function loadRechargeHistory() {
+    var token = sessionStorage.getItem(TOKEN_KEY);
+    fetch('/api/payment/orders', { headers: { 'Authorization': 'Bearer ' + token } })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        var el = document.getElementById('rechargeHistory');
+        if (!d.success || !d.orders) return;
+        var h = '<table style="width:100%;font-size:.72rem"><tr style="color:rgba(255,255,255,.4)"><th>金额</th><th>状态</th><th>时间</th></tr>';
+        var sm = { pending: '待支付', submitted: '待确认', confirmed: '已到账', rejected: '已拒绝' };
+        d.orders.forEach(function(o) {
+          h += '<tr style="color:rgba(255,255,255,.7)"><td>' + o.amount_yuan + '元</td><td>' + (sm[o.status] || o.status) + '</td><td>' + (o.created_at || '').substring(0,16) + '</td></tr>';
+        });
+        h += '</table>';
+        el.innerHTML = h;
+      });
+  }
+  window.changePassword = function(){
+    var oldPw=document.getElementById('pwOld').value, newPw=document.getElementById('pwNew').value;
+    var msg=document.getElementById('pwMsg');
+    if(!oldPw||!newPw){msg.textContent='请填写原密码和新密码';msg.style.color='#fca5a5';return;}
+    var token=sessionStorage.getItem('thesis_ai_token');
+    fetch('/api/auth/change_password',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({old_password:oldPw,new_password:newPw})})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.success){msg.textContent=d.message;msg.style.color='#34d399';}
+        else{msg.textContent=d.error;msg.style.color='#fca5a5';}
+      }).catch(function(){msg.textContent='网络错误';msg.style.color='#fca5a5';});
+  };
+  // Auto update balance on login
+  window.loadConsumptionHistory = function() {
+    var token = sessionStorage.getItem('thesis_ai_token');
+    fetch('/api/payment/balance', { headers: { 'Authorization': 'Bearer ' + token } })
+      .then(function(r){return r.json();}).then(function(d){
+        var el = document.getElementById('consumptionHistory');
+        if(!d.success){el.innerHTML='加载失败';return;}
+        var h='<div style="color:rgba(255,255,255,.2);font-size:.58rem;margin-bottom:4px">余额: '+(d.credits||0)+'点</div>';
+        fetch('/api/payment/orders', { headers: { 'Authorization': 'Bearer ' + token } })
+          .then(function(r2){return r2.json();}).then(function(d2){
+            if(d2.orders&&d2.orders.length){
+              var sm={pending:'待支付',submitted:'已提交',confirmed:'已到账'};
+              d2.orders.slice(0,10).forEach(function(o){
+                h+='<div style="padding:2px 0;font-size:.6rem;display:flex;justify-content:space-between"><span>¥'+o.amount_yuan+'</span><span style="color:rgba(255,255,255,.3)">'+sm[o.status]+'</span><span style="color:rgba(255,255,255,.2)">'+(o.created_at||'').substring(0,10)+'</span></div>';
+              });
+            }
+            el.innerHTML=h;
+          });
+      });
+  };
+  window.copyInviteCode = function() {
+    var code = document.getElementById('myInviteCode').textContent.trim();
+    if(code==='----')return;
+    navigator.clipboard.writeText(code).then(function(){alert('已复制: '+code);});
+  };
+  setTimeout(function(){
+    var token = sessionStorage.getItem('thesis_ai_token');
+    if(!token)return;
+    fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+token}})
+      .then(function(r){return r.json();}).then(function(d){
+        if(d.success&&d.user){
+          var el=document.getElementById('myInviteCode');
+          if(!el)return;
+          if(!d.user.invite_code){
+            fetch('/api/invite/generate',{method:'POST',headers:{'Authorization':'Bearer '+token},body:'{}'})
+              .then(function(r2){return r2.json();}).then(function(d2){if(d2.success)el.textContent=d2.code;});
+          }else{el.textContent=d.user.invite_code;}
+        }
+      });
+  },1000);
+  scheduleBalanceRefresh();
+
+  // ====== 站内消息（管理员赠送/充值到账等） ======
+  var _notifyOpen = false;
+  var _lastUnread = 0;
+  window.toggleNotifyPanel = function(force) {
+    var p = document.getElementById('notifyPanel');
+    if (!p) return;
+    if (typeof force === 'boolean') _notifyOpen = force;
+    else _notifyOpen = !_notifyOpen;
+    p.style.display = _notifyOpen ? 'block' : 'none';
+    if (_notifyOpen) {
+      window.pollNotifications(true);
+      // 打开时自动标已读可选手动；这里先刷新列表
+    }
+  };
+  window.pollNotifications = function(render) {
+    var token = sessionStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    fetch('/api/notifications?limit=40', { headers: { 'Authorization': 'Bearer ' + token } })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d.success) return;
+        var unread = d.unread || 0;
+        var badge = document.getElementById('notifyBadge');
+        if (badge) {
+          if (unread > 0) { badge.style.display = ''; badge.textContent = unread > 99 ? '99+' : String(unread); }
+          else { badge.style.display = 'none'; }
+        }
+        // 新消息轻提示
+        if (unread > _lastUnread && _lastUnread >= 0 && document.visibilityState === 'visible') {
+          var newest = (d.notifications || []).find(function(n){ return !n.is_read; });
+          if (newest && window.ttp) try { ttp('📬 ' + (newest.title || '新消息')); } catch(e) {}
+        }
+        _lastUnread = unread;
+        if (render || _notifyOpen) renderNotifyList(d.notifications || []);
+      }).catch(function(){});
+  };
+  function renderNotifyList(list) {
+    var el = document.getElementById('notifyList');
+    if (!el) return;
+    if (!list.length) {
+      el.innerHTML = '<div style="padding:28px 16px;text-align:center;color:var(--text-muted,#999);font-size:.75rem">暂无消息</div>';
+      return;
+    }
+    var typeIcon = { gift: '🎁', recharge: '💳', system: '📢' };
+    var h = '';
+    list.forEach(function(n){
+      var unread = !n.is_read;
+      h += '<div onclick="markNotificationRead('+n.id+')" style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.04);cursor:pointer;background:'+(unread?'rgba(0,113,227,.04)':'transparent')+'">'+
+        '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">'+
+          '<div style="font-size:.78rem;font-weight:'+(unread?700:600)+';color:var(--text-primary,#111)">'+(typeIcon[n.type]||'📢')+' '+(n.title||'')+'</div>'+
+          '<div style="font-size:.58rem;color:var(--text-muted,#999);white-space:nowrap">'+(n.created_at||'').substring(5,16)+'</div>'+
+        '</div>'+
+        '<div style="font-size:.7rem;color:var(--text-secondary,#555);margin-top:4px;line-height:1.5">'+(n.body||'')+'</div>'+
+        (unread?'<div style="font-size:.58rem;color:var(--accent,#0071e3);margin-top:4px">未读 · 点击标记已读</div>':'')+
+      '</div>';
+    });
+    el.innerHTML = h;
+  }
+  window.markNotificationRead = function(id) {
+    var token = sessionStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    fetch('/api/notifications/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ ids: [id] })
+    }).then(function(r){ return r.json(); }).then(function(){ window.pollNotifications(true); updateBalanceDisplay(); });
+  };
+  window.markAllNotificationsRead = function() {
+    var token = sessionStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    fetch('/api/notifications/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ all: true })
+    }).then(function(r){ return r.json(); }).then(function(){ window.pollNotifications(true); });
+  };
+  // close panel on outside click
+  document.addEventListener('click', function(e){
+    var p = document.getElementById('notifyPanel');
+    var b = document.getElementById('notifyBellBtn');
+    if (!p || !_notifyOpen) return;
+    if (p.contains(e.target) || (b && b.contains(e.target))) return;
+    toggleNotifyPanel(false);
+  });
+  setTimeout(function(){ window.pollNotifications(); }, 800);
+  setInterval(function(){ window.pollNotifications(); }, 20000);
+  setTimeout(function(){
+    var inp = document.getElementById('rechargeAmountInput');
+    if (inp) inp.addEventListener('input', onRechargeAmountEdited);
+  }, 0);
+})();
+</script>
+
+<!-- ====== 充值弹窗 ====== -->
+<div id="rechargeModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg-overlay);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:100070;align-items:center;justify-content:center" onclick="hideRechargeModal()">
+  <div style="background:var(--bg-card);border-radius:var(--radius-xl);padding:24px;width:520px;max-width:96%;max-height:85vh;overflow-y:auto;border:1px solid var(--border);box-shadow:var(--shadow-lg)" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="font-size:var(--font-size-xl);color:var(--text-primary);margin:0;font-weight:var(--font-weight-bold)">充值</h3>
+      <button onclick="hideRechargeModal()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.2rem;font-family:var(--font-sans)">&times;</button>
+    </div>
+    <p style="font-size:var(--font-size-md);color:var(--text-muted);margin:0 0 8px">当前余额: <strong id="rechargeBalance" style="color:var(--text-primary)">0.00</strong> 点</p>
+    <p style="font-size:.68rem;color:var(--text-muted);margin:0 0 12px;line-height:1.55">充值所得点数按当前兑换规则计算。请按订单显示的金额转账；管理员按实收确认到账。</p>
+    <h4 style="font-size:var(--font-size-base);color:var(--text-secondary);margin:0 0 8px;font-weight:var(--font-weight-semibold)">充值金额（元）</h4>
+    <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap">
+      <input type="text" inputmode="decimal" id="rechargeAmountInput" autocomplete="off" placeholder="请输入充值金额" aria-describedby="rechargePointsPreview rechargeAmountError" style="flex:1;min-width:140px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:.9rem;font-family:var(--font-sans)">
+      <span id="rechargePointsPreview" style="font-size:.78rem;color:var(--text-muted);white-space:nowrap">所得点数按当前兑换规则计算</span>
+    </div>
+    <div id="rechargeAmountError" aria-live="polite" style="min-height:16px;margin:-3px 0 7px;color:#ef4444;font-size:.68rem"></div>
+    <button type="button" class="ai-btn" style="width:100%;margin-bottom:12px" onclick="selectRechargeAmountFromInput()">下一步：扫码支付</button>
+    <div id="rechargeOrderInfo" aria-live="polite" style="display:none;font-size:.75rem;color:var(--accent);margin:0 0 10px;padding:8px 10px;border-radius:8px;background:var(--accent-glow);border:1px solid var(--accent)"></div>
+    <div id="rechargePayment" style="display:none;padding:14px;background:var(--surface-alt);border-radius:var(--radius-lg);border:1px solid var(--border);margin-bottom:12px">
+      <h4 style="font-size:var(--font-size-md);color:var(--text-muted);margin:0 0 10px;font-weight:var(--font-weight-semibold)">扫码支付</h4>
+      <div class="recharge-qr-pair" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:12px">
+        <div class="recharge-qr-card" data-method="alipay" onclick="switchQR('alipay')" style="flex:1;min-width:150px;max-width:200px;text-align:center;padding:10px;border-radius:12px;border:2px solid var(--accent);background:var(--bg-card);cursor:pointer">
+          <div style="font-size:.78rem;font-weight:700;margin-bottom:6px;color:var(--text-primary)">支付宝</div>
+          <img id="qrImageAlipay" src="static/qr-alipay.png" alt="支付宝收款码" style="width:148px;height:148px;border-radius:10px;background:#fff;object-fit:contain;display:block;margin:0 auto">
+          <div style="font-size:.62rem;color:var(--text-muted);margin-top:6px">扫码向商家付款</div>
+        </div>
+        <div class="recharge-qr-card" data-method="wechat" onclick="switchQR('wechat')" style="flex:1;min-width:150px;max-width:200px;text-align:center;padding:10px;border-radius:12px;border:2px solid transparent;background:var(--bg-card);cursor:pointer">
+          <div style="font-size:.78rem;font-weight:700;margin-bottom:6px;color:var(--text-primary)">微信</div>
+          <img id="qrImageWechat" src="static/qr-wechat.png" alt="微信收款码" style="width:148px;height:148px;border-radius:10px;background:#fff;object-fit:contain;display:block;margin:0 auto">
+          <div style="font-size:.62rem;color:var(--text-muted);margin-top:6px">扫码向商家付款</div>
+        </div>
+      </div>
+      <p id="rechargePayHint" style="font-size:var(--font-size-xs);color:var(--text-muted);text-align:center;margin:0 0 10px">请使用<strong id="rechargePayMethodLabel">支付宝</strong>转账 <strong id="rechargePayAmountLabel">—</strong> 元，备注务必填写订单号</p>
+      <button id="rechargeSubmitBtn" onclick="submitRecharge()" style="width:100%;padding:12px;border-radius:var(--radius-md);border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:var(--font-weight-bold);font-size:var(--font-size-base);font-family:var(--font-sans)">创建订单并显示支付说明</button>
+      <p style="font-size:var(--font-size-xs);color:var(--text-muted);text-align:center;margin:8px 0 0">支付完成后点「我已支付」提交审核；管理员按实收金额确认到账</p>
+    </div>
+    <h4 style="font-size:var(--font-size-md);color:var(--text-secondary);margin:12px 0 6px;font-weight:var(--font-weight-semibold)">修改密码</h4>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <input type="password" id="pwOld" placeholder="原密码" style="flex:1;min-width:80px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;font-size:var(--font-size-sm);color:var(--text-primary);outline:none;font-family:var(--font-sans)">
+      <input type="password" id="pwNew" placeholder="新密码(6位+)" style="flex:1;min-width:80px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;font-size:var(--font-size-sm);color:var(--text-primary);outline:none;font-family:var(--font-sans)">
+      <button onclick="changePassword()" style="padding:7px 14px;border:none;border-radius:var(--radius-sm);background:var(--accent);color:#fff;font-size:var(--font-size-sm);cursor:pointer;font-weight:var(--font-weight-semibold);font-family:var(--font-sans)">修改</button>
+    </div>
+    <div id="pwMsg" style="font-size:var(--font-size-xs);min-height:14px;margin-top:4px"></div>
+    <h4 style="font-size:var(--font-size-md);color:var(--text-secondary);margin:12px 0 6px;font-weight:var(--font-weight-semibold)">充值记录</h4>
+    <div id="rechargeHistory" style="max-height:160px;overflow-y:auto;font-size:var(--font-size-sm);color:var(--text-muted)"></div>
+  </div>
+</div>
+
+<!-- ====== 账户中心 ====== -->
+<div id="accountCenterMask" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(6px);z-index:100065;align-items:center;justify-content:center" onclick="closeAccountCenter()">
+  <div id="accountCenter" style="background:var(--bg-card,#fff);border-radius:16px;width:min(920px,96vw);max-height:88vh;overflow:hidden;border:1px solid var(--border,#e5e7eb);box-shadow:0 24px 64px rgba(0,0,0,.22);display:flex;flex-direction:column" onclick="event.stopPropagation()">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border,#e5e7eb)">
+      <div>
+        <b style="font-size:1rem;color:var(--text-primary,#111)">账户中心</b>
+        <span id="acctUserMeta" style="margin-left:10px;font-size:.72rem;color:var(--text-muted,#888)"></span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="openAccountCenter()" style="border:1px solid var(--border);background:var(--bg-card);border-radius:8px;padding:5px 10px;font-size:.72rem;cursor:pointer">刷新</button>
+        <button onclick="closeAccountCenter()" style="border:none;background:transparent;font-size:1.1rem;cursor:pointer;color:var(--text-muted)">✕</button>
+      </div>
+    </div>
+    <div id="acctKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:14px 18px;border-bottom:1px solid var(--border,#eef2f7)"></div>
+    <div style="display:flex;gap:6px;padding:10px 18px 0;flex-wrap:wrap" id="acctTabs">
+      <button class="acct-tab active" data-tab="tx" onclick="switchAcctTab('tx')">消费流水</button>
+      <button class="acct-tab" data-tab="orders" onclick="switchAcctTab('orders')">充值订单</button>
+      <button class="acct-tab" data-tab="msgs" onclick="switchAcctTab('msgs')">消息</button>
+      <button class="acct-tab" data-tab="invite" onclick="switchAcctTab('invite')">邀请</button>
+    </div>
+    <div id="acctBody" style="padding:12px 18px 18px;overflow:auto;flex:1;font-size:.78rem;color:var(--text-secondary,#444)"></div>
+    <div style="padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="showRechargeModal();closeAccountCenter()" style="background:var(--accent,#0071e3);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;font-size:.8rem">去充值</button>
+    </div>
+  </div>
+</div>
+<style>
+  .acct-tab{border:1px solid var(--border,#e5e7eb);background:var(--bg-card,#fff);color:var(--text-muted,#666);border-radius:999px;padding:5px 12px;font-size:.72rem;font-weight:600;cursor:pointer}
+  .acct-tab.active{background:var(--accent,#0071e3);color:#fff;border-color:var(--accent,#0071e3)}
+  .acct-kpi{background:var(--surface-alt,#f8fafc);border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:10px 12px}
+  .acct-kpi .v{font-size:1.15rem;font-weight:800;color:var(--text-primary,#111);font-family:ui-monospace,monospace}
+  .acct-kpi .l{font-size:.62rem;color:var(--text-muted,#888);margin-top:2px;text-transform:uppercase;letter-spacing:.04em}
+  .acct-table{width:100%;border-collapse:collapse}
+  .acct-table th,.acct-table td{padding:7px 8px;border-bottom:1px solid rgba(0,0,0,.05);text-align:left;font-size:.72rem}
+  .acct-table th{color:var(--text-muted,#888);font-weight:700}
+</style>
+<script>
+(function(){
+  // 402 全局拦截：余额不足 → 引导充值
+  if (!window.__fetchPatched402) {
+    window.__fetchPatched402 = true;
+    var _origFetch = window.fetch;
+    window.fetch = function() {
+      return _origFetch.apply(this, arguments).then(function(res) {
+        if (res && res.status === 402) {
+          try {
+            res.clone().json().then(function(d) {
+              var msg = (d && d.error) ? d.error : '点数不足';
+              if (confirm(msg + '\n\n是否立即充值？')) {
+                if (typeof showRechargeModal === 'function') showRechargeModal();
+              }
+              if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
+            }).catch(function(){});
+          } catch (e) {}
+        }
+        return res;
+      });
+    };
+  }
+
+  var _acctCache = null;
+  var _acctTab = 'tx';
+  window.openAccountCenter = function() {
+    var mask = document.getElementById('accountCenterMask');
+    if (!mask) return;
+    mask.style.display = 'flex';
+    var token = sessionStorage.getItem('thesis_ai_token');
+    if (!token) { document.getElementById('acctBody').innerHTML = '请先登录'; return; }
+    document.getElementById('acctBody').innerHTML = '<div style="padding:20px;color:#999">加载中…</div>';
+    fetch('/api/account/overview', { headers: { 'Authorization': 'Bearer ' + token } })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d.success) { document.getElementById('acctBody').textContent = d.error || '加载失败'; return; }
+        _acctCache = d;
+        var u = d.user || {};
+        document.getElementById('acctUserMeta').textContent = (u.username || '') + ' · ID ' + (u.id || '');
+        var free = d.free || {}, st = d.stats || {};
+        document.getElementById('acctKpis').innerHTML =
+          '<div class="acct-kpi"><div class="v">'+Number(u.points||0).toFixed(3)+'</div><div class="l">余额(点)</div></div>'+
+          '<div class="acct-kpi"><div class="v">'+(free.remaining||0)+'/'+(free.limit||0)+'</div><div class="l">今日免费剩余</div></div>'+
+          '<div class="acct-kpi"><div class="v">'+Number(st.spent_points||0).toFixed(3)+'</div><div class="l">累计消耗</div></div>'+
+          '<div class="acct-kpi"><div class="v">¥'+Number(st.recharged_yuan||0).toFixed(2)+'</div><div class="l">累计充值</div></div>'+
+          '<div class="acct-kpi"><div class="v">'+(st.unread_notifications||0)+'</div><div class="l">未读消息</div></div>'+
+          '<div class="acct-kpi"><div class="v">'+(st.invite_used||0)+'</div><div class="l">邀请成功</div></div>';
+        switchAcctTab(_acctTab);
+      }).catch(function(){ document.getElementById('acctBody').textContent = '网络错误'; });
+  };
+  window.closeAccountCenter = function(){
+    var mask = document.getElementById('accountCenterMask');
+    if (mask) mask.style.display = 'none';
+  };
+  window.switchAcctTab = function(tab){
+    _acctTab = tab || 'tx';
+    document.querySelectorAll('#acctTabs .acct-tab').forEach(function(b){
+      b.classList.toggle('active', b.getAttribute('data-tab') === _acctTab);
+    });
+    var d = _acctCache; if (!d) return;
+    var body = document.getElementById('acctBody');
+    if (_acctTab === 'tx') {
+      var h = '<table class="acct-table"><thead><tr><th>时间</th><th>类型</th><th>变动</th><th>余额后</th><th>说明</th></tr></thead><tbody>';
+      (d.transactions||[]).forEach(function(t){
+        var p = Number(t.points||0);
+        h += '<tr><td>'+(t.created_at||'').substring(0,16)+'</td><td>'+t.type+'</td>'+
+          '<td style="color:'+(p>=0?'#059669':'#dc2626')+'">'+(p>=0?'+':'')+p.toFixed(3)+'</td>'+
+          '<td>'+Number(t.points_after||0).toFixed(3)+'</td><td>'+(t.description||'')+'</td></tr>';
+      });
+      h += '</tbody></table>';
+      if (!(d.transactions||[]).length) h = '<div style="padding:16px;color:#999">暂无流水</div>';
+      body.innerHTML = h;
+    } else if (_acctTab === 'orders') {
+      var sm = {pending:'待支付',submitted:'待确认',confirmed:'已到账',rejected:'已拒绝'};
+      var h2 = '<table class="acct-table"><thead><tr><th>订单</th><th>金额</th><th>状态</th><th>附言码</th><th>时间</th><th></th></tr></thead><tbody>';
+      (d.orders||[]).forEach(function(o){
+        var ops = '';
+        if (o.status === 'rejected' || o.status === 'pending') {
+          ops = '<button onclick="resubmitOrder('+o.id+')" style="font-size:.68rem;padding:3px 8px;border-radius:6px;border:1px solid #ddd;background:#fff;cursor:pointer">重新提交</button>';
+        }
+        h2 += '<tr><td>#'+o.id+'</td><td>¥'+o.amount_yuan+'</td><td>'+(sm[o.status]||o.status)+'</td><td>'+(o.note||o.id)+'</td><td>'+(o.created_at||'').substring(0,16)+'</td><td>'+ops+'</td></tr>';
+      });
+      h2 += '</tbody></table>';
+      if (!(d.orders||[]).length) h2 = '<div style="padding:16px;color:#999">暂无充值订单</div>';
+      body.innerHTML = h2 + '<p style="margin:10px 0 0;font-size:.68rem;color:#888">转账备注请填写订单号（附言码），便于管理员核对到账。</p>';
+    } else if (_acctTab === 'msgs') {
+      var list = d.notifications || [];
+      if (!list.length) { body.innerHTML = '<div style="padding:16px;color:#999">暂无消息</div>'; return; }
+      var h3 = '';
+      list.forEach(function(n){
+        h3 += '<div style="padding:10px 0;border-bottom:1px solid rgba(0,0,0,.05)">' +
+          '<div style="display:flex;justify-content:space-between"><b style="font-size:.8rem">'+(n.title||'')+'</b><span style="color:#999;font-size:.65rem">'+(n.created_at||'').substring(5,16)+'</span></div>' +
+          '<div style="margin-top:4px;line-height:1.5">'+(n.body||'')+'</div>' +
+          (!n.is_read ? '<div style="color:#0071e3;font-size:.65rem;margin-top:4px">未读</div>' : '') +
+          '</div>';
+      });
+      body.innerHTML = h3;
+    } else if (_acctTab === 'invite') {
+      var code = (d.user && d.user.invite_code) || '----';
+      body.innerHTML =
+        '<div style="padding:8px 0"><div style="color:#888;font-size:.7rem;margin-bottom:6px">我的邀请码</div>' +
+        '<div style="display:flex;gap:8px;align-items:center"><code style="font-size:1.1rem;font-weight:800;letter-spacing:.08em">'+code+'</code>' +
+        '<button onclick="navigator.clipboard.writeText(\''+code+'\').then(function(){alert(\'已复制\')})" style="padding:5px 10px;border-radius:6px;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:.72rem">复制</button></div>' +
+        '<p style="margin:12px 0 0;color:#666;line-height:1.6;font-size:.75rem">好友注册时填写你的邀请码，双方各得奖励点数。今日成功邀请：'+(d.stats&&d.stats.invite_used||0)+' 人（累计）。</p></div>';
+    }
+  };
+  window.resubmitOrder = function(oid){
+    var token = sessionStorage.getItem('thesis_ai_token');
+    fetch('/api/payment/resubmit', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body: JSON.stringify({order_id: oid})
+    }).then(function(r){return r.json()}).then(function(d){
+      alert(d.success ? (d.message||'已提交') : (d.error||'失败'));
+      if (d.success) openAccountCenter();
+    });
+  };
+})();
+</script>
+
+<script>
+function showPricingInfo(){ /* real impl assigned to window.showPricingInfo below */ }
+</script>
+
+<div id="accountModalMask" class="acct-mask" style="display:none">
+  <div id="accountModal" class="acct-modal" onclick="event.stopPropagation()">
+    <div class="acct-modal-head">
+      <b id="accountModalTitle">消费明细</b>
+      <button class="acct-close" onclick="closeAccountModal()">✕</button>
+    </div>
+    <div id="accountModalBody" class="acct-modal-body"></div>
+  </div>
+</div>
+<script>
+function openAccountModal(title, html){
+  var m=document.getElementById('accountModalMask');
+  document.getElementById('accountModalTitle').textContent=title||'账户';
+  document.getElementById('accountModalBody').innerHTML=html||'';
+  m.style.display='flex';
+  m.classList.add('show');
+}
+function closeAccountModal(){ var m=document.getElementById('accountModalMask'); m.style.display='none'; m.classList.remove('show'); }
+function showConsumptionHistory(){
+  var token=sessionStorage.getItem('thesis_ai_token'); if(!token){alert('请先登录');return;}
+  openAccountModal('消费明细', '<div style="padding:20px;color:rgba(226,232,240,.55)">加载中…</div>');
+  fetch('/api/usage/history?limit=100', {headers:{'Authorization':'Bearer '+token}})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.success){ openAccountModal('消费明细', '<div style="color:#fca5a5">'+(d.error||'加载失败')+'</div>'); return; }
+      window._usageHistoryCache=d;
+      renderConsumptionHistory(d, '', '');
+      var ch=document.getElementById('consumptionHistory'); if(ch) ch.textContent=JSON.stringify({n:(d.transactions||[]).length});
+    }).catch(function(){ openAccountModal('消费明细', '<div style="color:#fca5a5">网络错误</div>'); });
+}
+function renderConsumptionHistory(d, fromDate, toDate){
+  function inRange(ts){
+    if(!ts) return true;
+    var day=(ts||'').substring(0,10);
+    if(fromDate && day < fromDate) return false;
+    if(toDate && day > toDate) return false;
+    return true;
+  }
+  function typeLabel(t){
+    var m={usage:'功能消耗',recharge:'充值',gift:'赠送',refund:'退款',admin:'管理员调整',free:'体验额度'};
+    return m[t]||t||'其他';
+  }
+  function usageModuleLabel(m){
+    var map={
+      'topic-finder':'选题推荐','proposal':'开题大纲','proofread':'论文查错','de-duplicate':'查重降重','review':'论文审阅','expand':'论文扩写','chapter-expand':'论文扩写','defense-ppt':'答辩PPT','en-abstract':'英文摘要','format-check':'格式检查','terminology':'术语分析','paragraph':'段落分析','dashboard':'论文看板','data-analysis':'数据分析','data-ml':'数据分析','data-profile':'数据画像','joint-analysis':'联合分析','figure-advisor':'科研图表顾问','figure-advisor-batch':'科研图表顾问','figure-recommend':'图表推荐','figure-render-code':'图表代码生成','figure-qa':'图表规范质检','search':'文献检索','literature-search':'文献检索','kg':'知识图谱','knowledge-graph':'知识图谱','export-docx':'导出文档'
+    };
+    return map[m]||'智能能力';
+  }
+  function modLabel(m){ return usageModuleLabel(m); }
+  var txs=(d.transactions||[]).filter(function(t){return inRange(t.created_at);});
+  var llms=(d.llm_usage||[]).filter(function(t){return inRange(t.created_at);});
+  var h='';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">';
+  h+='<label style="font-size:.68rem;opacity:.75">从</label><input id="histFromDate" type="date" value="'+(fromDate||'')+'" style="font-size:.7rem;padding:4px 6px;border-radius:6px;border:1px solid rgba(128,128,128,.25)">';
+  h+='<label style="font-size:.68rem;opacity:.75">到</label><input id="histToDate" type="date" value="'+(toDate||'')+'" style="font-size:.7rem;padding:4px 6px;border-radius:6px;border:1px solid rgba(128,128,128,.25)">';
+  h+='<button type="button" onclick="filterConsumptionHistory()" style="font-size:.68rem;padding:5px 10px;border-radius:8px;border:1px solid rgba(128,128,128,.25);cursor:pointer;background:transparent">筛选</button>';
+  h+='<button type="button" onclick="exportConsumptionHistory()" style="font-size:.68rem;padding:5px 10px;border-radius:8px;border:1px solid rgba(128,128,128,.25);cursor:pointer;background:transparent">导出</button>';
+  h+='</div>';
+  h+='<div style="margin-bottom:12px;opacity:.75;font-size:.72rem">共 '+txs.length+' 笔交易，智能调用 '+llms.length+' 次。单位：点。</div>';
+  h+='<b>交易记录</b><div style="overflow:auto;margin:6px 0 14px"><table style="width:100%;border-collapse:collapse;font-size:.72rem">';
+  h+='<tr style="opacity:.85"><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">时间</th><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">类型</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">变动(点)</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">余额(点)</th><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">说明</th></tr>';
+  txs.forEach(function(t){
+    var pts=Number(t.points||0);
+    var desc=String(t.description||'').replace(/API|api_cost|上游|倍率|厘/gi,'');
+    h+='<tr><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12)">'+(t.created_at||'')+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12)">'+typeLabel(t.type)+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12);text-align:right">'+(pts>=0?'+':'')+Number(pts).toFixed(3)+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12);text-align:right">'+Number(t.points_after||0).toFixed(3)+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12)">'+desc+'</td></tr>';
+  });
+  if(!txs.length) h+='<tr><td colspan="5" style="padding:10px;opacity:.6">暂无交易</td></tr>';
+  h+='</table></div>';
+  h+='<b>智能调用</b><div style="overflow:auto;margin-top:6px"><table style="width:100%;border-collapse:collapse;font-size:.72rem">';
+  h+='<tr style="opacity:.85"><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">时间</th><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">功能</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">Token</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">扣点</th></tr>';
+  llms.forEach(function(l){
+    var tok=(Number(l.prompt_tokens||0)+Number(l.completion_tokens||0));
+    h+='<tr><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12)">'+(l.created_at||'')+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12)">'+modLabel(l.module)+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12);text-align:right">'+tok+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12);text-align:right">'+Number(l.points_charged||0).toFixed(3)+'</td></tr>';
+  });
+  if(!llms.length) h+='<tr><td colspan="4" style="padding:10px;opacity:.6">暂无智能调用</td></tr>';
+  h+='</table></div>';
+  openAccountModal('消费明细', h);
+}
+function filterConsumptionHistory(){
+  var d=window._usageHistoryCache; if(!d){showConsumptionHistory();return;}
+  var fromDate=(document.getElementById('histFromDate')||{}).value||'';
+  var toDate=(document.getElementById('histToDate')||{}).value||'';
+  renderConsumptionHistory(d, fromDate, toDate);
+}
+function exportConsumptionHistory(){
+  var d=window._usageHistoryCache; if(!d){alert('请先打开明细');return;}
+  var fromDate=(document.getElementById('histFromDate')||{}).value||'';
+  var toDate=(document.getElementById('histToDate')||{}).value||'';
+  function inRange(ts){
+    var day=(ts||'').substring(0,10);
+    if(fromDate && day < fromDate) return false;
+    if(toDate && day > toDate) return false;
+    return true;
+  }
+  var rows=['类型,时间,功能或类别,变动点,余额点,Token,说明'];
+  (d.transactions||[]).filter(function(t){return inRange(t.created_at);}).forEach(function(t){
+    rows.push(['交易', t.created_at||'', t.type||'', t.points, t.points_after, '', String(t.description||'').replace(/API|api_cost|厘/gi,'')].join(','));
+  });
+  (d.llm_usage||[]).filter(function(t){return inRange(t.created_at);}).forEach(function(l){
+    rows.push(['智能调用', l.created_at||'', usageModuleLabel(l.module), l.points_charged||0, '', (Number(l.prompt_tokens||0)+Number(l.completion_tokens||0)), ''].join(','));
+  });
+  var blob=new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8;'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='usage_history.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(a.href);},500);
+}
+// improve pricing modal using account modal when possible
+var _oldShowPricingInfo = window.showPricingInfo;
+window.showPricingInfo = function(){
+  fetch('/api/pricing').then(function(r){return r.json();}).then(function(d){
+    if(!d.success){alert('暂时无法获取说明');return;}
+    var h='<div style="line-height:1.75">';
+    h+='<p style="margin:0 0 12px;color:#64748b;font-size:.8rem">点数用于使用站内智能与分析能力。充值订单确认后入账。</p>';
+    h+='<b>怎么计点</b><ul style="margin:8px 0 12px 18px;padding:0;font-size:.84rem">';
+    h+='<li>写作、润色、查错等智能能力：按实际使用量计点</li>';
+    h+='<li>文献检索、知识图谱与格式/术语等分析能力：按当前规则计点，体验额度以账户状态为准</li>';
+    h+='</ul>';
+    h+='<b>计费方式</b><div style="font-size:.84rem;margin:8px 0 12px">';
+    (d.items||[]).slice(0,12).forEach(function(it){
+      var nm=(it.name||it.key||'');
+      var mode=(it.billing==='smart'||it.billing==='llm-token')?'按实际使用量计点':'按当前规则计点';
+      h+='<div style="display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-bottom:1px solid rgba(0,0,0,.06)"><span>'+nm+'</span><span>'+mode+'</span></div>';
+    });
+    h+='</div>';
+    h+='<div style="font-size:.78rem;color:#64748b">注册奖励以账户实际到账为准。</div></div>';
+    openAccountModal('使用说明', h);
+  }).catch(function(){alert('网络错误');});
+};
+
+document.getElementById('accountModalMask').addEventListener('click', function(e){ if(e.target.id==='accountModalMask') closeAccountModal(); });
+</script>
+
+
+<div class="buddy-tools" id="buddyTools" aria-label="论文搭子快捷工具">
+  <button type="button" class="buddy-tool-fab" id="buddyAssistantBtn" onclick="openBuddyAssistant()" title="打开论文搭子助手" aria-label="打开论文搭子助手"><span aria-hidden="true">搭子</span></button>
+  <button type="button" class="buddy-tool-fab" id="buddyThemeBtn" onclick="openThemeStudio()" title="外观与阅读设置" aria-label="外观与阅读设置"><span aria-hidden="true">主题</span></button>
+  <button type="button" class="buddy-tool-fab" id="buddyHelpBtn" onclick="openContextHelp()" title="查看操作指南" aria-label="查看操作指南"><span aria-hidden="true">?</span></button>
+</div>
+<div class="buddy-backdrop" id="buddyBackdrop" onclick="closeBuddyAssistant()"></div>
+<aside class="buddy-drawer" id="buddyDrawer" aria-hidden="true" aria-label="论文搭子助手">
+  <header><div><strong>论文搭子</strong><span id="buddyContext">当前项目助手</span></div><button type="button" onclick="closeBuddyAssistant()">关闭</button></header>
+  <div class="buddy-body" id="buddyMessages"><div class="buddy-welcome">我会优先使用当前项目、论文版本和资料证据回答；找不到依据时会明确说明。</div></div>
+  <footer><textarea id="buddyInput" rows="3" placeholder="例如：总结当前章节；下一步做什么；资料中有哪些证据支持这个论点？"></textarea><div><span id="buddyCostHint">回答前确认计费方式</span><button type="button" onclick="askBuddyAssistant()">发送</button></div></footer>
+</aside>
+
+<div class="theme-studio-backdrop" id="themeStudioBackdrop" onclick="closeThemeStudio()"></div>
+<section class="theme-studio" id="themeStudio" aria-hidden="true">
+  <header><div><strong>外观与阅读</strong><span>即时预览，设置按账号保存</span></div><button type="button" onclick="closeThemeStudio()">关闭</button></header>
+  <div class="theme-studio-body">
+    <label>颜色模式<select id="prefColorMode" onchange="previewPreferences()"><option value="auto">自动（日间 06:00–18:00）</option><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
+    <label>强调色<select id="prefAccent" onchange="previewPreferences()"><option value="indigo">靛蓝</option><option value="ocean">海洋</option><option value="forest">森林</option><option value="rose">玫红</option><option value="sunset">日落</option></select></label>
+    <label>界面密度<select id="prefDensity" onchange="previewPreferences()"><option value="compact">紧凑</option><option value="default">标准</option><option value="relaxed">宽松</option></select></label>
+    <label>正文字体<select id="prefFont" onchange="previewPreferences()"><option value="auto">系统</option><option value="sans">无衬线</option><option value="serif">衬线</option></select></label>
+    <label>字号<select id="prefScale" onchange="previewPreferences()"><option value="0.9">90%</option><option value="1">100%</option><option value="1.1">110%</option></select></label>
+    <label class="theme-check"><input type="checkbox" id="prefReduceMotion" onchange="previewPreferences()">减少动态效果</label>
+  </div>
+  <footer><button type="button" onclick="resetPreferences()">恢复默认</button><button type="button" onclick="savePreferences()">保存设置</button></footer>
+</section>
+
+<!-- 消息中心：body 级 fixed，避免被 .bar 层叠上下文挡住 -->
+<div id="notifyPanel" style="display:none;position:fixed;top:52px;right:12px;width:360px;max-width:92vw;max-height:70vh;overflow:hidden;background:var(--bg-card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.22);z-index:100060">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border,#e5e7eb)">
+    <b style="font-size:.85rem;color:var(--text-primary,#111)">消息中心</b>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button type="button" onclick="markAllNotificationsRead()" style="background:none;border:none;color:var(--accent,#4f46e5);font-size:.68rem;cursor:pointer;font-weight:600">全部已读</button>
+      <button type="button" onclick="toggleNotifyPanel(false)" style="background:none;border:none;color:var(--text-muted,#999);cursor:pointer;font-size:.9rem">✕</button>
+    </div>
+  </div>
+  <div id="notifyList" style="max-height:56vh;overflow-y:auto;padding:6px 0"></div>
+</div>
+
 </body></html>
