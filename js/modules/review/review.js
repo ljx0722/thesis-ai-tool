@@ -47,7 +47,7 @@ var ReviewModule = (function() {
         '<button class="ai-btn" onclick="typeof PaperImport !== \'undefined\' ? PaperImport.open(\'new\') : (typeof openImportDialog === \'function\' ? openImportDialog(\'new\') : null)" style="margin-top:10px">📎 导入论文</button>' +
       '</div>';
     } else if (_activeTab === 'overview') {
-      html += renderOverview();
+      html += renderOverview();if(hasEssay&&!_container._autoChecked){_container._autoChecked=true;setTimeout(runLocalChecks,200);}
     } else {
       html += '<div id="reviewSubContent">请先运行分析</div>';
     }
