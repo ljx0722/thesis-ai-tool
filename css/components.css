@@ -1,0 +1,33 @@
+/* ====== Shared Components ====== */
+
+/* Buttons */
+.ai-btn {
+  display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border:none; border-radius:var(--radius-md);
+  font-size:var(--font-size-sm); font-weight:var(--font-weight-semibold); cursor:pointer; transition:all .15s;
+  background:var(--bg-elevated); color:var(--text-secondary); font-family:inherit;
+}
+.ai-btn:hover { background:var(--border); }
+.ai-btn.primary { background:var(--accent); color:#fff; }
+.ai-btn.primary:hover { filter:brightness(1.1); }
+.ai-btn-clear { background:transparent; border:1px solid var(--border); border-radius:var(--radius-md); padding:8px 16px; font-size:var(--font-size-sm); cursor:pointer; color:var(--text-muted); font-family:inherit; }
+
+/* Textarea */
+.ai-textarea { width:100%; min-height:150px; padding:12px; border:1.5px solid var(--border); border-radius:var(--radius-md); font-size:var(--font-size-sm); font-family:inherit; resize:vertical; outline:none; background:var(--bg-input); color:var(--text-primary); }
+.ai-textarea:focus { border-color:var(--accent); }
+
+/* Loading */
+.ai-loading { text-align:center; padding:30px; color:var(--text-muted); font-size:var(--font-size-sm); }
+.ai-output { padding:14px; background:var(--surface-alt); border-radius:var(--radius-md); border:1px solid var(--border); font-size:var(--font-size-sm); line-height:1.7; white-space:pre-wrap; }
+.ai-output-error { padding:14px; background:rgba(239,68,68,.06); border-radius:var(--radius-md); border:1px solid rgba(239,68,68,.2); color:#ef4444; font-size:var(--font-size-sm); }
+
+/* Cards / Grid */
+.module-panel { padding:16px; }
+.module-panel-content { display:flex; flex-direction:column; gap:12px; }
+.ai-desc { font-size:var(--font-size-xs); color:var(--text-muted); line-height:1.6; margin-bottom:4px; }
+.ai-actions { display:flex; gap:8px; flex-wrap:wrap; }
+
+/* Panel empty */
+.panel-empty { text-align:center; padding:40px 20px; color:var(--text-muted); font-size:var(--font-size-sm); }
+
+/* Modal overlay */
+.tb-modal-overlay { transition:opacity .2s; }
