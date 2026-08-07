@@ -111,11 +111,10 @@
     <span id="projectProgressChip" class="project-progress-chip">创建项目后显示进度</span>
   </div>
   <div class="bar-tabs" id="barTabs">
-    <button class="bar-tab active" data-nav="workspace" onclick="navigateTo('workspace')">总览</button>
+    <button class="bar-tab active" data-nav="setup" onclick="navigateTo('setup')">📋 立项</button>
     <button class="bar-tab" data-nav="literature" onclick="navigateTo('literature')">📚 文献</button>
     <button class="bar-tab" data-nav="writing" onclick="navigateTo('writing')">✍️ 写作</button>
     <button class="bar-tab" data-nav="review" onclick="navigateTo('review')">🔍 审阅</button>
-    <button class="bar-tab" data-nav="dashboard" onclick="navigateTo('dashboard')">📊 看板</button>
     <button class="bar-tab" data-nav="defense" onclick="navigateTo('defense')">🎤 答辩</button>
   </div>
   <div class="bar-right">
@@ -128,52 +127,119 @@
     
   </div>
 </div>
-<!-- ====== 大模块导航路由 ====== -->
-<script id="bigModuleRouter">
+<!-- ====== 5阶段导航路由 ====== -->
+<script id="phaseRouter">
 (function(){
-  var _activeNav = 'workspace';
-  function esc(s){return String(s||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]});}
+  var _phase='setup';
+  function el(id){return document.getElementById(id);}
 
-  function mountWorkspace(mc){mc.innerHTML='<div style="max-width:700px;margin:40px auto;padding:20px"><div style="text-align:center;margin-bottom:32px"><div style="font-size:48px;margin-bottom:8px">🎓</div><h2 style="font-size:20px;font-weight:700;margin-bottom:4px">论文搭子 ThesisBuddy</h2><p style="color:var(--text-muted,#888);font-size:13px">AI 论文全流程工作台 — 七个阶段，一条主线</p></div><div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:32px"><button class="nav-upload-btn primary" onclick="typeof openIdeaWizard===\'function\'&&openIdeaWizard()" style="padding:14px 28px;font-size:15px;border:none;border-radius:12px;cursor:pointer;font-weight:700">💡 从想法开始</button><button class="nav-upload-btn" onclick="typeof openImportDialog===\'function\'?openImportDialog(\'new\'):null" style="padding:14px 28px;font-size:15px;border:1px solid #d1d5db;border-radius:12px;cursor:pointer;font-weight:700;background:#fff">📄 导入论文</button></div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'+['🎯 想清楚|选题打磨','📚 找资料|文献检索','🧭 搭结构|开题大纲','✍️ 写出来|章节扩写','🔍 改得好|格式审阅','📊 过评审|论文看板','🎤 做答辩|PPT+摘要','🕸️ 知识图谱|概念分析'].map(function(s,i){var p=s.split('|');var navs=['workspace','literature','writing','writing','review','dashboard','defense','literature'];return'<div style="padding:14px 10px;text-align:center;background:#fff;border:1px solid #e5e7eb;border-radius:10px;cursor:pointer" onclick="navigateTo(\''+navs[i]+'\')"><div style="font-size:22px;margin-bottom:4px">'+esc(p[0].split(' ')[0])+'</div><div style="font-size:13px;font-weight:600">'+esc(p[0].split(' ').slice(1).join(' '))+'</div><div style="font-size:11px;color:#94a3b8">'+esc(p[1])+'</div></div>';}).join('')+'</div></div>';}
-
-  function mountCitely(mc){mc.innerHTML='<div id="citelyContainer"></div>';var pd={};try{if(window.ThesisProject&&ThesisProject.getCurrentProject){var p=ThesisProject.getCurrentProject();if(p){pd.keywords=p.keywords||'';pd.chapters=(p.chapters||[]).map(function(c){return{id:c.id||c.title||c,title:c.title||c};});}}}catch(e){}if(typeof Citely!=='undefined')Citely.mount('citelyContainer',pd);}
-
-  function mountWriting(mc){if(typeof WritingModule!=='undefined'){WritingModule.mount(mc);return;}mc.innerHTML='<div style="max-width:600px;margin:60px auto;text-align:center;color:var(--text-muted,#888)"><div style="font-size:48px;margin-bottom:12px">✍️</div><h3>论文写作</h3><p style="margin-top:8px">请先导入论文或从想法创建大纲</p><button class="ai-btn" style="margin-top:16px" onclick="typeof openImportDialog===\'function\'?openImportDialog(\'new\'):null">📄 导入论文</button></div>';}
-
-  function mountReview(mc){if(typeof ReviewModule!=='undefined'){ReviewModule.mount(mc);return;}mc.innerHTML='<div style="max-width:600px;margin:60px auto;text-align:center;color:var(--text-muted,#888)"><div style="font-size:48px;margin-bottom:12px">🔍</div><h3>论文审阅</h3><p style="margin-top:8px">请先导入论文后使用审阅功能</p></div>';}
-
-  function mountDashboard(mc){var hasText=typeof manuscriptText!=='undefined'&&manuscriptText&&manuscriptText.length>100;if(!hasText){mc.innerHTML='<div style="max-width:600px;margin:60px auto;text-align:center;color:var(--text-muted,#888)"><div style="font-size:48px;margin-bottom:12px">📊</div><h3>论文看板</h3><p style="margin-top:8px">导入论文后可查看综合评估</p></div>';return;}if(typeof showDashboard==='function'){mc.innerHTML='';showDashboard();}else{mc.innerHTML='<div style="max-width:600px;margin:60px auto;text-align:center"><p>看板加载中...</p></div>';}}
-
-  function mountDefense(mc){mc.innerHTML='<div style="max-width:700px;margin:40px auto;padding:20px"><h2 style="font-size:20px;font-weight:700;margin-bottom:20px">🎤 答辩准备</h2><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px"><div class="card" style="cursor:pointer;text-align:center;padding:24px" onclick="typeof window.openDefensePack===\'function\'?window.openDefensePack():null"><div style="font-size:32px;margin-bottom:8px">📊</div><div style="font-size:15px;font-weight:700">答辩PPT</div><div style="font-size:12px;color:var(--text-muted,#888);margin-top:4px">AI 生成答辩大纲与讲稿</div></div><div class="card" style="cursor:pointer;text-align:center;padding:24px" onclick="typeof window.runEnAbstract===\'function\'?navigateTo(\'review\'):null"><div style="font-size:32px;margin-bottom:8px">🌐</div><div style="font-size:15px;font-weight:700">英文摘要</div><div style="font-size:12px;color:var(--text-muted,#888);margin-top:4px">AI 翻译与润色英文摘要</div></div><div class="card" style="cursor:pointer;text-align:center;padding:24px" onclick="navigateTo(\'review\')"><div style="font-size:32px;margin-bottom:8px">🔍</div><div style="font-size:15px;font-weight:700">论文审阅</div><div style="font-size:12px;color:var(--text-muted,#888);margin-top:4px">识别风险与证据缺口</div></div></div></div>';}
-
-  var MOUNTERS={workspace:mountWorkspace,literature:mountCitely,writing:mountWriting,review:mountReview,dashboard:mountDashboard,defense:mountDefense};
-
-  window.navigateTo=function(id){
-    if(!MOUNTERS[id])return;_activeNav=id;
-    document.querySelectorAll('.bar-tab').forEach(function(t){t.classList.toggle('active',t.getAttribute('data-nav')===id);});
-    var mc=document.getElementById('mainContent');if(!mc)return;
-    var tp=document.getElementById('thesisPanel');
-    var rp=document.getElementById('refPanel');
-    if(id==='workspace'){
-      if(tp){tp.style.display='';tp.style.flex='1';}
-      if(rp)rp.style.display='none';
-      if(typeof window.renderWorkspaceHero==='function'){try{window.renderWorkspaceHero()}catch(e){}}
+  // ── 阶段1：立项 ──
+  function mountSetup(mc){
+    var hasProj=window.ThesisProject&&ThesisProject.getCurrentProject&&ThesisProject.getCurrentProject();
+    if(hasProj){
+      mc.innerHTML='<div style="display:flex;flex:1;overflow:hidden"><div id="workspaceContent" class="workspace-content" style="flex:1"></div></div>';
+      setTimeout(function(){if(typeof window.renderWorkspaceHero==='function')try{window.renderWorkspaceHero()}catch(e){}},50);
       return;
     }
-    if(tp)tp.style.display='none';
-    if(rp)rp.style.display='none';
-    mc.innerHTML='<div style="flex:1;overflow:auto;min-height:0" id="tbModuleRoot"></div>';
-    var root=document.getElementById('tbModuleRoot');
-    if(root&&MOUNTERS[id])MOUNTERS[id](root);
+    mc.innerHTML='<div style="max-width:560px;margin:80px auto;text-align:center;padding:0 20px">'+
+      '<div style="font-size:56px;margin-bottom:16px">🎓</div>'+
+      '<h2 style="font-size:22px;font-weight:700;margin-bottom:4px">论文搭子 ThesisBuddy</h2>'+
+      '<p style="color:#94a3b8;font-size:14px;margin-bottom:40px">AI 论文全流程工作台 — 从想法到答辩通关</p>'+
+      '<div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:48px">'+
+        '<div onclick="typeof openIdeaWizard===\'function\'&&openIdeaWizard()" style="flex:1;min-width:200px;max-width:260px;padding:28px 20px;background:#fff;border:2px solid #4f46e5;border-radius:16px;cursor:pointer;transition:all .15s" onmouseenter="this.style.boxShadow=\'0 8px 30px rgba(79,70,229,.15)\'" onmouseleave="this.style.boxShadow=\'none\'">'+
+          '<div style="font-size:36px;margin-bottom:12px">💡</div>'+
+          '<div style="font-size:16px;font-weight:700;color:#111;margin-bottom:4px">从想法开始</div>'+
+          '<div style="font-size:12px;color:#94a3b8">选题 → 大纲 → 分章写作</div>'+
+        '</div>'+
+        '<div onclick="typeof openImportDialog===\'function\'?openImportDialog(\'new\'):null" style="flex:1;min-width:200px;max-width:260px;padding:28px 20px;background:#fff;border:2px solid #e2e8f0;border-radius:16px;cursor:pointer;transition:all .15s" onmouseenter="this.style.borderColor=\'#4f46e5\';this.style.boxShadow=\'0 8px 30px rgba(79,70,229,.1)\'" onmouseleave="this.style.borderColor=\'#e2e8f0\';this.style.boxShadow=\'none\'">'+
+          '<div style="font-size:36px;margin-bottom:12px">📄</div>'+
+          '<div style="font-size:16px;font-weight:700;color:#111;margin-bottom:4px">导入论文</div>'+
+          '<div style="font-size:12px;color:#94a3b8">解析 DOCX → 审阅 → 导出</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">'+
+        [{i:'🎯',t:'想清楚',d:'选题打磨'},{i:'📚',t:'找资料',d:'文献检索'},{i:'🧭',t:'搭结构',d:'开题大纲'},{i:'✍️',t:'写出来',d:'章节扩写'},{i:'🎤',t:'答辩',d:'PPT+摘要'}].map(function(s){return'<div style="padding:12px 8px;text-align:center;background:#fff;border:1px solid #f1f5f9;border-radius:10px"><div style="font-size:20px;margin-bottom:2px">'+s.i+'</div><div style="font-size:12px;font-weight:600">'+s.t+'</div><div style="font-size:10px;color:#94a3b8">'+s.d+'</div></div>';}).join('')+
+      '</div>'+
+    '</div>';
+  }
+
+  // ── 阶段2：文献 ──
+  function mountLit(mc){
+    mc.innerHTML='<div id="citelyContainer" style="height:100%;display:flex;flex-direction:column"></div>';
+    var pd={};
+    try{var p=window.ThesisProject&&ThesisProject.getCurrentProject?ThesisProject.getCurrentProject():null;if(p){pd.keywords=p.keywords||'';pd.chapters=(p.chapters||[]).map(function(c){return{id:c.id||c.title||c,title:c.title||c};});}}catch(e){}
+    if(typeof Citely!=='undefined'){setTimeout(function(){Citely.mount('citelyContainer',pd);},50);}
+    else{mc.innerHTML='<div style="max-width:500px;margin:80px auto;text-align:center;color:#94a3b8"><div style="font-size:48px;margin-bottom:12px">📚</div><p>文献模块加载中...</p></div>';}
+  }
+
+  // ── 阶段3：写作 ──
+  function mountWrite(mc){
+    if(typeof WritingModule!=='undefined'){WritingModule.mount(mc);return;}
+    var hasText=typeof manuscriptText!=='undefined'&&manuscriptText&&manuscriptText.length>100;
+    if(hasText && typeof window.openChapterBoard==='function'){mc.innerHTML='';window.openChapterBoard();return;}
+    mc.innerHTML='<div style="max-width:500px;margin:80px auto;text-align:center;color:#94a3b8">'+
+      '<div style="font-size:48px;margin-bottom:12px">✍️</div><h3 style="color:#111;margin-bottom:8px">论文写作</h3>'+
+      '<p>请先在「立项」中导入论文或从想法创建大纲</p>'+
+      '<button class="bar-mini" style="margin-top:16px;padding:8px 20px;border:1px solid #d1d5db;border-radius:10px;background:#fff;cursor:pointer;font-size:13px;font-weight:600" onclick="navigateTo(\'setup\')">→ 去立项</button>'+
+    '</div>';
+  }
+
+  // ── 阶段4：审阅 ──
+  function mountReview(mc){
+    if(typeof ReviewModule!=='undefined'){ReviewModule.mount(mc);return;}
+    var hasText=typeof manuscriptText!=='undefined'&&manuscriptText&&manuscriptText.length>100;
+    if(hasText && typeof window.runFormatCheck==='function'){
+      mc.innerHTML='<div style="padding:20px;height:100%;overflow:auto"><div id="reviewInline"></div></div>';
+      setTimeout(function(){var c=document.getElementById('reviewInline');if(c&&window.runFormatCheck)runFormatCheck(c);},50);
+      return;
+    }
+    mc.innerHTML='<div style="max-width:500px;margin:80px auto;text-align:center;color:#94a3b8">'+
+      '<div style="font-size:48px;margin-bottom:12px">🔍</div><h3 style="color:#111;margin-bottom:8px">论文审阅</h3>'+
+      '<p>导入论文后可进行格式检查、查错、术语分析等</p></div>';
+  }
+
+  // ── 阶段5：答辩 ──
+  function mountDefense(mc){
+    mc.innerHTML='<div style="max-width:800px;margin:40px auto;padding:20px">'+
+      '<h2 style="font-size:20px;font-weight:700;margin-bottom:24px;color:#111">🎤 答辩准备</h2>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px">'+
+        '<div class="card" style="cursor:pointer;text-align:center;padding:28px 20px" onclick="typeof showDashboard===\'function\'?showDashboard():null">'+
+          '<div style="font-size:36px;margin-bottom:10px">📊</div><div style="font-size:15px;font-weight:700;color:#111">论文看板</div>'+
+          '<div style="font-size:12px;color:#94a3b8;margin-top:4px">综合评分 · 雷达图 · 行动清单</div></div>'+
+        '<div class="card" style="cursor:pointer;text-align:center;padding:28px 20px" onclick="typeof window.openDefensePack===\'function\'?window.openDefensePack():null">'+
+          '<div style="font-size:36px;margin-bottom:10px">📊</div><div style="font-size:15px;font-weight:700;color:#111">答辩PPT</div>'+
+          '<div style="font-size:12px;color:#94a3b8;margin-top:4px">AI 生成答辩大纲与讲稿</div></div>'+
+        '<div class="card" style="cursor:pointer;text-align:center;padding:28px 20px" onclick="typeof window.runEnAbstract===\'function\'?navigateTo(\'review\'):null">'+
+          '<div style="font-size:36px;margin-bottom:10px">🌐</div><div style="font-size:15px;font-weight:700;color:#111">英文摘要</div>'+
+          '<div style="font-size:12px;color:#94a3b8;margin-top:4px">AI 翻译与润色</div></div>'+
+        '<div class="card" style="cursor:pointer;text-align:center;padding:28px 20px" onclick="if(typeof window.exportFullPaper===\'function\')window.exportFullPaper();">'+
+          '<div style="font-size:36px;margin-bottom:10px">📄</div><div style="font-size:15px;font-weight:700;color:#111">导出论文</div>'+
+          '<div style="font-size:12px;color:#94a3b8;margin-top:4px">DOCX · PDF · TXT</div></div>'+
+      '</div></div>';
+  }
+
+  var MOUNTERS={setup:mountSetup,literature:mountLit,writing:mountWrite,review:mountReview,defense:mountDefense};
+
+  window.navigateTo=function(id){
+    if(!MOUNTERS[id])return;_phase=id;
+    document.querySelectorAll('.bar-tab').forEach(function(t){t.classList.toggle('active',t.getAttribute('data-nav')===id);});
+    var mc=el('mainContent');if(!mc)return;
+    // Hide panels, show module full-width
+    var tp=el('thesisPanel'), rp=el('refPanel');
+    if(id==='setup'){
+      if(tp)tp.style.display='';if(rp)rp.style.display='none';
+      MOUNTERS[id](mc);return;
+    }
+    if(tp)tp.style.display='none';if(rp)rp.style.display='none';
+    mc.innerHTML='';MOUNTERS[id](mc);
     try{history.pushState({nav:id},'','#/'+id)}catch(e){}
   };
 
   window.addEventListener('popstate',function(e){if(e.state&&e.state.nav)navigateTo(e.state.nav);});
 
-  var _oldSwitchView=window.switchView;
-  window.switchView=function(v){var map={workspace:'workspace',refs:'literature',tools:'workspace',dashboard:'dashboard'};if(map[v]){navigateTo(map[v]);return;}if(_oldSwitchView)_oldSwitchView(v);};
-  var _oldSwitchModule=window.switchModule;
-  window.switchModule=function(m){var map={references:'literature',dashboard:'dashboard'};if(map[m]){navigateTo(map[m]);return;}if(_oldSwitchModule)_oldSwitchModule(m);};
+  // Backward compat
+  var _sw=window.switchView;window.switchView=function(v){var m={workspace:'setup',refs:'literature',tools:'setup',dashboard:'defense'};if(m[v]){navigateTo(m[v]);return;}if(_sw)_sw(v);};
+  var _sm=window.switchModule;window.switchModule=function(m){var map={references:'literature',dashboard:'defense'};if(map[m]){navigateTo(map[m]);return;}if(_sm)_sm(m);};
 })();
 </script>
 <!-- ====== 更新日志按钮 ====== -->
@@ -208,26 +274,10 @@
   <!-- 左侧导航轨 -->
   <div class="nav-sidebar" id="navSidebar">
     <div class="nav-brand-mini">ThesisBuddy</div>
-    <div class="nav-upload" id="navUpload">
-      <button onclick="openIdeaWizard()" class="nav-upload-btn primary">💡 从想法开始</button>
-      <button onclick="openImportDialog('new')" class="nav-upload-btn">📎 导入论文</button>
-    </div>
-
-    <div class="nav-section-label">主线进度</div>
+    <div class="nav-section-label">阶段</div>
     <div id="stageNav" class="stage-nav"></div>
 
-    <div class="nav-section-label">百宝箱
-      <button class="nav-mini-btn" onclick="openToolboxPicker()" title="自定义快捷入口">⚙</button>
-    </div>
-    <div id="toolboxFavorites" class="toolbox-favs"></div>
-    <button class="nav-linkish" onclick="openToolboxPicker()">＋ 添加快捷功能</button>
-    <button class="nav-linkish" onclick="openMaterialsLibrary()">📁 项目资料库</button>
-    <button class="nav-linkish" onclick="openFeatureCatalog()">☰ 全部功能目录</button>
-
-    <!-- 目录树（在导航轨内折叠显示） -->
-    <div class="nav-section-label" style="margin-top:12px">📑 目录树
-      <button class="nav-mini-btn" onclick="toggleTocPanel()" title="折叠/展开">‹</button>
-    </div>
+    <div class="nav-section-label" style="margin-top:8px">目录</div>
     <div class="toc-panel" id="tocPanel">
       <div class="toc-panel-head">
         <div class="toc-panel-sub" id="navTreeMeta">论文生长过程中会逐步出现章节</div>
@@ -494,17 +544,6 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <script defer src="js/modules/account/account.js?v=70"></script>
 <script defer src="js/modules/account/notifications.js?v=70"></script>
 <script defer src="js/modules/paper-import.js?v=70"></script>
-
-<!-- ====== Citely 文献模块（替代旧文献模块） ====== -->
-<link rel="stylesheet" href="css/citely.css?v=70">
-<script defer src="js/modules/citely.js?v=70"></script>
-
-<!-- ====== 审阅模块 ====== -->
-<link rel="stylesheet" href="css/modules/review.css?v=70">
-<script defer src="js/modules/review/review.js?v=70"></script>
-
-<!-- ====== 写作模块 ====== -->
-<script defer src="js/modules/writing/writing.js?v=70"></script>
 
 <!-- ====== 旧模块（逐步废弃中） ====== -->
 <script defer src="js/modules/optimization.js?v=65"></script>
