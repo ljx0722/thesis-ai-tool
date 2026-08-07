@@ -111,10 +111,12 @@
     <span id="projectProgressChip" class="project-progress-chip">创建项目后显示进度</span>
   </div>
   <div class="bar-tabs" id="barTabs">
-    <button class="bar-tab active" data-view="workspace" onclick="switchView('workspace')">总览</button>
-    <button class="bar-tab" data-view="refs" onclick="switchModule('references')">📚 参考文献</button>
-    <button class="bar-tab" data-view="tools" onclick="openToolHome()">工具台</button>
-    <button class="bar-tab" data-view="dashboard" onclick="showDashboard()">看板</button>
+    <button class="bar-tab active" data-nav="workspace" onclick="navigateTo('workspace')">总览</button>
+    <button class="bar-tab" data-nav="literature" onclick="navigateTo('literature')">📚 文献</button>
+    <button class="bar-tab" data-nav="writing" onclick="navigateTo('writing')">✍️ 写作</button>
+    <button class="bar-tab" data-nav="review" onclick="navigateTo('review')">🔍 审阅</button>
+    <button class="bar-tab" data-nav="dashboard" onclick="navigateTo('dashboard')">📊 看板</button>
+    <button class="bar-tab" data-nav="defense" onclick="navigateTo('defense')">🎤 答辩</button>
   </div>
   <div class="bar-right">
     <button class="workspace-drawer-btn" onclick="toggleToolPanel()" title="打开工具台">工具</button>
@@ -126,6 +128,54 @@
     
   </div>
 </div>
+<!-- ====== 大模块导航路由 ====== -->
+<script id="bigModuleRouter">
+(function(){
+  var _activeNav = 'workspace';
+  function esc(s){return String(s||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]});}
+
+  function mountWorkspace(mc){mc.innerHTML='<div style="max-width:700px;margin:40px auto;padding:20px"><div style="text-align:center;margin-bottom:32px"><div style="font-size:48px;margin-bottom:8px">🎓</div><h2 style="font-size:20px;font-weight:700;margin-bottom:4px">论文搭子 ThesisBuddy</h2><p style="color:var(--text-muted,#888);font-size:13px">AI 论文全流程工作台 — 七个阶段，一条主线</p></div><div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:32px"><button class="nav-upload-btn primary" onclick="typeof openIdeaWizard===\'function\'&&openIdeaWizard()" style="padding:14px 28px;font-size:15px;border:none;border-radius:12px;cursor:pointer;font-weight:700">💡 从想法开始</button><button class="nav-upload-btn" onclick="typeof openImportDialog===\'function\'?openImportDialog(\'new\'):null" style="padding:14px 28px;font-size:15px;border:1px solid #d1d5db;border-radius:12px;cursor:pointer;font-weight:700;background:#fff">📄 导入论文</button></div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'+['🎯 想清楚|选题打磨','📚 找资料|文献检索','🧭 搭结构|开题大纲','✍️ 写出来|章节扩写','🔍 改得好|格式审阅','📊 过评审|论文看板','🎤 做答辩|PPT+摘要','🕸️ 知识图谱|概念分析'].map(function(s,i){var p=s.split('|');var navs=['workspace','literature','writing','writing','review','dashboard','defense','literature'];return'<div style="padding:14px 10px;text-align:center;background:#fff;border:1px solid #e5e7eb;border-radius:10px;cursor:pointer" onclick="navigateTo(\''+navs[i]+'\')"><div style="font-size:22px;margin-bottom:4px">'+esc(p[0].split(' ')[0])+'</div><div style="font-size:13px;font-weight:600">'+esc(p[0].split(' ').slice(1).join(' '))+'</div><div style="font-size:11px;color:#94a3b8">'+esc(p[1])+'</div></div>';}).join('')+'</div></div>';}
+
+  function mountCitely(mc){mc.innerHTML='<div id="citelyContainer"></div>';var pd={};try{if(window.ThesisProject&&ThesisProject.getCurrentProject){var p=ThesisProject.getCurrentProject();if(p){pd.keywords=p.keywords||'';pd.chapters=(p.chapters||[]).map(function(c){return{id:c.id||c.title||c,title:c.title||c};});}}}catch(e){}if(typeof Citely!=='undefined')Citely.mount('citelyContainer',pd);}
+
+  function mountWriting(mc){if(typeof WritingModule!=='undefined'){WritingModule.mount(mc);return;}mc.innerHTML='<div style="max-width:600px;margin:60px auto;text-align:center;color:var(--text-muted,#888)"><div style="font-size:48px;margin-bottom:12px">✍️</div><h3>论文写作</h3><p style="margin-top:8px">请先导入论文或从想法创建大纲</p><button class="ai-btn" style="margin-top:16px" onclick="typeof openImportDialog===\'function\'?openImportDialog(\'new\'):null">📄 导入论文</button></div>';}
+
+  function mountReview(mc){if(typeof ReviewModule!=='undefined'){ReviewModule.mount(mc);return;}mc.innerHTML='<div style="max-width:600px;margin:60px auto;text-align:center;color:var(--text-muted,#888)"><div style="font-size:48px;margin-bottom:12px">🔍</div><h3>论文审阅</h3><p style="margin-top:8px">请先导入论文后使用审阅功能</p></div>';}
+
+  function mountDashboard(mc){var hasText=typeof manuscriptText!=='undefined'&&manuscriptText&&manuscriptText.length>100;if(!hasText){mc.innerHTML='<div style="max-width:600px;margin:60px auto;text-align:center;color:var(--text-muted,#888)"><div style="font-size:48px;margin-bottom:12px">📊</div><h3>论文看板</h3><p style="margin-top:8px">导入论文后可查看综合评估</p></div>';return;}if(typeof showDashboard==='function'){mc.innerHTML='';showDashboard();}else{mc.innerHTML='<div style="max-width:600px;margin:60px auto;text-align:center"><p>看板加载中...</p></div>';}}
+
+  function mountDefense(mc){mc.innerHTML='<div style="max-width:700px;margin:40px auto;padding:20px"><h2 style="font-size:20px;font-weight:700;margin-bottom:20px">🎤 答辩准备</h2><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px"><div class="card" style="cursor:pointer;text-align:center;padding:24px" onclick="typeof window.openDefensePack===\'function\'?window.openDefensePack():null"><div style="font-size:32px;margin-bottom:8px">📊</div><div style="font-size:15px;font-weight:700">答辩PPT</div><div style="font-size:12px;color:var(--text-muted,#888);margin-top:4px">AI 生成答辩大纲与讲稿</div></div><div class="card" style="cursor:pointer;text-align:center;padding:24px" onclick="typeof window.runEnAbstract===\'function\'?navigateTo(\'review\'):null"><div style="font-size:32px;margin-bottom:8px">🌐</div><div style="font-size:15px;font-weight:700">英文摘要</div><div style="font-size:12px;color:var(--text-muted,#888);margin-top:4px">AI 翻译与润色英文摘要</div></div><div class="card" style="cursor:pointer;text-align:center;padding:24px" onclick="navigateTo(\'review\')"><div style="font-size:32px;margin-bottom:8px">🔍</div><div style="font-size:15px;font-weight:700">论文审阅</div><div style="font-size:12px;color:var(--text-muted,#888);margin-top:4px">识别风险与证据缺口</div></div></div></div>';}
+
+  var MOUNTERS={workspace:mountWorkspace,literature:mountCitely,writing:mountWriting,review:mountReview,dashboard:mountDashboard,defense:mountDefense};
+
+  window.navigateTo=function(id){
+    if(!MOUNTERS[id])return;_activeNav=id;
+    document.querySelectorAll('.bar-tab').forEach(function(t){t.classList.toggle('active',t.getAttribute('data-nav')===id);});
+    var mc=document.getElementById('mainContent');if(!mc)return;
+    var tp=document.getElementById('thesisPanel');
+    var rp=document.getElementById('refPanel');
+    if(id==='workspace'){
+      if(tp){tp.style.display='';tp.style.flex='1';}
+      if(rp)rp.style.display='none';
+      if(typeof window.renderWorkspaceHero==='function'){try{window.renderWorkspaceHero()}catch(e){}}
+      return;
+    }
+    if(tp)tp.style.display='none';
+    if(rp)rp.style.display='none';
+    mc.innerHTML='<div style="flex:1;overflow:auto;min-height:0" id="tbModuleRoot"></div>';
+    var root=document.getElementById('tbModuleRoot');
+    if(root&&MOUNTERS[id])MOUNTERS[id](root);
+    try{history.pushState({nav:id},'','#/'+id)}catch(e){}
+  };
+
+  window.addEventListener('popstate',function(e){if(e.state&&e.state.nav)navigateTo(e.state.nav);});
+
+  var _oldSwitchView=window.switchView;
+  window.switchView=function(v){var map={workspace:'workspace',refs:'literature',tools:'workspace',dashboard:'dashboard'};if(map[v]){navigateTo(map[v]);return;}if(_oldSwitchView)_oldSwitchView(v);};
+  var _oldSwitchModule=window.switchModule;
+  window.switchModule=function(m){var map={references:'literature',dashboard:'dashboard'};if(map[m]){navigateTo(map[m]);return;}if(_oldSwitchModule)_oldSwitchModule(m);};
+})();
+</script>
 <!-- ====== 更新日志按钮 ====== -->
 <div id="changelogBtn" onclick="toggleChangelog()" title="更新日志" style="display:none;position:fixed;top:52px;right:12px;z-index:1000;font-size:.62rem;color:#0071e3;cursor:pointer;background:rgba(0,113,227,.08);padding:3px 10px;border-radius:12px;border:1px solid rgba(0,113,227,.2);transition:all .2s;font-weight:600" onmouseenter="this.style.background='rgba(0,113,227,.15)'" onmouseleave="this.style.background='rgba(0,113,227,.08)'">📜 更新日志</div>
 <div id="changelogPanel" style="display:none;position:fixed;top:88px;right:12px;width:340px;max-height:70vh;overflow-y:auto;background:#fff;border-radius:12px;padding:16px;box-shadow:0 8px 40px rgba(0,0,0,.15);z-index:1001;font-size:.68rem;line-height:1.7;color:#333;border:1px solid #e5e7eb">
@@ -473,6 +523,15 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <!-- literature-workbench.js + literature-search-modal.js 由 Citely 替代，保留作为回退 -->
 <script defer src="js/modules/literature-workbench.js?v=67"></script>
 <script defer src="js/modules/literature-search-modal.js?v=67"></script>
+
+<!-- ====== 新大模块（Citely 文献 + 审阅 + 写作） ====== -->
+<link rel="stylesheet" href="css/citely.css?v=80">
+<link rel="stylesheet" href="css/modules/review.css?v=80">
+<link rel="stylesheet" href="css/modules/writing.css?v=80">
+<script defer src="js/modules/citely.js?v=80"></script>
+<script defer src="js/modules/review/review.js?v=80"></script>
+<script defer src="js/modules/writing/writing.js?v=80"></script>
+
 <script defer src="js/app-modules.js?v=66"></script>
 
 <!-- ====== Shell 初始化（最后执行） ====== -->
