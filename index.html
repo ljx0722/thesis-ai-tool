@@ -429,8 +429,8 @@
     </div>
   </div>
 </div>
-<input type="file" id="fileInput" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none">
-    <script>window._pendingFile=null;window._importIntent='new';window.openImportDialog=function(intent){window._importIntent=intent||'new';if(typeof showUploadOverlay==='function')showUploadOverlay();else document.getElementById('uploadOverlay').classList.add('show');};window.triggerUpload=function(){window.openImportDialog('new');};</script>
+<input type="file" id="fileInput" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="var f=this.files[0];if(f&&typeof beginImportFile==='function'){beginImportFile(f,window._importIntent||'new').catch(function(e){console.error(e)})}">
+    <script>window._pendingFile=null;window._importIntent='new';window.openImportDialog=function(intent){window._importIntent=intent||'new';var el=document.getElementById('uploadOverlay');if(el){el.classList.add('show');el.style.display='flex'}};window.triggerUpload=function(){window.openImportDialog('new');};if(window.location.protocol==='file:'){document.getElementById('appShell').innerHTML='<div style="text-align:center;padding:100px 20px"><b>请通过 HTTP 访问</b><br><button onclick="window.open(\'http://localhost:5000/\',\'_self\')" style="font-size:1rem;padding:10px 30px;background:#0071e3;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;margin-top:16px">一键跳转 HTTP</button></div>';}</script>
 
 <!-- ====== 上传弹窗 ====== -->
 <div class="upload-overlay" id="uploadOverlay">
