@@ -297,38 +297,38 @@
     var FEATURE_TREE = [
       { id:'ideation', icon:'📋', label:'立项',
         children:[
-          { id:'topic-finder', icon:'💡', label:'选题推荐', action:'switchModule("topic-finder")', tab:'workspace' },
-          { id:'proposal', icon:'📝', label:'开题大纲', action:'switchModule("proposal")', tab:'workspace' },
+          { id:'topic-finder', icon:'💡', label:'选题推荐', tab:'workspace' },
+          { id:'proposal', icon:'📝', label:'开题大纲', tab:'workspace' },
         ]},
       { id:'literature', icon:'📚', label:'文献',
         children:[
-          { id:'references', icon:'📋', label:'参考文献工作台', action:'switchModule("references")', tab:'refs' },
-          { id:'citely', icon:'🔍', label:'智能文献检索', action:'_openCitely()', tab:'refs' },
-          { id:'knowledge-graph', icon:'🕸️', label:'知识图谱', action:'showKnowledgeGraph()', tab:'refs' },
+          { id:'references', icon:'📋', label:'参考文献工作台', tab:'refs' },
+          { id:'citely', icon:'🔍', label:'智能文献检索', tab:'refs' },
+          { id:'knowledge-graph', icon:'🕸️', label:'知识图谱', tab:'refs' },
         ]},
       { id:'writing', icon:'✍️', label:'写作',
         children:[
-          { id:'writing-workbench', icon:'📝', label:'写作工作台', action:'_openWriting()', tab:'writing' },
-          { id:'chapter-board', icon:'📋', label:'分章草稿', action:'openChapterBoard()', tab:'writing' },
-          { id:'expand', icon:'✏️', label:'AI扩写', action:'switchModule("expand")', tab:'writing' },
-          { id:'data-analysis', icon:'📈', label:'数据分析', action:'switchModule("data-analysis")', tab:'writing' },
-          { id:'outline', icon:'📑', label:'大纲编辑', action:'openOutlineEditor()', tab:'writing' },
+          { id:'writing-workbench', icon:'📝', label:'写作工作台', tab:'writing' },
+          { id:'chapter-board', icon:'📋', label:'分章草稿', tab:'writing' },
+          { id:'expand', icon:'✏️', label:'AI扩写', tab:'writing' },
+          { id:'data-analysis', icon:'📈', label:'数据分析', tab:'writing' },
+          { id:'outline', icon:'📑', label:'大纲编辑', tab:'writing' },
         ]},
       { id:'polish', icon:'🔍', label:'审阅打磨',
         children:[
-          { id:'format-check', icon:'✅', label:'格式检查', action:'switchModule("format-check")', needsThesis:true, tab:'review' },
-          { id:'proofread', icon:'✏️', label:'论文查错', action:'switchModule("proofread")', tab:'review' },
-          { id:'terminology', icon:'🔤', label:'术语分析', action:'switchModule("terminology")', needsThesis:true, tab:'review' },
-          { id:'paragraph', icon:'📝', label:'段落分析', action:'switchModule("paragraph")', needsThesis:true, tab:'review' },
-          { id:'de-duplicate', icon:'📋', label:'查重降重', action:'switchModule("de-duplicate")', tab:'review' },
-          { id:'review', icon:'🔍', label:'综合审阅', action:'switchModule("review")', needsThesis:true, tab:'review' },
-          { id:'optimization', icon:'💡', label:'优化建议', action:'switchModule("optimization")', needsThesis:true, tab:'review' },
+          { id:'format-check', icon:'✅', label:'格式检查', tab:'review' },
+          { id:'proofread', icon:'✏️', label:'论文查错', tab:'review' },
+          { id:'terminology', icon:'🔤', label:'术语分析', tab:'review' },
+          { id:'paragraph', icon:'📝', label:'段落分析', tab:'review' },
+          { id:'de-duplicate', icon:'📋', label:'查重降重', tab:'review' },
+          { id:'review', icon:'🔍', label:'综合审阅', tab:'review' },
+          { id:'optimization', icon:'💡', label:'优化建议', tab:'review' },
         ]},
       { id:'defense', icon:'🎤', label:'答辩',
         children:[
-          { id:'dashboard', icon:'📊', label:'论文看板', action:'showDashboard()', tab:'dashboard' },
-          { id:'defense-ppt', icon:'📊', label:'答辩PPT', action:'switchModule("defense-ppt")', tab:'dashboard' },
-          { id:'en-abstract', icon:'🌐', label:'英文摘要', action:'switchModule("en-abstract")', tab:'dashboard' },
+          { id:'dashboard', icon:'📊', label:'论文看板', tab:'dashboard' },
+          { id:'defense-ppt', icon:'📊', label:'答辩PPT', tab:'dashboard' },
+          { id:'en-abstract', icon:'🌐', label:'英文摘要', tab:'dashboard' },
         ]},
     ];
 
@@ -345,14 +345,12 @@
           '</div>'+
           '<div class="ft-children" id="ft-children-'+node.id+'">';
         (node.children||[]).forEach(function(ch){
-          var cls = ch.needsThesis ? ' ft-disabled' : '';
           var moduleId = ch.id;
           var tabName = ch.tab || 'workspace';
           var onClick = ' onclick="_open(\''+moduleId+'\',\''+tabName+'\')"';
-          h += '<div class="ft-leaf'+cls+'"'+onClick+'>'+
+          h += '<div class="ft-leaf"'+onClick+'>'+
             '<span class="ft-icon">'+ch.icon+'</span>'+
             '<span class="ft-label">'+esc(ch.label)+'</span>'+
-            (ch.needsThesis ? '<span class="ft-badge">需论文</span>' : '')+
           '</div>';
         });
         h += '</div></div>';
