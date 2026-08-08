@@ -112,10 +112,7 @@
   </div>
   <div class="bar-tabs" id="barTabs">
     <button class="bar-tab active" data-view="workspace" onclick="switchView('workspace');_restoreWorkspace()">工作台</button>
-    <button class="bar-tab" data-view="refs" onclick="switchModule('references')">文献</button>
-    <button class="bar-tab" data-view="writing" onclick="_openWriting()">写作</button>
-    <button class="bar-tab" data-view="review" onclick="switchModule('review')">审阅</button>
-    <button class="bar-tab" data-view="dashboard" onclick="showDashboard()">答辩</button>
+    <button class="bar-tab" data-view="dashboard" onclick="showDashboard()">看板</button>
   </div>
   <div class="bar-right">
     <button class="workspace-drawer-btn" onclick="toggleToolPanel()" title="打开工具台">工具</button>
@@ -158,10 +155,9 @@
 <div class="main" id="mainLayout">
   <!-- 第1栏：功能树 -->
   <div class="nav-sidebar" id="navSidebar">
-    <div class="nav-section">进度</div>
-    <div id="stageNav" class="stage-nav" style="max-height:90px;overflow-y:auto;flex-shrink:0;padding:0 8px"></div>
     <div class="nav-section">功能</div>
     <div id="navFeatureTree" class="nav-feature-tree"></div>
+    <div id="stageNav" style="display:none"></div>
     <div class="nav-section">快捷</div>
     <div class="nav-quick-actions">
       <button onclick="_restoreWorkspace()" class="nav-quick-btn">🏠 回到工作台</button>
