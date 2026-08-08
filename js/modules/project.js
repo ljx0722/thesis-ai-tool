@@ -1956,6 +1956,7 @@
     onManuscriptReady: onManuscriptReady,
     renderProjectChrome: renderProjectChrome,
     renderWorkspaceHero: renderWorkspaceHero,
+    renderStageNav: renderStageNav,
     saveOutline: saveOutline,
     getOutline: getOutline,
     logSkillRun: logSkillRun,

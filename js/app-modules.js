@@ -813,13 +813,27 @@ function jumpToSection(elementId, chapterLabel) {
 function updateStatusBar2() {
   var sb = document.getElementById('statusBar');
   if (!sb) return;
+  var hasProj = window.ThesisProject && ThesisProject.getCurrentProject && ThesisProject.getCurrentProject();
   var refCount = 0;
   if (typeof mergedRefs !== 'undefined' && mergedRefs.length) refCount = mergedRefs.length;
   else if (typeof existingRefs !== 'undefined' && existingRefs.length) refCount = existingRefs.length;
-  if (_thesisLoaded && refCount > 0) { var chCount = (typeof sections !== 'undefined' && sections) ? sections.length : 0; sb.textContent = chCount + '章 | ' + refCount + '条文献'; }
-  else if (_thesisLoaded) sb.textContent = '';
-  else sb.textContent = '等待上传论文…';
+  if (_thesisLoaded) {
+    var chCount = (typeof sections !== 'undefined' && sections) ? sections.filter(function(s){return s.title;}).length : 0;
+    var wordCount = typeof manuscriptText !== 'undefined' && manuscriptText ? Math.round(manuscriptText.length/1000) : 0;
+    sb.textContent = '📄 ' + chCount + '章 · ' + wordCount + 'k字 · ' + refCount + '条文献';
+    sb.style.color = 'rgba(255,255,255,.65)';
+  } else if (hasProj) {
+    sb.textContent = '📋 论文未导入';
+    sb.style.color = 'rgba(255,255,255,.4)';
+  } else {
+    sb.textContent = '📎 导入论文开始';
+    sb.style.color = 'rgba(255,255,255,.35)';
+  }
   updateNavStates();
+  // Also update stage nav in sidebar
+  if (window.ThesisProject && typeof ThesisProject.renderStageNav === 'function') {
+    try { ThesisProject.renderStageNav(); } catch(e) {}
+  }
 }
 
 function onThesisLoaded(options) {
