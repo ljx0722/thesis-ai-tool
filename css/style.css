@@ -2615,7 +2615,7 @@ body.dark #changelogPanel, body:not(.light) #changelogPanel { background: var(--
 .toc-panel .nav-tree{ flex:1; min-height:0; max-height:none; overflow-y:auto; border:none; padding:8px; }
 .thesis-panel{ flex:1 1 auto; min-width:280px; }
 .tool-panel, .ref-panel{
-  width:var(--tool-panel-width); min-width:280px; max-width:520px; flex:0 0 var(--tool-panel-width);
+  flex:1 1 auto; min-width:280px;
   display:flex; flex-direction:column; min-height:0; overflow:hidden;
   background:var(--bg-card); border-left:1px solid var(--border);
 }
@@ -2692,10 +2692,10 @@ body.dark #changelogPanel, body:not(.light) #changelogPanel { background: var(--
 .materials-pick select{ width:100%; margin:6px 0; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg-input); color:var(--text-primary); }
 @media (max-width: 1100px){
   .toc-panel{ width:180px; }
-  .tool-panel, .ref-panel{ width:min(320px, 34vw); min-width:0; }
+  .tool-panel, .ref-panel{ flex:1 1 auto; min-width:0; }
 }
 @media (max-width: 900px){
-  .tool-panel, .ref-panel{ width:min(300px, 40vw); }
+  .tool-panel, .ref-panel{ flex:1 1 auto; }
   .ai-input-row{ flex-direction:column; }
   .ai-input-row .ai-btn, .ai-input-row .ai-btn-clear{ width:100%; }
 }

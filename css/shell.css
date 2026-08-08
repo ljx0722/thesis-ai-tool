@@ -58,9 +58,6 @@
 
 /* Main content area — fills all remaining width (col 3) */
 .main-content { flex:1; overflow-y:auto; overflow-x:hidden; background:var(--bg-body); min-width:0; }
-/* Override style.css fixed widths so panels fill the available space */
-.main-content .thesis-panel { flex:1 1 auto !important; min-width:0 !important; width:auto !important; }
-.main-content .ref-panel { flex:1 1 auto !important; width:auto !important; min-width:0 !important; max-width:none !important; }
 
 /* Status bar */
 .status-bar {
