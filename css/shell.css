@@ -1,33 +1,4 @@
-/* ====== ThesisBuddy Design Tokens ====== */
-:root {
-  --accent: #4f46e5;
-  --accent-light: #6366f1;
-  --accent-bg: rgba(79,70,229,.06);
-  --bg-body: #f8fafc;
-  --bg-surface: #fff;
-  --bg-hover: #f1f5f9;
-  --border: #e2e8f0;
-  --border-light: #f1f5f9;
-  --text: #111827;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  --text-inverse: #fff;
-  --green: #10b981;
-  --red: #ef4444;
-  --amber: #f59e0b;
-  --radius-sm: 6px;
-  --radius: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,.06);
-  --shadow: 0 4px 16px rgba(0,0,0,.08);
-  --shadow-lg: 0 12px 40px rgba(0,0,0,.12);
-  --topbar-h: 48px;
-  --nav-w: 200px;
-  --font-mono: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-}
-
-/* ====== Shell Layout ====== */
+/* ====== ThesisBuddy Shell Layout ====== */
 .app-shell { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
 
 /* Top Bar */
@@ -43,8 +14,6 @@
 .bar-left h1 span { font-weight:400; opacity:.5; font-size:11px; }
 .bar-center { display:flex; align-items:center; gap:2px; }
 .bar-right { display:flex; align-items:center; gap:6px; flex-shrink:0; }
-
-/* Bar tabs */
 .bar-tab {
   padding:6px 14px; border:none; border-radius:8px; background:transparent;
   color:rgba(255,255,255,.55); font-size:13px; font-weight:600; cursor:pointer;
@@ -52,15 +21,13 @@
 }
 .bar-tab:hover { color:rgba(255,255,255,.85); background:rgba(255,255,255,.06); }
 .bar-tab.active { color:#fff; background:var(--accent); }
-
-/* Bar buttons */
 .bar-btn {
   padding:4px 10px; border:none; border-radius:8px; background:rgba(255,255,255,.06);
   color:rgba(255,255,255,.55); font-size:12px; cursor:pointer; transition:all .15s;
 }
 .bar-btn:hover { background:rgba(255,255,255,.1); color:#fff; }
 
-/* Main layout: sidebar + content */
+/* Main layout: feature tree | TOC | content */
 .main { display:flex; flex:1; overflow:hidden; min-height:0; }
 
 /* Nav sidebar — full-height flex column */
@@ -82,11 +49,45 @@
   flex-shrink:0; padding:6px 8px; display:flex; flex-direction:column; gap:3px;
   border-top:1px solid var(--border,#e2e8f0);
 }
+.nav-quick-btn {
+  display:flex; align-items:center; gap:6px; padding:6px 10px; border:1px solid var(--border,#e2e8f0);
+  border-radius:8px; background:#fff; font-size:12px; font-weight:500; cursor:pointer;
+  color:var(--text-secondary,#475569); transition:all .1s; text-align:left; font-family:inherit;
+}
+.nav-quick-btn:hover { border-color:var(--accent,#4f46e5); color:var(--accent); background:var(--accent-bg); }
+
+/* Main content area — fills all remaining width (col 3) */
+.main-content { flex:1; overflow-y:auto; overflow-x:hidden; background:var(--bg-body); min-width:0; }
+/* Override style.css fixed widths so panels fill the available space */
+.main-content .thesis-panel { flex:1 1 auto !important; min-width:0 !important; width:auto !important; }
+.main-content .ref-panel { flex:1 1 auto !important; width:auto !important; min-width:0 !important; max-width:none !important; }
+
+/* Status bar */
 .status-bar {
   flex-shrink:0; height:24px; display:flex; align-items:center; justify-content:space-between;
   padding:0 16px; font-size:11px; color:var(--text-muted); background:#fff;
   border-top:1px solid var(--border-light);
 }
+
+/* Tree Navigation */
+.ft-node { margin-bottom:2px; }
+.ft-row {
+  display:flex; align-items:center; gap:6px; padding:7px 10px; border-radius:8px;
+  cursor:pointer; font-size:13px; font-weight:600; color:var(--text-secondary,#475569);
+  transition:all .12s; user-select:none;
+}
+.ft-row:hover { background:var(--bg-hover,#f1f5f9); color:var(--text,#111); }
+.ft-icon { font-size:15px; width:22px; text-align:center; flex-shrink:0; }
+.ft-label { flex:1; }
+.ft-arrow { font-size:11px; color:var(--text-muted,#94a3b8); transition:transform .15s; }
+.ft-children { padding:2px 0 2px 8px; }
+.ft-leaf {
+  display:flex; align-items:center; gap:6px; padding:6px 10px 6px 28px; border-radius:8px;
+  cursor:pointer; font-size:12px; color:var(--text-secondary,#475569); transition:all .1s;
+}
+.ft-leaf:hover { background:var(--accent-bg,rgba(79,70,229,.06)); color:var(--accent,#4f46e5); }
+.ft-leaf.ft-disabled { opacity:.45; }
+.ft-leaf.ft-disabled:hover { background:transparent; color:var(--text-secondary,#475569); }
 
 /* Modal overlay */
 .modal-overlay {
@@ -128,35 +129,3 @@
 .loading-pct { font-size:32px; font-weight:700; color:#fff; }
 .loading-bar { width:200px; height:3px; background:rgba(255,255,255,.1); border-radius:3px; margin-top:12px; overflow:hidden; }
 .loading-bar-fill { height:100%; background:var(--accent); border-radius:3px; transform-origin:left; transition:transform .3s; }
-
-/* ====== Tree Navigation ====== */
-.nav-feature-tree { padding:0 8px 8px; }
-.ft-node { margin-bottom:2px; }
-.ft-row {
-  display:flex; align-items:center; gap:6px; padding:7px 10px; border-radius:8px;
-  cursor:pointer; font-size:13px; font-weight:600; color:var(--text-secondary,#475569);
-  transition:all .12s; user-select:none;
-}
-.ft-row:hover { background:var(--bg-hover,#f1f5f9); color:var(--text,#111); }
-.ft-icon { font-size:15px; width:22px; text-align:center; flex-shrink:0; }
-.ft-label { flex:1; }
-.ft-arrow { font-size:11px; color:var(--text-muted,#94a3b8); transition:transform .15s; }
-.ft-children { padding:2px 0 2px 8px; }
-.ft-leaf {
-  display:flex; align-items:center; gap:6px; padding:6px 10px 6px 28px; border-radius:8px;
-  cursor:pointer; font-size:12px; color:var(--text-secondary,#475569); transition:all .1s;
-}
-.ft-leaf:hover { background:var(--accent-bg,rgba(79,70,229,.06)); color:var(--accent,#4f46e5); }
-.ft-leaf.ft-disabled { opacity:.45; }
-.ft-leaf.ft-disabled:hover { background:transparent; color:var(--text-secondary,#475569); }
-.ft-badge { font-size:10px; padding:1px 6px; border-radius:6px; background:#f1f5f9; color:#94a3b8; margin-left:auto; }
-.ft-leaf:hover .ft-badge { background:var(--accent-bg); color:var(--accent); }
-
-/* Quick action buttons */
-.nav-quick-actions { padding:4px 8px; display:flex; flex-direction:column; gap:4px; }
-.nav-quick-btn {
-  display:flex; align-items:center; gap:6px; padding:6px 10px; border:1px solid var(--border,#e2e8f0);
-  border-radius:8px; background:#fff; font-size:12px; font-weight:500; cursor:pointer;
-  color:var(--text-secondary,#475569); transition:all .1s; text-align:left; font-family:inherit;
-}
-.nav-quick-btn:hover { border-color:var(--accent,#4f46e5); color:var(--accent); background:var(--accent-bg); }
