@@ -215,9 +215,13 @@
       if (moduleId === 'chapter-board') { if(typeof openChapterBoard==='function') openChapterBoard(); return; }
       if (moduleId === 'outline') { if(typeof openOutlineEditor==='function') openOutlineEditor(); return; }
 
-      // 参考文献：使用 LiteratureWorkbench
+      // 参考文献：切换回原始布局，使用 switchModule
       if (moduleId === 'references') {
-        if(typeof LiteratureWorkbench!=='undefined'&&typeof LiteratureWorkbench.show==='function') LiteratureWorkbench.show();
+        mc.innerHTML = ''; // 清除全屏内容
+        var tp2=document.getElementById('thesisPanel'), rp2=document.getElementById('refPanel');
+        if(tp2) tp2.style.display=''; if(rp2) rp2.style.display='';
+        if(typeof switchModule==='function') switchModule('references');
+        else if(typeof LiteratureWorkbench!=='undefined'&&typeof LiteratureWorkbench.show==='function') LiteratureWorkbench.show();
         else root.innerHTML='<div style="text-align:center;padding:40px;color:#94a3b8">文献工作台加载中...</div>';
         return;
       }
@@ -255,6 +259,12 @@
     // ── 通用全屏模块打开+tab高亮 ──
     window._open = function(moduleId, tabName) {
       _activateTab(tabName || 'workspace');
+      // 参考文献特殊：使用原始布局中的 refPanel
+      if (moduleId === 'references') {
+        _restoreWorkspace();
+        if(typeof switchModule==='function') switchModule('references');
+        return;
+      }
       _openModule(moduleId);
     };
 
