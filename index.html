@@ -111,11 +111,10 @@
     <span id="projectProgressChip" class="project-progress-chip">创建项目后显示进度</span>
   </div>
   <div class="bar-tabs" id="barTabs">
-    <button class="bar-tab active" data-nav="setup" onclick="navigateTo('setup')">📋 立项</button>
-    <button class="bar-tab" data-nav="literature" onclick="navigateTo('literature')">📚 文献</button>
-    <button class="bar-tab" data-nav="writing" onclick="navigateTo('writing')">✍️ 写作</button>
-    <button class="bar-tab" data-nav="review" onclick="navigateTo('review')">🔍 审阅</button>
-    <button class="bar-tab" data-nav="defense" onclick="navigateTo('defense')">🎤 答辩</button>
+    <button class="bar-tab active" data-view="workspace" onclick="switchView('workspace')">总览</button>
+    <button class="bar-tab" data-view="refs" onclick="switchModule('references')">📚 参考文献</button>
+    <button class="bar-tab" data-view="tools" onclick="openToolHome()">工具台</button>
+    <button class="bar-tab" data-view="dashboard" onclick="showDashboard()">看板</button>
   </div>
   <div class="bar-right">
     <button class="workspace-drawer-btn" onclick="toggleToolPanel()" title="打开工具台">工具</button>
@@ -127,173 +126,6 @@
     
   </div>
 </div>
-<!-- ====== 5阶段导航路由 ====== -->
-<script id="phaseRouter">
-(function(){
-  var _phase='setup';
-  function el(id){return document.getElementById(id);}
-
-  // ── 阶段1：立项（3步向导 + AI辅助）──
-  function mountSetup(mc){
-    var hasProj=window.ThesisProject&&ThesisProject.getCurrentProject&&ThesisProject.getCurrentProject();
-    if(hasProj){
-      mc.innerHTML='<div style="display:flex;flex:1;overflow:hidden"><div id="workspaceContent" class="workspace-content" style="flex:1"></div></div>';
-      setTimeout(function(){if(typeof window.renderWorkspaceHero==='function')try{window.renderWorkspaceHero()}catch(e){}},50);
-      return;
-    }
-    var step=0, ideaText='', topics=[], outline='';
-    function esc(s){return String(s||'').replace(/[&<>\"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c];});}
-    function render(){
-      var h='';
-      // Progress bar
-      h+='<div style="display:flex;gap:4px;margin-bottom:24px;justify-content:center">'+[1,2,3].map(function(i){return'<div style="width:80px;height:4px;border-radius:2px;background:'+(i<=step+1?'var(--accent,#4f46e5)':'#e2e8f0')+'"></div>';}).join('')+'</div>';
-
-      if(step===0){
-        // Step 1: Research idea
-        h+='<div style="max-width:560px;margin:0 auto">'+
-          '<h2 style="font-size:20px;font-weight:700;margin-bottom:4px">第1步：描述你的研究方向</h2>'+
-          '<p style="color:#94a3b8;font-size:13px;margin-bottom:20px">用一两句话描述你想研究什么，AI 会帮你分析选题方向</p>'+
-          '<textarea id="wizIdea" class="ai-textarea" style="height:100px;margin-bottom:12px" placeholder="例如：研究海绵城市在南方多雨地区的应用效果，分析其对城市内涝防治的影响">'+esc(ideaText)+'</textarea>'+
-          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
-            '<button class="btn btn-primary" onclick="(function(){var el=document.getElementById(\'wizIdea\');var v=el?el.value.trim():\'\';if(v.length<8){alert(\'请至少用8个字描述你的研究方向\');return;}ideaText=v;step=1;render();if(v.length>30){var btn=document.getElementById(\'wizAnalyzeBtn\');if(btn)btn.click();}})()">下一步 →</button>'+
-            '<button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="typeof openImportDialog===\'function\'?openImportDialog(\'new\'):null">或者直接导入论文</button>'+
-          '</div>'+
-        '</div>';
-      } else if(step===1){
-        // Step 2: AI topic analysis + outline
-        h+='<div style="max-width:600px;margin:0 auto">'+
-          '<h2 style="font-size:20px;font-weight:700;margin-bottom:4px">第2步：AI 选题分析</h2>'+
-          '<p style="color:#94a3b8;font-size:13px;margin-bottom:16px">基于你的研究方向，AI 正在分析...</p>';
-        if(topics.length){
-          h+='<div style="margin-bottom:16px"><b style="font-size:14px">推荐选题方向：</b></div>';
-          topics.forEach(function(t,i){
-            h+='<div class="card" style="margin-bottom:8px;cursor:pointer;padding:14px" onclick="(function(){document.getElementById(\'wizTitle\').value=\''+esc(t.replace(/'/g,\"\\\\'\")).replace(/\"/g,'&quot;')+'\';var el=document.getElementById(\'wizTitle\');if(el)el.focus();})()">'+
-              '<div style="font-size:14px;font-weight:600">'+(i+1)+'. '+esc(t)+'</div>'+
-              '<div style="font-size:11px;color:#94a3b8;margin-top:2px">点击选用此题目</div></div>';
-          });
-        } else {
-          h+='<div class="card" style="text-align:center;padding:24px">'+
-            '<div class="loading-spinner" style="margin:0 auto 12px"></div>'+
-            '<p style="font-size:13px;color:#94a3b8">正在通过 AI 分析你的研究方向...</p>'+
-            '<button id="wizAnalyzeBtn" class="btn btn-primary btn-sm" style="margin-top:12px" '+
-              'onclick="var self=this;self.disabled=true;self.textContent=\'分析中...\';var idea=ideaText;var t=sessionStorage.getItem(\'thesis_ai_token\');'+
-              'fetch(\'/api/llm/analyze\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\',\'Authorization\':\'Bearer \'+t},body:JSON.stringify({capability_id:\'topic-finder\',input:\'研究方向：\'+idea+\'。请给出3-5个具体的论文选题建议，每个一行，不要编号以外的文字。\',max_tokens:800})})'+
-              '.then(function(r){return r.json()}).then(function(d){if(d.success){var arr=d.content.split(/\\n/).filter(function(l){return /^\\d/.test(l.trim())}).map(function(l){return l.replace(/^\\d+[\\.\\、\\s]+/,\'\').trim()}).filter(Boolean);if(!arr.length)arr=[d.content.substring(0,80)];topics=arr;render();}else{alert(d.error||\'AI分析失败，请手动输入题目\');}})'+
-              '.catch(function(){alert(\'网络错误，请手动输入题目\')})">🤖 AI 分析选题</button>'+
-          '</div>';
-        }
-        h+='<div style="margin-top:16px"><label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">论文题目（可修改）</label>'+
-          '<input id="wizTitle" class="input" style="margin-bottom:8px" placeholder="输入或点击上方推荐题目" value="'+esc(ideaText.length>30?ideaText.substring(0,30)+'…的研究':ideaText)+'">'+
-          '<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">关键词（逗号分隔）</label>'+
-          '<input id="wizKeywords" class="input" style="margin-bottom:8px" placeholder="例如：海绵城市, 内涝防治, SWMM">'+
-          '<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">学科领域</label>'+
-          '<input id="wizField" class="input" style="margin-bottom:16px" placeholder="如：土木工程 / 环境科学 / 人工智能">'+
-        '</div>'+
-        '<div style="display:flex;gap:8px">'+
-          '<button class="btn btn-ghost" onclick="step=0;render()">← 上一步</button>'+
-          '<button class="btn btn-primary" onclick="(function(){var title=document.getElementById(\'wizTitle\');var t=title?title.value.trim():\'\';if(!t||t.length<4){alert(\'请输入论文题目（至少4个字）\');return;}step=2;render();var btn=document.getElementById(\'wizCreateBtn\');if(btn)btn.click();})()">创建项目 →</button>'+
-        '</div>';
-      } else {
-        // Step 3: Project created
-        h+='<div style="max-width:500px;margin:0 auto;text-align:center">'+
-          '<div style="font-size:48px;margin-bottom:12px">🎉</div>'+
-          '<h2 style="font-size:20px;font-weight:700;margin-bottom:4px">论文项目已创建！</h2>'+
-          '<p style="color:#94a3b8;font-size:13px;margin-bottom:24px">下一步做什么？</p>'+
-          '<div style="display:flex;flex-direction:column;gap:10px;text-align:left;max-width:340px;margin:0 auto">'+
-            '<div class="card" style="cursor:pointer;padding:16px;display:flex;align-items:center;gap:12px" onclick="navigateTo(\'literature\')">'+
-              '<div style="font-size:28px">📚</div><div><div style="font-weight:700;font-size:14px">检索文献</div><div style="font-size:12px;color:#94a3b8">搜索和引用相关论文</div></div></div>'+
-            '<div class="card" style="cursor:pointer;padding:16px;display:flex;align-items:center;gap:12px" onclick="navigateTo(\'writing\')">'+
-              '<div style="font-size:28px">✍️</div><div><div style="font-weight:700;font-size:14px">开始写作</div><div style="font-size:12px;color:#94a3b8">按章节撰写论文初稿</div></div></div>'+
-            '<div class="card" style="cursor:pointer;padding:16px;display:flex;align-items:center;gap:12px" onclick="navigateTo(\'review\')">'+
-              '<div style="font-size:28px">🔍</div><div><div style="font-weight:700;font-size:14px">审阅打磨</div><div style="font-size:12px;color:#94a3b8">检查格式、术语和逻辑</div></div></div>'+
-          '</div>'+
-          '<button id="wizCreateBtn" style="display:none" onclick="(function(){var title=document.getElementById(\'wizTitle\');var kw=document.getElementById(\'wizKeywords\');var fd=document.getElementById(\'wizField\');var t=(title?title.value.trim():\'\')||ideaText.substring(0,24);if(typeof ThesisProject!==\'undefined\'&&ThesisProject.createProject){var p=ThesisProject.createProject({title:t,idea:ideaText,keywords:kw?kw.value.trim():\'\',field:fd?fd.value.trim():\'\',degree:\'本科\',mode:\'create\',currentStage:\'ideation\',schoolTemplate:\'generic\'});try{ThesisProject.applySchoolTemplate(\'generic\')}catch(e){}ThesisProject.renderProjectChrome();}};navigateTo(\'setup\')">创建</button>'+
-        '</div>';
-      }
-      mc.innerHTML='<div style="padding:40px 20px">'+h+'</div>';
-    }
-    render();
-  }
-
-  // ── 阶段2：文献 ──
-  function mountLit(mc){
-    mc.innerHTML='<div id="citelyContainer" style="height:100%;display:flex;flex-direction:column"></div>';
-    var pd={};
-    try{var p=window.ThesisProject&&ThesisProject.getCurrentProject?ThesisProject.getCurrentProject():null;if(p){pd.keywords=p.keywords||'';pd.chapters=(p.chapters||[]).map(function(c){return{id:c.id||c.title||c,title:c.title||c};});}}catch(e){}
-    if(typeof Citely!=='undefined'){setTimeout(function(){Citely.mount('citelyContainer',pd);},50);}
-    else{mc.innerHTML='<div style="max-width:500px;margin:80px auto;text-align:center;color:#94a3b8"><div style="font-size:48px;margin-bottom:12px">📚</div><p>文献模块加载中...</p></div>';}
-  }
-
-  // ── 阶段3：写作 ──
-  function mountWrite(mc){
-    if(typeof WritingModule!=='undefined'){WritingModule.mount(mc);return;}
-    var hasText=typeof manuscriptText!=='undefined'&&manuscriptText&&manuscriptText.length>100;
-    if(hasText && typeof window.openChapterBoard==='function'){mc.innerHTML='';window.openChapterBoard();return;}
-    mc.innerHTML='<div style="max-width:500px;margin:80px auto;text-align:center;color:#94a3b8">'+
-      '<div style="font-size:48px;margin-bottom:12px">✍️</div><h3 style="color:#111;margin-bottom:8px">论文写作</h3>'+
-      '<p>请先在「立项」中导入论文或从想法创建大纲</p>'+
-      '<button class="bar-mini" style="margin-top:16px;padding:8px 20px;border:1px solid #d1d5db;border-radius:10px;background:#fff;cursor:pointer;font-size:13px;font-weight:600" onclick="navigateTo(\'setup\')">→ 去立项</button>'+
-    '</div>';
-  }
-
-  // ── 阶段4：审阅 ──
-  function mountReview(mc){
-    if(typeof ReviewModule!=='undefined'){ReviewModule.mount(mc);return;}
-    var hasText=typeof manuscriptText!=='undefined'&&manuscriptText&&manuscriptText.length>100;
-    if(hasText && typeof window.runFormatCheck==='function'){
-      mc.innerHTML='<div style="padding:20px;height:100%;overflow:auto"><div id="reviewInline"></div></div>';
-      setTimeout(function(){var c=document.getElementById('reviewInline');if(c&&window.runFormatCheck)runFormatCheck(c);},50);
-      return;
-    }
-    mc.innerHTML='<div style="max-width:500px;margin:80px auto;text-align:center;color:#94a3b8">'+
-      '<div style="font-size:48px;margin-bottom:12px">🔍</div><h3 style="color:#111;margin-bottom:8px">论文审阅</h3>'+
-      '<p>导入论文后可进行格式检查、查错、术语分析等</p></div>';
-  }
-
-  // ── 阶段5：答辩 ──
-  function mountDefense(mc){
-    mc.innerHTML='<div style="max-width:800px;margin:40px auto;padding:20px">'+
-      '<h2 style="font-size:20px;font-weight:700;margin-bottom:24px;color:#111">🎤 答辩准备</h2>'+
-      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px">'+
-        '<div class="card" style="cursor:pointer;text-align:center;padding:28px 20px" onclick="typeof showDashboard===\'function\'?showDashboard():null">'+
-          '<div style="font-size:36px;margin-bottom:10px">📊</div><div style="font-size:15px;font-weight:700;color:#111">论文看板</div>'+
-          '<div style="font-size:12px;color:#94a3b8;margin-top:4px">综合评分 · 雷达图 · 行动清单</div></div>'+
-        '<div class="card" style="cursor:pointer;text-align:center;padding:28px 20px" onclick="typeof window.openDefensePack===\'function\'?window.openDefensePack():null">'+
-          '<div style="font-size:36px;margin-bottom:10px">📊</div><div style="font-size:15px;font-weight:700;color:#111">答辩PPT</div>'+
-          '<div style="font-size:12px;color:#94a3b8;margin-top:4px">AI 生成答辩大纲与讲稿</div></div>'+
-        '<div class="card" style="cursor:pointer;text-align:center;padding:28px 20px" onclick="typeof window.runEnAbstract===\'function\'?navigateTo(\'review\'):null">'+
-          '<div style="font-size:36px;margin-bottom:10px">🌐</div><div style="font-size:15px;font-weight:700;color:#111">英文摘要</div>'+
-          '<div style="font-size:12px;color:#94a3b8;margin-top:4px">AI 翻译与润色</div></div>'+
-        '<div class="card" style="cursor:pointer;text-align:center;padding:28px 20px" onclick="if(typeof window.exportFullPaper===\'function\')window.exportFullPaper();">'+
-          '<div style="font-size:36px;margin-bottom:10px">📄</div><div style="font-size:15px;font-weight:700;color:#111">导出论文</div>'+
-          '<div style="font-size:12px;color:#94a3b8;margin-top:4px">DOCX · PDF · TXT</div></div>'+
-      '</div></div>';
-  }
-
-  var MOUNTERS={setup:mountSetup,literature:mountLit,writing:mountWrite,review:mountReview,defense:mountDefense};
-
-  window.navigateTo=function(id){
-    if(!MOUNTERS[id])return;_phase=id;
-    document.querySelectorAll('.bar-tab').forEach(function(t){t.classList.toggle('active',t.getAttribute('data-nav')===id);});
-    var mc=el('mainContent');if(!mc)return;
-    // Hide panels, show module full-width
-    var tp=el('thesisPanel'), rp=el('refPanel');
-    if(id==='setup'){
-      if(tp)tp.style.display='';if(rp)rp.style.display='none';
-      MOUNTERS[id](mc);return;
-    }
-    if(tp)tp.style.display='none';if(rp)rp.style.display='none';
-    mc.innerHTML='';MOUNTERS[id](mc);
-    try{history.pushState({nav:id},'','#/'+id)}catch(e){}
-  };
-
-  window.addEventListener('popstate',function(e){if(e.state&&e.state.nav)navigateTo(e.state.nav);});
-
-  // Backward compat
-  var _sw=window.switchView;window.switchView=function(v){var m={workspace:'setup',refs:'literature',tools:'setup',dashboard:'defense'};if(m[v]){navigateTo(m[v]);return;}if(_sw)_sw(v);};
-  var _sm=window.switchModule;window.switchModule=function(m){var map={references:'literature',dashboard:'defense'};if(map[m]){navigateTo(map[m]);return;}if(_sm)_sm(m);};
-})();
-</script>
 <!-- ====== 更新日志按钮 ====== -->
 <div id="changelogBtn" onclick="toggleChangelog()" title="更新日志" style="display:none;position:fixed;top:52px;right:12px;z-index:1000;font-size:.62rem;color:#0071e3;cursor:pointer;background:rgba(0,113,227,.08);padding:3px 10px;border-radius:12px;border:1px solid rgba(0,113,227,.2);transition:all .2s;font-weight:600" onmouseenter="this.style.background='rgba(0,113,227,.15)'" onmouseleave="this.style.background='rgba(0,113,227,.08)'">📜 更新日志</div>
 <div id="changelogPanel" style="display:none;position:fixed;top:88px;right:12px;width:340px;max-height:70vh;overflow-y:auto;background:#fff;border-radius:12px;padding:16px;box-shadow:0 8px 40px rgba(0,0,0,.15);z-index:1001;font-size:.68rem;line-height:1.7;color:#333;border:1px solid #e5e7eb">
@@ -326,10 +158,26 @@
   <!-- 左侧导航轨 -->
   <div class="nav-sidebar" id="navSidebar">
     <div class="nav-brand-mini">ThesisBuddy</div>
-    <div class="nav-section-label">阶段</div>
+    <div class="nav-upload" id="navUpload">
+      <button onclick="openIdeaWizard()" class="nav-upload-btn primary">💡 从想法开始</button>
+      <button onclick="openImportDialog('new')" class="nav-upload-btn">📎 导入论文</button>
+    </div>
+
+    <div class="nav-section-label">主线进度</div>
     <div id="stageNav" class="stage-nav"></div>
 
-    <div class="nav-section-label" style="margin-top:8px">目录</div>
+    <div class="nav-section-label">百宝箱
+      <button class="nav-mini-btn" onclick="openToolboxPicker()" title="自定义快捷入口">⚙</button>
+    </div>
+    <div id="toolboxFavorites" class="toolbox-favs"></div>
+    <button class="nav-linkish" onclick="openToolboxPicker()">＋ 添加快捷功能</button>
+    <button class="nav-linkish" onclick="openMaterialsLibrary()">📁 项目资料库</button>
+    <button class="nav-linkish" onclick="openFeatureCatalog()">☰ 全部功能目录</button>
+
+    <!-- 目录树（在导航轨内折叠显示） -->
+    <div class="nav-section-label" style="margin-top:12px">📑 目录树
+      <button class="nav-mini-btn" onclick="toggleTocPanel()" title="折叠/展开">‹</button>
+    </div>
     <div class="toc-panel" id="tocPanel">
       <div class="toc-panel-head">
         <div class="toc-panel-sub" id="navTreeMeta">论文生长过程中会逐步出现章节</div>
@@ -597,6 +445,17 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <script defer src="js/modules/account/notifications.js?v=70"></script>
 <script defer src="js/modules/paper-import.js?v=70"></script>
 
+<!-- ====== Citely 文献模块（替代旧文献模块） ====== -->
+<link rel="stylesheet" href="css/citely.css?v=80">
+<script defer src="js/modules/citely.js?v=80"></script>
+
+<!-- ====== 审阅模块 ====== -->
+<link rel="stylesheet" href="css/modules/review.css?v=80">
+<script defer src="js/modules/review/review.js?v=80"></script>
+
+<!-- ====== 写作模块 ====== -->
+<script defer src="js/modules/writing/writing.js?v=80"></script>
+
 <!-- ====== 旧模块（逐步废弃中） ====== -->
 <script defer src="js/modules/optimization.js?v=65"></script>
 <script defer src="js/modules/format-check.js?v=65"></script>
@@ -607,22 +466,13 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <script defer src="js/modules/proposal.js?v=65"></script>
 <script defer src="js/modules/onboarding.js?v=65"></script>
 <script defer src="js/modules/topic-finder.js?v=65"></script>
-<script defer src="js/modules/proofread.js?v=65"></script>
+<script defer src="js/modules/proofread.js?v=80"></script>
 <script defer src="js/modules/de-duplicate.js?v=65"></script>
-<script defer src="js/modules/defense-ppt.js?v=65"></script>
-<script defer src="js/modules/en-abstract.js?v=65"></script>
+<script defer src="js/modules/defense-ppt.js?v=80"></script>
+<script defer src="js/modules/en-abstract.js?v=80"></script>
 <!-- literature-workbench.js + literature-search-modal.js 由 Citely 替代，保留作为回退 -->
 <script defer src="js/modules/literature-workbench.js?v=67"></script>
 <script defer src="js/modules/literature-search-modal.js?v=67"></script>
-
-<!-- ====== 新大模块（Citely 文献 + 审阅 + 写作） ====== -->
-<link rel="stylesheet" href="css/citely.css?v=80">
-<link rel="stylesheet" href="css/modules/review.css?v=80">
-<link rel="stylesheet" href="css/modules/writing.css?v=80">
-<script defer src="js/modules/citely.js?v=80"></script>
-<script defer src="js/modules/review/review.js?v=80"></script>
-<script defer src="js/modules/writing/writing.js?v=80"></script>
-
 <script defer src="js/app-modules.js?v=66"></script>
 
 <!-- ====== Shell 初始化（最后执行） ====== -->
