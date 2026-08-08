@@ -186,6 +186,7 @@
     <!-- 快捷操作 -->
     <div class="nav-section-label" style="margin-top:8px">快捷</div>
     <div class="nav-quick-actions">
+      <button onclick="_restoreWorkspace()" class="nav-quick-btn">🏠 回到工作台</button>
       <button onclick="openIdeaWizard()" class="nav-quick-btn">💡 从想法开始</button>
       <button onclick="openImportDialog('new')" class="nav-quick-btn">📎 导入论文</button>
       <button onclick="openMaterialsLibrary()" class="nav-quick-btn">📁 资料库</button>
@@ -195,6 +196,38 @@
   <script id="featureTreeScript">
   (function(){
     function esc(s){return String(s||'').replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+
+    // ── 全屏模块启动器 ──
+    window._openFullscreen = function(html, mountFn) {
+      var mc=document.getElementById('mainContent');
+      var tp=document.getElementById('thesisPanel');
+      var rp=document.getElementById('refPanel');
+      if(tp) tp.style.display='none'; if(rp) rp.style.display='none';
+      mc.innerHTML = html;
+      if(mountFn) setTimeout(mountFn, 50);
+    };
+    window._restoreWorkspace = function(){
+      var mc=document.getElementById('mainContent');
+      var tp=document.getElementById('thesisPanel');
+      var rp=document.getElementById('refPanel');
+      if(tp) tp.style.display=''; if(rp) rp.style.display='';
+      mc.innerHTML = '';
+      if(typeof window.renderWorkspaceHero==='function') try{window.renderWorkspaceHero()}catch(e){}
+    };
+    window._openCitely = function(){
+      _openFullscreen('<div id="citelyContainer"></div>', function(){
+        var pd={}; try{var p=window.ThesisProject&&ThesisProject.getCurrentProject?ThesisProject.getCurrentProject():null;if(p){pd.keywords=p.keywords||'';pd.chapters=(p.chapters||[]).map(function(c){return{id:c.id||c.title||c,title:c.title||c};});}}catch(e){}
+        if(typeof Citely!=='undefined') Citely.mount('citelyContainer', pd);
+      });
+    };
+    window._openWriting = function(){
+      _openFullscreen('', function(){
+        var mc=document.getElementById('mainContent');
+        if(typeof WritingModule!=='undefined') WritingModule.mount(mc);
+        else mc.innerHTML='<div style="text-align:center;padding:60px;color:#94a3b8">写作模块加载中...</div>';
+      });
+    };
+
     var FEATURE_TREE = [
       { id:'ideation', icon:'📋', label:'立项',
         children:[
@@ -204,10 +237,13 @@
       { id:'literature', icon:'📚', label:'文献',
         children:[
           { id:'references', icon:'📋', label:'参考文献工作台', action:'switchModule("references")' },
+          { id:'citely', icon:'🔍', label:'智能文献检索', action:'_openCitely()' },
           { id:'knowledge-graph', icon:'🕸️', label:'知识图谱', action:'showKnowledgeGraph()' },
         ]},
       { id:'writing', icon:'✍️', label:'写作',
         children:[
+          { id:'writing-workbench', icon:'📝', label:'写作工作台', action:'_openWriting()' },
+          { id:'chapter-board', icon:'📋', label:'分章草稿', action:'openChapterBoard()' },
           { id:'expand', icon:'✏️', label:'AI扩写', action:'switchModule("expand")' },
           { id:'data-analysis', icon:'📈', label:'数据分析', action:'switchModule("data-analysis")' },
           { id:'outline', icon:'📑', label:'大纲编辑', action:'openOutlineEditor()' },
