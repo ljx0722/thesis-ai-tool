@@ -65,28 +65,20 @@
 
 /* Nav sidebar */
 .nav-sidebar {
-  width:var(--nav-w); flex-shrink:0; overflow-y:auto;
+  width:var(--nav-w); flex-shrink:0;
   background:#fff; border-right:1px solid var(--border);
-  padding:12px 0; display:flex; flex-direction:column; gap:4px;
+  padding:8px 0; display:flex; flex-direction:column;
+  overflow:hidden; min-height:0;
 }
-.nav-brand { padding:8px 16px 16px; font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; }
-.nav-section { padding:16px 16px 4px; font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; }
-.nav-item {
-  display:flex; align-items:center; gap:8px; padding:8px 16px; margin:0 8px; border-radius:8px;
-  font-size:13px; font-weight:500; color:var(--text-secondary); cursor:pointer; transition:all .1s;
-  border:none; background:none; text-align:left; width:calc(100% - 16px);
-}
-.nav-item:hover { background:var(--bg-hover); color:var(--text); }
-.nav-item.active { background:var(--accent); color:#fff; }
-.nav-item .icon { font-size:16px; width:20px; text-align:center; }
-.nav-item .badge { margin-left:auto; font-size:11px; background:rgba(0,0,0,.08); padding:1px 7px; border-radius:10px; }
-.nav-item.active .badge { background:rgba(255,255,255,.2); }
-.nav-divider { height:1px; background:var(--border); margin:8px 16px; }
+.nav-brand { padding:6px 16px 10px; font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; flex-shrink:0; }
+.nav-section { padding:10px 16px 2px; font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; flex-shrink:0; }
+#stageNav { flex-shrink:0; max-height:120px; overflow-y:auto; }
 
-/* Main content */
-.main-content { flex:1; overflow-y:auto; overflow-x:hidden; background:var(--bg-body); min-width:0; }
+/* Feature tree — scrollable area */
+.nav-feature-tree { flex:1; overflow-y:auto; overflow-x:hidden; min-height:0; padding:4px 8px; }
 
-/* Status bar */
+/* Quick actions — fixed at bottom */
+.nav-quick-actions { flex-shrink:0; padding:4px 8px; display:flex; flex-direction:column; gap:3px; }
 .status-bar {
   flex-shrink:0; height:24px; display:flex; align-items:center; justify-content:space-between;
   padding:0 16px; font-size:11px; color:var(--text-muted); background:#fff;

@@ -158,12 +158,10 @@
 <div class="main" id="mainLayout">
   <!-- 第1栏：功能树 -->
   <div class="nav-sidebar" id="navSidebar">
-    <div class="nav-brand-mini">ThesisBuddy</div>
-    <div class="nav-section-label">阶段</div>
-    <div id="stageNav" class="stage-nav"></div>
-    <div class="nav-section-label">功能</div>
+    <div class="nav-section">功能</div>
     <div id="navFeatureTree" class="nav-feature-tree"></div>
-    <div class="nav-section-label" style="margin-top:8px">快捷</div>
+    <div id="stageNav" style="display:none"></div>
+    <div class="nav-section">快捷</div>
     <div class="nav-quick-actions">
       <button onclick="_restoreWorkspace()" class="nav-quick-btn">🏠 回到工作台</button>
       <button onclick="openIdeaWizard()" class="nav-quick-btn">💡 从想法开始</button>
@@ -240,14 +238,9 @@
         'review':'runReviewModule','optimization':'runOptimization',
         'defense-ppt':'runDefensePPT','en-abstract':'runEnAbstract',
       };
-        'terminology':'runTerminology','paragraph':'runParagraphAnalysis',
-        'review':'runReviewModule','optimization':'runOptimization',
-        'defense-ppt':'runDefensePPT','en-abstract':'runEnAbstract',
-      };
       var fnName = runners[moduleId];
       if(fnName && typeof window[fnName] === 'function') {
         window[fnName](root);
-        // Flash border
         mc.style.transition = 'box-shadow .3s';
         mc.style.boxShadow = 'inset 0 0 0 2px var(--accent,#4f46e5)';
         setTimeout(function(){ mc.style.boxShadow = ''; }, 1500);
