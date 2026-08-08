@@ -208,9 +208,68 @@
       if(mountFn) setTimeout(mountFn, 50);
     };
 
+    // ── 通用全屏模块：直接运行模块函数到主内容区 ──
+    window._openModule = function(moduleId) {
+      var mc=document.getElementById('mainContent');
+      var tp=document.getElementById('thesisPanel');
+      var rp=document.getElementById('refPanel');
+      if(tp) tp.style.display='none'; if(rp) rp.style.display='none';
+      mc.innerHTML = '<div style="flex:1;overflow:auto;min-height:0" id="tbModuleRoot"></div>';
+      var root = document.getElementById('tbModuleRoot');
+      if(!root) return;
+
+      // 特殊模块：弹窗型
+      if (moduleId === 'dashboard') { if(typeof showDashboard==='function') showDashboard(); return; }
+      if (moduleId === 'knowledge-graph') { if(typeof showKnowledgeGraph==='function') showKnowledgeGraph(); return; }
+      if (moduleId === 'chapter-board') { if(typeof openChapterBoard==='function') openChapterBoard(); return; }
+      if (moduleId === 'outline') { if(typeof openOutlineEditor==='function') openOutlineEditor(); return; }
+
+      // 参考文献：使用 LiteratureWorkbench
+      if (moduleId === 'references') {
+        if(typeof LiteratureWorkbench!=='undefined'&&typeof LiteratureWorkbench.show==='function') LiteratureWorkbench.show();
+        else root.innerHTML='<div style="text-align:center;padding:40px;color:#94a3b8">文献工作台加载中...</div>';
+        return;
+      }
+
+      // Citely 和写作工作台
+      if (moduleId === 'citely') { _openCitely(); return; }
+      if (moduleId === 'writing-workbench') { _openWriting(); return; }
+
+      // 通用模块 runner
+      var runners = {
+        'topic-finder':'runTopicFinder','proposal':'runProposalModule','expand':'runExpandModule',
+        'data-analysis':'runDataAnalysis','proofread':'runProofread',
+        'de-duplicate':'runDeduplicate','format-check':'runFormatCheck',
+        'terminology':'runTerminology','paragraph':'runParagraphAnalysis',
+        'review':'runReviewModule','optimization':'runOptimization',
+        'defense-ppt':'runDefensePPT','en-abstract':'runEnAbstract',
+      };
+        'terminology':'runTerminology','paragraph':'runParagraphAnalysis',
+        'review':'runReviewModule','optimization':'runOptimization',
+        'defense-ppt':'runDefensePPT','en-abstract':'runEnAbstract',
+      };
+      var fnName = runners[moduleId];
+      if(fnName && typeof window[fnName] === 'function') {
+        window[fnName](root);
+        // Flash border
+        mc.style.transition = 'box-shadow .3s';
+        mc.style.boxShadow = 'inset 0 0 0 2px var(--accent,#4f46e5)';
+        setTimeout(function(){ mc.style.boxShadow = ''; }, 1500);
+      } else {
+        root.innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8">模块加载中...</div>';
+      }
+    };
+
+    // ── 带tab高亮的模块打开 ──
+
     // ── 统一模块激活：执行action + 高亮对应顶栏标签 ──
     window._activateTab = function(tabName) {
       document.querySelectorAll('.bar-tab').forEach(function(t){t.classList.toggle('active',t.getAttribute('data-view')===tabName);});
+    };
+    // ── 通用全屏模块打开+tab高亮 ──
+    window._open = function(moduleId, tabName) {
+      _activateTab(tabName || 'workspace');
+      _openModule(moduleId);
     };
 
     // ── 带回工作台的恢复函数，同时高亮工作台标签 ──
@@ -291,7 +350,9 @@
           '<div class="ft-children" id="ft-children-'+node.id+'">';
         (node.children||[]).forEach(function(ch){
           var cls = ch.needsThesis ? ' ft-disabled' : '';
-          var onClick = (ch.action ? ' onclick="_activateTab(\''+(ch.tab||'workspace')+'\');'+ch.action.replace(/"/g,'&quot;')+'"' : '');
+          var moduleId = ch.id;
+          var tabName = ch.tab || 'workspace';
+          var onClick = ' onclick="_open(\''+moduleId+'\',\''+tabName+'\')"';
           h += '<div class="ft-leaf'+cls+'"'+onClick+'>'+
             '<span class="ft-icon">'+ch.icon+'</span>'+
             '<span class="ft-label">'+esc(ch.label)+'</span>'+
