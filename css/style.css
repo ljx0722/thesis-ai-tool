@@ -2835,7 +2835,7 @@ body.app-shell #mainLayout, body.app-shell .main{
 .tool-panel{
   min-height:0 !important;
   max-height:100% !important;
-  overflow:hidden !important;
+  overflow:hidden;
   display:flex !important;
   flex-direction:column !important;
 }

@@ -1301,7 +1301,9 @@ def ping():
 def _run_source(fn, *args):
     """Thread-safe wrapper: 在线程池中安全调用搜索函数"""
     try: return fn(*args) or []
-    except: return []
+    except Exception as e:
+        print(f'[search] source error in {fn.__name__ if hasattr(fn,"__name__") else str(fn)}: {e}')
+        return []
 
 @app.route('/search_api', methods=['POST'])
 @require_auth
@@ -1326,31 +1328,32 @@ def search_api():
             if not q.strip(): continue
             is_cn = bool(re.search(r'[一-鿿]', q))
 
-            # 每个词只查核心源 + 学术源
-            for source_fn in [
-                lambda: fetch_with_retry(search_openalex, q, min(max_per, 100)),
-                lambda: search_crossref(q, 50),
-                lambda: search_semantic_scholar(q, 50),
-                lambda: search_europepmc(q, 40),
-                lambda: search_arxiv(q, 30),
-                lambda: search_pubmed(q, 30),
-            ]:
+            # 核心源列表（顺序执行）
+            maxp = min(max_per, 50)
+            core_sources = [
+                lambda: fetch_with_retry(search_openalex, q, maxp),
+                lambda: search_crossref(q, 40),
+                lambda: search_semantic_scholar(q, 40),
+                lambda: search_europepmc(q, 30),
+                lambda: search_arxiv(q, 25),
+                lambda q=q: search_pubmed(q, 25),
+            ]
+            for source_fn in core_sources:
                 try: all_results.extend(source_fn() or [])
-                except: pass
+                except Exception: pass
 
             if is_cn:
                 try: all_results.extend(search_baidu_xueshu_page(q, 0) or [])
-                except: pass
+                except Exception: pass
                 try: all_results.extend(search_cnki(q, 30) or [])
-                except: pass
+                except Exception: pass
                 try: all_results.extend(search_openalex_cn(q, 50) or [])
-                except: pass
+                except Exception: pass
             else:
-                # 英文额外源
                 try: all_results.extend(search_core(q, 30) or [])
-                except: pass
+                except Exception: pass
                 try: all_results.extend(search_doaj(q, 20) or [])
-                except: pass
+                except Exception: pass
 
         all_results = dedup_results(all_results)
         all_results.sort(key=lambda r: r.get('year') or 0, reverse=True)

@@ -4317,6 +4317,7 @@ function closeKnowledgeGraph(){
   if(kgModalKeydown){document.removeEventListener('keydown',kgModalKeydown);kgModalKeydown=null;}
   if(kgResizeObserver){kgResizeObserver.disconnect();kgResizeObserver=null;}
   if(kgResizeFrame){cancelAnimationFrame(kgResizeFrame);kgResizeFrame=0;}
+  if(typeof window._wcCleanup==='function'){window._wcCleanup();window._wcCleanup=null;}
   var previous=kgPreviousFocus;kgPreviousFocus=null;if(previous&&typeof previous.focus==='function'&&document.contains(previous))previous.focus();
 }
 function switchKGView(view){
@@ -4554,10 +4555,16 @@ function renderWordCloud(){
     container.addEventListener('mousedown', function(ev) {
       if (ev.button === 0 && (ev.target === container || ev.target === inner)) { _wcPan2 = true; _wcPx2 = ev.clientX - _wcTx2; _wcPy2 = ev.clientY - _wcTy2; container.style.cursor = 'grabbing'; }
     });
-    document.addEventListener('mousemove', function(ev) {
-      if (_wcPan2) { _wcTx2 = ev.clientX - _wcPx2; _wcTy2 = ev.clientY - _wcPy2; applyWordCloudTransform(); }
-    });
-    document.addEventListener('mouseup', function() { _wcPan2 = false; if (container) container.style.cursor = 'grab'; });
+    var _wcMouseMove = function(ev) { if (_wcPan2) { _wcTx2 = ev.clientX - _wcPx2; _wcTy2 = ev.clientY - _wcPy2; applyWordCloudTransform(); } };
+    var _wcMouseUp = function() { _wcPan2 = false; if (container) container.style.cursor = 'grab'; };
+    document.addEventListener('mousemove', _wcMouseMove);
+    document.addEventListener('mouseup', _wcMouseUp);
+    // Cleanup on next KG close or view switch
+    if (window._wcCleanup) { window._wcCleanup(); }
+    window._wcCleanup = function() {
+      document.removeEventListener('mousemove', _wcMouseMove);
+      document.removeEventListener('mouseup', _wcMouseUp);
+    };
   }
 }
 
