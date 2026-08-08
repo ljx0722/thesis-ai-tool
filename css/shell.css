@@ -57,7 +57,12 @@
 .nav-quick-btn:hover { border-color:var(--accent,#4f46e5); color:var(--accent); background:var(--accent-bg); }
 
 /* Main content area — fills all remaining width (col 3) */
-.main-content { flex:1; overflow-y:auto; overflow-x:hidden; background:var(--bg-body); min-width:0; }
+.main-content { flex:1; overflow-y:auto; overflow-x:hidden; background:var(--bg-body); min-width:0; padding:16px 20px; }
+
+/* Consistent card/panel spacing inside modules */
+.module-panel, .module-panel-content { padding:16px !important; }
+.citely-root, .review-root, .writing-root { padding:16px; }
+.ref-panel .tool-panel-head { margin:0 0 12px 0; }
 
 /* Status bar */
 .status-bar {
