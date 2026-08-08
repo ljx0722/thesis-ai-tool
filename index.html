@@ -154,37 +154,15 @@
 </div>
 <script>function toggleChangelog(){var p=document.getElementById('changelogPanel');var opening=p.style.display==='none';p.style.display=opening?'block':'none';if(!opening)return;fetch('/static/changelog.json').then(function(r){return r.json();}).then(function(d){var entries=(d.entries||[]).filter(function(e){return e.status==='released'&&e.commit;});var body=entries.map(function(e){return'<section style="padding:10px 0;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between;gap:10px"><b>'+e.version+' · '+e.summary+'</b><span style="color:var(--text-muted)">'+e.date+'</span></div><ul style="margin:7px 0 0 18px">'+(e.changes||[]).map(function(c){return'<li>'+c+'</li>';}).join('')+'</ul></section>';}).join('');p.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>功能更新日志</b><button onclick="toggleChangelog()" style="border:0;background:transparent;color:var(--text-muted);cursor:pointer">关闭</button></div>'+body;}).catch(function(){p.innerHTML='<div style="padding:16px">更新日志加载失败，请稍后重试。</div>';});}</script>
 
-<!-- ====== 两栏工作台：树形导航 | 主内容 ====== -->
+<!-- ====== 三栏工作台：功能树 | 目录 | 主内容 ====== -->
 <div class="main" id="mainLayout">
-  <!-- 左侧树形导航 -->
+  <!-- 第1栏：功能树 -->
   <div class="nav-sidebar" id="navSidebar">
     <div class="nav-brand-mini">ThesisBuddy</div>
-
-    <!-- 阶段进度（保留） -->
-    <div class="nav-section-label">论文阶段</div>
+    <div class="nav-section-label">阶段</div>
     <div id="stageNav" class="stage-nav"></div>
-
-    <!-- 树形功能导航 -->
     <div class="nav-section-label">功能</div>
     <div id="navFeatureTree" class="nav-feature-tree"></div>
-
-    <!-- 目录树 -->
-    <div class="nav-section-label" style="margin-top:8px">论文目录</div>
-    <div class="toc-panel" id="tocPanel">
-      <div class="toc-panel-head">
-        <div class="toc-panel-sub" id="navTreeMeta">论文生长过程中会逐步出现章节</div>
-      </div>
-      <div class="nav-tree" id="navTree">
-        <div class="tree-empty">
-          <div class="tree-empty-title">目录还是空的</div>
-          <div class="tree-empty-desc">从想法创建大纲或导入DOCX后显示</div>
-          <button class="tree-empty-btn" onclick="openIdeaWizard()">从想法开始</button>
-          <button class="tree-empty-btn" onclick="triggerUpload()">导入论文</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 快捷操作 -->
     <div class="nav-section-label" style="margin-top:8px">快捷</div>
     <div class="nav-quick-actions">
       <button onclick="_restoreWorkspace()" class="nav-quick-btn">🏠 回到工作台</button>
@@ -193,6 +171,24 @@
       <button onclick="openMaterialsLibrary()" class="nav-quick-btn">📁 资料库</button>
     </div>
   </div>
+
+  <!-- 第2栏：目录树 -->
+  <div class="toc-panel" id="tocPanel">
+    <div class="toc-panel-head">
+      <div><span class="toc-panel-title">📑 目录树</span></div>
+    </div>
+    <div class="toc-panel-sub" id="navTreeMeta" style="padding:0 10px 4px;font-size:11px;color:#94a3b8">论文生长过程中会逐步出现章节</div>
+    <div class="nav-tree" id="navTree">
+      <div class="tree-empty">
+        <div class="tree-empty-title">目录还是空的</div>
+        <div class="tree-empty-desc">从想法创建大纲或导入DOCX后显示</div>
+        <button class="tree-empty-btn" onclick="openIdeaWizard()">从想法开始</button>
+        <button class="tree-empty-btn" onclick="triggerUpload()">导入论文</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 第3栏：主内容 -->
   <!-- ====== 树形导航脚本 ====== -->
   <script id="featureTreeScript">
   (function(){
