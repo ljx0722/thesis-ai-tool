@@ -153,31 +153,22 @@
 </div>
 <script>function toggleChangelog(){var p=document.getElementById('changelogPanel');var opening=p.style.display==='none';p.style.display=opening?'block':'none';if(!opening)return;fetch('/static/changelog.json').then(function(r){return r.json();}).then(function(d){var entries=(d.entries||[]).filter(function(e){return e.status==='released'&&e.commit;});var body=entries.map(function(e){return'<section style="padding:10px 0;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between;gap:10px"><b>'+e.version+' · '+e.summary+'</b><span style="color:var(--text-muted)">'+e.date+'</span></div><ul style="margin:7px 0 0 18px">'+(e.changes||[]).map(function(c){return'<li>'+c+'</li>';}).join('')+'</ul></section>';}).join('');p.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>功能更新日志</b><button onclick="toggleChangelog()" style="border:0;background:transparent;color:var(--text-muted);cursor:pointer">关闭</button></div>'+body;}).catch(function(){p.innerHTML='<div style="padding:16px">更新日志加载失败，请稍后重试。</div>';});}</script>
 
-<!-- ====== 两栏工作台：导航 | 主内容 ====== -->
+<!-- ====== 两栏工作台：树形导航 | 主内容 ====== -->
 <div class="main" id="mainLayout">
-  <!-- 左侧导航轨 -->
+  <!-- 左侧树形导航 -->
   <div class="nav-sidebar" id="navSidebar">
     <div class="nav-brand-mini">ThesisBuddy</div>
-    <div class="nav-upload" id="navUpload">
-      <button onclick="openIdeaWizard()" class="nav-upload-btn primary">💡 从想法开始</button>
-      <button onclick="openImportDialog('new')" class="nav-upload-btn">📎 导入论文</button>
-    </div>
 
-    <div class="nav-section-label">主线进度</div>
+    <!-- 阶段进度（保留） -->
+    <div class="nav-section-label">论文阶段</div>
     <div id="stageNav" class="stage-nav"></div>
 
-    <div class="nav-section-label">百宝箱
-      <button class="nav-mini-btn" onclick="openToolboxPicker()" title="自定义快捷入口">⚙</button>
-    </div>
-    <div id="toolboxFavorites" class="toolbox-favs"></div>
-    <button class="nav-linkish" onclick="openToolboxPicker()">＋ 添加快捷功能</button>
-    <button class="nav-linkish" onclick="openMaterialsLibrary()">📁 项目资料库</button>
-    <button class="nav-linkish" onclick="openFeatureCatalog()">☰ 全部功能目录</button>
+    <!-- 树形功能导航 -->
+    <div class="nav-section-label">功能</div>
+    <div id="navFeatureTree" class="nav-feature-tree"></div>
 
-    <!-- 目录树（在导航轨内折叠显示） -->
-    <div class="nav-section-label" style="margin-top:12px">📑 目录树
-      <button class="nav-mini-btn" onclick="toggleTocPanel()" title="折叠/展开">‹</button>
-    </div>
+    <!-- 目录树 -->
+    <div class="nav-section-label" style="margin-top:8px">论文目录</div>
     <div class="toc-panel" id="tocPanel">
       <div class="toc-panel-head">
         <div class="toc-panel-sub" id="navTreeMeta">论文生长过程中会逐步出现章节</div>
@@ -185,13 +176,97 @@
       <div class="nav-tree" id="navTree">
         <div class="tree-empty">
           <div class="tree-empty-title">目录还是空的</div>
-          <div class="tree-empty-desc">从想法创建大纲，或导入 DOCX 后，这里会显示全文结构。点击可跳转正文。</div>
+          <div class="tree-empty-desc">从想法创建大纲或导入DOCX后显示</div>
           <button class="tree-empty-btn" onclick="openIdeaWizard()">从想法开始</button>
           <button class="tree-empty-btn" onclick="triggerUpload()">导入论文</button>
         </div>
       </div>
     </div>
+
+    <!-- 快捷操作 -->
+    <div class="nav-section-label" style="margin-top:8px">快捷</div>
+    <div class="nav-quick-actions">
+      <button onclick="openIdeaWizard()" class="nav-quick-btn">💡 从想法开始</button>
+      <button onclick="openImportDialog('new')" class="nav-quick-btn">📎 导入论文</button>
+      <button onclick="openMaterialsLibrary()" class="nav-quick-btn">📁 资料库</button>
+    </div>
   </div>
+  <!-- ====== 树形导航脚本 ====== -->
+  <script id="featureTreeScript">
+  (function(){
+    function esc(s){return String(s||'').replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+    var FEATURE_TREE = [
+      { id:'ideation', icon:'📋', label:'立项',
+        children:[
+          { id:'topic-finder', icon:'💡', label:'选题推荐', action:'switchModule("topic-finder")' },
+          { id:'proposal', icon:'📝', label:'开题大纲', action:'switchModule("proposal")' },
+        ]},
+      { id:'literature', icon:'📚', label:'文献',
+        children:[
+          { id:'references', icon:'📋', label:'参考文献工作台', action:'switchModule("references")' },
+          { id:'knowledge-graph', icon:'🕸️', label:'知识图谱', action:'showKnowledgeGraph()' },
+        ]},
+      { id:'writing', icon:'✍️', label:'写作',
+        children:[
+          { id:'expand', icon:'✏️', label:'AI扩写', action:'switchModule("expand")' },
+          { id:'data-analysis', icon:'📈', label:'数据分析', action:'switchModule("data-analysis")' },
+          { id:'outline', icon:'📑', label:'大纲编辑', action:'openOutlineEditor()' },
+        ]},
+      { id:'polish', icon:'🔍', label:'审阅打磨',
+        children:[
+          { id:'format-check', icon:'✅', label:'格式检查', action:'switchModule("format-check")', needsThesis:true },
+          { id:'proofread', icon:'✏️', label:'论文查错', action:'switchModule("proofread")' },
+          { id:'terminology', icon:'🔤', label:'术语分析', action:'switchModule("terminology")', needsThesis:true },
+          { id:'paragraph', icon:'📝', label:'段落分析', action:'switchModule("paragraph")', needsThesis:true },
+          { id:'de-duplicate', icon:'📋', label:'查重降重', action:'switchModule("de-duplicate")' },
+          { id:'review', icon:'🔍', label:'综合审阅', action:'switchModule("review")', needsThesis:true },
+          { id:'optimization', icon:'💡', label:'优化建议', action:'switchModule("optimization")', needsThesis:true },
+        ]},
+      { id:'defense', icon:'🎤', label:'答辩',
+        children:[
+          { id:'dashboard', icon:'📊', label:'论文看板', action:'showDashboard()' },
+          { id:'defense-ppt', icon:'📊', label:'答辩PPT', action:'switchModule("defense-ppt")' },
+          { id:'en-abstract', icon:'🌐', label:'英文摘要', action:'switchModule("en-abstract")' },
+        ]},
+    ];
+
+    function renderTree(){
+      var container = document.getElementById('navFeatureTree');
+      if(!container) return;
+      var h = '';
+      FEATURE_TREE.forEach(function(node){
+        h += '<div class="ft-node">'+
+          '<div class="ft-row" onclick="(function(e){e.stopPropagation();var c=document.getElementById(\'ft-children-'+node.id+'\');if(c){c.style.display=c.style.display===\'none\'?\'block\':\'none\';this.querySelector(\'.ft-arrow\').textContent=c.style.display===\'none\'?\'▸\':\'▾\'}})()">'+
+            '<span class="ft-icon">'+node.icon+'</span>'+
+            '<span class="ft-label">'+esc(node.label)+'</span>'+
+            '<span class="ft-arrow">▾</span>'+
+          '</div>'+
+          '<div class="ft-children" id="ft-children-'+node.id+'">';
+        (node.children||[]).forEach(function(ch){
+          var cls = ch.needsThesis ? ' ft-disabled' : '';
+          var onClick = ch.action ? ' onclick="'+ch.action.replace(/"/g,'&quot;')+'"' : '';
+          h += '<div class="ft-leaf'+cls+'"'+onClick+'>'+
+            '<span class="ft-icon">'+ch.icon+'</span>'+
+            '<span class="ft-label">'+esc(ch.label)+'</span>'+
+            (ch.needsThesis ? '<span class="ft-badge">需论文</span>' : '')+
+          '</div>';
+        });
+        h += '</div></div>';
+      });
+      container.innerHTML = h;
+    }
+
+    // 渲染（等 DOM ready）
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',renderTree);
+    else renderTree();
+
+    // 公开折叠/展开辅助
+    window.toggleFT = function(id){
+      var c = document.getElementById('ft-children-'+id);
+      if(c) c.style.display = c.style.display==='none'?'block':'none';
+    };
+  })();
+  </script>
 
   <!-- 主内容区（论文 + 模块共用） -->
   <div class="main-content" id="mainContent">
