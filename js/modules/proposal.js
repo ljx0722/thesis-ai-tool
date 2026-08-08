@@ -39,7 +39,13 @@ window.runProposalAI = function() {
   }).then(function(r) { return r.json(); })
     .then(function(d) {
       if (d.success) {
-        output.innerHTML = '<div class="ai-output">' + d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>';
+        var wrapper = document.createElement('div');
+        var div = document.createElement('div');div.className = 'ai-output';div.style.whiteSpace='pre-wrap';div.textContent = d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;');wrapper.appendChild(div);
+        var btns = document.createElement('div');btns.style.cssText='margin-top:12px;display:flex;gap:8px';
+        var copyBtn = document.createElement('button');copyBtn.textContent='📋 复制结果';copyBtn.style.cssText='font-size:12px;padding:5px 12px;border:1px solid var(--border,#d1d5db);border-radius:8px;background:var(--bg-surface,#fff);cursor:pointer;color:var(--text-secondary,#555);font-weight:500';copyBtn.onclick=function(){navigator.clipboard.writeText(div.textContent).then(function(){if(typeof ttp==='function')ttp('已复制')})};
+        var saveBtn = document.createElement('button');saveBtn.textContent='💾 保存记录';saveBtn.style.cssText=copyBtn.style.cssText;saveBtn.onclick=function(){if(window.ThesisProject&&ThesisProject.logSkillRun)ThesisProject.logSkillRun({moduleId:'proposal',title:'开题大纲',summary:'AI完成'});if(typeof ttp==='function')ttp('已保存')};
+        btns.appendChild(copyBtn);btns.appendChild(saveBtn);wrapper.appendChild(btns);
+        output.innerHTML = '';output.appendChild(wrapper);
         if (window.ThesisProject && ThesisProject.logSkillRun) ThesisProject.logSkillRun({ moduleId: 'proposal', title: '开题大纲', summary: 'AI 完成' });
       if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
       } else {

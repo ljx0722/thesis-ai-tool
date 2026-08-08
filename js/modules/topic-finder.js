@@ -43,7 +43,12 @@ window.runTopicFinderAI = function() {
     });
   }).then(function(d) {
     out.innerHTML = '';
-    var result = document.createElement('div');result.className = 'ai-output';result.textContent = d.content || '服务未返回推荐内容';out.appendChild(result);
+    var wrapper = document.createElement('div');
+    var result = document.createElement('div');result.className = 'ai-output';result.style.whiteSpace='pre-wrap';result.textContent = d.content || '服务未返回推荐内容';wrapper.appendChild(result);
+    var btns = document.createElement('div');btns.style.cssText='margin-top:12px;display:flex;gap:8px';
+    var copyBtn = document.createElement('button');copyBtn.className='ai-btn-clear';copyBtn.style.cssText='font-size:12px;padding:5px 12px;border:1px solid var(--border,#d1d5db);border-radius:8px;background:var(--bg-surface,#fff);cursor:pointer;color:var(--text-secondary,#555);font-weight:500';copyBtn.textContent='📋 复制结果';copyBtn.onclick=function(){navigator.clipboard.writeText(result.textContent).then(function(){if(typeof ttp==='function')ttp('已复制')})};btns.appendChild(copyBtn);
+    var saveBtn = document.createElement('button');saveBtn.className='ai-btn-clear';saveBtn.style.cssText=copyBtn.style.cssText;saveBtn.textContent='💾 保存记录';saveBtn.onclick=function(){if(window.ThesisProject&&ThesisProject.logSkillRun)ThesisProject.logSkillRun({moduleId:'topic-finder',title:'选题推荐',summary:result.textContent.substring(0,100)});if(typeof ttp==='function')ttp('已保存')};btns.appendChild(saveBtn);
+    wrapper.appendChild(btns);out.appendChild(wrapper);
     if (window.ThesisProject && ThesisProject.logSkillRun) ThesisProject.logSkillRun({ moduleId: 'topic-finder', title: '选题推荐', summary: domain });
     if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
   }).catch(function(error) {

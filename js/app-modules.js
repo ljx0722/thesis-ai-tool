@@ -725,9 +725,15 @@ function switchPanel(moduleId) {
   var needsThesis = modDef ? modDef.requiresThesis : true;
 
   if (needsThesis && !_thesisLoaded) {
-    // File-dependent module without thesis: show upload prompt
     var label = modDef ? modDef.name : moduleId;
-    moduleArea.innerHTML = '<div class="module-panel" style="text-align:center;padding:60px 20px"><div style="font-size:3rem;margin-bottom:16px">📎</div><h4 style="margin-bottom:8px;color:var(--text-primary)">需要先上传论文</h4><p style="color:var(--text-muted);font-size:.8rem;margin-bottom:20px">"' + label + '"模块需要论文数据才能运行</p><button onclick="triggerUpload()" style="font-size:.85rem;padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:18px;cursor:pointer;font-weight:600">📎 上传论文</button></div>';
+    moduleArea.innerHTML = '<div class="module-panel" style="text-align:center;padding:50px 20px">'+
+      '<div style="font-size:2.5rem;margin-bottom:12px">📄</div>'+
+      '<h4 style="margin-bottom:8px;color:var(--text-primary)">需要论文数据</h4>'+
+      '<p style="color:var(--text-muted);font-size:.8rem;margin-bottom:6px">"' + label + '" 需要先导入论文</p>'+
+      '<p style="color:var(--text-muted);font-size:.72rem;margin-bottom:20px">支持 .docx / .doc 格式</p>'+
+      '<button onclick="openImportDialog(\'new\')" style="font-size:.85rem;padding:10px 24px;background:var(--accent,#4f46e5);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600">📎 上传论文</button>'+
+      '<button onclick="typeof openIdeaWizard===\'function\'&&openIdeaWizard()" style="font-size:.8rem;padding:8px 18px;border:1px solid var(--border,#d1d5db);border-radius:10px;background:var(--bg-surface,#fff);color:var(--text-secondary,#555);cursor:pointer;margin-left:8px;font-weight:600">💡 从想法开始</button>'+
+    '</div>';
     updateStatusBar2();
     return;
   }
@@ -762,6 +768,14 @@ function switchPanel(moduleId) {
         if (typeof fn === 'function') {
           fn(mc);
           if(capabilityInfo) renderCapabilityNotice(mc,capabilityInfo);
+          // Scroll right panel into view and flash to show module loaded
+          var rp = document.getElementById('refPanel');
+          if (rp) {
+            rp.scrollIntoView({ behavior:'smooth', block:'start' });
+            rp.style.transition = 'box-shadow .3s';
+            rp.style.boxShadow = '0 0 0 2px var(--accent,#4f46e5)';
+            setTimeout(function(){ rp.style.boxShadow = ''; }, 1500);
+          }
           try {
             if (window.ThesisProject && ThesisProject.logSkillRun && modDef && !modDef.aiDriven) {
               ThesisProject.logSkillRun({ moduleId: moduleId, title: modDef.name || moduleId, summary: '打开模块' });
