@@ -1,24 +1,16 @@
-/**
- * 开题报告 → 论文大纲建议模块
- * AI 分析开题报告内容，输出结构化论文大纲
- */
+/** 开题报告 → 论文大纲 */
 function runProposalModule(container) {
   var c = container || document.querySelector('.module-panel');
   if (!c) return;
   c.innerHTML = '<div class="module-panel-content">' +
-    '<h4>📝 开题报告 → 论文大纲建议</h4>' +
-    '<div class="ai-desc">将你的开题报告内容粘贴到下方，AI 会分析并输出：<br>' +
-    '<b>· 论文大纲结构</b>（章/节/小节）<br>' +
-    '<b>· 各章核心内容建议</b><br>' +
-    '<b>· 研究方法与技术路线</b><br>' +
-    '<b>· 参考文献方向建议</b><br>' +
-    '<b>· 数据可视化建议</b>（论文配图类型推荐）</div>' +
-    '<textarea id="proposalInput" class="ai-textarea" placeholder="在此粘贴你的开题报告全文..." style="height:200px;margin-bottom:0"></textarea>' +
-    '<div class="ai-actions">' +
-      '<button onclick="runProposalAI()" class="ai-btn">🤖 AI 分析开题报告</button>' +
+    '<h4>📝 开题大纲</h4>' +
+    '<p style="font-size:12px;color:#94a3b8;margin:4px 0 10px">粘贴开题报告，AI 生成章/节/小节结构化大纲 + 方法建议</p>' +
+    '<textarea id="proposalInput" class="ai-textarea" placeholder="在此粘贴你的开题报告全文..." style="height:160px;margin-bottom:8px"></textarea>' +
+    '<div style="display:flex;gap:8px">' +
+      '<button onclick="runProposalAI()" class="ai-btn" style="flex:1">🤖 生成大纲</button>' +
       '<button onclick="document.getElementById(\'proposalInput\').value=\'\';document.getElementById(\'proposalOutput\').innerHTML=\'\'" class="ai-btn-clear">清空</button>' +
     '</div>' +
-    '<div id="proposalOutput" style="min-height:200px"></div>' +
+    '<div id="proposalOutput" style="min-height:200px;margin-top:12px"></div>' +
   '</div>';
 }
 

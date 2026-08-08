@@ -1,24 +1,18 @@
-/** 论文查错：AI扫描语病/标点/重复句 — 自动读取论文全文 */
+/** 论文查错 */
 function runProofread(container) {
   var c = container || document.querySelector('.module-panel');
   if (!c) return;
   var hasManuscript = typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 50;
-  var preview = hasManuscript ? manuscriptText.substring(0, 300) + '…（共' + manuscriptText.length + '字）' : '';
   c.innerHTML = '<div class="module-panel module-panel-content">' +
     '<h4>✏️ 论文查错</h4>' +
-    '<div class="ai-desc">AI 逐句扫描：<b>语病 · 标点错误 · 重复句 · 口语化表达 · 长句拆分建议</b></div>' +
+    '<p style="font-size:12px;color:#94a3b8;margin:4px 0 10px">AI 逐句扫描语病、标点、重复、口语化、长句</p>' +
     (hasManuscript
-      ? '<div style="padding:10px 14px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;margin-bottom:8px;font-size:12px;color:#0369a1">📄 已自动读取论文正文：<span style="font-weight:600">' + manuscriptText.length + ' 字</span></div>'
-      : '<textarea id="proofreadInput" class="ai-textarea" placeholder="在此粘贴需要检查的论文段落..." style="margin-bottom:0"></textarea>') +
-    '<div class="ai-actions">' +
-    '<button onclick="runProofreadAI()" class="ai-btn">🤖 AI查错（' + (hasManuscript ? '全篇' : '粘贴内容') + '）</button>' +
-    (hasManuscript ? '<button onclick="(function(){var el=document.getElementById(\'proofreadScope\');el.style.display=el.style.display==\'none\'?\'block\':\'none\'})()" class="ai-btn-clear">选择范围</button>' : '') +
-    '<div id="proofreadScope" style="display:none;margin-top:8px">' +
-      '<label style="font-size:12px;display:block;margin-bottom:4px">只检查特定章节（可选）：</label>' +
-      '<select id="proofreadChapter" class="select" style="width:100%"><option value="">全篇</option>' +
-        (typeof sections !== 'undefined' && sections.length ? sections.filter(function(s){return s.title;}).map(function(s,i){return '<option value="'+(typeof isBodyChapter==="function"&&isBodyChapter(s)?"ch":"")+i+'">'+s.title.substring(0,40)+'</option>';}).join('') : '') +
-      '</select></div>'+
-    '<button onclick="document.getElementById(\'proofreadOutput\').innerHTML=\'\'" class="ai-btn-clear">清空结果</button></div>' +
+      ? '<div style="padding:8px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;margin-bottom:8px;font-size:12px;color:#0369a1">📄 已读取论文 ' + manuscriptText.length + ' 字</div>'
+      : '<textarea id="proofreadInput" class="ai-textarea" placeholder="粘贴需要检查的段落..." style="margin-bottom:8px"></textarea>') +
+    '<div style="display:flex;gap:8px">' +
+    '<button onclick="runProofreadAI()" class="ai-btn" style="flex:1">🤖 AI查错</button>' +
+    (hasManuscript ? '<button onclick="(function(){var el=document.getElementById(\'proofreadScope\');el.style.display=el.style.display===\'none\'?\'block\':\'none\'})()" class="ai-btn-clear">选范围</button>' : '') +
+    '<button onclick="document.getElementById(\'proofreadOutput\').innerHTML=\'\'" class="ai-btn-clear">清空</button></div>' +
     '<div id="proofreadOutput" style="min-height:200px"></div>' +
   '</div>';
 }

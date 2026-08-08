@@ -1,16 +1,14 @@
-/** 选题推荐：输入领域 → AI 搜索 + 分析 → 推荐论文题目 + 大纲 */
+/** 选题推荐：输入领域 → AI 分析 → 推荐论文题目 */
 function runTopicFinder(container) {
   var c = container || document.querySelector('.module-panel');
   if (!c) return;
   c.innerHTML = '<div class="module-panel module-panel-content">' +
     '<h4>💡 论文选题推荐</h4>' +
-    '<div class="ai-desc">输入你感兴趣的研究领域，AI 会分析该领域的研究热点与空白，为你推荐 <b>5 个可行论文题目</b>，每个附带大纲方向与参考文献建议。</div>' +
-    '<div class="ai-input-row ai-input-row-stack">' +
-      '<input id="topicDomain" class="ai-input" placeholder="研究领域（如：人工智能教育、供应链金融风险）">' +
-      '<input id="topicKeywords" class="ai-input" placeholder="关键词（选填，逗号分隔）">' +
-      '<button type="button" onclick="runTopicFinderAI()" class="ai-btn ai-btn-compact">开始推荐</button>' +
-    '</div>' +
-    '<div id="topicOutput" class="module-output-host"></div>' +
+    '<p style="font-size:12px;color:#94a3b8;margin:4px 0 10px">输入研究领域，AI 推荐 5 个可行题目 + 大纲方向</p>' +
+    '<input id="topicDomain" class="ai-input" style="margin-bottom:6px" placeholder="研究领域，如：人工智能教育、供应链金融风险">' +
+    '<input id="topicKeywords" class="ai-input" style="margin-bottom:8px" placeholder="关键词（选填，逗号分隔）">' +
+    '<button onclick="runTopicFinderAI()" class="ai-btn" style="width:100%">🤖 开始推荐</button>' +
+    '<div id="topicOutput" style="margin-top:12px"></div>' +
   '</div>';
 }
 
