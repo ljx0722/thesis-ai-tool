@@ -35,6 +35,38 @@ window._exportDefenseSlides = function() {
   navigator.clipboard.writeText(text).then(function(){ if(typeof ttp==='function') ttp('已复制'+_defenseSlides.length+'页大纲'); });
 };
 
+window._downloadPPTX = function() {
+  if (!_defenseSlides.length) { alert('请先生成PPT大纲'); return; }
+  if (typeof PptxGenJS === 'undefined') { _exportDefenseSlides(); return; }
+  try {
+    var pptx = new PptxGenJS();
+    pptx.defineLayout({ name:'CUSTOM', width:'13.33', height:'7.5' });
+    pptx.layout = 'CUSTOM';
+    _defenseSlides.forEach(function(s,i) {
+      var slide = pptx.addSlide();
+      slide.background = { color: i===0 ? '1E293B' : 'FFFFFF' };
+      slide.addText((s.title||'幻灯片'+(i+1)), {
+        x:0.8, y:0.6, w:11.7, h:1.2,
+        fontSize: 24, bold: true, color: i===0 ? 'FFFFFF' : '1E293B'
+      });
+      if (i===0) slide.addText('论文答辩', { x:0.8, y:2.0, w:11.7, h:0.5, fontSize:14, color:'CBD5E1' });
+      var bullets = s.bullets || ['要点1'];
+      slide.addText(bullets.map(function(b,j){ return '• ' + b; }).join('\n'), {
+        x:1.2, y:2.8, w:10.9, h:4, fontSize: 14, color: '334155', lineSpacing: 32
+      });
+      slide.addText(String(i+1), {
+        x:12.0, y:6.8, w:1, h:0.5, fontSize:10, color:'94A3B8'
+      });
+    });
+    pptx.writeFile({ fileName: '答辩PPT_论文搭子.pptx' }).then(function() {
+      if (typeof ttp === 'function') ttp('PPTX 已下载');
+    });
+  } catch(e) {
+    alert('PPTX 生成失败: ' + e.message + '，已复制文本大纲到剪贴板');
+    _exportDefenseSlides();
+  }
+};
+
 window.runDefenseAI = function() {
   var has = typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 200;
   var sc = document.getElementById('defenseSlides'), slideCount = sc?parseInt(sc.value):16;
@@ -63,8 +95,9 @@ window.runDefenseAI = function() {
       _defenseSlides.push({ title: l.replace(/^\d+[\.\、\s]+/,'').trim(), bullets: ['要点1','要点2','要点3'], duration: '2-3' });
     });
     var h = '<div style="margin-bottom:12px;display:flex;gap:8px;align-items:center">'+
-      '<span style="font-size:12px;color:#94a3b8">生成'+_defenseSlides.length+'页 · 点击标题或要点可直接编辑</span>'+
-      '<button class="ai-btn" style="margin-left:auto;font-size:12px;padding:5px 12px" onclick="_exportDefenseSlides()">📋 复制全部大纲</button></div>'+
+      '<span style="font-size:12px;color:#94a3b8">生成'+_defenseSlides.length+'页 · 点击可直接编辑</span>'+
+      '<button class="ai-btn" style="margin-left:auto;font-size:12px;padding:5px 12px" onclick="_downloadPPTX()">📥 下载PPTX</button>'+
+      '<button class="ai-btn-clear" style="font-size:12px;padding:5px 12px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer" onclick="_exportDefenseSlides()">📋 复制大纲</button></div>'+
       _renderDefenseSlides();
     out.innerHTML = h;
     if (window.ThesisProject && ThesisProject.logSkillRun) ThesisProject.logSkillRun({ moduleId: 'defense-ppt', title: '答辩PPT', summary: _defenseSlides.length + '页' });

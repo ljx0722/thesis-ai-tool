@@ -1072,7 +1072,20 @@ function runDataAnalysis(container) {
   }catch(e){}
   container.innerHTML =
     chapterBanner+
-    '<h4 style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">数据分析 <span id="daMatCountBadge" class="da-mat-count" style="font-size:.68rem;font-weight:600;color:var(--text-muted);background:var(--surface-alt);border:1px solid var(--border);padding:3px 10px;border-radius:999px">资料库 · …</span></h4>'+
+    '<div style="padding:14px;border:2px solid #4f46e5;border-radius:14px;margin-bottom:12px;background:#f8faff">'+
+    '<div style="font-weight:700;font-size:14px;margin-bottom:4px">⚡ 快速数据分析</div>'+
+    '<p style="font-size:12px;color:#94a3b8;margin-bottom:10px">粘贴 CSV 数据或上传 CSV 文件，即时生成描述统计和可视化图表</p>'+
+    '<textarea id="daQuickCSV" class="ai-textarea" style="height:80px;margin-bottom:8px;font-family:monospace;font-size:12px" placeholder="列A,列B,列C&#10;1,23,4.5&#10;2,18,6.2&#10;3,31,3.8"></textarea>'+
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+    '<button class="ai-btn" style="font-size:12px;padding:6px 14px" onclick="_quickDataAnalysis()">📊 即时分析</button>'+
+    '<input type="file" id="daFileInput" accept=".csv,.tsv,.txt" style="display:none" onchange="_handleDataFile(this)">'+
+    '<button class="ai-btn-clear" style="font-size:12px;padding:6px 12px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer" onclick="document.getElementById(\'daFileInput\').click()">📁 上传CSV</button>'+
+    '<button class="ai-btn-clear" style="font-size:12px;padding:6px 12px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer" onclick="document.getElementById(\'daQuickCSV\').value=\'\';var c=document.getElementById(\'daQuickChart\');if(c)c.innerHTML=\'\';var s=document.getElementById(\'daQuickStats\');if(s)s.innerHTML=\'\'">清空</button>'+
+    '</div>'+
+    '<div id="daQuickStats" style="margin-top:10px"></div>'+
+    '<div id="daQuickChart" style="margin-top:10px;max-width:100%"><canvas id="daChartCanvas" style="max-height:300px"></canvas></div>'+
+    '</div>'+
+    '<h4 style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:16px">📁 项目资料库分析 <span id="daMatCountBadge" class="da-mat-count" style="font-size:.68rem;font-weight:600;color:var(--text-muted);background:var(--surface-alt);border:1px solid var(--border);padding:3px 10px;border-radius:999px">资料库 · …</span></h4>'+
     '<div class="materials-pick" id="daMaterialsPick" style="padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-alt);margin-bottom:12px">'+
       '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:6px"><div><div style="font-size:.72rem;font-weight:700">从项目资料库选择数据表</div><div style="font-size:.62rem;color:var(--text-muted)">可多选 CSV/TSV；当前支持对所选表分别画像，联合分析将按批处理收费</div></div><label style="font-size:.68rem;white-space:nowrap"><input type="checkbox" id="daSelectAll" onchange="toggleAllDataMaterials(this.checked)"> 全选</label></div>'+
       '<div id="daMaterialList" class="da-material-list" style="max-height:180px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--bg-card);margin-bottom:8px"><div class="dw-loading" style="font-size:.7rem;color:var(--text-muted)">正在加载资料列表…</div></div>'+
@@ -1100,6 +1113,66 @@ function runDataAnalysis(container) {
   // 关键：渲染后立刻拉资料列表（此前未调用导致下拉一直「加载中」）
   setTimeout(function(){ try{ loadDataAnalysisMaterials(); }catch(e){} }, 0);
 }
+
+// ── 快速数据分析 (Chart.js + simple-statistics) ──
+window._quickDataAnalysis = function() {
+  var raw = document.getElementById('daQuickCSV').value.trim();
+  if (!raw) { alert('请粘贴CSV数据或上传CSV文件'); return; }
+  var lines = raw.split('\n').filter(function(l){ return l.trim(); });
+  if (lines.length < 2) { alert('至少需要1行表头 + 1行数据'); return; }
+  var headers = lines[0].split(/[,\t]/).map(function(h){ return h.trim(); });
+  var data = [];
+  for (var i = 1; i < lines.length; i++) {
+    var vals = lines[i].split(/[,\t]/).map(function(v){ return parseFloat(v.trim()); });
+    data.push(vals);
+  }
+  // Compute stats per column
+  var statsHtml = '<div style="font-size:13px;font-weight:600;margin-bottom:8px">📊 描述统计 (n='+(data.length)+')</div>'+
+    '<div style="display:grid;grid-template-columns:repeat('+Math.min(headers.length,6)+',1fr);gap:8px;margin-bottom:12px">';
+  var chartLabels = [], chartData = [], chartColors = ['#4f46e5','#10b981','#f59e0b','#ef4444','#8b5cf6','#6366f1','#ec4899','#14b8a6'];
+  headers.forEach(function(h,ci) {
+    var col = data.map(function(r){ return r[ci]; }).filter(function(v){ return !isNaN(v) && isFinite(v); });
+    if (!col.length) { statsHtml += '<div class="card" style="padding:10px;text-align:center;font-size:11px;color:#94a3b8">'+h+'<br>无数据</div>'; return; }
+    var mean = 0; col.forEach(function(v){ mean += v; }); mean /= col.length;
+    var sorted = col.slice().sort(function(a,b){ return a-b; });
+    var median = sorted.length%2 ? sorted[Math.floor(sorted.length/2)] : (sorted[sorted.length/2-1]+sorted[sorted.length/2])/2;
+    var variance = 0; col.forEach(function(v){ variance += (v-mean)*(v-mean); }); variance /= col.length;
+    var stdDev = Math.sqrt(variance);
+    var missing = data.length - col.length;
+    statsHtml += '<div class="card" style="padding:10px;text-align:left">'+
+      '<div style="font-weight:700;font-size:12px;margin-bottom:4px">'+h+'</div>'+
+      '<div style="font-size:11px;color:#555">均值: '+mean.toFixed(2)+'</div>'+
+      '<div style="font-size:11px;color:#555">中位数: '+median.toFixed(2)+'</div>'+
+      '<div style="font-size:11px;color:#555">标准差: '+stdDev.toFixed(2)+'</div>'+
+      (missing>0?'<div style="font-size:10px;color:#ef4444">缺失: '+missing+'行</div>':'')+
+    '</div>';
+    chartLabels.push(h.substring(0,8));
+    chartData.push(mean);
+  });
+  statsHtml += '</div>';
+  document.getElementById('daQuickStats').innerHTML = statsHtml;
+  // Draw chart
+  try {
+    var ctx = document.getElementById('daChartCanvas');
+    if (!ctx) return;
+    if (window._daChartInstance) window._daChartInstance.destroy();
+    window._daChartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: { labels: chartLabels, datasets: [{ label: '均值', data: chartData, backgroundColor: chartColors.slice(0,chartData.length) }] },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+  } catch(e) { console.warn('[chart]', e); }
+};
+
+window._handleDataFile = function(input) {
+  var file = input.files[0]; if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var ta = document.getElementById('daQuickCSV');
+    if (ta) { ta.value = e.target.result; _quickDataAnalysis(); }
+  };
+  reader.readAsText(file);
+};
 
 function inferClaimTypes(claim){
   var c=(claim||'').toLowerCase(),types=[];

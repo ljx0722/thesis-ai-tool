@@ -18,7 +18,8 @@ var Citely = (function() {
     filters: { yearFrom: '', yearTo: '', language: 'all', maxResults: 30, sources: ['OA','CR','S2','BD'] },
     activeTab: 'results',
     projectKeywords: '',
-    chapters: []
+    chapters: [],
+    exportFormat: 'gbt7714'
   };
 
   // ── API ──
@@ -332,7 +333,6 @@ var Citely = (function() {
   function exportBibliography() {
     var citations = loadCitations();
     var saved = loadSavedPapers();
-    // Merge: use citations first, then saved papers not yet cited
     var allPapers = citations.slice();
     saved.forEach(function(p) {
       var exists = allPapers.some(function(c) { return (p.doi && c.doi === p.doi) || p.title === c.title; });
@@ -341,32 +341,54 @@ var Citely = (function() {
 
     if (!allPapers.length) { showToast('没有可导出的文献'); return; }
 
-    // GB/T 7714 format
-    var lines = allPapers.map(function(p, i) {
-      var authors = (p.authors || '佚名').split(',').slice(0, 3).join(', ');
-      if ((p.authors||'').split(',').length > 3) authors += ', 等';
-      return '[' + (i+1) + '] ' + authors + '. ' + (p.title || '') +
-        '[J]. ' + (p.journal || '未知期刊') + ', ' + (p.year || '') +
-        (p.doi ? '. DOI:' + p.doi : '') + '.';
-    });
+    // Detect format preference from state
+    var fmt = state.exportFormat || 'gbt7714';
+    var lines = [];
+    if (fmt === 'gbt7714') {
+      lines = allPapers.map(function(p, i) {
+        var authors = (p.authors || '佚名').split(',').slice(0, 3).join(', ');
+        if ((p.authors||'').split(',').length > 3) authors += ', 等';
+        return '[' + (i+1) + '] ' + authors + '. ' + (p.title || '') +
+          '[J]. ' + (p.journal || '未知期刊') + ', ' + (p.year || '') +
+          (p.doi ? '. DOI:' + p.doi : '') + '.';
+      });
+    } else if (fmt === 'apa') {
+      lines = allPapers.map(function(p, i) {
+        var authors = (p.authors || 'Anonymous').split(',').map(function(a){ return a.trim().split(' ').pop(); }).slice(0, 3).join(', ');
+        if ((p.authors||'').split(',').length > 3) authors += ', et al.';
+        return authors + ' (' + (p.year||'n.d.') + '). ' + (p.title||'Untitled') + '. *' +
+          (p.journal||'Unknown Journal') + '*' + (p.doi ? '. https://doi.org/'+p.doi : '') + '.';
+      });
+    } else if (fmt === 'bibtex') {
+      lines = allPapers.map(function(p, i) {
+        var author = (p.authors||'anonymous').split(',')[0].trim().split(' ').pop().toLowerCase();
+        var key = author + (p.year||'') + (p.title||'').split(' ')[0].toLowerCase();
+        return '@article{' + key + ',\n  title={' + (p.title||'') + '},\n  author={' + (p.authors||'佚名') + '},\n  journal={' + (p.journal||'') + '},\n  year={' + (p.year||'') + '}' +
+          (p.doi ? ',\n  doi={' + p.doi + '}' : '') + '\n}';
+      });
+    }
 
-    var text = lines.join('\n');
-    // Copy to clipboard
-    navigator.clipboard.writeText(text).then(function() {
-      showToast('参考文献已复制到剪贴板 (' + allPapers.length + ' 条)');
-    }).catch(function() {
-      // Fallback: show in modal
-      var ta = document.createElement('textarea');
-      ta.value = text; ta.style.cssText = 'position:fixed;top:20%;left:10%;width:80%;height:60%;z-index:99999';
-      ta.id = 'citelyExportTA';
-      document.body.appendChild(ta);
-      ta.select();
-      showToast('请手动复制 (Ctrl+C) 后关闭此窗口');
-      setTimeout(function() {
-        var el = document.getElementById('citelyExportTA');
-        if (el) el.remove();
-      }, 30000);
-    });
+    var text = lines.join(fmt==='bibtex'?'\n\n':'\n');
+
+    // Show format selector + copy
+    var modalId = 'citelyExport_' + Date.now();
+    var html = '<div style="padding:14px">'+
+      '<div style="display:flex;gap:6px;margin-bottom:12px">'+
+        ['gbt7714','apa','bibtex'].map(function(f) {
+          return '<button class="'+(f===fmt?'ai-btn':'ai-btn-clear')+'" style="font-size:12px;padding:5px 12px" onclick="var s=window.Citely.getState?Citely.getState():null;if(s)s.exportFormat=\''+f+'\';Citely.exportBibliography();var el=document.getElementById(\''+modalId+'\');if(el)el.remove()">' + (f==='gbt7714'?'GB/T 7714':f==='apa'?'APA 7th':'BibTeX') + '</button>';
+        }).join('') +
+      '</div>'+
+      '<textarea readonly style="width:100%;height:300px;font-family:monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:8px;padding:10px;resize:vertical">' + text + '</textarea>'+
+      '<div style="margin-top:8px;display:flex;gap:8px">'+
+        '<button class="ai-btn" style="flex:1;font-size:12px" onclick="navigator.clipboard.writeText(this.parentElement.previousElementSibling.value).then(function(){if(typeof ttp===\'function\')ttp(\'已复制 '+allPapers.length+' 条文献\')})">📋 复制到剪贴板</button>'+
+        '<button class="ai-btn-clear" style="font-size:12px;padding:5px 12px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer" onclick="document.getElementById(\''+modalId+'\').remove()">关闭</button>'+
+      '</div></div>';
+    var ov = document.createElement('div');
+    ov.id = modalId;
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:100000;display:flex;align-items:center;justify-content:center';
+    ov.innerHTML = '<div style="background:#fff;border-radius:16px;max-width:700px;width:94vw;max-height:85vh;overflow:auto;box-shadow:0 24px 64px rgba(0,0,0,.22)" onclick="event.stopPropagation()">'+html+'</div>';
+    ov.onclick = function(){ ov.remove(); };
+    document.body.appendChild(ov);
   }
 
   function mount(containerId, projectData) {

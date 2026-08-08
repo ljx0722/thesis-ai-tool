@@ -1,4 +1,5 @@
-/** 查重降重 — 深度版：逐句对比 + 相似度 + 一键替换 */
+/** 查重降重 — 深度版：逐句对比 + 相似度 + diff高亮 + 一键替换 */
+var _dedupDiffs = [];
 function runDeduplicate(c) {
   var has = typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100;
   c.innerHTML = '<div class="module-panel module-panel-content">' +
@@ -17,6 +18,26 @@ window._replaceText = function(text) {
   var ta = document.getElementById('dedupInput');
   if (ta) { ta.value = text; ta.focus(); }
   if (typeof ttp === 'function') ttp('已替换到输入框');
+};
+
+window._showDiff = function(idx) {
+  if (!_dedupDiffs[idx]) return;
+  var original = _dedupDiffs[idx].original, rewritten = _dedupDiffs[idx].rewritten;
+  if (typeof diff_match_patch === 'undefined') {
+    alert('原文：'+original+'\n\n改写：'+rewritten);
+    return;
+  }
+  var dmp = new diff_match_patch();
+  var diffs = dmp.diff_main(original, rewritten);
+  dmp.diff_cleanupSemantic(diffs);
+  var h = '';
+  diffs.forEach(function(d) {
+    if (d[0] === 0) h += d[1].replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    else if (d[0] === -1) h += '<del style="background:#fee2e2;color:#dc2626;text-decoration:line-through">'+d[1].replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</del>';
+    else h += '<ins style="background:#dcfce7;color:#16a34a;text-decoration:none">'+d[1].replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</ins>';
+  });
+  var win = window.open('', '_diff'+idx, 'width=800,height=500,scrollbars=yes');
+  win.document.write('<html><head><title>逐字对比</title><style>body{font-family:sans-serif;padding:20px;line-height:1.8;font-size:14px}del{background:#fee2e2;color:#dc2626;text-decoration:line-through;padding:1px 2px}ins{background:#dcfce7;color:#16a34a;text-decoration:none;padding:1px 2px}h3{font-size:13px;color:#94a3b8;margin-bottom:4px}</style></head><body><h3>删除的 (红色) / 新增的 (绿色)</h3>'+h+'</body></html>');
 };
 
 window.runDedupAI = function(mode) {
@@ -55,7 +76,8 @@ window.runDedupAI = function(mode) {
           h += '<div style="margin-bottom:10px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid #f1f5f9">'+
             '<div style="font-size:12px;color:#94a3b8;margin-bottom:4px">📝 原句</div><div style="font-size:12px;color:#555;margin-bottom:6px;padding:6px;background:#fff;border-radius:4px">'+parts[0].replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>'+
             '<div style="font-size:12px;color:#94a3b8;margin-bottom:4px">✨ 改写</div><div style="font-size:12px;color:#111;padding:6px;background:#f0f9ff;border-radius:4px;border:1px solid #bae6fd">'+parts[1].replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>'+
-            '<div style="margin-top:6px"><button class="ai-btn-clear" style="font-size:11px;padding:3px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer" onclick="_replaceText(\''+parts[1].replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\')">🔄 替换到输入框</button></div></div>';
+            '<div style="margin-top:6px;display:flex;gap:6px"><button class="ai-btn-clear" style="font-size:11px;padding:3px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer" onclick="_replaceText(\''+parts[1].replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\')">🔄 替换</button>'+
+          '<button class="ai-btn-clear" style="font-size:11px;padding:3px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer" onclick="_dedupDiffs['+lines.indexOf(l)+']={original:\''+parts[0].replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\',rewritten:\''+parts[1].replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\'};_showDiff('+lines.indexOf(l)+')">🔍 逐字对比</button></div></div>';
         }
       });
       if (!hasComparison) h += '<div class="ai-output">'+d.content.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>';
