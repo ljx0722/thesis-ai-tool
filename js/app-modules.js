@@ -840,6 +840,8 @@ function onThesisLoaded(options) {
   options=options||{};
   _thesisLoaded = true; _analysisCache = {}; kgCurrentData = null;
   updateBarActions(); updateStatusBar2(); updateNavStates();
+  // Refresh the feature tree to show thesis-dependent tools
+  if (typeof window._renderFeatureTree === 'function') window._renderFeatureTree();
   if (!options.skipRevisionSave && window.ThesisProject && typeof ThesisProject.onManuscriptReady === 'function') {
     ThesisProject.onManuscriptReady();
   }
