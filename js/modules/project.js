@@ -1752,7 +1752,15 @@
       unloadProjectRuntime();var s=d.snapshot||{};
       manuscriptText=s.text||'';manuscriptHTML=s.html||'';sections=s.sections||[];existingRefs=s.references||[];mergedRefs=[];paperTopics=s.topics||[];
       var tb=document.getElementById('thesisBox'),ws=document.getElementById('workspaceContent');if(tb){Array.prototype.slice.call(tb.childNodes).forEach(function(n){if(n!==ws)tb.removeChild(n);});if(ws)ws.style.display='none';var root=document.createElement('div');root.id='paperContentRoot';root.className='paper-content-root';root.innerHTML=manuscriptHTML;tb.appendChild(root);}
-      if(typeof rehydrateManuscriptRuntime==='function')rehydrateManuscriptRuntime();else if(typeof renderNavTree==='function')renderNavTree(sections);window._thesisStructured=sections.length>0;if(typeof renderExistingOnly==='function')renderExistingOnly();if(typeof onThesisLoaded==='function')onThesisLoaded({skipRevisionSave:true});return true;
+      if(typeof rehydrateManuscriptRuntime==='function')rehydrateManuscriptRuntime();
+      else if(typeof renderNavTree==='function')renderNavTree(sections);
+      if(typeof structureThesisBox==='function')structureThesisBox();
+      if(typeof renderExistingOnly==='function')renderExistingOnly();
+      if(typeof onThesisLoaded==='function')onThesisLoaded({skipRevisionSave:true});
+      // 重新渲染UI元素
+      try{renderProjectChrome();}catch(e){}
+      try{if(typeof updateStatusBar2==='function')updateStatusBar2();}catch(e){}
+      return true;
     });
   }
 
@@ -1772,10 +1780,20 @@
   function bootstrapAuthenticatedUser() {
     return pullCloudProjects().then(function(list){
       var current=getCurrentProject();if(!current&&list&&list.length){setCurrentId(list[0].id);current=list[0];}
-      if(current&&current.activeRevisionId){return hydrateRevision(current.id,current.activeRevisionId).catch(function(){unloadProjectRuntime();}).then(function(){restoreImportDecomposition(current);renderProjectChrome();if(typeof switchView==='function')switchView('workspace');return current;});}
-      unloadProjectRuntime();restoreImportDecomposition(current);renderProjectChrome();if(typeof switchView==='function')switchView('workspace');return current;
+      if(current&&current.activeRevisionId){return hydrateRevision(current.id,current.activeRevisionId).catch(function(err){console.warn('[hydrate]',err);unloadProjectRuntime();}).then(function(result){
+        restoreImportDecomposition(current);renderProjectChrome();
+        if(typeof switchView==='function')switchView('workspace');
+        // 状态栏刷新
+        try{if(typeof updateStatusBar2==='function')updateStatusBar2();}catch(e){}
+        return current;
+      });}
+      unloadProjectRuntime();restoreImportDecomposition(current);renderProjectChrome();if(typeof switchView==='function')switchView('workspace');
+      try{if(typeof updateStatusBar2==='function')updateStatusBar2();}catch(e){}
+      return current;
     }).catch(function(err){
-      console.warn('[project-cloud-pull]',err);var current=getCurrentProject();unloadProjectRuntime();restoreImportDecomposition(current);renderProjectChrome();if(typeof switchView==='function')switchView('workspace');if(typeof ttp==='function')ttp('云端项目加载失败，已使用本地数据');return current;
+      console.warn('[project-cloud-pull]',err);var current=getCurrentProject();unloadProjectRuntime();restoreImportDecomposition(current);renderProjectChrome();if(typeof switchView==='function')switchView('workspace');
+      try{if(typeof updateStatusBar2==='function')updateStatusBar2();}catch(e){}
+      if(typeof ttp==='function')ttp('云端项目加载失败，已使用本地数据');return current;
     });
   }
 
