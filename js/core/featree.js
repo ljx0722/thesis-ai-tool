@@ -27,8 +27,7 @@
       {id:'defense-ppt',icon:'📊',label:'答辩PPT'},
       {id:'en-abstract',icon:'🌐',label:'英文摘要'},
     ];
-    var h=tools.map(function(t){return'<div class="ft-leaf" onclick="_open(\''+t.id+'\',\'workspace\')">'+'<span class="ft-icon">'+t.icon+'</span><span class="ft-label">'+t.label+'</span></div>'}).join('');
-    c.innerHTML=h;
+    var h='';tools.forEach(function(t){h+='<div class="ft-leaf" onclick="_open(\''+t.id+'\')"><span class="ft-icon">'+t.icon+'</span><span class="ft-label">'+t.label+'</span></div>'});c.innerHTML=h;
   }
   renderTree();window._renderFeatureTree=renderTree;
 })();
@@ -36,21 +35,39 @@
 
 <script id="moduleRouter">
 (function(){
-  window._openFullscreen=function(h,m){var mc=document.getElementById('mainContent'),tp=document.getElementById('thesisPanel'),rp=document.getElementById('refPanel');if(tp)tp.style.display='none';if(rp)rp.style.display='none';mc.innerHTML=h;if(m)setTimeout(m,50)};
-  window._activateTab=function(n){document.querySelectorAll('.bar-tab').forEach(function(t){t.classList.toggle('active',t.getAttribute('data-view')===n)})};
-  window._restoreWorkspace=function(){var mc=document.getElementById('mainContent'),tp=document.getElementById('thesisPanel'),rp=document.getElementById('refPanel');if(tp)tp.style.display='';if(rp)rp.style.display='';mc.innerHTML='<div id="workspaceContent" class="workspace-content"></div>';_activateTab('workspace');if(typeof window.renderWorkspaceHero==='function')try{window.renderWorkspaceHero()}catch(e){};if(window._renderFeatureTree)window._renderFeatureTree()};
-  window._open=function(id,tab){_activateTab(tab||'workspace');var mc=document.getElementById('mainContent'),tp=document.getElementById('thesisPanel'),rp=document.getElementById('refPanel');
-    if(id==='references'){_restoreWorkspace();if(typeof switchModule==='function')switchModule('references');return}
+  var LABELS={'format-check':'✅ 格式检查','proofread':'✏️ 论文查错','terminology':'🔤 术语分析','paragraph':'📝 段落分析','de-duplicate':'📋 查重降重','review':'🔍 综合审阅','optimization':'💡 优化建议','expand':'📝 AI扩写','data-analysis':'📈 数据分析','topic-finder':'💡 选题推荐','proposal':'📝 开题大纲','defense-ppt':'📊 答辩PPT','en-abstract':'🌐 英文摘要','references':'📋 参考文献'};
+  var RUNNERS={'topic-finder':'runTopicFinder','proposal':'runProposalModule','expand':'runExpandModule','data-analysis':'runDataAnalysis','proofread':'runProofread','de-duplicate':'runDeduplicate','format-check':'runFormatCheck','terminology':'runTerminology','paragraph':'runParagraphAnalysis','review':'runReviewModule','optimization':'runOptimization','defense-ppt':'runDefensePPT','en-abstract':'runEnAbstract'};
+
+  // Open module in drawer alongside thesis (never hides thesis)
+  window._open=function(id){
+    // Overlay modules
     if(id==='dashboard'){if(typeof showDashboard==='function')showDashboard();return}
     if(id==='knowledge-graph'){if(typeof showKnowledgeGraph==='function')showKnowledgeGraph();return}
     if(id==='chapter-board'){if(typeof openChapterBoard==='function')openChapterBoard();return}
     if(id==='outline'){if(typeof openOutlineEditor==='function')openOutlineEditor();return}
-    if(id==='citely'){if(tp)tp.style.display='none';if(rp)rp.style.display='none';mc.innerHTML='<div id="citelyContainer"></div>';var pd={};try{var p=window.ThesisProject&&ThesisProject.getCurrentProject?ThesisProject.getCurrentProject():null;if(p){pd.keywords=p.keywords||'';pd.chapters=(p.chapters||[]).map(function(c){return{id:c.id||c.title||c,title:c.title||c}});}}catch(e){}if(typeof Citely!=='undefined')setTimeout(function(){Citely.mount('citelyContainer',pd)},50);return}
-    if(id==='writing-workbench'){if(tp)tp.style.display='none';if(rp)rp.style.display='none';mc.innerHTML='';if(typeof WritingModule!=='undefined')WritingModule.mount(mc);return}
-    if(tp)tp.style.display='none';if(rp)rp.style.display='none';mc.innerHTML='<div style="flex:1;overflow:auto;min-height:0" id="tbModuleRoot"></div>';
-    var root=document.getElementById('tbModuleRoot');if(!root)return;
-    var runners={'topic-finder':'runTopicFinder','proposal':'runProposalModule','expand':'runExpandModule','data-analysis':'runDataAnalysis','proofread':'runProofread','de-duplicate':'runDeduplicate','format-check':'runFormatCheck','terminology':'runTerminology','paragraph':'runParagraphAnalysis','review':'runReviewModule','optimization':'runOptimization','defense-ppt':'runDefensePPT','en-abstract':'runEnAbstract'};
-    var fn=runners[id];if(fn&&typeof window[fn]==='function'){window[fn](root);mc.style.boxShadow='inset 0 0 0 2px var(--accent)';setTimeout(function(){mc.style.boxShadow=''},1500)}else{root.innerHTML='<div style="text-align:center;padding:40px;color:#94a3b8">加载中...</div>'}
-  }
+    // References: uses switchModule (thesis stays visible)
+    if(id==='references'){if(typeof switchModule==='function')switchModule('references');return}
+    // Citely: replaces thesisBox with fullscreen search
+    if(id==='citely'){var tb=document.getElementById('thesisBox');if(tb){tb.innerHTML='<div id="citelyContainer"></div>';var pd={};try{var p=window.ThesisProject&&ThesisProject.getCurrentProject?ThesisProject.getCurrentProject():null;if(p){pd.keywords=p.keywords||'';pd.chapters=(p.chapters||[]).map(function(c){return{id:c.id||c.title||c,title:c.title||c}});}}catch(e){}if(typeof Citely!=='undefined')setTimeout(function(){Citely.mount('citelyContainer',pd)},50)}return}
+    // Writing: replaces thesisBox
+    if(id==='writing-workbench'){var tb2=document.getElementById('thesisBox');if(tb2){tb2.innerHTML='';if(typeof WritingModule!=='undefined')WritingModule.mount(tb2)}return}
+
+    // All other tools: open in side drawer
+    var d=document.getElementById('toolDrawer');
+    if(!d){d=document.createElement('div');d.id='toolDrawer';d.className='tool-drawer';d.innerHTML='<div class="tool-drawer-head"><span id="toolDrawerTitle">工具</span><button onclick="document.getElementById(\'toolDrawer\').classList.remove(\'open\');" style="border:none;background:none;font-size:18px;cursor:pointer;color:#94a3b8">&times;</button></div><div class="tool-drawer-body" id="toolDrawerBody"></div>';document.body.appendChild(d)}
+    d.classList.add('open');
+    var title=document.getElementById('toolDrawerTitle');if(title)title.textContent=LABELS[id]||id;
+    var body=document.getElementById('toolDrawerBody');if(!body)return;body.innerHTML='';
+    var fn=RUNNERS[id];
+    if(fn&&typeof window[fn]==='function'){window[fn](body);body.style.boxShadow='inset 0 0 0 2px var(--accent)';setTimeout(function(){body.style.boxShadow=''},1500)}
+    else{body.innerHTML='<div style="text-align:center;padding:40px;color:#94a3b8">加载中...</div>'}
+  };
+
+  window._restoreWorkspace=function(){
+    var d=document.getElementById('toolDrawer');if(d)d.classList.remove('open');
+    var tb=document.getElementById('thesisBox');if(tb)tb.innerHTML='<div id="workspaceContent" class="workspace-content"></div>';
+    if(typeof window.renderWorkspaceHero==='function')try{window.renderWorkspaceHero()}catch(e){}
+    if(window._renderFeatureTree)window._renderFeatureTree();
+  };
 })();
 </script>
