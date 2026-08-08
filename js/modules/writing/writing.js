@@ -46,29 +46,35 @@ var WritingModule = (function() {
   function render(){
     if(!_container)return;
     var chapters=getChapters();
-    var h='<div class="writing-root" style="display:flex;height:100%">';
-    // Left: TOC
-    h+='<div style="width:240px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--border,#e2e8f0);background:#fff;padding:12px">';
-    h+='<div style="font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">📑 目录</div>';
+    var h='<div class="writing-root" style="display:flex;flex-direction:column;height:100%">';
+    // Toolbar
+    var totalWords=0;chapters.forEach(function(ch,i){totalWords+=ch.wordCount||(ch.content?ch.content.length:0);});
+    h+='<div style="padding:12px 20px;border-bottom:1px solid var(--border,#e2e8f0);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">'+
+      '<div><span style="font-weight:700;font-size:14px">✍️ 写作工作台</span>'+
+      (chapters.length?' <span style="font-size:12px;color:#94a3b8">'+chapters.length+'章 · '+totalWords+'字</span>':'')+'</div>'+
+      '<div style="display:flex;gap:6px">'+
+        (typeof openOutlineEditor==='function'?'<button class="btn btn-ghost btn-sm" onclick="openOutlineEditor()">编辑大纲</button>':'')+
+        (typeof mergeDraftsIntoThesis==='function'?'<button class="btn btn-ghost btn-sm" onclick="mergeDraftsIntoThesis()">合并到正文</button>':'')+
+      '</div></div>';
+    // Body
+    h+='<div style="display:flex;flex:1;overflow:hidden;min-height:0">';
+    // Chapter selector (compact, no TOC - uses global TOC column)
+    h+='<div style="width:200px;flex-shrink:0;overflow-y:auto;padding:12px;border-right:1px solid var(--border,#f1f5f9)">';
     if(!chapters.length){
-      h+='<div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px">还没有章节<br><button class="btn btn-sm btn-ghost" style="margin-top:8px" onclick="navigateTo(\'setup\')">去立项</button></div>';
+      h+='<div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px">还没有章节</div>';
     }else{
-      var totalWords=0;
-      chapters.forEach(function(ch,i){totalWords+=ch.wordCount||(ch.content?ch.content.length:0);});
-      h+='<div style="font-size:11px;color:#94a3b8;margin-bottom:8px">'+chapters.length+'章 · '+totalWords+'字</div>';
       chapters.forEach(function(ch,i){
         var isActive=_activeChapter&&(_activeChapter.id===ch.id||_activeChapter.title===ch.title);
         var wc=ch.wordCount||(ch.content?ch.content.length:0);
         h+='<div style="padding:8px 10px;margin-bottom:4px;border-radius:8px;cursor:pointer;font-size:13px;'+
           (isActive?'background:var(--accent,#4f46e5);color:#fff;font-weight:600':'color:var(--text-secondary,#555)')+
           '" onclick="WritingModule.selectChapter(\''+(ch.id||ch.title||'ch_'+i)+'\')">'+
-          (i+1)+'. '+esc((ch.title||'未命名').substring(0,30))+
-          (wc>0?' <span style="font-size:10px;opacity:.6">'+wc+'字</span>':'')+
-        '</div>';
+          (i+1)+'. '+esc((ch.title||'未命名').substring(0,24))+
+          (wc>0?' <span style="font-size:10px;opacity:.6">'+wc+'字</span>':'')+'</div>';
       });
     }
     h+='</div>';
-    // Right: Content
+    // Content
     h+='<div style="flex:1;overflow-y:auto;padding:20px">';
     if(!chapters.length){
       h+='<div style="text-align:center;padding:60px 20px;color:#94a3b8">'+
@@ -89,7 +95,7 @@ var WritingModule = (function() {
       h+='<div style="text-align:center;padding:60px 20px;color:#94a3b8">'+
         '<div style="font-size:48px;margin-bottom:12px">📝</div><h3>选择章节开始写作</h3><p style="margin-top:8px">从左侧目录中选择一个章节</p></div>';
     }
-    h+='</div></div>';
+    h+='</div></div></div>';
     _container.innerHTML=h;
   }
 
