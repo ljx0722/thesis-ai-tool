@@ -74,7 +74,7 @@
 .nav-section { padding:10px 16px 2px; font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; flex-shrink:0; }
 #stageNav { flex-shrink:0; max-height:120px; overflow-y:auto; }
 
-/* Feature tree — scrollable area */
+/* Feature tree — fills all available height, scrolls independently */
 .nav-feature-tree { flex:1; overflow-y:auto; overflow-x:hidden; min-height:0; padding:4px 8px; }
 
 /* Quick actions — fixed at bottom */
