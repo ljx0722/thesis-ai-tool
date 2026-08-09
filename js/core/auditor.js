@@ -269,13 +269,154 @@
   }
 
   // ── 导出 ──
+  // ── 段落级三维审阅 ──
+  function auditParagraphs() {
+    var box = document.getElementById('thesisBox');
+    if (!box) return;
+
+    var paragraphs = box.querySelectorAll('p, li, blockquote');
+    var text = typeof manuscriptText !== 'undefined' ? manuscriptText : '';
+    var refs = typeof existingRefs !== 'undefined' && existingRefs.length ? existingRefs :
+               (typeof mergedRefs !== 'undefined' && mergedRefs.length ? mergedRefs : []);
+
+    paragraphs.forEach(function(p, idx) {
+      var pt = (p.textContent || '').trim();
+      if (pt.length < 10) return;
+
+      // 1. 格式维度
+      var formatScore = 85;
+      var formatIssues = [];
+      if (pt.length > 800) { formatScore -= 10; formatIssues.push('段落过长(>800字)');
+      } else if (pt.length < 30) { formatScore -= 5; formatIssues.push('段落过短(<30字)'); }
+      if (/^\d+[\.\、\s]/.test(pt) && pt.length < 50) formatScore -= 15;
+
+      // 2. 写作维度
+      var writingScore = 80;
+      var writingIssues = [];
+      var sents = pt.split(/[。！？\.\!\?]+/).filter(function(s){ return s.trim().length > 3; });
+      var avgLen = 0; sents.forEach(function(s){ avgLen += s.length; });
+      avgLen = sents.length > 0 ? Math.round(avgLen/sents.length) : 0;
+      if (avgLen > 60) { writingScore -= 15; writingIssues.push('平均句长'+avgLen+'字，建议拆分');
+      } else if (avgLen > 45) { writingScore -= 5; writingIssues.push('平均句长偏长('+avgLen+'字)'); }
+      var passives = (pt.match(/被|由|受|为\.{2,}所/g)||[]).length;
+      if (passives > 3) writingScore -= 5;
+
+      // 3. 引用维度
+      var citeScore = 80;
+      var citeIssues = [];
+      var hasCite = /\[\d+\]|\(\d{4}\)|\[[一-鿿]+,\s*\d{4}\]/.test(pt);
+      if (!hasCite && pt.length > 100 && refs.length > 0) {
+        // 需要引用的句子（有断言/数据/方法）
+        var needsCite = /研究|数据|表明|发现|证明|模型|算法|实验|调查|分析|结果|结论|方法|采用|基于|提出|认为/.test(pt);
+        if (needsCite) { citeScore -= 25; citeIssues.push('缺少文献引用'); }
+        else if (pt.length > 200) { citeScore -= 10; citeIssues.push('长段落未引用文献'); }
+      } else if (hasCite) { citeScore = 90; }
+
+      // Store scores in paragraph data attributes
+      p.setAttribute('data-fmt-score', String(Math.max(0, Math.min(100, formatScore))));
+      p.setAttribute('data-write-score', String(Math.max(0, Math.min(100, writingScore))));
+      p.setAttribute('data-cite-score', String(Math.max(0, Math.min(100, citeScore))));
+      p.setAttribute('data-fmt-issues', JSON.stringify(formatIssues));
+      p.setAttribute('data-write-issues', JSON.stringify(writingIssues));
+      p.setAttribute('data-cite-issues', JSON.stringify(citeIssues));
+      p.setAttribute('data-para-index', String(idx));
+
+      // Add indicator strip
+      _renderParaIndicator(p, formatScore, writingScore, citeScore);
+    });
+  }
+
+  function _renderParaIndicator(p, fmt, write, cite) {
+    // Remove old indicator
+    var old = p.querySelector('.para-indicator');
+    if (old) old.remove();
+
+    var indicator = document.createElement('span');
+    indicator.className = 'para-indicator';
+    indicator.style.cssText = 'float:right;display:inline-flex;flex-direction:column;gap:2px;margin-left:8px;padding:3px 4px;border-radius:4px;cursor:pointer;opacity:.7;transition:opacity .15s';
+    indicator.onmouseenter = function(){ this.style.opacity='1'; };
+    indicator.onmouseleave = function(){ this.style.opacity='.7'; };
+    indicator.onclick = function(e) { e.stopPropagation(); _openParaReview(e.currentTarget.parentElement); };
+
+    var fmtColor = fmt >= 80 ? '#10b981' : (fmt >= 55 ? '#f59e0b' : '#ef4444');
+    var writeColor = write >= 80 ? '#10b981' : (write >= 55 ? '#f59e0b' : '#ef4444');
+    var citeColor = cite >= 80 ? '#10b981' : (cite >= 55 ? '#3b82f6' : '#6366f1');
+
+    indicator.innerHTML =
+      '<span style="width:6px;height:6px;border-radius:50%;background:'+fmtColor+'" title="格式: '+fmt+'分"></span>'+
+      '<span style="width:6px;height:6px;border-radius:50%;background:'+writeColor+'" title="写作: '+write+'分"></span>'+
+      '<span style="width:6px;height:6px;border-radius:50%;background:'+citeColor+'" title="引用: '+cite+'分"></span>';
+
+    p.appendChild(indicator);
+  }
+
+  // ── 段落审阅面板 ──
+  window._openParaReview = function(el) {
+    var fmtScore = parseInt(el.getAttribute('data-fmt-score')||'85');
+    var writeScore = parseInt(el.getAttribute('data-write-score')||'80');
+    var citeScore = parseInt(el.getAttribute('data-cite-score')||'80');
+    var fmtIssues = JSON.parse(el.getAttribute('data-fmt-issues')||'[]');
+    var writeIssues = JSON.parse(el.getAttribute('data-write-issues')||'[]');
+    var citeIssues = JSON.parse(el.getAttribute('data-cite-issues')||'[]');
+    var paraText = (el.textContent||'').trim().substring(0, 200);
+
+    var fmtColor = fmtScore >= 80 ? '#10b981' : (fmtScore >= 55 ? '#f59e0b' : '#ef4444');
+    var writeColor = writeScore >= 80 ? '#10b981' : (writeScore >= 55 ? '#f59e0b' : '#ef4444');
+    var citeColor = citeScore >= 80 ? '#10b981' : (citeScore >= 55 ? '#3b82f6' : '#6366f1');
+
+    var h = '<div style="padding:14px">'+
+      '<div style="font-size:13px;color:#94a3b8;margin-bottom:4px">段落 '+(parseInt(el.getAttribute('data-para-index')||'0')+1)+'</div>'+
+      '<div style="font-size:12px;color:#555;line-height:1.6;margin-bottom:16px;padding:8px 10px;background:#f8fafc;border-radius:6px">'+paraText+'…</div>';
+
+    // Format section
+    h += '<div style="margin-bottom:12px"><div style="font-weight:600;font-size:13px;color:'+fmtColor+';margin-bottom:4px">📐 格式 — '+fmtScore+'分</div>';
+    if (fmtIssues.length) fmtIssues.forEach(function(i){ h += '<div style="font-size:12px;color:#555;margin-bottom:2px">⚠ '+i+'</div>'; });
+    else h += '<div style="font-size:12px;color:#94a3b8">✅ 格式规范</div>';
+    h += '</div>';
+
+    // Writing section
+    h += '<div style="margin-bottom:12px"><div style="font-weight:600;font-size:13px;color:'+writeColor+';margin-bottom:4px">✏️ 写作 — '+writeScore+'分</div>';
+    if (writeIssues.length) writeIssues.forEach(function(i){ h += '<div style="font-size:12px;color:#555;margin-bottom:2px">⚠ '+i+'</div>'; });
+    else h += '<div style="font-size:12px;color:#94a3b8">✅ 写作良好</div>';
+    h += '</div>';
+
+    // Citation section
+    h += '<div style="margin-bottom:12px"><div style="font-weight:600;font-size:13px;color:'+citeColor+';margin-bottom:4px">📚 引用 — '+citeScore+'分</div>';
+    if (citeIssues.length) citeIssues.forEach(function(i){ h += '<div style="font-size:12px;color:#555;margin-bottom:2px">⚠ '+i+'</div>'; });
+    else h += '<div style="font-size:12px;color:#94a3b8">✅ 引用充分</div>';
+    h += '</div>';
+
+    // Actions
+    var hasIssues = fmtIssues.length + writeIssues.length + citeIssues.length > 0;
+    h += '<div style="display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid #e2e8f0;padding-top:10px">';
+    if (fmtScore < 70) h += '<button class="btn btn-ghost btn-sm" onclick="this.parentElement.parentElement.querySelector(\'p\');_open(\'format-check\');">格式检查</button>';
+    if (writeScore < 70) h += '<button class="btn btn-ghost btn-sm" onclick="_open(\'proofread\')">AI查错</button>';
+    if (citeScore < 70) h += '<button class="btn btn-ghost btn-sm" onclick="_open(\'citely\')">文献检索</button>';
+    if (hasIssues) h += '<button class="btn btn-primary btn-sm" onclick="_open(\'expand\')">AI扩写</button>';
+    h += '</div>';
+
+    h += '</div>';
+
+    // Show in tool drawer
+    var drawer = document.getElementById('toolDrawer');
+    if (!drawer) {
+      drawer = document.createElement('div'); drawer.id = 'toolDrawer'; drawer.className = 'tool-drawer';
+      drawer.innerHTML = '<div class="tool-drawer-head"><span id="toolDrawerTitle">段落审阅</span><button onclick="this.parentElement.parentElement.classList.remove(\'open\')" style="border:none;background:none;font-size:18px;cursor:pointer;color:#94a3b8">&times;</button></div><div class="tool-drawer-body" id="toolDrawerBody"></div>';
+      document.body.appendChild(drawer);
+    }
+    drawer.classList.add('open');
+    document.getElementById('toolDrawerTitle').textContent = '段落审阅 #'+(parseInt(el.getAttribute('data-para-index')||'0')+1);
+    document.getElementById('toolDrawerBody').innerHTML = h;
+  };
+
   window.ThesisAuditor = {
     REVIEWERS: REVIEWERS,
     auditFull: auditFull,
     getResults: function() { return _reviewResults; },
     getOverallScore: function() { return _reviewResults.overall || _reviewResults.overall_score || 0; },
     getVerdict: function() { return _reviewResults.verdict || ''; },
-    applyAnnotations: applyParagraphAnnotations,
+    applyAnnotations: auditParagraphs,
+    auditParagraphs: auditParagraphs,
     // Legacy compat
     auditAll: auditFull,
     getSummary: function() { return { avgScore: _reviewResults.overall || 0, verdict: _reviewResults.verdict || '' }; },

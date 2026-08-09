@@ -849,9 +849,10 @@ function onThesisLoaded(options) {
   // 自动运行审阅并标注段落
   setTimeout(function(){
     try {
-      if (typeof ThesisAuditor !== 'undefined' && ThesisAuditor.auditAll) {
-        ThesisAuditor.auditAll();
-        ThesisAuditor.applyAnnotations();
+      if (typeof ThesisAuditor !== 'undefined' && ThesisAuditor.auditFull) {
+        ThesisAuditor.auditFull();
+        // 段落级三维审阅标注 (format/writing/citation indicators)
+        if (ThesisAuditor.auditParagraphs) ThesisAuditor.auditParagraphs();
       }
     } catch(e) { console.warn('[auto-audit]', e); }
   }, 800);
