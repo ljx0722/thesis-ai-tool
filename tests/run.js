@@ -1330,10 +1330,10 @@ test('AUDIT: thesis review uses project or document title', function() {
 
 test('SECURITY: topic finder renders user and API text safely', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/topic-finder.js'), 'utf8');
-  var block = src.substring(src.indexOf('window.runTopicFinderAI'), src.length);
-  assert(block.indexOf('loading.textContent') >= 0, 'Topic finder must use textContent for dynamic values');
+  // v3: _tfAnalyze replaces old runTopicFinderAI
+  var block = src.substring(src.indexOf('window._tfAnalyze'), src.length);
   assert(block.indexOf('.catch(function') >= 0, 'Topic finder must handle errors');
-  // New v2: structured JSON-to-card output with escaped innerHTML (safe: content .replace() escaping)
+  // v3: All AI output goes through .replace(/&/g + .replace(/</g escaping
   assert(src.indexOf('.replace(/&/g,') >= 0 && src.indexOf('.replace(/</g,') >= 0, 'AI output must be HTML-escaped');
 });
 
