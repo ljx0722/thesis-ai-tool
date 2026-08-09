@@ -85,7 +85,23 @@
   }
 
   // ── 论文就绪标记 ──
+  function syncFromGlobals() {
+    // 从旧全局变量同步填充 _doc（桥接兼容）
+    if (typeof manuscriptText !== 'undefined' && manuscriptText) _doc.text = manuscriptText;
+    if (typeof manuscriptHTML !== 'undefined' && manuscriptHTML) _doc.html = manuscriptHTML;
+    if (typeof sections !== 'undefined' && sections) {
+      _doc.chapters = sections;
+      _doc.meta.chapterCount = sections.length;
+    }
+    if (typeof existingRefs !== 'undefined' && existingRefs) {
+      _doc.references = existingRefs;
+      _doc.meta.refCount = existingRefs.length;
+    }
+    if (typeof paperTopics !== 'undefined' && paperTopics) _doc.topics = paperTopics;
+  }
+
   function markReady(source) {
+    syncFromGlobals();
     _doc.source = source || _doc.source;
     _doc.meta.loaded = true;
     _doc.meta.ready = true;

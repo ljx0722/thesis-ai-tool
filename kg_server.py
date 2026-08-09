@@ -771,7 +771,7 @@ DEEPSEEK_MODEL = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
 TOKEN_YUAN_PER_10M = float(os.environ.get('TOKEN_YUAN_PER_10M', '1.0'))
 DEEPSEEK_INPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_INPUT_PRICE', str(TOKEN_YUAN_PER_10M / 10.0)))
 DEEPSEEK_OUTPUT_PRICE_PER_1M = float(os.environ.get('DEEPSEEK_OUTPUT_PRICE', str(TOKEN_YUAN_PER_10M / 10.0)))
-USER_MARKUP = float(os.environ.get('USER_MARKUP', '3.0'))  # 用户扣点倍率（覆盖 API + 运维），默认 ×3
+USER_MARKUP = float(os.environ.get('USER_MARKUP', '2.0'))  # 用户扣点倍率（覆盖 API + 运维），默认 ×2
 SEARCH_DAILY_FREE = int(os.environ.get('SEARCH_DAILY_FREE', '0'))
 KG_DAILY_FREE = int(os.environ.get('KG_DAILY_FREE', '2'))
 CREDIT_PER_YUAN = 1000  # 1元=1000厘=1.0显示点
@@ -2987,6 +2987,9 @@ CAPABILITY_PROMPTS = {
     'literature-evidence-analysis': '你是学术证据评审助手。输入是 JSON。只输出一个合法 JSON 对象，不要 Markdown。只能根据题名、摘要和元数据判断文献与论点的关系；摘要缺失时 evidenceSpans 必须为空并在 warnings 标记信息不足；不得虚构样本、方法、结论、DOI或引用。输出字段必须符合用户提供的 requiredOutput。',
     'sentence-evidence-audit': '你是句子级论文证据审计助手。输入是 JSON。只输出一个合法 JSON 对象，不要 Markdown。只根据原句、上下文和候选文献判断引用需求、AI味风险、证据类型与推荐动作；不得虚构文献、DOI、数据或研究结论。输出字段必须符合用户提供的 requiredOutput。',
     'sentence-grounded-rewrite': '你是证据化学术改写助手。输入是 JSON。只输出一个合法 JSON 对象，不要 Markdown。改写必须基于原句和 candidatePapers 中已有候选文献；不得编造文献、DOI、作者、年份、样本或结论；没有足够文献依据时必须在 risk 中说明，且 paperIds 为空。输出字段必须符合用户提供的 requiredOutput。',
+    'review': '你是论文评审专家。从选题价值、文献综述、研究方法、内容论证、创新性、学术写作、格式规范等多维度进行评审，给出具体评分和修改建议。',
+    'domain-analysis': '你是学术领域分析师。根据用户描述的研究方向，分析领域现状、研究热点、关键文献方向和研究方法建议。',
+    'llm-analysis': '你是论文搭子 ThesisBuddy 的通用分析助手。根据用户的具体需求提供专业、严谨的分析和建议，不虚构事实或引用。',
 }
 
 CAPABILITY_ALIASES = {
