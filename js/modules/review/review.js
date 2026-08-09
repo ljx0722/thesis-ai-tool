@@ -47,7 +47,7 @@ var ReviewModule = (function() {
         '<button class="ai-btn" onclick="typeof PaperImport !== \'undefined\' ? PaperImport.open(\'new\') : (typeof openImportDialog === \'function\' ? openImportDialog(\'new\') : null)" style="margin-top:10px">📎 导入论文</button>' +
       '</div>';
     } else if (_activeTab === 'overview') {
-      html += renderOverview();if(hasEssay&&!_container._autoChecked){_container._autoChecked=true;setTimeout(runLocalChecks,200);}
+      html += renderOverview();
     } else {
       html += '<div id="reviewSubContent">请先运行分析</div>';
     }
@@ -112,9 +112,15 @@ var ReviewModule = (function() {
     var subContainer = document.getElementById('reviewSubContent');
     if (!subContainer) return;
 
-    // 运行对应的旧模块函数
+    // format + paragraph → HealthCheckModule.runCheck()
+    if ((tabId === 'format' || tabId === 'paragraph') && typeof HealthCheckModule !== 'undefined') {
+      var checkId = tabId === 'format' ? 'format-check' : 'paragraph';
+      HealthCheckModule.mount(subContainer);
+      HealthCheckModule.runCheck(checkId);
+      return;
+    }
+    // de-duplicate / review / optimize → global functions
     var runnerMap = {
-      'format': 'health-check',      'paragraph': 'health-check',
       'de-duplicate': 'runDeduplicate',
       'review': 'runReviewModule',
       'optimize': 'runOptimization',
@@ -122,11 +128,12 @@ var ReviewModule = (function() {
     var fnName = runnerMap[tabId];
     if (fnName && typeof window[fnName] === 'function') {
       window[fnName](subContainer);
+    }
   }
 
   function runAllChecks() {
     // 依次运行所有本地检查
-    var tasks = TABS.filter(function(t) { return t.id !== 'overview'; });
+    var tasks = TABS.filter(function(t) { return t.id !== 'overview' && t.id !== 'health-check'; });
     var idx = 0;
     function runNext() {
       if (idx >= tasks.length) return;
