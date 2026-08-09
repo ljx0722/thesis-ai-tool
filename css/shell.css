@@ -20,11 +20,12 @@
 
 /* Topbar global search */
 .topbar-center { flex: 1; max-width: 480px; min-width: 0; }
-.global-search { display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 34px; background: rgba(255,255,255,0.08); border: 1px solid var(--border-sidebar); border-radius: var(--radius-md); transition: all var(--duration-fast) var(--easing-default); }
-.global-search:focus-within { border-color: var(--accent-400); background: rgba(255,255,255,0.12); }
-.global-search-icon { width: 16px; height: 16px; color: rgba(255,255,255,0.35); flex-shrink: 0; }
+.global-search { display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 34px; background: rgba(255,255,255,0.12); border: 1px solid var(--border-sidebar); border-radius: var(--radius-md); transition: all var(--duration-fast) var(--easing-default); cursor: pointer; }
+.global-search:hover { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.16); }
+.global-search:focus-within { border-color: var(--accent-400); background: rgba(255,255,255,0.16); }
+.global-search-icon { width: 16px; height: 16px; color: rgba(255,255,255,0.45); flex-shrink: 0; }
 .global-search-input { flex: 1; border: none; background: none; padding: 4px 0; font-size: var(--text-sm); color: #e2e8f0; outline: none; cursor: pointer; }
-.global-search-input::placeholder { color: rgba(255,255,255,0.3); }
+.global-search-input::placeholder { color: rgba(255,255,255,0.4); }
 .global-search-kbd { font-size: 10px; padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,0.1); color: var(--text-sidebar-muted); font-family: var(--font-mono); white-space: nowrap; }
 
 /* Topbar icon buttons */
@@ -115,7 +116,9 @@ body.is-resizing, body.is-resizing * { cursor: col-resize !important; user-selec
   .tool-panel { display: none; }
 }
 @media (max-width: 600px) {
-  .topbar-center { display: none; }
+  .global-search { width: 34px; padding: 0; justify-content: center; }
+  .global-search-input, .global-search-kbd { display: none; }
+  .topbar-center { flex: 0 0 auto; max-width: none; }
   .topbar-brand span { display: none; }
   .content-body { padding: var(--space-2); }
 }

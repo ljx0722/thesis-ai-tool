@@ -1,19 +1,10 @@
 """
-论文搭子 ThesisBuddy - 模块化启动入口
-使用 Flask 应用工厂创建应用。
+论文搭子 ThesisBuddy - 启动入口
+统一使用 kg_server:app (单体 Flask 应用)
 用法: python run.py
 """
 import os
-import sys
-
-# 确保项目根目录在 Python 路径中
-script_dir = os.path.dirname(os.path.abspath(__file__))
-if script_dir not in sys.path:
-    sys.path.insert(0, script_dir)
-
-from backend.app import create_app
-
-app = create_app()
+from kg_server import app
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
