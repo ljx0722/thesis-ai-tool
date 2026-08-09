@@ -134,10 +134,58 @@ function gradeMeta(composite) {
 }
 
 function computeAllScores() {
+  // Try ThesisAuditor 5-reviewer model first (unified review system)
+  var aud = typeof ThesisAuditor !== 'undefined' && ThesisAuditor.getResults ? ThesisAuditor.getResults() : null;
   var rev = typeof computeThesisReview === 'function' ? computeThesisReview() : null;
-  if (!rev || !rev.dimensions || rev.dimensions.length < 10) {
-    return null;
+
+  if (aud && aud.overall) {
+    // Use 5-reviewer scores + legacy structure for the dashboard
+    var rmap = {
+      '主编审阅 (EIC)': { key: 'topic', label: '选题价值', weight: 0.10 },
+      '领域审阅': { key: 'literature', label: '文献综述', weight: 0.15 },
+      '主编审阅 (EIC)': { key: 'struct', label: '框架结构', weight: 0.08 },
+      '方法审阅': { key: 'method', label: '研究方法', weight: 0.10 },
+      '领域审阅': { key: 'content', label: '内容论证', weight: 0.10 },
+      '质疑审阅 (Devil\'s Advocate)': { key: 'conclusion', label: '结论展望', weight: 0.10 },
+      '交叉视角审阅': { key: 'innovation', label: '创新性', weight: 0.05 },
+      '质疑审阅 (Devil\'s Advocate)': { key: 'readable', label: '学术写作', weight: 0.08 },
+      '主编审阅 (EIC)': { key: 'format', label: '格式规范', weight: 0.05 },
+      '交叉视角审阅': { key: 'practical', label: '实践价值', weight: 0.07 }
+    };
+    var dims = [];
+    var reviewers = aud.reviewers || {};
+    var rKeys = Object.keys(reviewers);
+    rKeys.forEach(function(rk) {
+      var meta = rmap[rk]; if (!meta) return;
+      dims.push({ key: meta.key, label: meta.label, weight: meta.weight, score: reviewers[rk].score, modules: [] });
+    });
+    if (dims.length < 5) { /* fall through to legacy */ } else {
+      var composite = aud.overall;
+      var gradeMeta = composite >= 85 ? { grade: 'A', tone: 'ok', label: '优秀' } :
+                     (composite >= 70 ? { grade: 'B', tone: 'info', label: '良好' } :
+                     (composite >= 55 ? { grade: 'C', tone: 'warn', label: '需改进' } :
+                     { grade: 'D', tone: 'bad', label: '需重构' }));
+      var text = typeof manuscriptText !== 'undefined' ? manuscriptText : '';
+      var secs = typeof sections !== 'undefined' ? sections : [];
+      var bodyChs = secs.filter(function(s){return s.title && typeof isBodyChapter === 'function' && isBodyChapter(s);});
+      var refs = typeof existingRefs !== 'undefined' && existingRefs.length ? existingRefs : [];
+      var stats = {
+        words: text.length, chCount: bodyChs.length, refCount: refs.length,
+        cnRefs: refs.filter(function(r){return /[一-鿿]/.test((r.title||r.ci||'').substring(0,5));}).length,
+        enRefs: refs.length - refs.filter(function(r){return /[一-鿿]/.test((r.title||r.ci||'').substring(0,5));}).length,
+        recentRefs: refs.filter(function(r){var y=parseInt(r.year,10)||0; return y>=(new Date().getFullYear()-5);}).length,
+        doiRefs: refs.filter(function(r){return r.doi&&r.doi.length>5;}).length,
+        avgSentLen: 35, figCount: (text.match(/图\s*\d+/g)||[]).length,
+        bodyChs: bodyChs
+      };
+      return { composite: composite, gradeMeta: gradeMeta, dims: dims, stats: stats, bodyChs: bodyChs,
+        gradeTone: gradeMeta.tone, gradeLabel: gradeMeta.label, grade: gradeMeta.grade,
+        verdict: aud.verdict || '', strengths: aud.strengths || [], weaknesses: aud.weaknesses || [] };
+    }
   }
+
+  // Legacy fallback
+  if (!rev || !rev.dimensions || rev.dimensions.length < 10) { return null; }
   var dims = THESIS_BOARD_WEIGHTS.map(function (meta, idx) {
     var source = rev.dimensions[idx] || { score: 0, label: meta.label, subItems: [] };
     return {
