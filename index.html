@@ -123,8 +123,8 @@
       <button class="topbar-icon-btn" onclick="toggleAccountMenu()" title="账户菜单">账户 ▾</button>
       <div class="topbar-dropdown" id="accountDropdown" style="display:none">
         <button onclick="openAccountCenter();toggleAccountMenu()">账户中心</button>
-        <button onclick="showConsumptionHistory();toggleAccountMenu()">消费明细</button>
-        <button onclick="showPricingInfo();toggleAccountMenu()">使用说明</button>
+        <button onclick="openAccountCenter();setTimeout(function(){switchAcctTab('tx')},200);toggleAccountMenu()">消费明细</button>
+        <button onclick="openAccountCenter();setTimeout(function(){switchAcctTab('orders')},200);toggleAccountMenu()">使用说明</button>
         <button onclick="toggleChangelog();toggleAccountMenu()">更新日志</button>
         <hr>
         <button onclick="doLogout()" style="color:var(--danger)">登出</button>
@@ -1025,141 +1025,8 @@ function toggleChangelog(){var p=document.getElementById('changelogPanel');var o
 </script>
 
 <script>
-function showPricingInfo(){ /* real impl assigned to window.showPricingInfo below */ }
+function showPricingInfo(){ openAccountCenter(); setTimeout(function(){ switchAcctTab('orders'); }, 100); }
 </script>
-
-<div id="accountModalMask" class="acct-mask modal-overlay hidden" style="display:none">
-  <div id="accountModal" class="acct-modal" onclick="event.stopPropagation()">
-    <div class="acct-modal-head">
-      <b id="accountModalTitle">消费明细</b>
-      <button class="acct-close" onclick="closeAccountModal()">✕</button>
-    </div>
-    <div id="accountModalBody" class="acct-modal-body"></div>
-  </div>
-</div>
-<script>
-function openAccountModal(title, html){
-  var m=document.getElementById('accountModalMask');
-  document.getElementById('accountModalTitle').textContent=title||'账户';
-  document.getElementById('accountModalBody').innerHTML=html||'';
-  m.style.display='flex';
-  m.classList.add('show');
-}
-function closeAccountModal(){ var m=document.getElementById('accountModalMask'); m.style.display='none'; m.classList.remove('show'); }
-function showConsumptionHistory(){
-  var token=sessionStorage.getItem('thesis_ai_token'); if(!token){alert('请先登录');return;}
-  openAccountModal('消费明细', '<div style="padding:20px;color:rgba(226,232,240,.55)">加载中…</div>');
-  fetch('/api/usage/history?limit=100', {headers:{'Authorization':'Bearer '+token}})
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if(!d.success){ openAccountModal('消费明细', '<div style="color:#fca5a5">'+(d.error||'加载失败')+'</div>'); return; }
-      window._usageHistoryCache=d;
-      renderConsumptionHistory(d, '', '');
-      var ch=document.getElementById('consumptionHistory'); if(ch) ch.textContent=JSON.stringify({n:(d.transactions||[]).length});
-    }).catch(function(){ openAccountModal('消费明细', '<div style="color:#fca5a5">网络错误</div>'); });
-}
-function renderConsumptionHistory(d, fromDate, toDate){
-  function inRange(ts){
-    if(!ts) return true;
-    var day=(ts||'').substring(0,10);
-    if(fromDate && day < fromDate) return false;
-    if(toDate && day > toDate) return false;
-    return true;
-  }
-  function typeLabel(t){
-    var m={usage:'功能消耗',recharge:'充值',gift:'赠送',refund:'退款',admin:'管理员调整',free:'体验额度'};
-    return m[t]||t||'其他';
-  }
-  function usageModuleLabel(m){
-    var map={
-      'topic-finder':'选题推荐','proposal':'开题大纲','proofread':'论文查错','de-duplicate':'查重降重','review':'论文审阅','expand':'论文扩写','chapter-expand':'论文扩写','defense-ppt':'答辩PPT','en-abstract':'英文摘要','format-check':'格式检查','terminology':'术语分析','paragraph':'段落分析','dashboard':'论文看板','data-analysis':'数据分析','data-ml':'数据分析','data-profile':'数据画像','joint-analysis':'联合分析','figure-advisor':'科研图表顾问','figure-advisor-batch':'科研图表顾问','figure-recommend':'图表推荐','figure-render-code':'图表代码生成','figure-qa':'图表规范质检','search':'文献检索','literature-search':'文献检索','kg':'知识图谱','knowledge-graph':'知识图谱','export-docx':'导出文档'
-    };
-    return map[m]||'智能能力';
-  }
-  function modLabel(m){ return usageModuleLabel(m); }
-  var txs=(d.transactions||[]).filter(function(t){return inRange(t.created_at);});
-  var llms=(d.llm_usage||[]).filter(function(t){return inRange(t.created_at);});
-  var h='';
-  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">';
-  h+='<label style="font-size:.68rem;opacity:.75">从</label><input id="histFromDate" type="date" value="'+(fromDate||'')+'" style="font-size:.7rem;padding:4px 6px;border-radius:6px;border:1px solid rgba(128,128,128,.25)">';
-  h+='<label style="font-size:.68rem;opacity:.75">到</label><input id="histToDate" type="date" value="'+(toDate||'')+'" style="font-size:.7rem;padding:4px 6px;border-radius:6px;border:1px solid rgba(128,128,128,.25)">';
-  h+='<button type="button" onclick="filterConsumptionHistory()" style="font-size:.68rem;padding:5px 10px;border-radius:8px;border:1px solid rgba(128,128,128,.25);cursor:pointer;background:transparent">筛选</button>';
-  h+='<button type="button" onclick="exportConsumptionHistory()" style="font-size:.68rem;padding:5px 10px;border-radius:8px;border:1px solid rgba(128,128,128,.25);cursor:pointer;background:transparent">导出</button>';
-  h+='</div>';
-  h+='<div style="margin-bottom:12px;opacity:.75;font-size:.72rem">共 '+txs.length+' 笔交易，智能调用 '+llms.length+' 次。单位：点。</div>';
-  h+='<b>交易记录</b><div style="overflow:auto;margin:6px 0 14px"><table style="width:100%;border-collapse:collapse;font-size:.72rem">';
-  h+='<tr style="opacity:.85"><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">时间</th><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">类型</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">变动(点)</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">余额(点)</th><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">说明</th></tr>';
-  txs.forEach(function(t){
-    var pts=Number(t.points||0);
-    var desc=String(t.description||'').replace(/API|api_cost|上游|倍率|厘/gi,'');
-    h+='<tr><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12)">'+(t.created_at||'')+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12)">'+typeLabel(t.type)+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12);text-align:right">'+(pts>=0?'+':'')+Number(pts).toFixed(3)+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12);text-align:right">'+Number(t.points_after||0).toFixed(3)+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12)">'+desc+'</td></tr>';
-  });
-  if(!txs.length) h+='<tr><td colspan="5" style="padding:10px;opacity:.6">暂无交易</td></tr>';
-  h+='</table></div>';
-  h+='<b>智能调用</b><div style="overflow:auto;margin-top:6px"><table style="width:100%;border-collapse:collapse;font-size:.72rem">';
-  h+='<tr style="opacity:.85"><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">时间</th><th style="text-align:left;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">功能</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">Token</th><th style="text-align:right;padding:6px;border-bottom:1px solid rgba(128,128,128,.2)">扣点</th></tr>';
-  llms.forEach(function(l){
-    var tok=(Number(l.prompt_tokens||0)+Number(l.completion_tokens||0));
-    h+='<tr><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12)">'+(l.created_at||'')+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12)">'+modLabel(l.module)+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12);text-align:right">'+tok+'</td><td style="padding:6px;border-bottom:1px solid rgba(128,128,128,.12);text-align:right">'+Number(l.points_charged||0).toFixed(3)+'</td></tr>';
-  });
-  if(!llms.length) h+='<tr><td colspan="4" style="padding:10px;opacity:.6">暂无智能调用</td></tr>';
-  h+='</table></div>';
-  openAccountModal('消费明细', h);
-}
-function filterConsumptionHistory(){
-  var d=window._usageHistoryCache; if(!d){showConsumptionHistory();return;}
-  var fromDate=(document.getElementById('histFromDate')||{}).value||'';
-  var toDate=(document.getElementById('histToDate')||{}).value||'';
-  renderConsumptionHistory(d, fromDate, toDate);
-}
-function exportConsumptionHistory(){
-  var d=window._usageHistoryCache; if(!d){alert('请先打开明细');return;}
-  var fromDate=(document.getElementById('histFromDate')||{}).value||'';
-  var toDate=(document.getElementById('histToDate')||{}).value||'';
-  function inRange(ts){
-    var day=(ts||'').substring(0,10);
-    if(fromDate && day < fromDate) return false;
-    if(toDate && day > toDate) return false;
-    return true;
-  }
-  var rows=['类型,时间,功能或类别,变动点,余额点,Token,说明'];
-  (d.transactions||[]).filter(function(t){return inRange(t.created_at);}).forEach(function(t){
-    rows.push(['交易', t.created_at||'', t.type||'', t.points, t.points_after, '', String(t.description||'').replace(/API|api_cost|厘/gi,'')].join(','));
-  });
-  (d.llm_usage||[]).filter(function(t){return inRange(t.created_at);}).forEach(function(l){
-    rows.push(['智能调用', l.created_at||'', usageModuleLabel(l.module), l.points_charged||0, '', (Number(l.prompt_tokens||0)+Number(l.completion_tokens||0)), ''].join(','));
-  });
-  var blob=new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8;'});
-  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='usage_history.csv';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  setTimeout(function(){URL.revokeObjectURL(a.href);},500);
-}
-// improve pricing modal using account modal when possible
-var _oldShowPricingInfo = window.showPricingInfo;
-window.showPricingInfo = function(){
-  fetch('/api/pricing').then(function(r){return r.json();}).then(function(d){
-    if(!d.success){alert('暂时无法获取说明');return;}
-    var h='<div style="line-height:1.75">';
-    h+='<p style="margin:0 0 12px;color:#64748b;font-size:.8rem">点数用于使用站内智能与分析能力。充值订单确认后入账。</p>';
-    h+='<b>怎么计点</b><ul style="margin:8px 0 12px 18px;padding:0;font-size:.84rem">';
-    h+='<li>写作、润色、查错等智能能力：按实际使用量计点</li>';
-    h+='<li>文献检索、知识图谱与格式/术语等分析能力：按当前规则计点，体验额度以账户状态为准</li>';
-    h+='</ul>';
-    h+='<b>计费方式</b><div style="font-size:.84rem;margin:8px 0 12px">';
-    (d.items||[]).slice(0,12).forEach(function(it){
-      var nm=(it.name||it.key||'');
-      var mode=(it.billing==='smart'||it.billing==='llm-token')?'按实际使用量计点':'按当前规则计点';
-      h+='<div style="display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-bottom:1px solid rgba(0,0,0,.06)"><span>'+nm+'</span><span>'+mode+'</span></div>';
-    });
-    h+='</div>';
-    h+='<div style="font-size:.78rem;color:#64748b">注册奖励以账户实际到账为准。</div></div>';
-    openAccountModal('使用说明', h);
-  }).catch(function(){alert('网络错误');});
-};
-
-document.getElementById('accountModalMask').addEventListener('click', function(e){ if(e.target.id==='accountModalMask') closeAccountModal(); });
-</script>
-
 
 <div class="theme-studio-backdrop" id="themeStudioBackdrop" onclick="closeThemeStudio()"></div>
 <section class="theme-studio" id="themeStudio" aria-hidden="true">
