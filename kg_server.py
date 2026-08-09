@@ -1328,7 +1328,7 @@ def search_api():
             if not q.strip(): continue
             is_cn = bool(re.search(r'[一-鿿]', q))
 
-            # 核心源列表（顺序执行）
+            # 核心源列表 — 分批执行，达到阈值后提前终止
             maxp = min(max_per, 50)
             core_sources = [
                 lambda: fetch_with_retry(search_openalex, q, maxp),
@@ -1336,16 +1336,20 @@ def search_api():
                 lambda: search_semantic_scholar(q, 40),
                 lambda: search_europepmc(q, 30),
                 lambda: search_arxiv(q, 25),
-                lambda q=q: search_pubmed(q, 25),
+                lambda: search_pubmed(q, 25),
             ]
             for source_fn in core_sources:
-                try: all_results.extend(source_fn() or [])
-                except Exception: pass
+                try:
+                    results = source_fn() or []
+                    all_results.extend(results)
+                    # 提前终止：单个查询收集到足够结果后跳过剩余源
+                    if len(results) >= 15:
+                        break
+                except Exception:
+                    pass
 
             if is_cn:
                 try: all_results.extend(search_baidu_xueshu_page(q, 0) or [])
-                except Exception: pass
-                try: all_results.extend(search_cnki(q, 30) or [])
                 except Exception: pass
                 try: all_results.extend(search_openalex_cn(q, 50) or [])
                 except Exception: pass

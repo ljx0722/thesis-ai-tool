@@ -1352,6 +1352,41 @@
       '<div style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#555">'+
         '<div>📄 '+chCount+' 章 · '+(wordCount/1000).toFixed(1)+'k 字</div>'+
         '<div>📚 '+refCount+' 条文献</div>'+
+        '<div>📝 结构完整度 '+Math.round([bodyChs.some(function(c){return /绪论|引言/.test(c.title)}),bodyChs.some(function(c){return /文献|综述/.test(c.title)}),bodyChs.some(function(c){return /方法|设计/.test(c.title)}),bodyChs.some(function(c){return /结果|分析/.test(c.title)}),bodyChs.some(function(c){return /结论|展望/.test(c.title)})].filter(Boolean).length/5*100)+'%</div>'+
+      '</div>'+
+      '<div style="font-size:12px">'+chBars+'</div>';
+
+    // 5-reviewer breakdown (from academic-research-skills model)
+    var reviewerBreakdown = '';
+    try {
+      if (typeof ThesisAuditor !== 'undefined' && ThesisAuditor.getResults) {
+        var results = ThesisAuditor.getResults();
+        if (results && results.reviewers) {
+          var rKeys = Object.keys(results.reviewers);
+          if (rKeys.length >= 4) {
+            reviewerBreakdown = '<div style="grid-column:1/-1;border-top:1px solid #f1f5f9;padding-top:10px;margin-top:4px;font-size:11px;color:#94a3b8;text-align:center">5-Reviewer 审阅: ';
+            rKeys.forEach(function(k, i) {
+              var r = results.reviewers[k];
+              var shortName = k.replace(/审阅.*/,'').replace(/\(.*\)/,'').trim();
+              var rTone = r.score >= 80 ? '#10b981' : (r.score >= 55 ? '#f59e0b' : '#ef4444');
+              reviewerBreakdown += '<span style="color:'+rTone+';font-weight:600;margin:0 4px">'+shortName+' '+r.score+'</span>';
+              if (i < rKeys.length - 1) reviewerBreakdown += '·';
+            });
+            reviewerBreakdown += '</div>';
+          }
+        }
+      }
+    } catch(e) {}
+
+    return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;padding:14px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'+
+      '<div style="text-align:center;grid-row:span 2">'+
+        '<div style="font-size:36px;font-weight:700;color:'+tone+'">'+healthScore+'</div>'+
+        '<div style="font-size:12px;color:#94a3b8">论文健康分</div>'+
+        '<div style="font-size:11px;padding:1px 8px;border-radius:10px;background:'+tone+'20;color:'+tone+';font-weight:600;display:inline-block;margin-top:2px">'+label+'</div>'+
+      '</div>'+
+      '<div style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#555">'+
+        '<div>📄 '+chCount+' 章 · '+(wordCount/1000).toFixed(1)+'k 字</div>'+
+        '<div>📚 '+refCount+' 条文献</div>'+
         '<div>📝 '+(typeof proseReadability !== 'undefined' ? proseReadability(text) : '结构完整度 '+Math.round(bodyChs.length/5*100)+'%')+'</div>'+
       '</div>'+
       '<div style="font-size:12px">'+chBars+'</div>'+
