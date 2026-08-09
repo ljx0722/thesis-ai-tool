@@ -15,5 +15,5 @@
 
 .review-overview h3 { font-size:.95rem; margin:0 0 4px; }
 .review-card-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px; margin-top:10px; }
-.review-card { cursor:pointer; border:1px solid var(--border,#e5e7eb); border-radius:12px; padding:16px; transition:all .15s; background:var(--bg-card,#fff); }
+.review-card { cursor:pointer; border:1px solid var(--border,#e5e7eb); border-radius:12px; padding:16px; transition:all .15s; background:var(--surface-card,#fff); }
 .review-card:hover { box-shadow:0 2px 12px rgba(0,0,0,.06); }

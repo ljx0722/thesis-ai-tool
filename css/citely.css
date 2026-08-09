@@ -23,7 +23,7 @@
 .citely-search-input {
   flex:1; padding:10px 14px; border:1.5px solid var(--border,#d1d5db); border-radius:10px;
   font-size:.85rem; outline:none; transition:border-color .2s;
-  background:var(--bg-input,#fff); color:var(--text-primary,#111); font-family:inherit;
+  background:var(--surface-input,#fff); color:var(--text-primary,#111); font-family:inherit;
 }
 .citely-search-input:focus { border-color:var(--accent,#4f46e5); box-shadow:0 0 0 3px rgba(79,70,229,.1); }
 .citely-search-input::placeholder { color:var(--text-muted,#9ca3af); }
@@ -38,8 +38,8 @@
 .citely-btn-ghost:hover { background:var(--border,#e5e7eb); }
 .citely-btn-sm { padding:6px 12px; font-size:.72rem; border-radius:8px; background:var(--bg-elevated,#f3f4f6); color:var(--text-secondary,#555); }
 .citely-btn-sm:hover { background:var(--border,#e5e7eb); }
-.citely-input-sm { padding:5px 8px; border:1px solid var(--border,#d1d5db); border-radius:6px; font-size:.72rem; outline:none; background:var(--bg-input,#fff); color:var(--text-primary,#111); font-family:inherit; }
-.citely-select-sm { padding:5px 8px; border:1px solid var(--border,#d1d5db); border-radius:6px; font-size:.72rem; outline:none; background:var(--bg-input,#fff); color:var(--text-primary,#111); cursor:pointer; font-family:inherit; }
+.citely-input-sm { padding:5px 8px; border:1px solid var(--border,#d1d5db); border-radius:6px; font-size:.72rem; outline:none; background:var(--surface-input,#fff); color:var(--text-primary,#111); font-family:inherit; }
+.citely-select-sm { padding:5px 8px; border:1px solid var(--border,#d1d5db); border-radius:6px; font-size:.72rem; outline:none; background:var(--surface-input,#fff); color:var(--text-primary,#111); cursor:pointer; font-family:inherit; }
 
 .citely-filters { margin-top:10px; padding:12px 14px; background:var(--bg-elevated,#f8fafc); border-radius:10px; border:1px solid var(--border,#e5e7eb); }
 .citely-filter-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
@@ -55,7 +55,7 @@
 
 /* Cards */
 .citely-card {
-  background:var(--bg-card,#fff); border:1px solid var(--border,#e5e7eb); border-radius:12px; padding:14px 16px;
+  background:var(--surface-card,#fff); border:1px solid var(--border,#e5e7eb); border-radius:12px; padding:14px 16px;
   margin-bottom:10px; transition:all .15s;
 }
 .citely-card:hover { border-color:var(--accent,#4f46e5); box-shadow:0 2px 12px rgba(0,0,0,.06); }
@@ -75,18 +75,18 @@
 .citely-action-btn {
   display:inline-flex; align-items:center; gap:3px; padding:5px 12px; border:1px solid var(--border,#d1d5db);
   border-radius:8px; font-size:.7rem; font-weight:600; cursor:pointer; transition:all .15s;
-  background:var(--bg-card,#fff); color:var(--text-secondary,#555); font-family:inherit;
+  background:var(--surface-card,#fff); color:var(--text-secondary,#555); font-family:inherit;
 }
 .citely-action-btn:hover { background:var(--bg-elevated,#f3f4f6); }
 .citely-save { border-color:#10b981; color:#10b981; }
 .citely-save:hover { background:#10b981; color:#fff; }
 .citely-saved-badge { font-size:.7rem; color:#10b981; font-weight:600; }
 .citely-cite-group { display:flex; align-items:center; gap:4px; margin-left:auto; }
-.citely-cite-select { font-size:.68rem; padding:5px 8px; border:1px solid var(--border,#d1d5db); border-radius:8px; background:var(--bg-input,#fff); color:var(--text-primary,#111); cursor:pointer; max-width:180px; font-family:inherit; outline:none; }
+.citely-cite-select { font-size:.68rem; padding:5px 8px; border:1px solid var(--border,#d1d5db); border-radius:8px; background:var(--surface-input,#fff); color:var(--text-primary,#111); cursor:pointer; max-width:180px; font-family:inherit; outline:none; }
 
 /* Citation map */
 .citely-citation-map { display:flex; flex-direction:column; gap:12px; }
-.citely-citation-chapter { background:var(--bg-card,#fff); border:1px solid var(--border,#e5e7eb); border-radius:10px; padding:12px 14px; }
+.citely-citation-chapter { background:var(--surface-card,#fff); border:1px solid var(--border,#e5e7eb); border-radius:10px; padding:12px 14px; }
 .citely-citation-chapter-title { font-size:.82rem; font-weight:700; color:var(--text-primary,#111); margin-bottom:8px; display:flex; align-items:center; gap:8px; }
 .citely-cite-count-sm { font-size:.65rem; color:var(--accent,#4f46e5); font-weight:600; }
 .citely-citation-item { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border,#f3f4f6); font-size:.75rem; color:var(--text-secondary,#555); }
