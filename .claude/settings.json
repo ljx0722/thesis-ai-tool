@@ -1,5 +1,31 @@
 {
-  "description": "Impeccable design detector: runs after Edit/Write/MultiEdit on UI files and surfaces findings as system reminders.",
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"E:/同济学习/毕业论文/论文文献AI利器/.claude/worktrees/agent-a41daffd167d7d430\" status --short -- kg_server.py)",
+      "Bash(git -C \"E:/同济学习/毕业论文/论文文献AI利器/.claude/worktrees/agent-a41daffd167d7d430\" diff --unified=80 HEAD -- kg_server.py)",
+      "Bash(git -C \"E:/同济学习/毕业论文/论文文献AI利器/.claude/worktrees/agent-af026ce47df9b0383\" diff --unified=80 -- kg_server.py)",
+      "Bash(git -C \"E:/同济学习/毕业论文/论文文献AI利器/.claude/worktrees/agent-a41daffd167d7d430\" diff --unified=3 2e2592f..HEAD -- kg_server.py)",
+      "Bash(git -C \"E:/同济学习/毕业论文/论文文献AI利器\" status --short)",
+      "Bash(git -C \"E:/同济学习/毕业论文/论文文献AI利器\" log --oneline -5)",
+      "Bash(git -C \"E:/同济学习/毕业论文/论文文献AI利器\" diff -- kg_server.py)",
+      "Bash(git -C \"E:/同济学习/毕业论文/论文文献AI利器/.claude/worktrees/agent-af026ce47df9b0383\" diff --unified=80 -- \"kg_server.py\")",
+      "Bash(git -C \"E:/同济学习/毕业论文/论文文献AI利器/.claude/worktrees/agent-af026ce47df9b0383\" diff HEAD -- kg_server.py)",
+      "Read(//e/同济学习/毕业论文/**)",
+      "Read(//e/同济学习/**)",
+      "Bash(git -C \"E:/同济学习/毕业论文/论文文献AI利器/.claude/worktrees/agent-a41daffd167d7d430\" diff --unified=80 2e2592f..HEAD -- kg_server.py)",
+      "Skill(code-review)",
+      "Bash(git -C \"E:/同济学习/毕业论文/论文文献AI利器/.claude/worktrees/agent-a41daffd167d7d430\" rev-parse --show-toplevel)",
+      "Bash(git -C \"E:/同济学习/毕业论文/论文文献AI利器/.claude/worktrees/agent-af026ce47df9b0383\" status --short -- kg_server.py)",
+      "Bash(git -C \"E:/同济学习/毕业论文/论文文献AI利器/.claude/worktrees/agent-af026ce47df9b0383\" log -5 --oneline)",
+      "Bash(git -C \"E:/同济学习/毕业论文/论文文献AI利器/.claude/worktrees/agent-a41daffd167d7d430\" diff --numstat 2e2592f..HEAD -- kg_server.py)",
+      "Bash(git -C \"E:/同济学习/毕业论文/论文文献AI利器/.claude/worktrees/agent-af026ce47df9b0383\" status --short -- \"kg_server.py\")",
+      "Bash(git -C \"E:/同济学习/毕业论文/论文文献AI利器/.claude/worktrees/agent-a41daffd167d7d430\" log --oneline 2e2592f..HEAD -- kg_server.py)",
+      "Bash(git -C \"E:/同济学习/毕业论文/论文文献AI利器/.claude/worktrees/agent-af026ce47df9b0383\" diff --numstat HEAD -- kg_server.py)",
+      "Bash(git -C \"E:/同济学习/毕业论文/论文文献AI利器/.claude/worktrees/agent-a41daffd167d7d430\" status --short --branch)",
+      "Bash(ADMIN_SECRET=localtest ADMIN_PASSWORD=localpass python kg_server.py)",
+      "Bash(python -m pytest tests)"
+    ]
+  },
   "hooks": {
     "PostToolUse": [
       {
@@ -14,5 +40,6 @@
         ]
       }
     ]
-  }
+  },
+  "description": "Impeccable design detector: runs after Edit/Write/MultiEdit on UI files and surfaces findings as system reminders."
 }

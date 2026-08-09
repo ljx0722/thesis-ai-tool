@@ -1,0 +1,377 @@
+
+=== Section 1: Syntax & Structure ===
+  ✓ All JS files parse without syntax errors
+  ✓ All JS files have balanced braces
+  ✓ kg_server.py compiles without errors
+  ✓ HTML has all required <script> tags in correct order
+
+=== Section 2: Historical Bug Fixes ===
+  ✓ LITERATURE: inferred placement is metadata-only and cannot mutate the manuscript
+  ✓ LITERATURE: legacy batch flow has no inferred placement fallback
+  ✓ BUG-FIX: Body boundary helper remains available for citation scanning and deletion
+  ✓ BUG-FIX: No-DOM refs sorted by tempNum for stable numbering
+  ✓ BUG-FIX: DOM renumbering uses marker identity (not displayNum)
+  ✓ BUG-FIX: deleteRef protects displaced existing refs
+  ✓ BUG-FIX: No genSen fake sentences generated
+  ✓ BUG-FIX: Sentence splitting excludes Chinese semicolons
+  ✓ BUG-FIX: Passive voice detection uses negative lookahead
+  ✓ BUG-FIX: Figure/table detection deduplicates by main number
+  ✓ BUG-FIX: Non-body chapters excluded in search and analysis
+  ✓ BUG-FIX: strict language and recency constraints use unified solver
+  ✓ BUG-FIX: refStatus element has null guard
+  ✓ BUG-FIX: verifyRef returns extended fields (citations, retracted, verified)
+  ✓ BUG-FIX: closeKnowledgeGraph clears kgCurrentData
+  ✓ FEATURE: All 10 literature sources in search_api
+
+=== Section 3: Data Flow & Edge Cases ===
+  ✓ EDGE: assignChapters has body-chapters-empty guard
+  ✓ EDGE: unlocated references never fabricate chapter 1
+  ✓ EDGE: chapterForElement returns unknown instead of fabricating chapter 1
+  ✓ EDGE: beforeRefList returns true when no ref boundary found
+  ✓ EDGE: searchCache cleared on new file upload
+  ✓ EDGE: mergedRefs reset on new file upload
+  ✓ EDGE: startSearch opens claim-based local search with project seeding
+  ✓ EDGE: onThesisLoaded calls switchPanel(\'references\')
+  ✓ EDGE: changeThesis clears kgCurrentData
+  ✓ EDGE: resetSearch clears kgCurrentData
+
+=== Section 4: UI/HTML Elements ===
+  ✓ HTML has all required id elements
+  ✓ CSS class .ref-only used for panel switching
+  ✓ Help button (?) exists in unified tools
+  ✓ Upload overlay / file input is present
+
+=== Section 5: Security & Robustness ===
+  ✓ SECURITY: Static route preserves multi-dot parser library filenames
+  ✓ IMPORT: dependency failure is non-blocking and recoverable
+  ✗ LITERATURE: workbench actions are bound once and report runtime errors
+    Error: Search without a selection must run audit instead of doing nothing
+  ✓ LITERATURE: imported references have a visible workbench view
+  ✓ DASHBOARD: scores come from thesis-review dimensions with real weights
+  ✓ BILLING: dashboard open charges before render
+  ✓ BILLING: knowledge graph never falls back to free offline graph
+  ✓ SECURITY: No eval() in production code
+  ✓ SECURITY: No document.write() calls
+  ✓ ROBUST: window.onerror handler exists
+  ✓ ROBUST: kg_server.py API routes have try-except
+  ✓ PERF: search uses forEachChunked to avoid blocking main thread
+
+=== Section 6: Module System & UX ===
+  ✓ MODULE: All 6 modules registered with icons
+  ✓ MODULE: switchPanel handles all module IDs
+  ✓ KEYBOARD: Ctrl+1~6 shortcuts registered
+  ✓ TOUR: onboarding.js has tourStart, tourEnd functions
+  ✓ TOUR: tourEnd calls showUploadOverlay when thesis not loaded
+
+=== Section 7: Module Enhancement Coverage ===
+  ✓ MODULE: format-check checks abstract elements
+  ✓ MODULE: format-check checks conclusion structure
+  ✓ MODULE: optimization detects research methods
+  ✓ MODULE: optimization detects innovation hints
+  ✓ MODULE: paragraph analysis has academic tone check
+  ✓ MODULE: thesis-review.js covers all 10 dimensions
+  ✓ MODULE: thesis-review.js auto+manual item distinction
+  ✓ MODULE: thesis-review composite uses all dimensions
+  ✓ MODULE: dashboard.js integrates review scores
+  ✓ UI: Dashboard entry exists
+  ✓ UI: Dashboard overlay has review report button
+
+=== Section 8: Onboarding / Tour ===
+  ✓ ONBOARD: Tour covers all major modules
+  ✓ ONBOARD: Tour step count >= 7
+
+=== Section 9: Expanded Data Flow ===
+  ✓ DATA: thesis review includes timestamp
+  ✓ DATA: thesis review stats include CN/EN/DOI/5yr
+  ✓ SAFETY: thesis review returns early when no text
+
+=== Section 10: Literature Sources ===
+  ✓ SOURCES: All 12 sources exist in kg_server.py
+  ✓ SOURCES: Chinese sources only triggered for CN queries
+  ✓ SOURCES: ping endpoint reflects all new sources
+
+=== Section 11: UI Design System ===
+  ✓ CSS: Dark mode body.dark class overrides color vars
+  ✓ CSS: Print styles use @media print
+  ✓ CSS: Reduced motion respects accessibility
+  ✓ CSS: Skeleton screen animation exists
+  ✓ CSS: Uses CSS design tokens extensively
+  ✓ CSS: Unified animation timing variables
+  ✓ HTML: Unified theme control exists
+  ✓ Theme: account preferences support automatic time mode
+  ✓ HTML: OG meta tags for social sharing
+  ✓ HTML: Favicon via inline SVG
+  ✓ HTML: Meta description for SEO
+  ✓ HTML: Skeleton screen placeholder in thesis box
+  ✓ HTML: Uses external CSS stylesheet
+
+=== Section 12: Code Quality & New Features ===
+  ✓ CODE: app.js uses strict mode
+  ✓ CODE: window.onerror does not show user-facing alert
+  ✓ CODE: Export KG as PNG function exists
+  ✓ CODE: KG modal HTML has PNG export button
+  ✓ CODE: Search failure alert is informative
+  ✓ CODE: dashboard.js has complete rendering pipeline
+  ✓ CODE: dashboard.js shows per-dimension explanations and suggestions
+  ✓ CODE: loading.js exists as a module
+  ✓ FEATURE: kg_server.py search has concurrent ThreadPoolExecutor
+  ✓ FEATURE: kg_server.py has retry logic for API calls
+  ✓ FEATURE: kg_server.py search_api handles empty queries
+
+=== Section 14: Regression Tests ===
+  ✓ REGRESSION: format-check.js declares totalChars before use
+  ✓ REGRESSION: dashboard.js buildDashboardHTML uses s.bodyChs not bare bodyChs
+  ✓ REGRESSION: dashboard.js drawChapterChart uses window._dbBodyChs
+  ✓ REGRESSION: optimization.js declares totalChars before use
+  ✓ REGRESSION: paragraph-analysis.js declares bodyBoundaryEl or uses it from global
+  ✓ REGRESSION: All run* functions accept container parameter
+  ✓ REGRESSION: dashboard.js functions all use proper variable scoping
+
+=== Section 15: Paper Structure & Robustness ===
+  ✓ PAPER: Chapter extraction scans p+h1~h6 for chapter/section text patterns
+  ✓ PAPER: Chapter extraction has boundary guards (bodyStarted, refBound)
+  ✓ PAPER: Text-based fallback exists when H1/H2/H3 parsing fails
+  ✓ PAPER: onThesisLoaded called even on parse error (catch block)
+  ✓ PAPER: Text-pattern chapter scanning is primary (regex is fallback)
+  ✓ PAPER: Non-docx files (.doc) show appropriate error
+  ✓ PAPER: sections array built from text-pattern scanning of all paragraph elements
+  ✓ PAPER: _thesisLoaded is properly set via onThesisLoaded callback
+
+=== Section 16: UI & Citation Scope ===
+  ✓ UI: Section anchors have IDs set on DOM elements
+  ✓ UI: Subsection anchors have DOM IDs
+  ✓ UI: navClickToSec function exists
+  ✓ BUG: existing citation scan covers the full body and preserves all occurrences
+  ✓ LITERATURE: automatic marker insertion is absent from legacy search
+  ✓ BUG: chapter location preserves unknown state
+
+=== Section 17: Anti-Regression ===
+  ✓ REGRESSION: Cat game starts when batch verify shows loading
+  ✓ REGRESSION: Cat game starts when startSearch shows loading
+  ✗ REGRESSION: Dashboard and graph overlays use theme surfaces
+    Error: Theme modals must not use undefined legacy surface tokens
+  ✗ REGRESSION: claim search supports project seeds and explicit completion states
+    Error: Literature workbench must support a manual claim
+  ✓ REGRESSION: search stays available without a manuscript
+  ✓ REGRESSION: dashboard knowledge graph action triggers once
+  ✓ REGRESSION: Dashboard uses dense dimension overview layout
+  ✓ REGRESSION: Dashboard score explains real weighting formula
+  ✓ REGRESSION: Dashboard has radar chart section
+  ✓ REGRESSION: Search progress panel has explanation text
+  ✓ REGRESSION: Game shows hint text to new players
+  ✓ REGRESSION: Tree nav has title attribute for accessibility
+  ✓ REGRESSION: ScoreReference uses extractTitleKws not paperTopics
+  ✓ REGRESSION: Score bars have info-icons with tooltips
+  ✓ REGRESSION: Four scoring dimensions all have tooltips
+  ✓ REGRESSION: literature search entry always opens the workbench
+  ✓ REGRESSION: Existing marker scan preserves cross-chapter occurrences
+  ✓ REGRESSION: Batch verify sends catGame start in same event loop
+  ✓ REGRESSION: DOI completion also shows loading overlay
+  ✓ REGRESSION: All 10 review dimensions are computed with auto and manual items
+  ✓ REGRESSION: Review composite uses all 10 dimensions in formula
+  ✓ REGRESSION: Review render function generates HTML report
+  ✓ REGRESSION: Search uses sentence-level keyword extraction
+  ✓ REGRESSION: assignChapters is async and chunked
+  ✓ REGRESSION: strict constraint solver covers language and year windows
+  ✓ REGRESSION: Non-body chapters excluded from search rounds
+  ✓ REGRESSION: Thread-safe session uses threading.local()
+  ✓ REGRESSION: Search API function body uses lambda (not ThreadPoolExecutor)
+  ✓ REGRESSION: Search API queries only OpenAlex/Crossref/Semantic Scholar
+  ✓ REGRESSION: Frontend sends 1 word per request with concurrency
+  ✓ REGRESSION: Gunicorn timeout is 180 seconds
+
+=== Section 18: Content Rendering ===
+  ✓ RENDER: Images have responsive max-width styling
+  ✓ RENDER: Tables are NOT hidden by CSS display:none
+  ✓ RENDER: Upload immediately shows loading overlay
+
+=== Section 19: Module Enhancement Coverage ===
+  ✓ FORMAT: Abstract bilingual check exists
+  ✓ FORMAT: Citation position detection exists
+  ✓ FORMAT: Chart citation check exists
+  ✓ FORMAT: Header/footer detection exists
+  ✓ TERM: Spell check dictionary exists
+  ✓ TERM: Term evolution detection exists
+  ✓ TERM: Translation consistency check exists
+  ✓ TERM: Proper noun extraction exists
+  ✓ PARA: Paragraph logic coherence exists
+  ✓ PARA: Head-tail echo check exists
+  ✓ PARA: Reference density distribution exists
+  ✓ PARA: Paragraph numbering check exists
+  ✓ OPT: Data viz suggestion exists
+  ✓ OPT: Chapter structure comparison exists
+  ✓ KG: Chapter correlation matrix exists
+
+=== Section 20: Audit Regression ===
+  ✓ AUDIT: renderRefNetwork function exists
+  ✓ AUDIT: section anchoring searches p+h1-h6
+  ✓ AUDIT: format-check var h declared before first h+= use
+  ✓ AUDIT: terminology.js has no duplicate updLoad calls
+  ✓ AUDIT: terminology.js section ordering correct
+  ✓ AUDIT: paragraph-analysis numbering before closing div
+  ✓ AUDIT: paragraph-analysis bc4 before ref density
+  ✓ AUDIT: optimization updLoad percentages monotonic
+  ✓ AUDIT: chapter parsing uses cnDigit not bare parseInt
+  ✓ AUDIT: structureThesisBox uses compareDocumentPosition
+  ✓ AUDIT: _bareHeadingCount global exists for heading style QA
+  ✓ AUDIT: format-check has heading style quality section
+  ✓ AUDIT: format-check has empty chapter detection
+  ✓ AUDIT: format-check has figure/table caption format check
+  ✓ AUDIT: paragraph-analysis has debris paragraph detection
+  ✓ AUDIT: optimization has empty chapter warning
+  ✓ AUDIT: terminology spell dictionary expanded beyond 3 pairs
+
+=== Section 21: Interactive Search Flow ===
+  ✓ FLOW: calcRefConfidence function exists
+  ✓ FLOW: showRefConfirmModal function exists
+  ✓ FLOW: showAssignModal function exists
+  ✓ FLOW: rcOverlay modal HTML exists
+  ✓ FLOW: asOverlay modal HTML exists
+  ✓ FLOW: startSearch uses showRefConfirmModal
+  ✓ FLOW: startSearch uses showAssignModal
+  ✓ FLOW: confidence score considers year + source + DOI + journal
+  ✓ FLOW: ref confirmation modal has select-all and filter buttons
+  ✓ FLOW: assign modal has mode selector (auto/uniform/weighted)
+
+=== Section 22: Inline Heading Calibration ===
+  ✓ HC: startInlineCalibration wrapper exists
+  ✓ HC: showCalibrationModal function exists
+  ✓ HC: renderCalibrationModal uses DOM-based rendering
+  ✓ HC: cwAutoMatch style-name based matching exists
+  ✓ HC: cwNextPhase/cwPrevPhase 3-step wizard flow exists
+  ✓ HC: mcAcceptAll / mcClose exist as compat aliases
+  ✓ HC: upload flow calls startInlineCalibration
+  ✓ HC: heading detection no longer guesses body text as headings
+
+=== Section 23: System Integrity Guards ===
+  ✓ INTEGRITY: No Python raw-string artifacts in JS regex literals
+  ✓ INTEGRITY: Module functions declare var h before first h+= use
+  ✓ INTEGRITY: updLoad messages are not duplicated within each module
+  ✓ INTEGRITY: All runAnalysis functions contain updLoad("完成",100)
+  ✓ INTEGRITY: Heading detection covers 6+ patterns in detectHeadingLevel
+  ✓ INTEGRITY: bodyStarted supports 4+ chapter-start patterns
+  ✓ INTEGRITY: populateChapterText filters page numbers and TOC entries
+  ✓ INTEGRITY: Heading merge scans up to 3 siblings
+  ✓ INTEGRITY: Section anchoring searches p+h1~h6 (not just h1-h3)
+  ✓ INTEGRITY: All test declarations precede final result reporting
+  ✓ INTEGRITY: mammoth and jszip loaded with defer (not blocking)
+  ✓ INTEGRITY: Upload input appears before external scripts
+  ✓ INTEGRITY: cnDigit handles 1-20 (regression from chNum parsing)
+  ✓ INTEGRITY: Chapter dedup exists (mammoth split-title protection)
+  ✓ INTEGRITY: detectChapterNum function exists
+  ✓ INTEGRITY: jumpToParagraph uses filtered[i] not paras[i]
+  ✓ INTEGRITY: All modules accept container parameter
+  ✓ INTEGRITY: updateSrPanel dead reference removed from app.js
+  ✓ INTEGRITY: structureThesisBox guards against double arrow insertion
+  ✓ INTEGRITY: onboarding.js covers new modules (expand + data-analysis)
+  ✓ INTEGRITY: onboarding.js has 11+ tour steps
+  ✓ INTEGRITY: buildFullTree with paragraph+ sentence layers + _treeIndex
+
+=== Section 24: Audit Regression ===
+  ✓ AUDIT: detectHeadingLevel filters TOC (d{1,3})
+  ✓ AUDIT: heading scan has broad TOC filter
+  ✓ AUDIT: pre-parse has TOC filter
+  ✓ AUDIT: bodyStartIdx uses detectHeadingLevel
+  ✓ AUDIT: occurrence collection writes sentence refs
+  ✓ AUDIT: only confirmed citation commits create generated markers
+  ✓ AUDIT: lookupRefPosition reads occurrence summary
+  ✓ AUDIT: sectionPathFor function removed
+  ✓ AUDIT: renderRefs uses lookupRefPosition
+  ✓ AUDIT: renderExistingOnly uses lookupRefPosition
+  ✓ CITATION: unified parser handles bracket, full-width, comma and range markers
+  ✓ CITATION: occurrence scan is leaf-only and excludes bibliography tail
+  ✓ CITATION: tree index preserves full parent and location chain
+  ✓ CITATION: import uses occurrence scan without raw DOM pre-location
+  ✓ CITATION: rendering exposes detected inferred and unlocated states
+  ✓ CITATION: reset preserves original marker text before rebuilding
+  ✓ CITATION: renumber and delete update every occurrence marker
+
+=== Section 25: New Modules & Admin API ===
+  ✓ MODULE: topic-finder.js has runTopicFinder
+  ✓ MODULE: proofread.js exists
+  ✓ MODULE: de-duplicate.js has check+rewrite modes
+  ✓ MODULE: defense-ppt.js and en-abstract.js exist
+  ✓ MODULE: APP_MODULES has 16 entries
+  ✓ API: Admin dashboard + users + credits endpoints
+  ✓ API: Payment submit endpoint exists
+  ✓ ADMIN: admin.html dashboard page exists
+  ✓ UI: Nav sidebar has 4 stage groups
+  ✓ UI: All 16 modules in nav sidebar
+  ✓ UI: Landing highlights + invite + consumption history
+  ✓ PRICING: 3/day free limit in usage_module
+  ✓ SECURITY: Admin dashboard requires auth
+
+=== Section 26: Thesis OS Project Features ===
+  ✓ PROJECT: project.js exists and parses
+  ✓ PROJECT: index includes project.js
+  ✓ DATA: analysis has overview + significance + AI summary
+  ✓ IMPORT: heading style patterns cover custom TJ styles
+  ✓ API: usage history + admin pricing exist
+  ✓ UI: points use decimals helper
+  ✓ PROJECT: delete refreshes open project UIs
+  ✓ UI: history filter/export exists
+  ✓ UI: consumption history entry exists
+  ✓ API: pricing endpoint exists
+  ✓ BILLING: capability-aware pricing and immutable snapshots
+  ✓ UI: landing workflow explorer uses shared stages
+  ✓ API: export docx + analyze_ml routes exist
+  ✓ API: materials + pricing schedules exist
+  ✓ RECHARGE: free amount flow uses integer cents and explicit order state
+  ✓ RECHARGE: amount parsers reject malformed and out-of-range values
+  ✓ RECHARGE: backend Decimal parser and confirmation are exact
+  ✓ IMPORT: file accept includes doc and docx
+  ✓ API: cloud projects routes exist
+  ✓ PROJECT: pipeline/defense/refnorm exist
+  ✓ UI: four-column layout + toolbox + tool home
+  ✓ UI: simplified sidebar has TOC wrap
+  ✓ REGRESSION: app runtime declarations do not abort upload initialization
+  ✓ REGRESSION: DOCX import protects package and scan indexes
+  ✓ REGRESSION: import and calibration settle safely
+  ✓ REGRESSION: assets use refreshed cache version
+  ✓ REGRESSION: figure advisor keeps selected material name in scope
+  ✓ REGRESSION: workspace resizers support all desktop columns
+  ✓ REGRESSION: ThesisBuddy FABs follow theme contrast tokens
+  ✓ PROJECT: merge/preview/cloud helpers exist
+  ✓ PROJECT: citation closed loop + import sync helpers
+  ✓ UX: two-path home exists
+  ✓ Billing: configurable balance refresh is present
+  ✓ Upload: DOCX recovery and style mapping contracts
+  ✓ REGRESSION: DOCX paragraph alignment is monotonic and duplicate-safe
+  ✓ REGRESSION: unmatched DOCX headings support manual mapping and skip
+  ✓ RELEASE: ThesisBuddy platform contracts are present
+  ✓ RELEASE: machine-readable changelog and health endpoints exist
+  ✓ FIGURE: universal chart template registry is domain-neutral
+  ✓ FIGURE: domain example is isolated and not default
+  ✓ FIGURE: project plans are dynamic and persisted
+  ✓ CAPABILITY: preflight routes and client wiring match
+  ✓ UPLOAD: decomposition uses pipeline runs and progress recovery
+  ✓ CITATION: DOCX superscript fidelity and audit runs are wired
+  ✓ BUDDY: multi-source retrieval and conversation memory contracts
+  ✓ FIGURE: advisor closed loop uses profile/plan/render-code/qa
+  ✓ TIME: Beijing timezone helpers and hourly client sync exist
+  ✓ SECURITY: static route is root-contained
+  ✓ BILLING: figure advisor charges once and can multi-preview
+  ✓ SECURITY: ML result fields are HTML escaped
+  ✓ DATA: joint recipe covers all selected sources and ignores empty join keys
+  ✓ DATA: joint analysis uses durable disk-backed materialization
+  ✓ BILLING: idempotency replay validates project and input hash
+  ✓ PROJECT: path-aware stages and safe queue cleanup exist
+  ✓ DATA: multi-select materials and profile batch entry exist
+  ✓ DEPLOY: single worker for SQLite
+OK search price 500
+OK search daily free env
+OK kg daily free env
+OK kg free default 2
+OK consume daily quota helper
+OK ml precharge comment
+OK webhook hmac
+OK scrollInThesisBox
+OK search modal
+
+=== RESULTS ===
+  Passed:  304
+  Failed:  3
+  Warnings:0
+  Total:   307
+
+❌ TESTS FAILED — fix before deploying!

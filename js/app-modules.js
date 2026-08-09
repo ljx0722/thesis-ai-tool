@@ -595,23 +595,31 @@ function enableLiteratureButtons(){
   }catch(e){}
 }
 function switchModule(moduleId) {
-  // Pre-checks preserved from original dispatcher
   var _mod0 = APP_MODULES.find(function(x){return x.id===moduleId;});
   if (_mod0 && (_mod0.aiDriven || _mod0.localCharge || _mod0.serverFixed)) {
     if (!ensureLoggedIn('登录后即可使用该功能')) return;
   }
   if (typeof searchRunning !== 'undefined' && searchRunning) { ttp('检索进行中，请等待完成'); return; }
+  if (_activeModule === moduleId) return;
   _activeModule = moduleId;
 
-  // Delegate to unified module dispatcher
-  if (typeof _open === 'function') {
-    _open(moduleId);
-  } else {
-    // Fallback: old inline switchPanel for compat
-    switchPanel(moduleId);
+  // Special cases that need full-screen: dashboard, knowledge-graph
+  if (moduleId === 'dashboard') { showDashboard(); return; }
+  if (moduleId === 'knowledge-graph') { showKnowledgeGraph(); return; }
+  if (moduleId === 'citely' && typeof Citely !== 'undefined') {
+    var tb = (document.getElementById('thesisBox') || document.getElementById('contentBody'));
+    if (tb) { tb.innerHTML = ''; Citely.mount(tb); }
+    return;
+  }
+  if (moduleId === 'writing-workbench' && typeof WritingModule !== 'undefined') {
+    var tbw = (document.getElementById('thesisBox') || document.getElementById('contentBody'));
+    if (tbw) { tbw.innerHTML = ''; WritingModule.mount(tbw); }
+    return;
   }
 
-  // pushState for back button
+  // Default: render in right panel
+  switchPanel(moduleId);
+
   try { history.pushState({ module: moduleId }, '', '#/' + moduleId); } catch (e) {}
 }
 

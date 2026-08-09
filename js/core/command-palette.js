@@ -92,23 +92,19 @@
   }
 
   function execute(id) {
-    // Track recent
     _recentIds = _recentIds.filter(function(x) { return x !== id; });
     _recentIds.unshift(id);
     if (_recentIds.length > 8) _recentIds = _recentIds.slice(0, 8);
-
     close();
-
-    // Dispatch based on module type
     if (id === 'import') {
       if (typeof openImportDialog === 'function') openImportDialog('new');
       return;
     }
-
-    if (typeof _open === 'function') {
-      _open(id);
-    } else if (typeof Nav !== 'undefined' && Nav.navigate) {
+    // ONE dispatch path: Nav for milestones, switchModule for everything else
+    if (typeof Nav !== 'undefined' && Nav.navigate) {
       Nav.navigate(id);
+    } else if (typeof switchModule === 'function') {
+      switchModule(id);
     }
   }
 
