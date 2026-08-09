@@ -601,27 +601,21 @@ function enableLiteratureButtons(){
   }catch(e){}
 }
 function switchModule(moduleId) {
+  // Pre-checks preserved from original dispatcher
   var _mod0 = APP_MODULES.find(function(x){return x.id===moduleId;});
   if (_mod0 && (_mod0.aiDriven || _mod0.localCharge || _mod0.serverFixed)) {
     if (!ensureLoggedIn('登录后即可使用该功能')) return;
   }
   if (typeof searchRunning !== 'undefined' && searchRunning) { ttp('检索进行中，请等待完成'); return; }
   _activeModule = moduleId;
-  var home=document.getElementById('toolHome'); if(home) home.style.display='none';
-  document.querySelectorAll('.tool-tab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-tooltab')==='refs' && moduleId==='references'); });
-  var meta = (APP_MODULES||[]).find(function(m){return m.id===moduleId;});
-  setToolPanelHeader(meta ? (meta.icon+' '+meta.name) : moduleId, meta && meta.requiresThesis ? '基于论文内容；左侧正文/目录保持可见' : '可直接使用');
 
-  // Highlight nav items
-  document.querySelectorAll('.nav-item').forEach(function(n) {
-    n.classList.toggle('active', n.getAttribute('data-module') === moduleId);
-  });
-  var tabs = document.querySelectorAll('.module-tab');
-  for (var i = 0; i < tabs.length; i++) tabs[i].classList.toggle('active', tabs[i].getAttribute('data-module') === moduleId);
-
-  switchPanel(moduleId);
-
-  if (moduleId === 'knowledge-graph' && _thesisLoaded) showKnowledgeGraph();
+  // Delegate to unified module dispatcher
+  if (typeof _open === 'function') {
+    _open(moduleId);
+  } else {
+    // Fallback: old inline switchPanel for compat
+    switchPanel(moduleId);
+  }
 
   // pushState for back button
   try { history.pushState({ module: moduleId }, '', '#/' + moduleId); } catch (e) {}
