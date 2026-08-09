@@ -2301,7 +2301,7 @@ test('PROJECT: citation closed loop + import sync helpers', function() {
 
 test('UX: two-path home exists', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');
-  assert(src.indexOf('你想先做什么') >= 0 || src.indexOf('home-choice') >= 0, 'two-path home missing');
+  assert(src.indexOf('从想法开始') >= 0 && src.indexOf('导入已有论文') >= 0, 'two-path home missing');
   assert(src.indexOf('从想法开始') >= 0, 'idea path missing');
   assert(src.indexOf('上传') >= 0, 'upload path missing');
 });

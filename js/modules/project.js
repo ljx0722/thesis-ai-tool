@@ -1397,27 +1397,25 @@
     var next = nextAction(project);
     if (!project || isProjectEmpty(project)) {
       return '' +
-        '<div class="project-overview home-simple">' +
-          '<div class="project-overview-head">' +
-            '<div class="project-badge">开始使用</div>' +
-            '<h2>你想先做什么？</h2>' +
-            '<p>中间是论文全貌，左侧是目录树——内容会一点点长出来。右侧工具台可随时用（如数据分析）。</p>' +
+        '<div style=”max-width:640px;margin:80px auto;text-align:center;padding:0 20px”>' +
+          '<div style=”font-size:56px;margin-bottom:16px”>🎓</div>' +
+          '<h2 style=”font-size:24px;font-weight:700;color:#111;margin-bottom:4px”>论文搭子 ThesisBuddy</h2>' +
+          '<p style=”font-size:14px;color:#94a3b8;margin-bottom:36px”>AI 论文全流程工作台 — 从想法到答辩通关</p>' +
+          '<div style=”display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:32px”>' +
+            '<div onclick=”openIdeaWizard()” style=”flex:1;min-width:220px;max-width:300px;padding:28px 24px;background:#fff;border:2px solid #4f46e5;border-radius:16px;cursor:pointer;transition:all .15s;text-align:left” onmouseenter=”this.style.boxShadow=\'0 8px 30px rgba(79,70,229,.15)\'” onmouseleave=”this.style.boxShadow=\'none\'”>' +
+              '<div style=”font-size:32px;margin-bottom:12px”>💡</div>' +
+              '<div style=”font-size:16px;font-weight:700;color:#111;margin-bottom:4px”>从想法开始</div>' +
+              '<div style=”font-size:12px;color:#94a3b8;line-height:1.6”>选题分析 → 大纲生成 → 分章写作 → 审阅打磨 → 答辩准备</div>' +
+              '<div style=”font-size:11px;color:#4f46e5;font-weight:600;margin-top:12px”>适合：还没有论文草稿 →</div>' +
+            '</div>' +
+            '<div onclick=”openImportDialog(\'new\')” style=”flex:1;min-width:220px;max-width:300px;padding:28px 24px;background:#fff;border:2px solid #e2e8f0;border-radius:16px;cursor:pointer;transition:all .15s;text-align:left” onmouseenter=”this.style.borderColor=\'#4f46e5\';this.style.boxShadow=\'0 8px 30px rgba(79,70,229,.1)\'” onmouseleave=”this.style.borderColor=\'#e2e8f0\';this.style.boxShadow=\'none\'”>' +
+              '<div style=”font-size:32px;margin-bottom:12px”>📄</div>' +
+              '<div style=”font-size:16px;font-weight:700;color:#111;margin-bottom:4px”>导入已有论文</div>' +
+              '<div style=”font-size:12px;color:#94a3b8;line-height:1.6”>上传 DOCX → 自动解析目录与参考文献 → 逐章审阅优化</div>' +
+              '<div style=”font-size:11px;color:#4f46e5;font-weight:600;margin-top:12px”>适合：已有论文草稿 →</div>' +
+            '</div>' +
           '</div>' +
-          '<div class="home-choice-grid">' +
-            '<button class="home-choice primary" onclick="openIdeaWizard()">' +
-              '<div class="home-choice-kicker">路径 A · 推荐新手</div>' +
-              '<div class="home-choice-title">💡 从想法开始</div>' +
-              '<div class="home-choice-desc">还没有完整论文。先立项，再写大纲、分章草稿、检索文献。</div>' +
-              '<div class="home-choice-next">下一步：创建项目 → 一键流水线/大纲写作</div>' +
-            '</button>' +
-            '<button class="home-choice" onclick="triggerUpload()">' +
-              '<div class="home-choice-kicker">路径 B · 已有草稿</div>' +
-              '<div class="home-choice-title">📄 上传论文打磨</div>' +
-              '<div class="home-choice-desc">已有 DOCX。导入后自动解析目录树、参考文献，再做评审与优化。</div>' +
-              '<div class="home-choice-next">下一步：上传 .docx → 查看目录树</div>' +
-            '</button>' +
-          '</div>' +
-          '<div class="home-help-note">左侧上方是主线阶段，中间大区域是目录树，底部“全部工具”按需展开。登录后项目自动云同步。</div>' +
+          '<p style=”font-size:12px;color:#94a3b8”>按 <kbd style=”padding:1px 6px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;font-family:monospace”>Ctrl+K</kbd> 搜索所有功能 · 已有项目？点击顶栏项目名切换</p>' +
         '</div>';
     }
 
