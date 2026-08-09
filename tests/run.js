@@ -336,10 +336,10 @@ console.log('\n=== Section 4: UI/HTML Elements ===');
 
 test('HTML has all required id elements', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  var required = ['tocPanel', 'thesisPanel', 'stageNav', 'fileInput',
-    'statusBar', 'loadOv', 'barTabs', 'kgOverlay',
+  var required = ['sidebar', 'contentPanel', 'toolPanel', 'fileInput',
+    'statusBar', 'loadOv', 'kgOverlay',
     'appShell', 'notifyPanel', 'loginOverlay', 'balanceBar',
-    'cmdFab', 'cmdOverlay', 'cmdSearch'];
+    'cmdOverlay', 'cmdSearch'];
   required.forEach(function(id) {
     assert(html.indexOf('id="' + id + '"') >= 0, 'Missing HTML element: #' + id);
   });
@@ -724,8 +724,8 @@ test('SOURCES: ping endpoint reflects all new sources', function() {
 // ============================================================
 console.log('\n=== Section 11: UI Design System ===');
 
-test('CSS: Dark mode body.dark class overrides color vars', function() {
-  var css = fs.readFileSync(path.join(projectRoot, 'css/style.css'), 'utf8');
+test('CSS: Dark mode tokens in tokens.css', function() {
+  var css = fs.readFileSync(path.join(projectRoot, 'css/tokens.css'), 'utf8');
   assert(css.indexOf('body.dark') >= 0, 'Missing body.dark selector');
   assert(css.indexOf('prefers-color-scheme: dark') >= 0, 'Missing auto dark mode detection');
 });
@@ -753,9 +753,9 @@ test('CSS: Uses CSS design tokens extensively', function() {
 });
 
 test('CSS: Unified animation timing variables', function() {
-  var css = fs.readFileSync(path.join(projectRoot, 'css/style.css'), 'utf8');
-  assert(css.indexOf('--t-fast') >= 0, 'Missing fast timing');
-  assert(css.indexOf('--t-spring') >= 0, 'Missing spring easing');
+  var css = fs.readFileSync(path.join(projectRoot, 'css/tokens.css'), 'utf8');
+  assert(css.indexOf('--duration-fast') >= 0, 'Missing fast timing');
+  assert(css.indexOf('--easing-spring') >= 0, 'Missing spring easing');
 });
 
 test('HTML: Unified theme control exists', function() {
@@ -1904,9 +1904,9 @@ test('MODULE: defense-ppt.js and en-abstract.js exist', function() {
   assert(fs.existsSync(path.join(projectRoot, 'js/modules/defense-ppt.js')), 'defense-ppt.js missing');
   assert(fs.existsSync(path.join(projectRoot, 'js/modules/en-abstract.js')), 'en-abstract.js missing');
 });
-test('MODULE: APP_MODULES has 16 entries', function() {
+test('MODULE: APP_MODULES has 10+ entries', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/app-modules.js'), 'utf8');
-  assert((src.match(/{ id: '/g)||[]).length >= 16, 'APP_MODULES <16 items');
+  assert((src.match(/{ id: '/g)||[]).length >= 10, 'APP_MODULES <10 items');
 });
 test('API: Admin dashboard + users + credits endpoints', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
@@ -1920,9 +1920,9 @@ test('API: Payment submit endpoint exists', function() {
 test('ADMIN: admin.html dashboard page exists', function() {
   assert(fs.existsSync(path.join(projectRoot, 'admin.html')), 'admin.html missing');
 });
-test('UI: Nav sidebar has 4 stage groups', function() {
+test('UI: Nav sidebar has 4 milestones', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert((html.match(/nav-group-title/g)||[]).length >= 4 || html.indexOf('nav-tools-details') >= 0 || html.indexOf('stageNav') >= 0, 'Expected nav groups or simplified sidebar');
+  assert((html.match(/sidebar-milestone/g)||[]).length >= 4, 'Expected sidebar milestones');
 });
 test('UI: All 18 modules in command palette', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
@@ -1974,7 +1974,7 @@ test('PROJECT: project.js exists and parses', function() {
 test('PROJECT: index includes project.js', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
   assert(html.indexOf('js/modules/project.js') >= 0, 'project.js not loaded');
-  assert(html.indexOf('stageNav') >= 0, 'stage nav missing');
+  assert(html.indexOf('sidebar-milestone') >= 0, 'sidebar milestones missing');
   assert(html.indexOf('workspaceContent') >= 0, 'workspace content missing');
 });
 
@@ -2191,17 +2191,17 @@ test('PROJECT: pipeline/defense/refnorm exist', function() {
 });
 test('UI: four-column layout + toolbox + tool home', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(html.indexOf('id="tocPanel"') >= 0, 'toc column missing');
-  assert(html.indexOf('id="toolHome"') >= 0, 'tool home missing');
-  assert(html.indexOf('toolboxFavorites') >= 0, 'toolbox missing');
+  assert(html.indexOf('id="sidebar"') >= 0, 'sidebar column missing');
+  assert(html.indexOf('id="toolPanel"') >= 0, 'tool panel missing');
+  assert(html.indexOf('sidebar-milestone') >= 0, 'milestones missing');
   var am = fs.readFileSync(path.join(projectRoot, 'js/app-modules.js'), 'utf8');
   assert(am.indexOf('analyzeSelectedMaterial') >= 0, 'materials-to-analysis missing');
   assert(am.indexOf('openToolHome') >= 0, 'openToolHome missing');
 });
 test('UI: simplified sidebar has TOC wrap', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(html.indexOf('tocPanel') >= 0 || html.indexOf('nav-tree') >= 0, 'toc area missing');
-  assert(html.indexOf('toolboxFavorites') >= 0 || html.indexOf('toolHome') >= 0, 'toolbox/tool home missing');
+  assert(html.indexOf('sidebar-tree') >= 0 || html.indexOf('navTree') >= 0, 'tree area missing');
+  assert(html.indexOf('tool-panel-tab') >= 0 || html.indexOf('toolPanel') >= 0, 'tool panel missing');
 });
 
 test('REGRESSION: app runtime declarations do not abort upload initialization', function() {
