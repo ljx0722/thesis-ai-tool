@@ -212,7 +212,7 @@ function toggleChangelog(){var p=document.getElementById('changelogPanel');var o
         <button class="btn-ghost btn-sm" onclick="showDashboard()">看板</button>
       </div>
     </div>
-    <div class="content-body" id="contentBody"></div>
+    <div class="content-body" id="contentBody"><div id="thesisBox" style="display:none"><div id="workspaceContent"></div></div><div id="toolHome" style="display:none"></div><div id="stageNav" style="display:none"></div><span id="statusBar" style="display:none"></span></div>
     <div class="skeleton-full" id="thesisSkeleton" style="display:none"><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-block"></div></div>
   </div>
   <div class="tool-panel" id="toolPanel">
@@ -1184,4 +1184,13 @@ document.getElementById('accountModalMask').addEventListener('click', function(e
   <div id="notifyList" style="max-height:56vh;overflow-y:auto;padding:6px 0"></div>
 </div>
 
+
+<div id="tocPanel" style="display:none"></div>
+<div id="thesisPanel" style="display:none"></div>
+<div id="barTabs" style="display:none"></div>
+<div id="navFeatureTree" style="display:none"></div>
+<div id="cmdFab" style="display:none"></div>
+<div id="buddyTools" style="display:none"></div>
+<div id="buddyBackdrop" style="display:none"></div>
+<div id="buddyDrawer" style="display:none"></div>
 </body></html>
