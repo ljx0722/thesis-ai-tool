@@ -2839,6 +2839,12 @@ body.app-shell #mainLayout, body.app-shell .main{
   display:flex !important;
   flex-direction:column !important;
 }
+/* Allow inner content areas to scroll */
+.nav-feature-tree, .thesis-box, .ref-panel .module-area, .toc-panel .nav-tree {
+  overflow-y:auto !important;
+  flex:1 1 auto !important;
+  min-height:0 !important;
+}
 .nav-sidebar{ background: var(--bg-sidebar) !important; color: var(--text-sidebar); border-right:1px solid var(--border-sidebar) !important; }
 .toc-panel{ background: var(--bg-sidebar) !important; color: var(--text-sidebar); border-right:1px solid var(--border-sidebar) !important; }
 .nav-sidebar .nav-item,
