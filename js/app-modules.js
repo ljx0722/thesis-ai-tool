@@ -840,6 +840,10 @@ function onThesisLoaded(options) {
   options=options||{};
   _thesisLoaded = true; _analysisCache = {}; kgCurrentData = null;
   updateBarActions(); updateStatusBar2(); updateNavStates();
+  // 统一文档模型：标记论文就绪
+  if (typeof window.ThesisDocument !== 'undefined' && ThesisDocument.markReady) {
+    ThesisDocument.markReady('import');
+  }
   // Refresh the feature tree to show thesis-dependent tools
   if (typeof window._renderFeatureTree === 'function') window._renderFeatureTree();
   if (!options.skipRevisionSave && window.ThesisProject && typeof ThesisProject.onManuscriptReady === 'function') {
