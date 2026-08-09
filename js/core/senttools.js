@@ -22,7 +22,7 @@
   function show(x,y,text,pEl,range){
     _selectedText=text||'';_selectedParagraph=pEl||null;_selectedRange=range||null;
     var tb=getToolbar(),h='<div style="display:flex;gap:3px;align-items:center">';
-    [{id:'proofread',label:'查错',icon:'✏️'},{id:'rewrite',label:'改写',icon:'📝'},{id:'dedup',label:'降重',icon:'📋'},{id:'cite',label:'引用',icon:'📚'}].forEach(function(t){
+    [{id:'health-check',label:'体检',icon:'✏️'},{id:'rewrite',label:'改写',icon:'📝'},{id:'dedup',label:'降重',icon:'📋'},{id:'cite',label:'引用',icon:'📚'}].forEach(function(t){
       h+='<button onclick="event.stopPropagation();_runSentenceAction(\''+t.id+'\')" style="border:none;background:rgba(255,255,255,.1);color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;transition:background .1s" onmouseenter="this.style.background=\'rgba(255,255,255,.2)\'" onmouseleave="this.style.background=\'rgba(255,255,255,.1)\'">'+t.icon+' '+t.label+'</button>';
     });
     h+='<button onclick="event.stopPropagation();_closeSentenceToolbar()" style="border:none;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-size:14px;padding:5px">&times;</button></div>';
@@ -47,10 +47,10 @@
     var panel = getResultPanel(); panel.style.display = 'flex';
     var title = document.getElementById('sentPanelTitle'), body = document.getElementById('sentPanelBody');
     var prompts = {
-      'proofread': { title: '✏️ 查错结果', prompt: '请逐句检查以下文本的语法错误、标点错误和表达问题，逐条列出问题和修改建议：\n\n' + text, capability: 'proofread' },
+      'proofread': { title: '✏️ 查错结果', prompt: '请逐句检查以下文本的语法错误、标点错误和表达问题，逐条列出问题和修改建议：\n\n' + text, capability: 'health-check' },
       'rewrite':   { title: '📝 改写结果', prompt: '请用更学术和专业的语言改写以下文本。仅输出改写后的完整文本，不要解释：\n\n' + text, capability: 'expand' },
       'dedup':     { title: '📋 降重结果', prompt: '请在不改变原意的前提下重新表述以下文本。仅输出改写后的文本：\n\n' + text, capability: 'de-duplicate' },
-      'cite':      { title: '📚 引用建议', prompt: '分析以下文本中哪些陈述需要参考文献支撑，逐条指出并建议引用方向：\n\n' + text, capability: 'proofread' },
+      'cite':      { title: '📚 引用建议', prompt: '分析以下文本中哪些陈述需要参考文献支撑，逐条指出并建议引用方向：\n\n' + text, capability: 'health-check' },
     };
     var cfg = prompts[actionId] || prompts['proofread'];
     if(title) title.textContent = cfg.title;

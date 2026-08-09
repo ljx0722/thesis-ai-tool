@@ -7,10 +7,10 @@
   'use strict';
 
   var RUNNERS={
-    'topic-finder':'runTopicFinder','proposal':'runProposalModule',
+    'ideation':'IdeationModule','health-check':'HealthCheckModule',
     'expand':'runExpandModule','data-analysis':'runDataAnalysis',
-    'proofread':'runProofread','de-duplicate':'runDeduplicate',
-    'format-check':'runFormatCheck','terminology':'runTerminology',
+    
+    
     'paragraph':'runParagraphAnalysis','review':'runReviewModule',
     'optimization':'runOptimization','defense-ppt':'runDefensePPT',
     'en-abstract':'runEnAbstract'

@@ -133,7 +133,7 @@ function isBodyChapter(s) {
 // ===== Tool dock (right panel home) + favorites =====
 var TOOLBOX_KEY = 'thesis_ai_toolbox_favs_v1';
 function toolboxStorageKey(){try{var u=JSON.parse(sessionStorage.getItem('thesis_ai_user')||'{}');return TOOLBOX_KEY+'_u'+(u.id!=null?u.id:'guest');}catch(e){return TOOLBOX_KEY+'_guest';}}
-var DEFAULT_FAVS = ['references','proofread','format-check','data-analysis'];
+var DEFAULT_FAVS = ['health-check','ideation','citely','data-analysis'];
 
 function loadToolboxFavs(){
   try{
@@ -243,8 +243,8 @@ function renderToolHome(){
   (APP_MODULES||[]).forEach(function(m){ (m.requiresThesis?need:free).push(m); });
   var taskGroups=[
     {title:'证据与引用',desc:'逐句补真实文献、确认引用',action:"launchTool('references')"},
-    {title:'句子改写 / 降 AI 味',desc:'查错、降重、长句与口语化处理',action:"launchTool('proofread')"},
-    {title:'格式与导出',desc:'格式检查、预览、DOCX 导出',action:"launchTool('format-check')"},
+    {title:'论文体检',desc:'一键查错、降重、格式、术语、段落',action:"launchTool('health-check')"},
+    {title:'开题工作台',desc:'选题探索与大纲生成',action:"launchTool('ideation')"},
     {title:'数据与图表',desc:'资料库、数据分析、科研图表',action:"launchTool('data-analysis')"}
   ];
   freeHost.innerHTML = taskGroups.map(function(g){return '<button class="tool-card task-card" onclick="'+g.action+'"><b>'+g.title+'</b><span>'+g.desc+'</span></button>';}).join('') +
@@ -283,7 +283,7 @@ function setToolPanelHeader(name, sub){
 
 var APP_MODULES = [
   // 选题阶段 — 无需论文, AI驱动
-  { id: 'topic-finder',    name: '选题推荐',   icon: '💡', requiresThesis: false, aiDriven: true },
+  { id: 'ideation',        name: '开题工作台', icon: '💡', requiresThesis: false, aiDriven: true },
   { id: 'proposal',        name: '开题大纲',   icon: '📝', requiresThesis: false, aiDriven: true },
   // 撰写阶段
   { id: 'references',      name: '参考文献',   icon: '📋', requiresThesis: true,  aiDriven: false },
@@ -291,11 +291,8 @@ var APP_MODULES = [
   { id: 'data-analysis',   name: '数据分析',   icon: '📈', requiresThesis: false, aiDriven: false, serverFixed: true, localCharge: true, openOnly: true },
   { id: 'knowledge-graph', name: '知识图谱',   icon: '🕸️', requiresThesis: true,  aiDriven: false, serverFixed: true },
   // 打磨阶段
-  { id: 'proofread',       name: '论文查错',   icon: '✏️', requiresThesis: false, aiDriven: true },
-  { id: 'de-duplicate',    name: '查重降重',   icon: '📋', requiresThesis: false, aiDriven: true },
-  { id: 'format-check',    name: '格式检查',   icon: '✅', requiresThesis: true,  aiDriven: false, localCharge: true },
-  { id: 'terminology',     name: '术语分析',   icon: '🔤', requiresThesis: true,  aiDriven: false, localCharge: true },
-  { id: 'paragraph',       name: '段落分析',   icon: '📝', requiresThesis: true,  aiDriven: false, localCharge: true },
+  { id: 'health-check',    name: '论文体检',   icon: '🏥', requiresThesis: false, aiDriven: true },
+  { id: 'de-duplicate',    name: '查重降重',   icon: '📋', requiresThesis: false, aiDriven: true },  { id: 'paragraph',       name: '段落分析',   icon: '📝', requiresThesis: true,  aiDriven: false, localCharge: true },
   // 评审输出
   { id: 'review',          name: '论文审阅',   icon: '🔍', requiresThesis: true,  aiDriven: true },
   { id: 'optimization',    name: '优化建议',   icon: '💡', requiresThesis: true,  aiDriven: false, localCharge: true },
@@ -306,16 +303,13 @@ var APP_MODULES = [
 
 // 模块 id → 运行函数名映射 (run + PascalCase 或特定命名)
 var MODULE_RUNNERS = {
-  'topic-finder':    'runTopicFinder',
-  'proposal':        'runProposalModule',
+  'ideation':        'IdeationModule',
+  // 'proposal' merged into ideation module,
   'expand':          'runExpandModule',
   'data-analysis':   'runDataAnalysis',
   'knowledge-graph': 'runKnowledgeGraphModule',
-  'proofread':       'runProofread',
-  'de-duplicate':    'runDeduplicate',
-  'format-check':    'runFormatCheck',
-  'terminology':     'runTerminology',
-  'paragraph':       'runParagraphAnalysis',
+  'health-check':    'HealthCheckModule',
+  'de-duplicate':    'runDeduplicate',  'paragraph':       'runParagraphAnalysis',
   'review':          'runReviewModule',
   'optimization':    'runOptimization',
   'defense-ppt':     'runDefensePPT',
@@ -998,9 +992,9 @@ function runReviewModule(container) {
     '<div id="reviewTerm" style="flex:1;min-width:300px;border:1px solid var(--bd);border-radius:10px;padding:12px;background:var(--card)"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">🔤 术语分析</div><div id="reviewTermContent" style="font-size:.7rem;color:var(--m)">分析中...</div></div>'+
     '</div>';
   setTimeout(function(){
-    var fc=document.getElementById('reviewFormatContent');if(fc&&typeof runFormatCheck==='function')runFormatCheck(fc);
+    var fc=document.getElementById('reviewFormatContent');if(fc&&typeof HealthCheckModule!=='undefined')HealthCheckModule.runCheck('format-check');
     var pc=document.getElementById('reviewParaContent');if(pc&&typeof runParagraphAnalysis==='function')runParagraphAnalysis(pc);
-    var tc=document.getElementById('reviewTermContent');if(tc&&typeof runTerminology==='function')runTerminology(tc);
+    var tc=document.getElementById('reviewTermContent');if(tc&&typeof HealthCheckModule!=='undefined')HealthCheckModule.runCheck('terminology');
     try {
       if (window.ThesisProject && ThesisProject.logSkillRun) {
         ThesisProject.logSkillRun({ moduleId: 'review', title: '论文审阅', summary: '格式+段落+术语' });

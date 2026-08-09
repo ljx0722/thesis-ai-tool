@@ -3,15 +3,15 @@
  * 权威分数来自 computeThesisReview()；展示与行动映射在此层完成。
  */
 var THESIS_BOARD_WEIGHTS = [
-  { key: 'topic', label: '选题价值', weight: 0.10, modules: [{ id: 'topic-finder', name: '选题推荐' }, { id: 'proposal', name: '开题报告' }] },
+  { key: 'topic', label: '选题价值', weight: 0.10, modules: [{ id: 'ideation', name: '选题推荐' }, { id: 'ideation', name: '开题报告' }] },
   { key: 'literature', label: '文献综述', weight: 0.15, modules: [{ id: 'references', name: '文献工作台' }, { id: 'knowledge-graph', name: '知识图谱' }] },
   { key: 'struct', label: '框架结构', weight: 0.15, modules: [{ id: 'optimization', name: '结构优化' }, { id: 'review', name: '论文查错' }] },
   { key: 'method', label: '研究方法', weight: 0.10, modules: [{ id: 'optimization', name: '结构优化' }, { id: 'data-analysis', name: '数据分析' }] },
   { key: 'content', label: '内容论证', weight: 0.15, modules: [{ id: 'paragraph', name: '段落分析' }, { id: 'data-analysis', name: '数据分析' }] },
-  { key: 'conclusion', label: '结论展望', weight: 0.10, modules: [{ id: 'optimization', name: '结构优化' }, { id: 'proofread', name: '校对润色' }] },
-  { key: 'innovation', label: '创新性', weight: 0.05, modules: [{ id: 'topic-finder', name: '选题推荐' }, { id: 'review', name: '论文查错' }] },
-  { key: 'readable', label: '学术写作', weight: 0.08, modules: [{ id: 'proofread', name: '校对润色' }, { id: 'paragraph', name: '段落分析' }, { id: 'terminology', name: '术语检查' }] },
-  { key: 'format', label: '格式规范', weight: 0.05, modules: [{ id: 'format-check', name: '格式检查' }] },
+  { key: 'conclusion', label: '结论展望', weight: 0.10, modules: [{ id: 'optimization', name: '结构优化' }, { id: 'health-check', name: '校对润色' }] },
+  { key: 'innovation', label: '创新性', weight: 0.05, modules: [{ id: 'ideation', name: '选题推荐' }, { id: 'review', name: '论文查错' }] },
+  { key: 'readable', label: '学术写作', weight: 0.08, modules: [{ id: 'health-check', name: '校对润色' }, { id: 'paragraph', name: '段落分析' }, { id: 'health-check', name: '术语检查' }] },
+  { key: 'format', label: '格式规范', weight: 0.05, modules: [{ id: 'health-check', name: '格式检查' }] },
   { key: 'practical', label: '实践价值', weight: 0.07, modules: [{ id: 'review', name: '论文查错' }, { id: 'data-analysis', name: '数据分析' }] }
 ];
 

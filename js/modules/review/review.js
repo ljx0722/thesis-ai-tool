@@ -15,8 +15,8 @@ var ReviewModule = (function() {
   var TABS = [
     { id: 'overview',   name: '总览',       icon: '📊', color: '#4f46e5' },
     { id: 'format',     name: '格式检查',   icon: '✅', color: '#10b981' },
-    { id: 'proofread',  name: '论文查错',   icon: '✏️', color: '#f59e0b' },
-    { id: 'terminology',name: '术语分析',   icon: '🔤', color: '#3b82f6' },
+    { id: 'health-check', name: '论文体检', icon: '🏥', color: '#6366f1' },
+    
     { id: 'paragraph',  name: '段落分析',   icon: '📝', color: '#8b5cf6' },
     { id: 'de-duplicate', name: '查重降重', icon: '📋', color: '#ef4444' },
     { id: 'review',     name: '综合审阅',   icon: '🔍', color: '#ec4899' },
@@ -99,10 +99,7 @@ var ReviewModule = (function() {
 
   function getTabDesc(id) {
     var m = {
-      'format': '检查标题层级、图表编号、参考文献格式、段落格式是否符合规范',
-      'proofread': 'AI 逐句扫描语病、标点错误、重复句、口语化表达',
-      'terminology': '检查术语使用一致性、中英文术语对应、专业名词规范',
-      'paragraph': '段落长度分布、长句检测、过渡词分析、标题拆分残留检测',
+      'format': '检查标题层级、图表编号、参考文献格式、段落格式是否符合规范',      'paragraph': '段落长度分布、长句检测、过渡词分析、标题拆分残留检测',
       'de-duplicate': 'AI 驱动的文本相似度检测与智能降重改写',
       'review': '十维综合评分：选题价值、文献综述、框架结构、研究方法、内容论证等',
       'optimize': '基于各维度检测结果，生成优先级优化建议清单',
@@ -117,10 +114,7 @@ var ReviewModule = (function() {
 
     // 运行对应的旧模块函数
     var runnerMap = {
-      'format': 'runFormatCheck',
-      'proofread': 'runProofread',
-      'terminology': 'runTerminology',
-      'paragraph': 'runParagraphAnalysis',
+      'format': 'health-check',      'paragraph': 'health-check',
       'de-duplicate': 'runDeduplicate',
       'review': 'runReviewModule',
       'optimize': 'runOptimization',
@@ -128,10 +122,6 @@ var ReviewModule = (function() {
     var fnName = runnerMap[tabId];
     if (fnName && typeof window[fnName] === 'function') {
       window[fnName](subContainer);
-    } else if (tabId === 'proofread') {
-      // proofread 的 runProofread 不接收 container，需要特殊处理
-      subContainer.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted,#888)">正在加载查错工具...</div>';
-    }
   }
 
   function runAllChecks() {

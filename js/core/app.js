@@ -249,11 +249,11 @@ var TB = window.TB || {};
 
   function getModuleRunner(id) {
     var map = {
-      'topic-finder': 'runTopicFinder', 'proposal': 'runProposalModule',
+      'ideation': 'IdeationModule', 'health-check': 'HealthCheckModule',
       'expand': 'runExpandModule', 'data-analysis': 'runDataAnalysis',
       'knowledge-graph': 'runKnowledgeGraphModule',
-      'proofread': 'runProofread', 'de-duplicate': 'runDeduplicate',
-      'format-check': 'runFormatCheck', 'terminology': 'runTerminology',
+      
+      
       'paragraph': 'runParagraphAnalysis', 'review': 'runReviewModule',
       'optimization': 'runOptimization', 'defense-ppt': 'runDefensePPT',
       'en-abstract': 'runEnAbstract', 'dashboard': 'showDashboard',

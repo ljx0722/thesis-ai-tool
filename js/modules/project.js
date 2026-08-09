@@ -6,35 +6,24 @@
   var STORAGE_KEY = 'thesis_ai_projects_v1';
   var CURRENT_KEY = 'thesis_ai_current_project_id';
 
-  // 9-Stage Academic Pipeline — modeled on academic-research-skills
-  // Path A (idea): all 9 stages. Path B (import): skips ideation+writing, starts from literature
+  // 4-Milestone Pipeline — aligned with academic-research-skills
+  // Each milestone maps to multiple academic-pipeline stages
   var STAGES = [
-    { id: 'ideation', name: '1.研究构思', icon: '💡', desc: '选题打磨、研究问题与方向确立', artifact: '明确选题与研究范围',
-      paths: ['idea'], modules: ['topic-finder', 'proposal'],
-      gates: ['idea_confirmed', 'title_set'] },
-    { id: 'literature', name: '2.文献调研', icon: '📚', desc: '系统检索、证据收集与研究脉络', artifact: '文献综述与证据地图',
-      paths: ['idea','docx'], modules: ['references', 'knowledge-graph', 'citely'],
-      gates: ['ref_count >= 10', 'lit_coverage >= 50'] },
-    { id: 'structure', name: '3.大纲构建', icon: '🧭', desc: '论文大纲、章节计划与方法设计', artifact: '完整论文大纲',
-      paths: ['idea','docx'], modules: ['proposal'], primaryAction: 'open-outline',
-      gates: ['outline_complete', 'chapters >= 5'] },
-    { id: 'writing', name: '4.初稿写作', icon: '✍️', desc: '分章写作、数据收集与图表表达', artifact: '完整论文初稿',
-      paths: ['idea'], modules: ['expand', 'data-analysis', 'writing-workbench'], primaryAction: 'open-outline',
-      gates: ['word_count >= 10000', 'all_chapters_drafted'] },
-    { id: 'polish', name: '5.打磨修改', icon: '🔍', desc: '查错、降重、格式、术语与逻辑', artifact: '逐项修改清单',
-      paths: ['idea','docx'], modules: ['proofread', 'de-duplicate', 'format-check', 'terminology', 'paragraph'],
-      gates: ['errors_fixed', 'duplicates_resolved'] },
-    { id: 'integrity', name: '6.诚信检查', icon: '🔒', desc: '引用验证、数据核实、完整性证明', artifact: '诚信检查报告',
-      paths: ['idea','docx'], modules: ['references', 'format-check'],
-      gates: ['all_refs_verified', 'data_claims_validated'] },
-    { id: 'review', name: '7.同行评审', icon: '🔄', desc: '5-reviewer模拟审阅、评分与修改建议', artifact: '审阅报告与修改路线图',
-      paths: ['idea','docx'], modules: ['review', 'optimization', 'dashboard'],
-      gates: ['all_reviewers_done', 'overall_score >= 55'] },
-    { id: 'revise', name: '8.终稿修订', icon: '✏️', desc: '根据审阅意见修订、再评审验证', artifact: '修改对照表与终稿',
-      paths: ['idea','docx'], modules: ['proofread', 'de-duplicate', 'review'],
-      gates: ['revision_complete', 're-review_approved'] },
-    { id: 'defense', name: '9.答辩准备', icon: '🎤', desc: '答辩PPT、英文摘要与问答演练', artifact: '答辩材料包',
-      paths: ['idea','docx'], modules: ['en-abstract', 'defense-ppt', 'dashboard'],
+    { id: 'prepare', name: '准备', icon: '📋', desc: '选题打磨、文献调研、大纲构建', artifact: '选题 + 文献 + 大纲',
+      paths: ['idea','docx'], modules: ['ideation', 'citely', 'knowledge-graph'],
+      pipelineStages: ['RESEARCH'],
+      gates: ['title_set', 'ref_count >= 10'] },
+    { id: 'write', name: '写作', icon: '✍️', desc: '分章写作、数据图表、AI辅助生成', artifact: '完整论文初稿',
+      paths: ['idea','docx'], modules: ['writing-workbench', 'data-analysis'],
+      pipelineStages: ['WRITE'],
+      gates: ['all_chapters_drafted'] },
+    { id: 'polish', name: '打磨', icon: '🔍', desc: '论文体检、查重降重、深度审阅', artifact: '体检报告 + 审阅意见',
+      paths: ['idea','docx'], modules: ['health-check', 'review', 'dashboard'],
+      pipelineStages: ['INTEGRITY', 'REVIEW', 'REVISE'],
+      gates: ['health_check_done', 'review_complete'] },
+    { id: 'finalize', name: '收尾', icon: '🎤', desc: '答辩PPT、英文摘要、格式定稿', artifact: '答辩材料 + 终稿',
+      paths: ['idea','docx'], modules: ['defense-ppt', 'en-abstract'],
+      pipelineStages: ['FINALIZE', 'PROCESS_SUMMARY'],
       gates: ['ppt_generated', 'abstract_translated'] }
   ];
 
@@ -625,7 +614,7 @@
     try {
       var mid = String(entry.moduleId || '');
       p.stageStatus = p.stageStatus || {};
-      if (/topic-finder|proposal/.test(mid) && p.stageStatus.ideation !== 'done') {
+      if (/ideation/.test(mid) && p.stageStatus.prepare !== 'done') {
         p.stageStatus.ideation = 'active';
         p.currentStage = p.currentStage || 'ideation';
       }
@@ -636,7 +625,7 @@
         p.stageStatus.writing = 'active';
         p.currentStage = 'writing';
       }
-      if (/proofread|format-check|de-duplicate|terminology|paragraph|optimization/.test(mid) && p.stageStatus.polish !== 'done') {
+      if (/health-check/.test(mid) && p.stageStatus.polish !== 'done') {
         p.stageStatus.polish = 'active';
         p.currentStage = 'polish';
       }
@@ -758,10 +747,10 @@
       hasTitle: !!(project && project.title && project.title !== '未命名论文项目'),
       hasField: !!(project && project.field && String(project.field).trim()),
       hasOutline: !!(outline && outline.chapters && outline.chapters.length >= 3),
-      hasPolish: hasLog(['proofread', 'format-check', 'de-duplicate', 'terminology', 'paragraph', 'optimization']),
+      hasPolish: hasLog(['health-check']),
       hasReview: hasLog(['review', 'dashboard', 'thesis-review']),
       hasIntegrity: refCount >= 5 && hasPaper,
-      hasRevised: hasLog(['proofread', 'de-duplicate', 'review']) && hasPaper,
+      hasRevised: hasLog(['health-check', 'review']) && hasPaper,
       hasDefense: hasLog(['en-abstract', 'defense-ppt', 'defense-pack', 'defense']),
       hasExport: hasLog(['export', 'export-docx']) || !!(project.artifacts && project.artifacts.exports && project.artifacts.exports.length),
       exportCount: (project.artifacts && project.artifacts.exports && project.artifacts.exports.length) || 0
