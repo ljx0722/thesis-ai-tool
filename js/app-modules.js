@@ -846,6 +846,15 @@ function onThesisLoaded(options) {
   }
   // Refresh the feature tree to show thesis-dependent tools
   if (typeof window._renderFeatureTree === 'function') window._renderFeatureTree();
+  // 自动运行审阅并标注段落
+  setTimeout(function(){
+    try {
+      if (typeof ThesisAuditor !== 'undefined' && ThesisAuditor.auditAll) {
+        ThesisAuditor.auditAll();
+        ThesisAuditor.applyAnnotations();
+      }
+    } catch(e) { console.warn('[auto-audit]', e); }
+  }, 800);
   if (!options.skipRevisionSave && window.ThesisProject && typeof ThesisProject.onManuscriptReady === 'function') {
     ThesisProject.onManuscriptReady();
   }

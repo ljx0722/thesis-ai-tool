@@ -1258,6 +1258,68 @@
       return !project;
     }
   }
+  function _renderHealthCard(project) {
+    var text = typeof manuscriptText !== 'undefined' ? manuscriptText : '';
+    var refs = typeof existingRefs !== 'undefined' && existingRefs.length ? existingRefs :
+               (typeof mergedRefs !== 'undefined' && mergedRefs.length ? mergedRefs : []);
+    var secs = typeof sections !== 'undefined' ? sections : [];
+    var bodyChs = secs.filter(function(s){return s.title && typeof isBodyChapter==='function' && isBodyChapter(s);});
+    var wordCount = text.length;
+    var refCount = refs.length;
+    var chCount = bodyChs.length;
+
+    // Try to get auditor scores
+    var healthScore = 0;
+    try {
+      if (typeof ThesisAuditor !== 'undefined' && ThesisAuditor.getSummary) {
+        var summary = ThesisAuditor.getSummary();
+        healthScore = summary.avgScore || 0;
+      }
+    } catch(e) {}
+    // Fallback: estimate from available data
+    if (healthScore === 0) {
+      healthScore = 60; // baseline
+      if (chCount >= 5) healthScore += 10;
+      if (refCount >= 15) healthScore += 10;
+      if (wordCount > 10000) healthScore += 5;
+      if (refCount > 0) {
+        var cn = refs.filter(function(r){return /[一-鿿]/.test((r.title||r.ci||'').substring(0,5));}).length;
+        if (cn > 0 && (refCount - cn) > 0 && cn/refCount > 0.3 && cn/refCount < 0.8) healthScore += 5;
+      }
+    }
+
+    var tone = healthScore >= 80 ? '#10b981' : (healthScore >= 60 ? '#f59e0b' : '#ef4444');
+    var label = healthScore >= 80 ? '优秀' : (healthScore >= 60 ? '良好' : '需改进');
+
+    // Build chapter quality bars
+    var chBars = '';
+    bodyChs.forEach(function(ch) {
+      var len = (ch.text || '').length;
+      var barW = Math.min(100, Math.round(len / Math.max(1, wordCount) * 300));
+      var chScore = 50;
+      if (len > 2000) chScore += 20;
+      if (len > 5000) chScore += 15;
+      var chTone = chScore >= 80 ? '#10b981' : (chScore >= 60 ? '#f59e0b' : '#ef4444');
+      chBars += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:12px">' +
+        '<span style="width:80px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escapeHtml(ch.name||ch.title||'第'+(bodyChs.indexOf(ch)+1)+'章')+'</span>' +
+        '<div style="flex:1;height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden"><div style="width:'+barW+'%;height:100%;background:'+chTone+';border-radius:3px"></div></div>' +
+        '<span style="font-size:11px;color:#94a3b8;width:30px;text-align:right">'+chScore+'</span></div>';
+    });
+
+    return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;padding:14px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'+
+      '<div style="text-align:center;grid-row:span 2">'+
+        '<div style="font-size:36px;font-weight:700;color:'+tone+'">'+healthScore+'</div>'+
+        '<div style="font-size:12px;color:#94a3b8">论文健康分</div>'+
+        '<div style="font-size:11px;padding:1px 8px;border-radius:10px;background:'+tone+'20;color:'+tone+';font-weight:600;display:inline-block;margin-top:2px">'+label+'</div>'+
+      '</div>'+
+      '<div style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#555">'+
+        '<div>📄 '+chCount+' 章 · '+(wordCount/1000).toFixed(1)+'k 字</div>'+
+        '<div>📚 '+refCount+' 条文献</div>'+
+        '<div>📝 '+(typeof proseReadability !== 'undefined' ? proseReadability(text) : '结构完整度 '+Math.round(bodyChs.length/5*100)+'%')+'</div>'+
+      '</div>'+
+      '<div style="font-size:12px">'+chBars+'</div>'+
+    '</div>';
+  }
   function renderProjectOverviewHTML(project) {
     var prog = calcProgress(project);
     var next = nextAction(project);
@@ -1310,6 +1372,7 @@
 
     return '' +
       '<div class="project-overview">' +
+        (project.hasManuscript && typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100 ? _renderHealthCard(project) : '') +
         '<div class="project-overview-head">' +
           '<div class="project-badge">' + (project.mode === 'import' ? '导入打磨' : '创作项目') + '</div>' +
           '<h2>' + escapeHtml(project.title) + '</h2>' +

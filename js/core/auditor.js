@@ -88,7 +88,40 @@
   });
 
   console.log('[TB] ThesisAuditor ready. 2 built-in checkers registered.');
-  // 其他 5 个检查器由各自模块在加载时通过 ThesisAuditor.register() 注册
+
+  // ── 段落级标注渲染 ──
+  function applyParagraphAnnotations() {
+    // 对论文中的每个段落，根据审计结果添加颜色标注
+    var box = document.getElementById('thesisBox');
+    if (!box) return;
+    var paragraphs = box.querySelectorAll('p, li, blockquote');
+    var results = _results;
+
+    paragraphs.forEach(function(p) {
+      var text = (p.textContent || '').trim();
+      if (text.length < 10) return;
+
+      // 清除旧标注
+      p.classList.remove('audit-ok','audit-warn','audit-bad');
+
+      var score = 0, issues = 0;
+      Object.keys(results).forEach(function(name) {
+        var r = results[name];
+        if (r && r.score) score += r.score;
+        if (r && r.issues) issues += r.issues.length;
+      });
+
+      score = Object.keys(results).length > 0 ? Math.round(score / Object.keys(results).length) : 0;
+
+      if (score >= 80) p.classList.add('audit-ok');
+      else if (score >= 50) p.classList.add('audit-warn');
+      else p.classList.add('audit-bad');
+
+      // 添加数据属性
+      p.setAttribute('data-audit-score', String(score));
+      p.setAttribute('data-audit-issues', String(issues));
+    });
+  }
 
   window.ThesisAuditor = {
     register: register,
@@ -96,7 +129,8 @@
     auditOne: auditOne,
     getSummary: getSummary,
     getResults: function() { return _results; },
-    getCheckers: function() { return Object.keys(_checkers); }
+    getCheckers: function() { return Object.keys(_checkers); },
+    applyAnnotations: applyParagraphAnnotations
   };
 
 })();
