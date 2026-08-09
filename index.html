@@ -134,7 +134,7 @@
   </div>
 </header>
 <!-- ====== 更新日志按钮 ====== -->
-<div id="changelogBtn" onclick="toggleChangelog()" title="更新日志" style="display:none;position:fixed;top:52px;right:12px;z-index:1000;font-size:.62rem;color:#0071e3;cursor:pointer;background:rgba(0,113,227,.08);padding:3px 10px;border-radius:12px;border:1px solid rgba(0,113,227,.2);transition:all .2s;font-weight:600" onmouseenter="this.style.background='rgba(0,113,227,.15)'" onmouseleave="this.style.background='rgba(0,113,227,.08)'">📜 更新日志</div>
+<div id="changelogBtn" class="changelog-fab" onclick="toggleChangelog()" title="更新日志" style="display:none">📜 更新日志</div>
 <div id="changelogPanel" style="display:none;position:fixed;top:88px;right:12px;width:340px;max-height:70vh;overflow-y:auto;background:#fff;border-radius:12px;padding:16px;box-shadow:0 8px 40px rgba(0,0,0,.15);z-index:1001;font-size:.68rem;line-height:1.7;color:#333;border:1px solid #e5e7eb">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-size:.8rem">📜 功能更新日志</b><span onclick="document.getElementById('changelogPanel').style.display='none'" style="cursor:pointer;font-size:.7rem;color:#999">✕</span></div>
   <div style="border-left:2px solid #0071e3;padding-left:10px">
@@ -821,23 +821,23 @@ function toggleChangelog(){var p=document.getElementById('changelogPanel');var o
 </script>
 
 <!-- ====== 充值弹窗 ====== -->
-<div id="rechargeModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg-overlay);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:100070;align-items:center;justify-content:center" onclick="hideRechargeModal()">
-  <div style="background:var(--bg-card);border-radius:var(--radius-xl);padding:24px;width:520px;max-width:96%;max-height:85vh;overflow-y:auto;border:1px solid var(--border);box-shadow:var(--shadow-lg)" onclick="event.stopPropagation()">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <h3 style="font-size:var(--font-size-xl);color:var(--text-primary);margin:0;font-weight:var(--font-weight-bold)">充值</h3>
-      <button onclick="hideRechargeModal()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.2rem;font-family:var(--font-sans)">&times;</button>
+<div id="rechargeModal" class="modal-overlay hidden" style="display:none" onclick="hideRechargeModal()">
+  <div class="modal-card" style="width:520px;max-width:96%;max-height:85vh;overflow-y:auto;padding:24px" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-header-title">充值</h3>
+      <button class="modal-close" onclick="hideRechargeModal()">&times;</button>
     </div>
     <p style="font-size:var(--font-size-md);color:var(--text-muted);margin:0 0 8px">当前余额: <strong id="rechargeBalance" style="color:var(--text-primary)">0.00</strong> 点</p>
     <p style="font-size:.68rem;color:var(--text-muted);margin:0 0 12px;line-height:1.55">充值所得点数按当前兑换规则计算。请按订单显示的金额转账；管理员按实收确认到账。</p>
     <h4 style="font-size:var(--font-size-base);color:var(--text-secondary);margin:0 0 8px;font-weight:var(--font-weight-semibold)">充值金额（元）</h4>
     <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap">
-      <input type="text" inputmode="decimal" id="rechargeAmountInput" autocomplete="off" placeholder="请输入充值金额" aria-describedby="rechargePointsPreview rechargeAmountError" style="flex:1;min-width:140px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:.9rem;font-family:var(--font-sans)">
+      <input type="text" inputmode="decimal" id="rechargeAmountInput" autocomplete="off" placeholder="请输入充值金额" aria-describedby="rechargePointsPreview rechargeAmountError" class="input" style="flex:1;min-width:140px;font-size:.9rem">
       <span id="rechargePointsPreview" style="font-size:.78rem;color:var(--text-muted);white-space:nowrap">所得点数按当前兑换规则计算</span>
     </div>
     <div id="rechargeAmountError" aria-live="polite" style="min-height:16px;margin:-3px 0 7px;color:#ef4444;font-size:.68rem"></div>
     <button type="button" class="ai-btn" style="width:100%;margin-bottom:12px" onclick="selectRechargeAmountFromInput()">下一步：扫码支付</button>
     <div id="rechargeOrderInfo" aria-live="polite" style="display:none;font-size:.75rem;color:var(--accent);margin:0 0 10px;padding:8px 10px;border-radius:8px;background:var(--accent-glow);border:1px solid var(--accent)"></div>
-    <div id="rechargePayment" style="display:none;padding:14px;background:var(--surface-alt);border-radius:var(--radius-lg);border:1px solid var(--border);margin-bottom:12px">
+    <div id="rechargePayment" class="recharge-payment-section" style="display:none">
       <h4 style="font-size:var(--font-size-md);color:var(--text-muted);margin:0 0 10px;font-weight:var(--font-weight-semibold)">扫码支付</h4>
       <div class="recharge-qr-pair" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:12px">
         <div class="recharge-qr-card" data-method="alipay" onclick="switchQR('alipay')" style="flex:1;min-width:150px;max-width:200px;text-align:center;padding:10px;border-radius:12px;border:2px solid var(--accent);background:var(--bg-card);cursor:pointer">
@@ -852,14 +852,14 @@ function toggleChangelog(){var p=document.getElementById('changelogPanel');var o
         </div>
       </div>
       <p id="rechargePayHint" style="font-size:var(--font-size-xs);color:var(--text-muted);text-align:center;margin:0 0 10px">请使用<strong id="rechargePayMethodLabel">支付宝</strong>转账 <strong id="rechargePayAmountLabel">—</strong> 元，备注务必填写订单号</p>
-      <button id="rechargeSubmitBtn" onclick="submitRecharge()" style="width:100%;padding:12px;border-radius:var(--radius-md);border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:var(--font-weight-bold);font-size:var(--font-size-base);font-family:var(--font-sans)">创建订单并显示支付说明</button>
+      <button id="rechargeSubmitBtn" onclick="submitRecharge()" class="ai-btn" style="width:100%">创建订单并显示支付说明</button>
       <p style="font-size:var(--font-size-xs);color:var(--text-muted);text-align:center;margin:8px 0 0">支付完成后点「我已支付」提交审核；管理员按实收金额确认到账</p>
     </div>
     <h4 style="font-size:var(--font-size-md);color:var(--text-secondary);margin:12px 0 6px;font-weight:var(--font-weight-semibold)">修改密码</h4>
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-      <input type="password" id="pwOld" placeholder="原密码" style="flex:1;min-width:80px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;font-size:var(--font-size-sm);color:var(--text-primary);outline:none;font-family:var(--font-sans)">
-      <input type="password" id="pwNew" placeholder="新密码(6位+)" style="flex:1;min-width:80px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;font-size:var(--font-size-sm);color:var(--text-primary);outline:none;font-family:var(--font-sans)">
-      <button onclick="changePassword()" style="padding:7px 14px;border:none;border-radius:var(--radius-sm);background:var(--accent);color:#fff;font-size:var(--font-size-sm);cursor:pointer;font-weight:var(--font-weight-semibold);font-family:var(--font-sans)">修改</button>
+      <input type="password" id="pwOld" placeholder="原密码" class="input" style="flex:1;min-width:80px;padding:7px 10px;font-size:var(--text-sm)">
+      <input type="password" id="pwNew" placeholder="新密码(6位+)" class="input" style="flex:1;min-width:80px;padding:7px 10px;font-size:var(--text-sm)">
+      <button onclick="changePassword()" class="ai-btn" style="padding:7px 14px;font-size:var(--text-sm)">修改</button>
     </div>
     <div id="pwMsg" style="font-size:var(--font-size-xs);min-height:14px;margin-top:4px"></div>
     <h4 style="font-size:var(--font-size-md);color:var(--text-secondary);margin:12px 0 6px;font-weight:var(--font-weight-semibold)">充值记录</h4>
@@ -868,8 +868,8 @@ function toggleChangelog(){var p=document.getElementById('changelogPanel');var o
 </div>
 
 <!-- ====== 账户中心 ====== -->
-<div id="accountCenterMask" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(6px);z-index:100065;align-items:center;justify-content:center" onclick="closeAccountCenter()">
-  <div id="accountCenter" style="background:var(--bg-card,#fff);border-radius:16px;width:min(920px,96vw);max-height:88vh;overflow:hidden;border:1px solid var(--border,#e5e7eb);box-shadow:0 24px 64px rgba(0,0,0,.22);display:flex;flex-direction:column" onclick="event.stopPropagation()">
+<div id="accountCenterMask" class="modal-overlay hidden" style="display:none" onclick="closeAccountCenter()">
+  <div id="accountCenter" class="modal-card" style="width:min(920px,96vw);max-height:88vh" onclick="event.stopPropagation()">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border,#e5e7eb)">
       <div>
         <b style="font-size:1rem;color:var(--text-primary,#111)">账户中心</b>
@@ -1028,7 +1028,7 @@ function toggleChangelog(){var p=document.getElementById('changelogPanel');var o
 function showPricingInfo(){ /* real impl assigned to window.showPricingInfo below */ }
 </script>
 
-<div id="accountModalMask" class="acct-mask" style="display:none">
+<div id="accountModalMask" class="acct-mask modal-overlay hidden" style="display:none">
   <div id="accountModal" class="acct-modal" onclick="event.stopPropagation()">
     <div class="acct-modal-head">
       <b id="accountModalTitle">消费明细</b>
@@ -1176,15 +1176,9 @@ document.getElementById('accountModalMask').addEventListener('click', function(e
 </section>
 
 <!-- 消息中心：body 级 fixed，避免被 .bar 层叠上下文挡住 -->
-<div id="notifyPanel" style="display:none;position:fixed;top:52px;right:12px;width:360px;max-width:92vw;max-height:70vh;overflow:hidden;background:var(--bg-card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.22);z-index:100060">
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border,#e5e7eb)">
-    <b style="font-size:.85rem;color:var(--text-primary,#111)">消息中心</b>
-    <div style="display:flex;gap:8px;align-items:center">
-      <button type="button" onclick="markAllNotificationsRead()" style="background:none;border:none;color:var(--accent,#4f46e5);font-size:.68rem;cursor:pointer;font-weight:600">全部已读</button>
-      <button type="button" onclick="toggleNotifyPanel(false)" style="background:none;border:none;color:var(--text-muted,#999);cursor:pointer;font-size:.9rem">✕</button>
-    </div>
-  </div>
-  <div id="notifyList" style="max-height:56vh;overflow-y:auto;padding:6px 0"></div>
+<div id="notifyPanel" class="notify-panel" style="display:none">
+  <div class="notify-header"><b>消息中心</b><div class="notify-header-actions"><button type="button" onclick="markAllNotificationsRead()" class="notify-read-all">全部已读</button><button type="button" onclick="toggleNotifyPanel(false)" class="notify-close">✕</button></div></div>
+  <div id="notifyList" class="notify-list"></div>
 </div>
 
 
