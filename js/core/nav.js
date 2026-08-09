@@ -37,7 +37,7 @@
     if (tabId === 'references' && typeof switchPanel === 'function') switchPanel('references');
     else if (tabId === 'inspect' && typeof HealthCheckModule !== 'undefined') HealthCheckModule.mount(body);
     else if (tabId === 'review' && typeof ReviewModule !== 'undefined') ReviewModule.mount(body);
-    else if (tabId === 'buddy' && typeof BuddyAssistant !== 'undefined') BuddyAssistant.open();
+    else if (tabId === 'buddy' && typeof BuddyAssistant !== 'undefined') BuddyAssistant.mount(body);
   }
 
   function toggleToolPanel() {

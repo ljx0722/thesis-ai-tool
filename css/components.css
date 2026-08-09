@@ -127,3 +127,20 @@
 .welcome-card-desc { font-size: .75rem; color: var(--text-secondary); line-height: 1.6; display: block; }
 .welcome-hint { font-size: .68rem; color: var(--text-muted); }
 .welcome-hint kbd { display: inline-block; padding: 1px 7px; border-radius: 4px; background: var(--surface-alt); border: 1px solid var(--border-strong); font-family: var(--font-mono); font-size: .62rem; font-weight: var(--weight-semibold); }
+
+/* ── Buddy Assistant Panel ── */
+.buddy-panel { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.buddy-chat-body { flex: 1; overflow-y: auto; padding: var(--space-2); display: flex; flex-direction: column; gap: 8px; }
+.buddy-welcome { font-size: var(--text-sm); color: var(--text-muted); text-align: center; padding: 14px 8px; line-height: 1.6; }
+.buddy-msg { display: flex; flex-direction: column; }
+.buddy-msg-user { align-items: flex-end; }
+.buddy-msg-ai { align-items: flex-start; }
+.buddy-msg-bubble { max-width: 88%; padding: 8px 12px; border-radius: 12px; font-size: var(--text-sm); line-height: 1.55; overflow-wrap: break-word; word-break: break-word; }
+.buddy-msg-user .buddy-msg-bubble { background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+.buddy-msg-ai .buddy-msg-bubble { background: var(--surface-alt); color: var(--text-primary); border-bottom-left-radius: 4px; }
+.buddy-quick-row { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 4px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.buddy-quick-btn { padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius-full); background: var(--surface-card); color: var(--text-secondary); font-size: var(--text-xs); cursor: pointer; white-space: nowrap; font-family: var(--font-sans); transition: all var(--duration-fast); }
+.buddy-quick-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+.buddy-input-row { display: flex; gap: 6px; padding: 8px 4px; border-top: 1px solid var(--border); flex-shrink: 0; align-items: flex-end; }
+.buddy-input-row textarea { flex: 1; min-height: 44px; max-height: 80px; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 10px; font-size: var(--text-sm); resize: none; outline: none; font-family: var(--font-sans); color: var(--text-primary); background: var(--surface-input); }
+.buddy-input-row textarea:focus { border-color: var(--accent); }
