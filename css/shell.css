@@ -123,6 +123,9 @@
   opacity:.7; transition:opacity .15s; user-select:none;
 }
 .para-indicator:hover { opacity:1; background:rgba(226,232,240,.8); }
+
+/* Import banner animation */
+@keyframes slideDown { from { transform:translateY(-100%);opacity:0 } to { transform:translateY(0);opacity:1 } }
 .ft-leaf.ft-disabled { opacity:.45; }
 .ft-leaf.ft-disabled:hover { background:transparent; color:var(--text-secondary,#475569); }
 

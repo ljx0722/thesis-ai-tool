@@ -1963,7 +1963,33 @@
     if (typeof switchView === 'function') switchView('paper');
     try { ensureUnifiedProjectState(); } catch (e) {}
     try { saveManuscriptRevision({sourceType:'import',fileName:window._uploadFileName||'',kind:window._uploadFileKind||'',sizeBytes:window._uploadFileSize||0}).then(function(d){return runImportDecomposition({intent:window._importIntent||'new',fileName:window._uploadFileName||'',revisionId:d&&d.revision_id||''});}).catch(function(e){console.warn('[revision/decomposition]',e.message);if(typeof ttp==='function')ttp('论文已载入，云端拆解可稍后重试');}); } catch (eRev) {}
-    if (typeof ttp === 'function') ttp('论文已导入：目录树与正文已就绪，可点「工作台」查看主线进度');
+
+    // 引导横幅
+    var chCount = (typeof sections !== 'undefined' && sections) ? sections.filter(function(s){return s.title}).length : 0;
+    var wc = typeof manuscriptText !== 'undefined' && manuscriptText ? Math.round(manuscriptText.length/1000) : 0;
+    var rc = typeof existingRefs !== 'undefined' && existingRefs.length ? existingRefs.length : 0;
+    var banner = document.createElement('div');
+    banner.id = 'importBanner';
+    banner.style.cssText = 'position:absolute;top:0;left:0;right:0;z-index:50;background:linear-gradient(135deg,rgba(79,70,229,.95),rgba(99,102,241,.95));color:#fff;padding:16px 20px;border-radius:0 0 12px 12px;box-shadow:0 4px 20px rgba(79,70,229,.25);animation:slideDown .3s ease;text-align:center;margin:0 20px';
+    banner.innerHTML =
+      '<div style="font-size:18px;font-weight:700;margin-bottom:4px">🎉 论文导入完成！</div>'+
+      '<div style="font-size:13px;opacity:.85;margin-bottom:2px">📄 ' + chCount + '章 · ' + wc + 'k字 · 📚 ' + rc + '条文献</div>'+
+      '<div style="font-size:12px;opacity:.7;margin-bottom:10px">段落右侧彩色圆点显示质量评估 · 选中文字激活AI工具栏 · Ctrl+K 搜索所有功能</div>'+
+      '<div style="display:flex;gap:8px;justify-content:center">'+
+        '<button onclick="var el=document.getElementById(\'importBanner\');if(el)el.remove();_open(\'format-check\')" style="border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;padding:5px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">✅ 开始审阅</button>'+
+        '<button onclick="var el=document.getElementById(\'importBanner\');if(el)el.remove();_open(\'citely\')" style="border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;padding:5px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🔍 检索文献</button>'+
+        '<button onclick="var el=document.getElementById(\'importBanner\');if(el)el.remove();_open(\'proofread\')" style="border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;padding:5px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">✏️ 校对查错</button>'+
+        '<button onclick="var el=document.getElementById(\'importBanner\');if(el)el.remove()" style="border:none;background:transparent;color:rgba(255,255,255,.5);cursor:pointer;font-size:14px;padding:0 8px">&times;</button>'+
+      '</div>';
+    var thesisPanel = document.getElementById('thesisPanel');
+    if (thesisPanel) {
+      thesisPanel.style.position = 'relative';
+      thesisPanel.insertBefore(banner, thesisPanel.firstChild);
+      setTimeout(function() {
+        var b = document.getElementById('importBanner');
+        if (b) { b.style.transition = 'opacity .5s'; b.style.opacity = '0'; setTimeout(function() { if (b && b.parentElement) b.remove(); }, 500); }
+      }, 10000);
+    }
   }
 
   function renderImportDecomposition(job) {
