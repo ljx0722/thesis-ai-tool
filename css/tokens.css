@@ -129,6 +129,38 @@
   --z-modal: 500;
   --z-toast: 600;
   --z-tooltip: 700;
+
+  /* ── Backward compat: old variable names → new token names ── */
+  --font-size-xs: var(--text-xs);
+  --font-size-sm: var(--text-sm);
+  --font-size-md: var(--text-md);
+  --font-size-base: var(--text-base);
+  --font-size-lg: var(--text-lg);
+  --font-size-xl: var(--text-xl);
+  --font-size-2xl: var(--text-2xl);
+  --font-size-3xl: var(--text-3xl);
+  --font-size-hero: var(--text-hero);
+  --font-weight-normal: var(--weight-normal);
+  --font-weight-medium: var(--weight-medium);
+  --font-weight-semibold: var(--weight-semibold);
+  --font-weight-bold: var(--weight-bold);
+  --font-weight-heavy: var(--weight-heavy);
+  --line-height-tight: var(--leading-tight);
+  --line-height-normal: var(--leading-normal);
+  --line-height-relaxed: var(--leading-relaxed);
+  --bg-app: var(--surface-app);
+  --bg-card: var(--surface-card);
+  --bg-card-hover: var(--surface-card-hover);
+  --bg-input: var(--surface-input);
+  --bg-overlay: var(--surface-overlay);
+  --bg-sidebar: var(--surface-sidebar);
+  --t-fast: var(--duration-fast);
+  --t-base: var(--duration-base);
+  --t-slow: var(--duration-slow);
+  --t-spring: var(--easing-spring);
+  --duration-instant: 0ms;
+  --bg-topbar: var(--surface-topbar);
+  --m: var(--text-muted);
 }
 
 /* ── Dark Mode ── */
