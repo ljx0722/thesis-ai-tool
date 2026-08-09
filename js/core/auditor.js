@@ -271,57 +271,40 @@
   // ── 导出 ──
   // ── 段落级三维审阅 ──
   function auditParagraphs() {
+    // Integrate with 5-reviewer: use global review model scores, not isolated heuristics
+    if (!_reviewResults || !_reviewResults.overall) auditFull();
     var box = document.getElementById('thesisBox');
     if (!box) return;
-
     var paragraphs = box.querySelectorAll('p, li, blockquote');
-    var text = typeof manuscriptText !== 'undefined' ? manuscriptText : '';
-    var refs = typeof existingRefs !== 'undefined' && existingRefs.length ? existingRefs :
-               (typeof mergedRefs !== 'undefined' && mergedRefs.length ? mergedRefs : []);
-
+    var refs = typeof existingRefs !== 'undefined' && existingRefs.length ? existingRefs : [];
     paragraphs.forEach(function(p, idx) {
       var pt = (p.textContent || '').trim();
       if (pt.length < 10) return;
-
-      // 1. 格式维度
-      var formatScore = 85;
+      // Base scores from 5-reviewer model
+      var eicScore = (_reviewResults.reviewers||{})['主编审阅 (EIC)'] ? _reviewResults.reviewers['主编审阅 (EIC)'].score : 70;
+      var methodScore = (_reviewResults.reviewers||{})['方法审阅'] ? _reviewResults.reviewers['方法审阅'].score : 70;
+      var domainScore = (_reviewResults.reviewers||{})['领域审阅'] ? _reviewResults.reviewers['领域审阅'].score : 60;
+      var devilScore = (_reviewResults.reviewers||{})["质疑审阅 (Devil's Advocate)"] ? _reviewResults.reviewers["质疑审阅 (Devil's Advocate)"].score : 60;
+      // Format = EIC structure check + paragraph-level tweaks
+      var formatScore = eicScore;
       var formatIssues = [];
-      if (pt.length > 800) { formatScore -= 10; formatIssues.push('段落过长(>800字)');
-      } else if (pt.length < 30) { formatScore -= 5; formatIssues.push('段落过短(<30字)'); }
-      if (/^\d+[\.\、\s]/.test(pt) && pt.length < 50) formatScore -= 15;
-
-      // 2. 写作维度
-      var writingScore = 80;
+      if (pt.length > 800) { formatScore -= 10; formatIssues.push('段落过长(>800字)'); }
+      else if (pt.length < 30 && pt.length > 5) { formatScore -= 5; }
+      // Writing = average of method + devil, + sentence-level adjustments
+      var writingScore = Math.round((methodScore + devilScore) / 2);
       var writingIssues = [];
       var sents = pt.split(/[。！？\.\!\?]+/).filter(function(s){ return s.trim().length > 3; });
-      var avgLen = 0; sents.forEach(function(s){ avgLen += s.length; });
-      avgLen = sents.length > 0 ? Math.round(avgLen/sents.length) : 0;
-      if (avgLen > 60) { writingScore -= 15; writingIssues.push('平均句长'+avgLen+'字，建议拆分');
-      } else if (avgLen > 45) { writingScore -= 5; writingIssues.push('平均句长偏长('+avgLen+'字)'); }
-      var passives = (pt.match(/被|由|受|为\.{2,}所/g)||[]).length;
-      if (passives > 3) writingScore -= 5;
-
-      // 3. 引用维度
-      var citeScore = 80;
+      if (sents.length > 0) { var avgLen = Math.round(sents.reduce(function(a,s){return a+s.length;},0)/sents.length); if (avgLen > 60) { writingScore -= 10; writingIssues.push('平均句长'+avgLen+'字'); } }
+      // Citation = domain lit-review score
+      var citeScore = domainScore;
       var citeIssues = [];
-      var hasCite = /\[\d+\]|\(\d{4}\)|\[[一-鿿]+,\s*\d{4}\]/.test(pt);
-      if (!hasCite && pt.length > 100 && refs.length > 0) {
-        // 需要引用的句子（有断言/数据/方法）
-        var needsCite = /研究|数据|表明|发现|证明|模型|算法|实验|调查|分析|结果|结论|方法|采用|基于|提出|认为/.test(pt);
-        if (needsCite) { citeScore -= 25; citeIssues.push('缺少文献引用'); }
-        else if (pt.length > 200) { citeScore -= 10; citeIssues.push('长段落未引用文献'); }
-      } else if (hasCite) { citeScore = 90; }
-
-      // Store scores in paragraph data attributes
-      p.setAttribute('data-fmt-score', String(Math.max(0, Math.min(100, formatScore))));
-      p.setAttribute('data-write-score', String(Math.max(0, Math.min(100, writingScore))));
-      p.setAttribute('data-cite-score', String(Math.max(0, Math.min(100, citeScore))));
-      p.setAttribute('data-fmt-issues', JSON.stringify(formatIssues));
-      p.setAttribute('data-write-issues', JSON.stringify(writingIssues));
-      p.setAttribute('data-cite-issues', JSON.stringify(citeIssues));
+      if (!(/\[\d+\]|\(\d{4}\)/.test(pt)) && pt.length > 100 && refs.length > 0 && /研究|数据|表明|发现|证明|模型|算法|实验|调查|分析|结果|结论|方法|采用|基于|提出|认为/.test(pt)) { citeScore -= 15; citeIssues.push('缺少文献引用'); }
+      formatScore = Math.max(0, Math.min(100, formatScore));
+      writingScore = Math.max(0, Math.min(100, writingScore));
+      citeScore = Math.max(0, Math.min(100, citeScore));
+      p.setAttribute('data-fmt-score', String(formatScore)); p.setAttribute('data-write-score', String(writingScore)); p.setAttribute('data-cite-score', String(citeScore));
+      p.setAttribute('data-fmt-issues', JSON.stringify(formatIssues)); p.setAttribute('data-write-issues', JSON.stringify(writingIssues)); p.setAttribute('data-cite-issues', JSON.stringify(citeIssues));
       p.setAttribute('data-para-index', String(idx));
-
-      // Add indicator strip
       _renderParaIndicator(p, formatScore, writingScore, citeScore);
     });
   }
