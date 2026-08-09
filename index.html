@@ -112,7 +112,10 @@
   </div>
   <div class="bar-tabs" id="barTabs">
     <button class="bar-tab active" data-view="workspace" onclick="switchView('workspace');_restoreWorkspace()">工作台</button>
+    <button class="bar-tab" data-view="writing" onclick="_open('writing-workbench')">写作</button>
+    <button class="bar-tab" data-view="review" onclick="_open('review')">审阅</button>
     <button class="bar-tab" data-view="dashboard" onclick="showDashboard()">看板</button>
+    <button class="bar-tab" data-view="defense" onclick="_open('defense-ppt')">答辩</button>
   </div>
   <div class="bar-right">
     <button class="workspace-drawer-btn" onclick="toggleToolPanel()" title="打开工具台">工具</button>
@@ -430,6 +433,7 @@ window._ambientTips=['参考文献最好近3年的占一半以上','英文文献
 <script defer src="js/core/ui.js?v=91"></script>
 <script defer src="js/core/doc.js?v=91"></script>
 <script defer src="js/core/senttools.js?v=91"></script>
+<script defer src="js/core/auditor.js?v=91"></script>
 
 <!-- ====== 第三方库 ====== -->
 <script defer src="mammoth.browser.min.js?v=90"></script>
