@@ -146,7 +146,7 @@
           '<span class="welcome-card-desc">已有 DOCX 论文？导入后体检、审阅、打磨</span>'+
         '</button>'+
       '</div>'+
-      '<p class="welcome-hint">按 <kbd>Ctrl+K</kbd> 搜索功能 · 按 <kbd>Ctrl+B</kbd> 召唤论文搭子</p>'+
+      '<p class="welcome-hint">按 <kbd>Ctrl+K</kbd> 全局搜索功能 · 右侧面板切换文献/搭子/检查/审阅</p>'+
       '</div>';
     body.innerHTML = h;
   }
