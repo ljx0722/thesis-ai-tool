@@ -1653,24 +1653,34 @@
     if (project) {
       try { project = autoSyncStageProgress(project) || project; } catch (e) {}
     }
-    var html = '';
+    // 渲染为紧凑的阶段圆点条
     var stages = project ? availableStages(project) : STAGES;
+    var html = '';
     stages.forEach(function (s, idx) {
       var st = project ? ((project.stageStatus || {})[s.id] || 'todo') : 'todo';
       var cur = project && project.currentStage === s.id;
-      var meta = '';
-      if (project) {
-        try {
-          var ev = evaluateStage(project, s.id);
-          if (ev.total) meta = ' · ' + ev.passed + '/' + ev.total;
-        } catch (e) {}
-      }
-      html += '<div class="stage-nav-item' + (cur ? ' active' : '') + ' is-' + st + '" onclick="openProjectStage(\'' + s.id + '\')">' +
-        '<span class="stage-nav-idx">' + (idx + 1) + '</span>' +
-        '<span class="stage-nav-text"><b>' + s.name + '</b><i>' + s.desc + meta + '</i></span>' +
-      '</div>';
+      var color = st === 'done' ? '#10b981' : (cur ? '#4f46e5' : '#e2e8f0');
+      var size = cur ? '12px' : (st === 'done' ? '10px' : '8px');
+      html += '<span style="display:inline-block;width:'+size+';height:'+size+';border-radius:50%;background:'+color+
+        ';margin:0 3px;cursor:pointer;transition:transform .15s;vertical-align:middle'+
+        (cur?'transform:scale(1.3)':'')+'" title="'+(project?s.name+' · '+(st==='done'?'已完成':(cur?'进行中':'未开始')):'第'+(idx+1)+'阶段')+
+        '" onclick="openProjectStage(\''+s.id+'\')"></span>';
     });
-    host.innerHTML = html;
+    // Also update TOC panel footer if available
+    var tocFoot = document.getElementById('tocStageFooter');
+    if (!tocFoot && document.getElementById('tocPanel')) {
+      tocFoot = document.createElement('div');
+      tocFoot.id = 'tocStageFooter';
+      tocFoot.style.cssText = 'padding:8px 10px;border-top:1px solid #e2e8f0;margin-top:8px';
+      document.getElementById('tocPanel').appendChild(tocFoot);
+    }
+    if (tocFoot) {
+      var curStage = project ? (STAGES.find(function(s){return s.id===project.currentStage;})||null) : null;
+      tocFoot.innerHTML = '<div style="font-size:10px;color:#94a3b8;font-weight:600;margin-bottom:4px">阶段进度</div>'+
+        '<div style="text-align:center">'+html+'</div>'+
+        (curStage ? '<div style="font-size:10px;color:#4f46e5;font-weight:600;text-align:center;margin-top:2px">'+curStage.name+'</div>' : '');
+    }
+    host.style.display = 'none'; // Hide old stageNav host
   }
 
   function openProjectStage(stageId, moduleId) {
