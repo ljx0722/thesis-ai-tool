@@ -336,9 +336,10 @@ console.log('\n=== Section 4: UI/HTML Elements ===');
 
 test('HTML has all required id elements', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  var required = ['mainContent', 'navSidebar', 'stageNav', 'fileInput',
+  var required = ['tocPanel', 'thesisPanel', 'stageNav', 'fileInput',
     'statusBar', 'loadOv', 'barTabs', 'kgOverlay',
-    'appShell', 'notifyPanel', 'loginOverlay', 'balanceBar'];
+    'appShell', 'notifyPanel', 'loginOverlay', 'balanceBar',
+    'cmdFab', 'cmdOverlay', 'cmdSearch'];
   required.forEach(function(id) {
     assert(html.indexOf('id="' + id + '"') >= 0, 'Missing HTML element: #' + id);
   });
@@ -1923,11 +1924,12 @@ test('UI: Nav sidebar has 4 stage groups', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
   assert((html.match(/nav-group-title/g)||[]).length >= 4 || html.indexOf('nav-tools-details') >= 0 || html.indexOf('stageNav') >= 0, 'Expected nav groups or simplified sidebar');
 });
-test('UI: All 16 modules in nav sidebar', function() {
+test('UI: All 18 modules in command palette', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
   var am = fs.readFileSync(path.join(projectRoot, 'js/app-modules.js'), 'utf8');
-  assert(html.indexOf('toolHome') >= 0 || html.indexOf('toolboxFavorites') >= 0, 'tool dock missing');
+  assert(html.indexOf('cmdFab') >= 0 || html.indexOf('cmdOverlay') >= 0, 'command palette missing');
   assert(am.indexOf('topic-finder') >= 0 && am.indexOf('data-analysis') >= 0 && am.indexOf('proofread') >= 0, 'core modules missing from registry');
+  assert(html.indexOf('_openCommandPalette') >= 0, 'command palette launcher missing');
 });
 test('UI: Landing highlights + invite + consumption history', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');

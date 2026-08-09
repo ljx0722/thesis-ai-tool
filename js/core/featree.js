@@ -91,39 +91,11 @@
     if (window._renderFeatureTree) window._renderFeatureTree();
   };
 
-  // ── 状态感知侧栏 ──
+  // ── 状态感知：命令面板已替代侧栏功能树 ──
+  // _renderFeatureTree 现在渲染到命令面板（command palette）而非侧栏
   window._renderFeatureTree = function() {
-    var c = document.getElementById('navFeatureTree'); if (!c) return;
-    var hasEssay = typeof manuscriptText !== 'undefined' && manuscriptText && manuscriptText.length > 100;
-    var tools = hasEssay ? [
-      { id: 'format-check', icon: '✅', label: '格式检查' },
-      { id: 'proofread', icon: '✏️', label: '论文查错' },
-      { id: 'terminology', icon: '🔤', label: '术语分析' },
-      { id: 'paragraph', icon: '📝', label: '段落分析' },
-      { id: 'de-duplicate', icon: '📋', label: '查重降重' },
-      { id: 'review', icon: '🔍', label: '综合审阅' },
-      { id: 'optimization', icon: '💡', label: '优化建议' },
-      { id: 'expand', icon: '📝', label: 'AI扩写' },
-      { id: 'data-analysis', icon: '📈', label: '数据分析' },
-      { id: 'references', icon: '📋', label: '参考文献' },
-      { id: 'citely', icon: '🔍', label: '文献检索' },
-      { id: 'knowledge-graph', icon: '🕸️', label: '知识图谱' },
-      { id: 'dashboard', icon: '📊', label: '论文看板' },
-      { id: 'defense-ppt', icon: '📊', label: '答辩PPT' },
-    ] : [
-      { id: 'topic-finder', icon: '💡', label: '选题推荐' },
-      { id: 'proposal', icon: '📝', label: '开题大纲' },
-      { id: 'citely', icon: '🔍', label: '文献检索' },
-      { id: 'proofread', icon: '✏️', label: '论文查错' },
-      { id: 'de-duplicate', icon: '📋', label: '查重降重' },
-      { id: 'defense-ppt', icon: '📊', label: '答辩PPT' },
-      { id: 'en-abstract', icon: '🌐', label: '英文摘要' },
-    ];
-    var h = '';
-    tools.forEach(function(t) {
-      h += '<div class="ft-leaf" onclick="_open(\'' + t.id + '\')"><span class="ft-icon">' + t.icon + '</span><span class="ft-label">' + t.label + '</span></div>';
-    });
-    c.innerHTML = h;
+    // 论文加载后刷新命令面板的命令列表
+    if (typeof window._filterCommandPalette === 'function') window._filterCommandPalette();
   };
 
   // 初始化
