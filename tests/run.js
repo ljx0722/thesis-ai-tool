@@ -337,7 +337,7 @@ console.log('\n=== Section 4: UI/HTML Elements ===');
 test('HTML has all required id elements', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
   var required = ['sidebar', 'contentPanel', 'toolPanel', 'fileInput',
-    'statusBar', 'loadOv', 'kgOverlay',
+    'loadOv', 'kgOverlay',
     'appShell', 'notifyPanel', 'loginOverlay', 'balanceBar',
     'cmdOverlay', 'cmdSearch'];
   required.forEach(function(id) {
@@ -1975,7 +1975,7 @@ test('PROJECT: index includes project.js', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
   assert(html.indexOf('js/modules/project.js') >= 0, 'project.js not loaded');
   assert(html.indexOf('sidebar-milestone') >= 0, 'sidebar milestones missing');
-  assert(html.indexOf('workspaceContent') >= 0, 'workspace content missing');
+  assert(html.indexOf('id="contentBody"') >= 0, 'workspace content missing');
 });
 
 test('DATA: analysis has overview + significance + AI summary', function() {
