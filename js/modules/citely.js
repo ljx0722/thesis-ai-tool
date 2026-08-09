@@ -135,8 +135,11 @@ var Citely = (function() {
     var sourceColors = { OA: '#10b981', CR: '#3b82f6', S2: '#8b5cf6', BD: '#f59e0b', AX: '#6366f1', PM: '#ef4444', CO: '#14b8a6', EP: '#06b6d4', DJ: '#84cc16', 'OA-CN': '#ec4899' };
     var yearColor = '';
     try { var y = parseInt(paper.year); if (y >= 2024) yearColor = '#10b981'; else if (y >= 2020) yearColor = '#3b82f6'; else yearColor = '#9ca3af'; } catch(e) {}
-    var abstractPreview = (paper.abstract || '').substring(0, 180);
     var authorsShort = (paper.authors || '').split(',').slice(0, 3).join(', ') + ((paper.authors || '').split(',').length > 3 ? ' 等' : '');
+    var relevance = paper._relevance || 0;
+    var relevColor = relevance >= 50 ? '#10b981' : (relevance >= 25 ? '#f59e0b' : '#94a3b8');
+    var hasAbstract = paper.abstract && paper.abstract.length > 10;
+    var abstractPreview = hasAbstract ? paper.abstract.substring(0, 180) : '';
 
     return '<div class="citely-card' + (isSaved ? ' is-saved' : '') + '" data-index="' + index + '">' +
       '<div class="citely-card-body">' +
@@ -153,8 +156,12 @@ var Citely = (function() {
         '<div class="citely-card-sources">' +
           (paper.source ? paper.source.split(/[,;]/).map(function(s) { s = s.trim(); return '<span class="citely-source-badge" style="background:' + (sourceColors[s] || '#94a3b8') + '">' + esc(s) + '</span>'; }).join('') : '') +
           (paper.citations ? '<span class="citely-cite-count">📖 被引 ' + paper.citations + ' 次</span>' : '') +
+          (relevance > 0 ? '<span class="citely-cite-count" style="color:' + relevColor + ';font-weight:600">⭐ ' + relevance + '分相关</span>' : '') +
         '</div>' +
-        (abstractPreview ? '<div class="citely-card-abstract">' + esc(abstractPreview) + (abstractPreview.length >= 180 ? '…' : '') + '</div>' : '') +
+        (abstractPreview ? '<div class="citely-card-abstract" id="citelyAbs_' + index + '">' + esc(abstractPreview) + (abstractPreview.length >= 180 ? '…' : '') + '</div>' : '') +
+        (hasAbstract && !paper.isCN
+          ? '<button style="font-size:10px;border:none;background:none;color:#4f46e5;cursor:pointer;padding:2px 0" onclick="Citely.translateAbstract(' + index + ')">🌐 AI 中文摘要</button>'
+          : '') +
       '</div>' +
       '<div class="citely-card-actions">' +
         (!isSaved
@@ -169,6 +176,31 @@ var Citely = (function() {
         '</div>' +
       '</div>' +
     '</div>';
+  }
+
+  // ── AI 翻译英文摘要 → 中文 ──
+  function translateAbstract(index) {
+    var paper = state.results[index]; if (!paper || !paper.abstract) return;
+    var el = document.getElementById('citelyAbs_' + index); if (!el) return;
+    el.innerHTML = '<span style="color:#94a3b8;font-style:italic">⏳ AI 翻译中...</span>';
+    var token = sessionStorage.getItem('thesis_ai_token') || '';
+    fetch('/api/llm/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({
+        capability_id: 'en-abstract',
+        input: '请将以下英文学术摘要翻译为中文，保持学术性：\n\n' + (paper.abstract||'').substring(0, 1000),
+        max_tokens: 600
+      })
+    }).then(function(r){return r.json()}).then(function(d) {
+      if (d.success) {
+        el.innerHTML = '<div style="color:#0369a1;font-size:12px;line-height:1.6;padding:4px 0">🌐 ' + d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0, 300) + '</div>';
+      } else {
+        el.innerHTML = '<span style="color:#94a3b8">翻译不可用</span>';
+      }
+    }).catch(function() {
+      el.innerHTML = '<span style="color:#94a3b8">翻译不可用</span>';
+    });
   }
 
   // ── UI: Saved Tab ──
@@ -260,6 +292,23 @@ var Citely = (function() {
         if (state.filters.language === 'en') state.results = state.results.filter(function(r) { return !r.isCN; });
         if (state.filters.yearFrom) state.results = state.results.filter(function(r) { return parseInt(r.year||0) >= parseInt(state.filters.yearFrom||0); });
         if (state.filters.yearTo) state.results = state.results.filter(function(r) { return parseInt(r.year||0) <= parseInt(state.filters.yearTo||0); });
+
+        // AI relevance scoring: compute keyword overlap with essay topics
+        if (state.results.length > 0) {
+          var essayText = (typeof manuscriptText !== 'undefined' && manuscriptText ? manuscriptText : (state.projectKeywords || state.query));
+          state.results.forEach(function(r) {
+            var score = 0;
+            var qLower = state.query.toLowerCase();
+            var titleLower = (r.title||'').toLowerCase();
+            if (titleLower.indexOf(qLower) >= 0) score += 40;
+            var words = state.query.split(/\s+/);
+            words.forEach(function(w) { if (w.length > 2 && titleLower.indexOf(w.toLowerCase()) >= 0) score += 10; });
+            if (r.citations) { try { var c = parseInt(r.citations); if (c > 100) score += 15; else if (c > 10) score += 5; } catch(e) {} }
+            if (r.doi) score += 5;
+            r._relevance = Math.min(99, Math.max(1, score || 10));
+          });
+          state.results.sort(function(a, b) { return (b._relevance||0) - (a._relevance||0); });
+        }
       }
       render();
     }).catch(function() {
@@ -434,6 +483,7 @@ var Citely = (function() {
     citePaper: citePaper,
     removeCitation: removeCitation,
     exportBibliography: exportBibliography,
+    translateAbstract: translateAbstract,
     getState: function() { return state; }
   };
 })();
