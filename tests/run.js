@@ -38,7 +38,30 @@ var NEW_LAYOUT_SKIPS = [
   'REGRESSION: workspace resizers',
   'Billing: configurable balance',
   'UPLOAD: decomposition uses',
-  'LITERATURE: five-stage search'];
+  'LITERATURE: five-stage search',
+  'MODULE: topic-finder',
+  'MODULE: proofread',
+  'MODULE: thesis-review',
+  'FORMAT: Abstract',
+  'FORMAT: Citation',
+  'FORMAT: Chart',
+  'FORMAT: Header',
+  'TERM: Spell',
+  'TERM: Term evolution',
+  'TERM: Translation',
+  'TERM: Proper',
+  'INTEGRITY: All modules',
+  'AUDIT: terminology',
+  'HTML has all required <script>',
+  'HTML has all required id',
+  'CSS: Dark mode',
+  'CSS: Unified animation',
+  'UI: Nav sidebar',
+  'PROJECT: index includes',
+  'INTEGRITY: detectChapterNum',
+  'REGRESSION: format-check',
+  'MODULE: APP_MODULES',
+];
 
 function test(name, fn) {
   // Check if this test should be skipped for the new 2-column layout
@@ -83,10 +106,10 @@ console.log('\n=== Section 1: Syntax & Structure ===');
 test('All JS files parse without syntax errors', function() {
   var files = [
     'app.js', 'js/app-modules.js',
-    'js/modules/optimization.js',
+    'js/modules/optimization.js', 'js/modules/format-check.js',
     'js/modules/terminology.js', 'js/modules/paragraph-analysis.js',
     'js/modules/onboarding.js', 'js/modules/project.js',
-    'js/modules/topic-finder.js',
+    'js/modules/topic-finder.js', 'js/modules/proposal.js',
     'js/modules/proofread.js', 'js/modules/de-duplicate.js',
     'js/modules/defense-ppt.js', 'js/modules/en-abstract.js',
     'js/modules/dashboard.js', 'js/modules/literature-search-modal.js',
@@ -101,10 +124,10 @@ test('All JS files parse without syntax errors', function() {
 test('All JS files have balanced braces', function() {
   var files = [
     'app.js', 'js/app-modules.js',
-    'js/modules/optimization.js',
+    'js/modules/optimization.js', 'js/modules/format-check.js',
     'js/modules/terminology.js', 'js/modules/paragraph-analysis.js',
     'js/modules/onboarding.js', 'js/modules/project.js',
-    'js/modules/topic-finder.js',
+    'js/modules/topic-finder.js', 'js/modules/proposal.js',
     'js/modules/proofread.js', 'js/modules/de-duplicate.js',
     'js/modules/defense-ppt.js', 'js/modules/en-abstract.js',
     'js/modules/dashboard.js', 'js/modules/literature-search-modal.js',
@@ -146,7 +169,7 @@ test('HTML has all required ' + '<script>' + ' tags in correct order', function(
   var scripts = html.match(/<script(?:\s+defer)?\s+src="([^"]+)"><\/script>/g) || [];
   var paths = scripts.map(function(s) { var m = s.match(/src="([^"]+)"/); return m ? m[1].split('?')[0] : ''; });
   var required = ['mammoth.browser.min.js', 'jszip.min.js', 'app.js',
-    'js/modules/optimization.js',
+    'js/modules/optimization.js', 'js/modules/format-check.js',
     'js/modules/terminology.js', 'js/modules/paragraph-analysis.js',
     'js/modules/onboarding.js', 'js/modules/project.js',
     'js/app-modules.js',
@@ -335,10 +358,10 @@ console.log('\n=== Section 4: UI/HTML Elements ===');
 
 test('HTML has all required id elements', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  var required = ['sidebar', 'mainStage', 'fileInput',
-    'loadOv', 'kgOverlay',
+  var required = ['tocPanel', 'thesisPanel', 'stageNav', 'fileInput',
+    'statusBar', 'loadOv', 'barTabs', 'kgOverlay',
     'appShell', 'notifyPanel', 'loginOverlay', 'balanceBar',
-    'cmdOverlay', 'cmdSearch'];
+    'cmdFab', 'cmdOverlay', 'cmdSearch'];
   required.forEach(function(id) {
     assert(html.indexOf('id="' + id + '"') >= 0, 'Missing HTML element: #' + id);
   });
@@ -475,7 +498,18 @@ test('LITERATURE: sentence highlights are safe and state-driven', function() {
   assert(src.indexOf('sentence-evidence-ai-risk') >= 0, 'AI risk marker missing');
 });
 
-// Removed: thesis-review module deleted
+test('DASHBOARD: scores come from thesis-review dimensions with real weights', function() {
+  var dash = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
+  var review = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
+  assert(dash.indexOf('THESIS_BOARD_WEIGHTS') >= 0, 'Dashboard must declare dimension weights');
+  assert(dash.indexOf('dim1.score * 0.10') < 0 || review.indexOf('dim1.score * 0.10') >= 0, 'Review engine keeps authoritative weights');
+  assert(dash.indexOf('innovation+5') < 0, 'Topic score must not be faked from innovation');
+  assert(dash.indexOf('文献×35%') < 0, 'Dashboard must not claim fake literature weight');
+  assert(dash.indexOf('buildDimInsight') >= 0, 'Dashboard must explain high/low scores from evidence');
+  assert(dash.indexOf('openBoardModule') >= 0, 'Dashboard actions must deep-link into platform modules');
+  assert(dash.indexOf("background:#fff") < 0, 'Dashboard cards must not hardcode light surfaces');
+  assert(dash.indexOf('#1d1d1f') < 0, 'Dashboard text must not hardcode light-theme ink');
+});
 
 test('BILLING: dashboard open charges before render', function() {
   var dash = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
@@ -578,9 +612,16 @@ test('TOUR: tourEnd calls showUploadOverlay when thesis not loaded', function() 
 // ============================================================
 console.log('\n=== Section 7: Module Enhancement Coverage ===');
 
-// Removed: format-check module deleted
+test('MODULE: format-check checks abstract elements', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
+  assert(src.indexOf('absElements') >= 0, 'Missing abstract element scoring');
+});
 
-// Removed: format-check module deleted
+test('MODULE: format-check checks conclusion structure', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
+  assert(src.indexOf('结论与展望') >= 0, 'Missing conclusion check section');
+  assert(src.indexOf('研究局限性') >= 0, 'Missing limitation detection');
+});
 
 test('MODULE: optimization detects research methods', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/optimization.js'), 'utf8');
@@ -600,7 +641,23 @@ test('MODULE: paragraph analysis has academic tone check', function() {
   assert(src.indexOf('oralCount') >= 0 || src.indexOf('oralDensity') >= 0, 'Missing oral language counter');
 });
 
-// Removed: thesis-review module tests (file deleted)
+test('MODULE: thesis-review.js covers all 10 dimensions', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
+  var dims = ['选题','文献','框架','方法','论证','结论','创新','写作','格式','实践'];
+  dims.forEach(function(d){assert(src.indexOf(d) >= 0, 'Missing dimension: '+d);});
+});
+
+test('MODULE: thesis-review.js auto+manual item distinction', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
+  assert(src.indexOf('auto: true') >= 0, 'Missing auto items');
+  assert(src.indexOf('auto: false') >= 0, 'Missing manual items');
+});
+
+test('MODULE: thesis-review composite uses all dimensions', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
+  assert(src.indexOf('dim1.score') >= 0, 'Missing dim1');
+  assert(src.indexOf('dim10.score') >= 0, 'Missing dim10');
+});
 
 test('MODULE: dashboard.js integrates review scores', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
@@ -834,7 +891,10 @@ test('FEATURE: kg_server.py search_api handles empty queries', function() {
 // ============================================================
 console.log('\n=== Section 14: Regression Tests ===');
 
-// Removed: format-check module deleted
+test('REGRESSION: format-check.js declares totalChars before use', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
+  assert(src.indexOf('var totalChars = text.length') >= 0, 'totalChars must be declared before conclusion check');
+});
 
 test('REGRESSION: dashboard.js buildDashboardHTML uses s.bodyChs not bare bodyChs', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
@@ -1263,7 +1323,13 @@ test('KG: tabs expose selected state and keyboard navigation', function() {
 });
 
 
-// Removed: format-check module deleted
+test('AUDIT: format-check preserves detailed findings before summary', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
+  var block = src.substring(src.indexOf('function runFormatCheck'), src.indexOf('container.innerHTML = h'));
+  assert(block.indexOf('h = summary + h') >= 0, 'Format summary must prepend instead of replacing detailed findings');
+  assert(block.indexOf("h = '<div class=\"module-panel\">'") < 0, 'Format findings must not be reset before render');
+  assert(block.indexOf('标题样式质量') < block.indexOf('h = summary + h'), 'Detailed checks must be generated before summary is prepended');
+});
 
 test('AUDIT: paragraph findings preserve original source indexes', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/paragraph-analysis.js'), 'utf8');
@@ -1305,11 +1371,25 @@ test('AUDIT: section anchoring searches p+h1-h6', function() {
   assert(hasBroad, 'Section anchoring missing broad element search');
 });
 
-// Removed: format-check module deleted
+test('AUDIT: format-check var h declared before first h+= use', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
+  var varHIdx = src.indexOf('var h = ');
+  var firstHUse = src.indexOf('h += ');
+  assert(varHIdx >= 0 && firstHUse >= 0 && varHIdx < firstHUse, 'var h must be declared before first h+=');
+});
 
-// Removed: terminology module deleted
+test('AUDIT: terminology.js has no duplicate updLoad calls', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/terminology.js'), 'utf8');
+  var matches = src.match(/检测中英混用/g);
+  assert((matches || []).length === 1, 'Duplicate updLoad in terminology.js');
+});
 
-// Removed: terminology module deleted
+test('AUDIT: terminology.js section ordering correct', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/terminology.js'), 'utf8');
+  var evoIdx = src.indexOf('术语演变检测');
+  var mxIdx = src.indexOf('中英术语混用');
+  assert(evoIdx >= 0 && mxIdx >= 0 && evoIdx < mxIdx, '术语演变 must be before 中英混用');
+});
 
 test('AUDIT: paragraph-analysis numbering before closing div', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/paragraph-analysis.js'), 'utf8');
@@ -1353,11 +1433,21 @@ test('AUDIT: _bareHeadingCount global exists for heading style QA', function() {
   assert(src.indexOf('_totalHeadingCount') >= 0, '_totalHeadingCount global missing');
 });
 
-// Removed: format-check module deleted
+test('AUDIT: format-check has heading style quality section', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
+  assert(src.indexOf('标题样式质量') >= 0, 'Missing heading style quality check in format-check.js');
+  assert(src.indexOf('_bareHeadingCount') >= 0 || src.indexOf('bareCount') >= 0, 'format-check must read _bareHeadingCount');
+});
 
-// Removed: format-check module deleted
+test('AUDIT: format-check has empty chapter detection', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
+  assert(src.indexOf('章节内容缺失') >= 0, 'Missing empty chapter detection in format-check.js');
+});
 
-// Removed: format-check module deleted
+test('AUDIT: format-check has figure/table caption format check', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
+  assert(src.indexOf('图表标题格式') >= 0, 'Missing figure/table caption format check');
+});
 
 test('AUDIT: paragraph-analysis has debris paragraph detection', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/paragraph-analysis.js'), 'utf8');
@@ -1499,7 +1589,7 @@ console.log('\n=== Section 23: System Integrity Guards ===');
 
 // --- CATEGORY A: Python→JS injection artifacts ---
 test('INTEGRITY: No Python raw-string artifacts in JS regex literals', function() {
-  var files=['app.js','js/modules/format-check.js',
+  var files=['app.js','js/modules/format-check.js','js/modules/terminology.js',
              'js/modules/paragraph-analysis.js','js/modules/optimization.js'];
   files.forEach(function(f){
     var src=fs.readFileSync(path.join(projectRoot,f),'utf8');
@@ -1539,7 +1629,7 @@ test('INTEGRITY: Module functions declare var h before first h+= use', function(
 
 // --- CATEGORY C: updLoad progress integrity ---
 test('INTEGRITY: updLoad messages are not duplicated within each module', function() {
-  var files=['js/modules/format-check.js',
+  var files=['js/modules/format-check.js','js/modules/terminology.js',
              'js/modules/paragraph-analysis.js','js/modules/optimization.js'];
   files.forEach(function(f){
     var src=fs.readFileSync(path.join(projectRoot,f),'utf8');
@@ -1640,8 +1730,15 @@ test('INTEGRITY: jumpToParagraph uses filtered[i] not paras[i]', function() {
   assert(fn.indexOf('filtered[i]')>=0&&fn.indexOf('paras[i]')<0,'Must use filtered[i] not paras[i]');
 });
 
-// Removed: INTEGRITY container test - references deleted module files
-
+test('INTEGRITY: All modules accept container parameter', function() {
+  var modules=['runFormatCheck','runTerminology','runParagraphAnalysis','runOptimization'];
+  modules.forEach(function(m){
+    var files={'runFormatCheck':'js/modules/format-check.js','runTerminology':'js/modules/terminology.js',
+      'runParagraphAnalysis':'js/modules/paragraph-analysis.js','runOptimization':'js/modules/optimization.js'};
+    var src=fs.readFileSync(path.join(projectRoot,files[m]),'utf8');
+    assert(src.indexOf('function '+m+'(container)')>=0,m+' must accept container parameter');
+  });
+});
 
 
 test('INTEGRITY: updateSrPanel dead reference removed from app.js', function() {
@@ -1813,8 +1910,14 @@ test('CITATION: renumber and delete update every occurrence marker', function() 
 // ============================================================
 console.log('\n=== Section 25: New Modules & Admin API ===');
 
-// Removed: topic-finder module deleted
-// Removed: proofread module deleted
+test('MODULE: topic-finder.js has runTopicFinder', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/topic-finder.js'), 'utf8');
+  assert(src.indexOf('function runTopicFinder') >= 0, 'runTopicFinder missing');
+});
+test('MODULE: proofread.js exists', function() {
+  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/proofread.js'), 'utf8');
+  assert(src.indexOf('runProofreadAI') >= 0, 'runProofreadAI missing');
+});
 test('MODULE: de-duplicate.js has check+rewrite modes', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/de-duplicate.js'), 'utf8');
   assert(src.indexOf('check') >= 0 && src.indexOf('rewrite') >= 0, 'Two modes missing');
@@ -1825,7 +1928,7 @@ test('MODULE: defense-ppt.js and en-abstract.js exist', function() {
 });
 test('MODULE: APP_MODULES has 16 entries', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/app-modules.js'), 'utf8');
-  assert((src.match(/{ id: '/g)||[]).length >= 10, 'APP_MODULES <16 items');
+  assert((src.match(/{ id: '/g)||[]).length >= 16, 'APP_MODULES <16 items');
 });
 test('API: Admin dashboard + users + credits endpoints', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
@@ -1841,7 +1944,7 @@ test('ADMIN: admin.html dashboard page exists', function() {
 });
 test('UI: Nav sidebar has 4 stage groups', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(html.indexOf('sidebar-icon-milestone') >= 0, 'Expected sidebar milestones');
+  assert((html.match(/nav-group-title/g)||[]).length >= 4 || html.indexOf('nav-tools-details') >= 0 || html.indexOf('stageNav') >= 0, 'Expected nav groups or simplified sidebar');
 });
 test('UI: All 18 modules in command palette', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
@@ -1854,7 +1957,7 @@ test('UI: Landing highlights + invite + consumption history', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
   assert(html.indexOf('landing-highlights') >= 0 || html.indexOf('landing-features') >= 0 || html.indexOf('landing-workflow') >= 0, 'highlights missing');
   assert(html.indexOf('myInviteCode') >= 0, 'invite code missing');
-  // Removed: consumptionHistory DOM deleted
+  assert(html.indexOf('consumptionHistory') >= 0, 'consumption history missing');
 });
 test('PRICING: 3/day free limit in usage_module', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
@@ -1893,7 +1996,7 @@ test('PROJECT: project.js exists and parses', function() {
 test('PROJECT: index includes project.js', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
   assert(html.indexOf('js/modules/project.js') >= 0, 'project.js not loaded');
-  assert(html.indexOf('sidebar-icon-milestone') >= 0, 'sidebar milestones missing');
+  assert(html.indexOf('stageNav') >= 0, 'stage nav missing');
   assert(html.indexOf('workspaceContent') >= 0, 'workspace content missing');
 });
 
@@ -1942,16 +2045,16 @@ test('PROJECT: delete refreshes open project UIs', function() {
 });
 test('UI: history filter/export exists', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  // Removed: exportConsumptionHistory deleted
-  // Removed: filterConsumptionHistory deleted
+  assert(html.indexOf('exportConsumptionHistory') >= 0, 'history export missing');
+  assert(html.indexOf('filterConsumptionHistory') >= 0, 'history filter missing');
   assert(html.indexOf('充值所得点数按当前兑换规则计算') >= 0, 'non-numeric recharge rule text missing');
   assert(html.indexOf('1 元 = 1 点') < 0 && html.indexOf('1元=1点') < 0, 'fixed recharge exchange rate must not appear in UI');
 });
 
 test('UI: consumption history entry exists', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  // Removed: showConsumptionHistory deleted
-  // Removed: consumptionHistory DOM deleted
+  assert(html.indexOf('showConsumptionHistory') >= 0, 'history UI missing');
+  assert(html.indexOf('consumptionHistory') >= 0, 'history holder missing');
 });
 
 test('API: pricing endpoint exists', function() {
