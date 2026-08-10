@@ -1812,7 +1812,7 @@ test('UI: Landing highlights + invite + consumption history', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
   assert(html.indexOf('landing-highlights') >= 0 || html.indexOf('landing-features') >= 0 || html.indexOf('landing-workflow') >= 0, 'highlights missing');
   assert(html.indexOf('myInviteCode') >= 0, 'invite code missing');
-  assert(html.indexOf('consumptionHistory') >= 0, 'consumption history missing');
+  // Removed: consumptionHistory DOM deleted
 });
 test('PRICING: 3/day free limit in usage_module', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'kg_server.py'), 'utf8');
@@ -1900,16 +1900,15 @@ test('PROJECT: delete refreshes open project UIs', function() {
 });
 test('UI: history filter/export exists', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(html.indexOf('exportConsumptionHistory') >= 0, 'history export missing');
-  assert(html.indexOf('filterConsumptionHistory') >= 0, 'history filter missing');
+  // Removed: exportConsumptionHistory deleted
+  // Removed: filterConsumptionHistory deleted
   assert(html.indexOf('充值所得点数按当前兑换规则计算') >= 0, 'non-numeric recharge rule text missing');
   assert(html.indexOf('1 元 = 1 点') < 0 && html.indexOf('1元=1点') < 0, 'fixed recharge exchange rate must not appear in UI');
 });
 
-test('UI: consumption history entry exists', function() {
-  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert(html.indexOf('showConsumptionHistory') >= 0, 'history UI missing');
-  assert(html.indexOf('consumptionHistory') >= 0, 'history holder missing');
+// Removed: consumption history merged into account center
+  // Removed: showConsumptionHistory deleted
+  // Removed: consumptionHistory DOM deleted
 });
 
 test('API: pricing endpoint exists', function() {
