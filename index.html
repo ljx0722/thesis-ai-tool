@@ -22,81 +22,66 @@
   <div class="service-upgrade-actions"><span id="serviceUpgradeCountdown">--:--</span><button type="button" id="serviceUpgradeSave">立即保存</button></div>
 </div>
 <!-- ====== 登录页 ====== -->
-<div id="loginOverlay">
-  <div class="login-bg">
-    <div class="login-bg-grid"></div>
-  </div>
-
-  <div class="landing-container">
-    <!-- Left: Hero + Feature Grid -->
-    <div class="landing-hero">
-      <div class="landing-brand">
-        <h1 class="landing-title">论文搭子<br><span>ThesisBuddy</span></h1>
-        <p class="landing-desc">从一个想法到答辩通关，你的AI论文搭子，陪你搞定论文全流程</p>
+<div id="loginOverlay" class="login-v3">
+  <div class="login-v3-bg"></div>
+  <div class="login-v3-container">
+    <div class="login-v3-hero">
+      <div class="login-v3-brand">
+        <h1 class="login-v3-title">论文搭子 <span>ThesisBuddy</span></h1>
+        <p class="login-v3-desc">AI 驱动的学术论文全流程工作台 — 从选题到答辩，一个搭子全搞定</p>
       </div>
-
-      <div class="landing-workflow" aria-labelledby="landingWorkflowTitle">
-        <div class="landing-workflow-head">
-          <div>
-            <span class="landing-kicker">论文全流程工作台</span>
-            <h2 id="landingWorkflowTitle">一条主线，七个论文阶段</h2>
-          </div>
-          <span class="landing-live-note"><i></i>按阶段推进，不堆工具</span>
+      <div class="login-v3-stages">
+        <div class="login-v3-stage active" data-stage="0">
+          <span class="login-v3-stage-num">1</span>
+          <div><strong>准备</strong><span>选题探索 · 文献调研 · 大纲构建</span></div>
         </div>
-        <div class="landing-paths" role="tablist" aria-label="开始路径">
-          <button type="button" class="landing-path is-active" role="tab" aria-selected="true" data-landing-path="idea">💡 从想法开始<span>立项 → 大纲 → 分章写作</span></button>
-          <button type="button" class="landing-path" role="tab" aria-selected="false" data-landing-path="docx">📄 导入已有论文<span>解析 DOCX → 审阅 → 导出</span></button>
+        <div class="login-v3-stage" data-stage="1">
+          <span class="login-v3-stage-num">2</span>
+          <div><strong>写作</strong><span>分章写作 · 数据分析 · AI 扩写</span></div>
         </div>
-        <div class="landing-stage-rail" role="tablist" aria-label="论文阶段">
-          <button type="button" class="landing-stage is-active" role="tab" aria-selected="true" data-stage="0"><b>·</b><span>准备</span></button>
-          <button type="button" class="landing-stage" role="tab" aria-selected="false" data-stage="1"><b>·</b><span>写作</span></button>
-          <button type="button" class="landing-stage" role="tab" aria-selected="false" data-stage="2"><b>·</b><span>打磨</span></button>
-          <button type="button" class="landing-stage" role="tab" aria-selected="false" data-stage="3"><b>·</b><span>收尾</span></button>
+        <div class="login-v3-stage" data-stage="2">
+          <span class="login-v3-stage-num">3</span>
+          <div><strong>打磨</strong><span>论文体检 · 综合审阅 · 查重降重</span></div>
         </div>
-        <div class="landing-stage-detail" role="tabpanel" aria-live="polite" aria-labelledby="landingStageName">
-          <div class="landing-stage-index" id="landingStageIndex" aria-hidden="true">想</div>
-          <div><h3 id="landingStageName">想清楚</h3><p id="landingStageDesc">把模糊想法变成可研究的问题、选题方向和开题方案。</p><div class="landing-stage-tags" id="landingStageTags"><span>选题打磨</span><span>开题方案</span></div></div>
-          <span class="landing-stage-arrow" aria-hidden="true">↗</span>
+        <div class="login-v3-stage" data-stage="3">
+          <span class="login-v3-stage-num">4</span>
+          <div><strong>收尾</strong><span>答辩 PPT · 英文摘要 · 格式定稿</span></div>
         </div>
-        <p class="landing-truth-note">浏览阶段不会执行分析或扣费；登录后会按当前服务配置显示可用能力。</p>
       </div>
+      <p class="login-v3-note">浏览阶段不会扣费，登录后可用全部功能</p>
     </div>
 
-    <!-- Right: Login Card -->
-    <div class="landing-login">
-      <div class="login-card-v2">
-        <h3 class="login-card-title" id="loginCardTitle">登录系统</h3>
-        <div class="login-form">
-          <div class="login-field">
-            <svg class="login-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
-            <input type="text" id="loginUsername" placeholder="用户名" autocomplete="username" autofocus aria-required="true">
-          </div>
-          <div class="login-field">
-            <svg class="login-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            <input type="password" id="loginPassword" placeholder="密码" autocomplete="current-password" aria-required="true">
-          </div>
-          <div class="login-field" id="regConfirmField" style="display:none">
-            <svg class="login-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            <input type="password" id="regConfirmPassword" placeholder="确认密码">
-          </div>
-          <div class="login-error" id="loginError"></div>
-          <button class="login-btn" id="loginBtn" onclick="doLogin()">
-            <span id="loginBtnText">登 录</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          </button>
+    <div class="login-v3-card">
+      <h3 class="login-v3-card-title" id="loginCardTitle">登录系统</h3>
+      <div class="login-form">
+        <div class="login-field">
+          <svg class="login-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+          <input type="text" id="loginUsername" placeholder="用户名" autocomplete="username" autofocus aria-required="true">
         </div>
-        <div class="login-switch">
-          <span id="loginSwitchText">还没有账号？</span>
-          <div class="login-invite-row">
-            <input type="text" id="regInviteCode" placeholder="邀请码（选填）">
-          </div>
-          <a href="javascript:void(0)" id="loginSwitchLink" onclick="toggleRegMode()">立即注册</a>
+        <div class="login-field">
+          <svg class="login-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <input type="password" id="loginPassword" placeholder="密码" autocomplete="current-password" aria-required="true">
         </div>
+        <div class="login-field" id="regConfirmField" style="display:none">
+          <svg class="login-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <input type="password" id="regConfirmPassword" placeholder="确认密码">
+        </div>
+        <div class="login-error" id="loginError"></div>
+        <button class="login-btn" id="loginBtn" onclick="doLogin()">
+          <span id="loginBtnText">登 录</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+      <div class="login-switch">
+        <span id="loginSwitchText">还没有账号？</span>
+        <div class="login-invite-row">
+          <input type="text" id="regInviteCode" placeholder="邀请码（选填）">
+        </div>
+        <a href="javascript:void(0)" id="loginSwitchLink" onclick="toggleRegMode()">立即注册</a>
       </div>
     </div>
   </div>
 </div>
-
 <div id="appShell" style="display:none">
 <div id="fileBlock"><b>⚠️ 请通过 HTTP 访问</b><br><br>本页面需要调用外部API检索文献，无法从 file:// 协议使用。<br><br><button onclick="window.open('http://localhost:5000/','_self')" style="font-size:1rem;padding:10px 30px;background:#0071e3;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700">🔗 一键跳转 HTTP</button><br><br><small style="color:var(--m)">或双击运行 <b>启动.bat</b> 后点击上方按钮</small></div>
 <script>if(window.location.protocol==='file:'){document.getElementById('fileBlock').style.display='block';document.querySelector('.main-layout')&&(document.querySelector('.main-layout').style.display='none');document.querySelector('.topbar')&&(document.querySelector('.topbar').style.display='none');fetch('http://localhost:5000/',{mode:'no-cors'}).then(function(r){window.location.href='http://localhost:5000/'}).catch(function(){});}</script>
