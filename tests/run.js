@@ -129,7 +129,8 @@ test('HTML has all required ' + '<script>' + ' tags in correct order', function(
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
   // Match both regular and deferred script tags
   var scripts = html.match(/<script(?:\s+defer)?\s+src="([^"]+)"><\/script>/g) || [];
-  var paths = scripts.map(function(s) { var m = s.match(/src="([^"]+)"/); return m ? m[1].split('?')[0] : ''; });    'js/modules/onboarding.js', 'js/modules/project.js',
+  var paths = scripts.map(function(s) { var m = s.match(/src="([^"]+)"/); return m ? m[1].split('?')[0] : ''; });
+  var required = ['js/modules/onboarding.js', 'js/modules/project.js',
     'js/app-modules.js',
     'js/core/utils.js', 'js/core/api.js', 'js/core/state.js',
     'js/core/events.js', 'js/core/ui.js'];
