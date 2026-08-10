@@ -99,7 +99,7 @@
 
 <div id="appShell" style="display:none">
 <div id="fileBlock"><b>⚠️ 请通过 HTTP 访问</b><br><br>本页面需要调用外部API检索文献，无法从 file:// 协议使用。<br><br><button onclick="window.open('http://localhost:5000/','_self')" style="font-size:1rem;padding:10px 30px;background:#0071e3;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700">🔗 一键跳转 HTTP</button><br><br><small style="color:var(--m)">或双击运行 <b>启动.bat</b> 后点击上方按钮</small></div>
-<script>if(window.location.protocol==='file:'){document.getElementById('fileBlock').style.display='block';document.querySelector('.main')&&(document.querySelector('.main').style.display='none');document.querySelector('.topbar')&&(document.querySelector('.topbar').style.display='none');fetch('http://localhost:5000/',{mode:'no-cors'}).then(function(r){window.location.href='http://localhost:5000/'}).catch(function(){});}</script>
+<script>if(window.location.protocol==='file:'){document.getElementById('fileBlock').style.display='block';document.querySelector('.main-layout')&&(document.querySelector('.main-layout').style.display='none');document.querySelector('.topbar')&&(document.querySelector('.topbar').style.display='none');fetch('http://localhost:5000/',{mode:'no-cors'}).then(function(r){window.location.href='http://localhost:5000/'}).catch(function(){});}</script>
 
 <!-- ====== 快捷键提示条 ====== -->
 <div class="kb-hint" id="kbHint" style="display:none">⌨ Ctrl+K 搜索功能 | Ctrl+B 召唤论文搭子</div>
@@ -185,51 +185,68 @@ function toggleChangelog(){var p=document.getElementById('changelogPanel');var o
 
 <!-- ====== 两栏工作台：目录 | 论文正文 ====== -->
 <div class="main-layout" id="mainLayout">
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-      <span class="sidebar-project-name" id="sidebarProjectName">论文搭子</span>
-    </div>
-    <nav class="sidebar-milestones" role="navigation" aria-label="论文阶段">
-      <button class="sidebar-milestone active" data-milestone="prepare" onclick="Nav.navigate('prepare')"><span class="sidebar-milestone-icon">1</span> 准备</button>
-      <button class="sidebar-milestone" data-milestone="writing" onclick="Nav.navigate('writing')"><span class="sidebar-milestone-icon">2</span> 写作</button>
-      <button class="sidebar-milestone" data-milestone="polish" onclick="Nav.navigate('polish')"><span class="sidebar-milestone-icon">3</span> 打磨</button>
-      <button class="sidebar-milestone" data-milestone="finish" onclick="Nav.navigate('finish')"><span class="sidebar-milestone-icon">4</span> 收尾</button>
-    </nav>
-    <div class="sidebar-tree" id="navTree">
-      <div class="sidebar-tree-empty" id="navTreeMeta">导入论文后显示章节</div>
-    </div>
-    <div class="sidebar-footer">
-      <button class="sidebar-quick-action" onclick="openIdeaWizard()">💡 从想法开始</button>
-      <button class="sidebar-quick-action" onclick="openImportDialog('new')">📄 导入论文</button>
-      <button class="sidebar-quick-action" onclick="Nav.switchToolTab('buddy');Nav.toggleToolPanel()">🤖 论文搭子 (Ctrl+B)</button>
-      <button class="sidebar-quick-action" onclick="openThemeStudio()">⚙️ 外观设置</button>
-    </div>
+  <aside class="sidebar-icon" id="sidebar">
+    <button class="sidebar-icon-milestone active" data-milestone="prepare" onclick="Nav.navigate('prepare')" title="准备">
+      <span class="sidebar-icon-circle">1</span>准备
+    </button>
+    <button class="sidebar-icon-milestone" data-milestone="writing" onclick="Nav.navigate('writing')" title="写作">
+      <span class="sidebar-icon-circle">2</span>写作
+    </button>
+    <button class="sidebar-icon-milestone" data-milestone="polish" onclick="Nav.navigate('polish')" title="打磨">
+      <span class="sidebar-icon-circle">3</span>打磨
+    </button>
+    <button class="sidebar-icon-milestone" data-milestone="finish" onclick="Nav.navigate('finish')" title="收尾">
+      <span class="sidebar-icon-circle">4</span>收尾
+    </button>
+    <hr class="sidebar-icon-divider">
+    <button class="sidebar-icon-action" onclick="openIdeaWizard()" title="从想法开始">
+      <span class="sidebar-icon-action-icon">💡</span>想法
+    </button>
+    <button class="sidebar-icon-action" onclick="openImportDialog('new')" title="导入论文">
+      <span class="sidebar-icon-action-icon">📄</span>导入
+    </button>
+    <button class="sidebar-icon-action" onclick="Nav.switchToolTab('buddy');Nav.toggleToolPanel()" title="论文搭子">
+      <span class="sidebar-icon-action-icon">🤖</span>搭子
+    </button>
+    <button class="sidebar-icon-action" onclick="openThemeStudio()" title="外观设置">
+      <span class="sidebar-icon-action-icon">⚙️</span>设置
+    </button>
   </aside>
-  <div class="content-panel" id="contentPanel">
-    <div class="content-toolbar">
-      <span class="content-toolbar-title" id="contentTitle">准备</span>
-      <span class="content-toolbar-breadcrumb" id="contentBreadcrumb"><button class="breadcrumb-link" onclick="Nav.navigate('prepare')">论文搭子</button><span style="color:var(--text-muted)">/</span><span>准备</span></span>
-      <div class="content-toolbar-actions">
-        <button class="btn-ghost btn-sm" onclick="openImportDialog('replace')">导入论文</button>
-        <button class="btn-ghost btn-sm" onclick="openFullPaperPreview()">预览</button>
-        <button class="btn-ghost btn-sm" onclick="showDashboard()">看板</button>
+
+  <div class="main-stage" id="mainStage">
+    <div class="stage-dashboard" id="stageDashboard"></div>
+    <div class="stage-paper" id="stagePaper">
+      <div class="stage-paper-header">
+        <select id="paperChapterSelect" onchange="PaperPreview.selectChapter(this.value)" style="display:none">
+          <option value="">-- 选择章节 --</option>
+        </select>
+        <span id="paperWordCount" style="font-size:var(--text-xs);color:var(--text-muted);margin-left:auto"></span>
+      </div>
+      <div class="stage-paper-body" id="paperPreviewBody">
+        <div class="stage-paper-empty">
+          <div style="font-size:2rem;margin-bottom:8px">📄</div>
+          <strong>还没有论文</strong>
+          <span>创建项目或导入 DOCX 后会自动展示论文正文</span>
+          <button class="btn btn-primary btn-sm" onclick="openImportDialog('new')" style="margin-top:8px">导入论文</button>
+        </div>
       </div>
     </div>
-    <div class="content-body" id="contentBody"><div id="thesisBox" style="display:none"><div id="workspaceContent"></div></div><div id="toolHome" style="display:none"></div><div id="stageNav" style="display:none"></div><div class="status-bar" id="statusBar" style="display:none"></div></div>
-    <div class="skeleton-full" id="thesisSkeleton" style="display:none"><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-block"></div></div>
   </div>
+
   <div class="tool-panel" id="toolPanel">
     <div class="tool-panel-header">
-      <div class="tool-panel-tabs" id="toolPanelTabs">
-        <button class="tool-panel-tab active" data-tab="references" onclick="Nav.switchToolTab('references')">📚 文献</button>
-        <button class="tool-panel-tab" data-tab="buddy" onclick="Nav.switchToolTab('buddy')">🤖 搭子</button>
-        <button class="tool-panel-tab" data-tab="inspect" onclick="Nav.switchToolTab('inspect')">🔍 检查</button>
-        <button class="tool-panel-tab" data-tab="review" onclick="Nav.switchToolTab('review')">💬 审阅</button>
+      <div class="tool-panel-tabs" id="toolPanelTabs" role="tablist">
+        <button class="tool-panel-tab active" data-tab="references" onclick="Nav.switchToolTab('references')" role="tab" aria-selected="true">📚 文献</button>
+        <button class="tool-panel-tab" data-tab="buddy" onclick="Nav.switchToolTab('buddy')" role="tab" aria-selected="false">🤖 搭子</button>
+        <button class="tool-panel-tab" data-tab="inspect" onclick="Nav.switchToolTab('inspect')" role="tab" aria-selected="false">🔍 检查</button>
+        <button class="tool-panel-tab" data-tab="review" onclick="Nav.switchToolTab('review')" role="tab" aria-selected="false">💬 审阅</button>
       </div>
       <button class="btn-icon" onclick="Nav.toggleToolPanel()" title="收起面板">◀</button>
     </div>
     <div class="tool-panel-body" id="toolPanelBody"></div>
   </div>
+</div>
+
 </div>
 
 <script>
