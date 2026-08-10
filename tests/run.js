@@ -590,10 +590,6 @@ test('MODULE: paragraph analysis has academic tone check', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/paragraph-analysis.js'), 'utf8');
   assert(src.indexOf('学术语调') >= 0, 'Missing academic tone section');
   assert(src.indexOf('oralCount') >= 0 || src.indexOf('oralDensity') >= 0, 'Missing oral language counter');
-});  var dims = ['选题','文献','框架','方法','论证','结论','创新','写作','格式','实践'];
-  dims.forEach(function(d){assert(src.indexOf(d) >= 0, 'Missing dimension: '+d);});
-});  assert(src.indexOf('auto: true') >= 0, 'Missing auto items');
-  assert(src.indexOf('auto: false') >= 0, 'Missing manual items');
 });
 
 test('MODULE: thesis-review composite uses all dimensions', function() {  assert(src.indexOf('dim1.score') >= 0, 'Missing dim1');
