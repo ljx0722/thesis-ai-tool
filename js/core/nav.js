@@ -229,6 +229,8 @@
     updateSidebar('prepare');
     renderDashboard('prepare');
     PaperPreview.init();
+    // Load default tool panel tab content
+    setTimeout(function() { switchToolTab('references'); }, 100);
   }
 
   // Backward compat
