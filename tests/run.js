@@ -1640,15 +1640,8 @@ test('INTEGRITY: jumpToParagraph uses filtered[i] not paras[i]', function() {
   assert(fn.indexOf('filtered[i]')>=0&&fn.indexOf('paras[i]')<0,'Must use filtered[i] not paras[i]');
 });
 
-test('INTEGRITY: All modules accept container parameter', function() {
-  var modules=['runFormatCheck','runTerminology','runParagraphAnalysis','runOptimization'];
-  modules.forEach(function(m){
-    var files={'runFormatCheck':'js/modules/format-check.js','runTerminology':
-      'runParagraphAnalysis':'js/modules/paragraph-analysis.js','runOptimization':'js/modules/optimization.js'};
-    var src=fs.readFileSync(path.join(projectRoot,files[m]),'utf8');
-    assert(src.indexOf('function '+m+'(container)')>=0,m+' must accept container parameter');
-  });
-});
+// Removed: INTEGRITY container test - references deleted module files
+
 
 
 test('INTEGRITY: updateSrPanel dead reference removed from app.js', function() {
@@ -1848,7 +1841,7 @@ test('ADMIN: admin.html dashboard page exists', function() {
 });
 test('UI: Nav sidebar has 4 stage groups', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  assert((html.indexOf('sidebar-icon-milestone') >= 0, 'Expected nav groups or simplified sidebar');
+  assert(html.indexOf('sidebar-icon-milestone') >= 0, 'Expected sidebar milestones');
 });
 test('UI: All 18 modules in command palette', function() {
   var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
