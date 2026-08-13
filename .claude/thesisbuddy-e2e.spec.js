@@ -53,6 +53,41 @@ test('new user sees two real activation paths and contextual help', async ({ pag
   expect(consoleErrors.filter(error => !error.includes('favicon'))).toEqual([]);
 });
 
+test('desktop project home scrolls and exposes appearance settings', async ({ page }) => {
+  await page.goto(baseURL, { waitUntil: 'domcontentloaded' });
+  await authenticate(page);
+
+  await expect(page.locator('.activation-home')).toBeVisible();
+  const shellMetrics = await page.locator('#appShell').evaluate(element => ({
+    display: getComputedStyle(element).display,
+    height: element.clientHeight,
+    viewport: window.innerHeight
+  }));
+  expect(shellMetrics.display).toBe('flex');
+  expect(Math.abs(shellMetrics.height - shellMetrics.viewport)).toBeLessThanOrEqual(1);
+
+  await page.locator('#workspaceContent').evaluate(element => {
+    const spacer = document.createElement('div');
+    spacer.id = 'scrollAcceptanceSpacer';
+    spacer.style.height = '1600px';
+    element.appendChild(spacer);
+  });
+  const thesisBox = page.locator('#thesisBox');
+  await expect.poll(() => thesisBox.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+  const before = await thesisBox.evaluate(element => element.scrollTop);
+  await thesisBox.hover();
+  await page.mouse.wheel(0, 700);
+  await expect.poll(() => thesisBox.evaluate(element => element.scrollTop)).toBeGreaterThan(before);
+
+  await page.getByTitle('账户菜单').click();
+  const appearance = page.getByRole('button', { name: '外观设置' });
+  await expect(appearance).toBeVisible();
+  await appearance.click();
+  await expect(page.locator('#themeStudio')).toHaveClass(/open/);
+  await expect(page.locator('#prefAccent')).toBeVisible();
+  await expect(page.locator('#prefDensity')).toBeVisible();
+});
+
 test('mobile shell exposes four destinations and tool drawer', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(baseURL, { waitUntil: 'domcontentloaded' });
