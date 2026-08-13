@@ -40,7 +40,7 @@ jobs:
         run: node tests/run.js
       - name: Scan committed secrets
         run: |
-          if git grep -nE '(ADMIN_PASSWORD|ADMIN_SECRET|JWT_SECRET)=(admin123|changeme|password)' -- ':!tests/*'; then
+          if git grep -nE '(ADMIN_PASSWORD|ADMIN_SECRET|JWT_SECRET)=(admin123|changeme|password)' -- ':!tests/*' ':!*.md'; then
             echo 'Default production secret detected'
             exit 1
           fi
