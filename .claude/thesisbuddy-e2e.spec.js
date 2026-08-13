@@ -83,7 +83,16 @@ test('desktop project home scrolls and exposes appearance settings', async ({ pa
   const appearance = page.getByRole('button', { name: '外观设置' });
   await expect(appearance).toBeVisible();
   await appearance.click();
-  await expect(page.locator('#themeStudio')).toHaveClass(/open/);
+  const themeStudio = page.locator('#themeStudio');
+  await expect(themeStudio).toBeVisible();
+  await expect(themeStudio).toHaveClass(/open/);
+  await expect(themeStudio).toHaveAttribute('aria-hidden', 'false');
+  const panelBox = await themeStudio.boundingBox();
+  expect(panelBox).not.toBeNull();
+  expect(panelBox.x).toBeGreaterThanOrEqual(0);
+  expect(panelBox.y).toBeGreaterThanOrEqual(0);
+  expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(await page.evaluate(() => innerWidth));
+  expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(await page.evaluate(() => innerHeight));
   await expect(page.locator('#prefAccent')).toBeVisible();
   await expect(page.locator('#prefDensity')).toBeVisible();
 });

@@ -1023,8 +1023,8 @@ function showPricingInfo(){ openAccountCenter(); setTimeout(function(){ switchAc
 </script>
 
 <div class="theme-studio-backdrop" id="themeStudioBackdrop" onclick="closeThemeStudio()"></div>
-<section class="theme-studio" id="themeStudio" aria-hidden="true">
-  <header><div><strong>外观与阅读</strong><span>即时预览，设置按账号保存</span></div><button type="button" onclick="closeThemeStudio()">关闭</button></header>
+<section class="theme-studio" id="themeStudio" role="dialog" aria-modal="true" aria-labelledby="themeStudioTitle" aria-hidden="true">
+  <header><div><strong id="themeStudioTitle">外观与阅读</strong><span>即时预览，设置按账号保存</span></div><button type="button" onclick="closeThemeStudio()">关闭</button></header>
   <div class="theme-studio-body">
     <label>颜色模式<select id="prefColorMode" onchange="previewPreferences()"><option value="auto">自动（日间 06:00–18:00）</option><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
     <label>强调色<select id="prefAccent" onchange="previewPreferences()"><option value="indigo">靛蓝</option><option value="ocean">海洋</option><option value="forest">森林</option><option value="rose">玫红</option><option value="sunset">日落</option></select></label>
