@@ -16,7 +16,8 @@ var TB = window.TB || {};
     currentView: 'workspace',
     currentModule: null,
     theme: 'auto',
-    appReady: false
+    appReady: false,
+    appPhase: 'booting'
   };
 
   var _listeners = {};
@@ -62,14 +63,14 @@ var TB = window.TB || {};
     },
 
     setUser: function(user) {
-      _state.user = user;
+      var old = _state.user;
       _state.balance = (user && user.points) || _state.balance;
       this.set('user', user);
+      if (old === user) _state.user = user;
       this.set('balance', _state.balance);
     },
 
     setProject: function(project) {
-      _state.project = project;
       this.set('project', project);
     },
 

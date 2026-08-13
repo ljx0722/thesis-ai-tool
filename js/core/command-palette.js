@@ -5,7 +5,7 @@
 (function() {
   'use strict';
 
-  var CMDS = [
+  var FALLBACK_CMDS = [
     // 准备
     { id: 'ideation', icon: '💡', label: '开题工作台', keys: '选题 大纲 开题', milestone: 'prepare' },
     { id: 'topic-finder', icon: '🔍', label: '选题推荐', keys: '选题 题目 方向', milestone: 'prepare' },
@@ -28,6 +28,19 @@
     { id: 'references', icon: '📋', label: '参考文献管理', keys: '引用 文献 格式', milestone: 'any' },
     { id: 'import', icon: '📄', label: '导入论文', keys: '导入 上传 DOCX', milestone: 'any' },
   ];
+
+  function commands() {
+    if (!window.ThesisCapabilities) return FALLBACK_CMDS;
+    return ThesisCapabilities.all.map(function(item) {
+      return {
+        id: item.id,
+        icon: item.icon || '•',
+        label: item.name,
+        keys: item.searchTerms || item.name,
+        milestone: item.milestone || 'any'
+      };
+    }).concat([{ id: 'import', icon: 'DOCX', label: '导入已有论文', keys: '导入 上传 DOCX', milestone: 'any' }]);
+  }
 
   var _recentIds = [];
   var _selectedIdx = -1;
@@ -53,7 +66,7 @@
     var el = document.getElementById('cmdResults');
     if (!el) return;
 
-    var results = CMDS.filter(function(c) {
+    var results = commands().filter(function(c) {
       if (!q) return true;
       return c.label.indexOf(q) >= 0 || c.keys.indexOf(q) >= 0 || c.id.indexOf(q) >= 0;
     });
@@ -100,9 +113,8 @@
       if (typeof openImportDialog === 'function') openImportDialog('new');
       return;
     }
-    // ONE dispatch path: Nav for milestones, switchModule for everything else
-    if (typeof Nav !== 'undefined' && Nav.navigate) {
-      Nav.navigate(id);
+    if (window.ThesisRouter && ThesisRouter.openModule) {
+      ThesisRouter.openModule(id);
     } else if (typeof switchModule === 'function') {
       switchModule(id);
     }

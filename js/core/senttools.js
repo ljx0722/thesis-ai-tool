@@ -5,7 +5,7 @@
 (function(){
   'use strict';
 
-  var _toolbar = null, _selectedText = '', _selectedRange = null, _selectedParagraph = null, _resultPanel = null, _lastAIOutput = null;
+  var _toolbar = null, _selectedText = '', _selectedRange = null, _selectedParagraph = null, _resultPanel = null, _lastAIOutput = null, _lastSave = null;
 
   function getToolbar(){
     if(!_toolbar){_toolbar=document.createElement('div');_toolbar.id='sentenceToolbar';_toolbar.style.cssText='position:absolute;display:none;z-index:100;background:#1e293b;color:#fff;border-radius:10px;padding:6px 8px;box-shadow:0 8px 30px rgba(0,0,0,.3);font-size:12px;white-space:nowrap;pointer-events:auto';document.body.appendChild(_toolbar)}
@@ -42,6 +42,14 @@
     } else { if(typeof ttp==='function') ttp('无法定位原文位置'); }
   };
 
+  window._saveSentTool = function() {
+    if (!_lastSave) return;
+    if (typeof ThesisProject !== 'undefined' && ThesisProject.logSkillRun) {
+      ThesisProject.logSkillRun({ moduleId: 'sent-tool', title: _lastSave.title, summary: _lastSave.summary });
+    }
+    if (typeof ttp === 'function') ttp('已保存');
+  };
+
   window._runSentenceAction = function(actionId) {
     var text = _selectedText; if (!text || text.length < 3) return; hide();
     var panel = getResultPanel(); panel.style.display = 'flex';
@@ -65,12 +73,13 @@
       _lastAIOutput = d.content.replace(/</g,'&lt;').replace(/>/g,'&gt;');
       var isRewrite = (actionId === 'rewrite' || actionId === 'dedup');
       var rawContent = d.content;
+      _lastSave = { title: cfg.title, summary: text.substring(0, 50) };
       body.innerHTML =
         '<div class="ai-output" style="white-space:pre-wrap;font-size:13px;line-height:1.7">' + _lastAIOutput + '</div>' +
         '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">' +
         (isRewrite ? '<button class="btn btn-primary btn-sm" onclick="_applyToOriginal()">🔄 应用到原文</button>' : '') +
         '<button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText(this.parentElement.parentElement.querySelector(\'.ai-output\').textContent).then(function(){if(typeof ttp===\'function\')ttp(\'已复制\')})">📋 复制</button>' +
-        '<button class="btn btn-ghost btn-sm" onclick="if(typeof ThesisProject!==\'undefined\'&&ThesisProject.logSkillRun)ThesisProject.logSkillRun({moduleId:\'sent-tool\',title:\''+cfg.title+'\',summary:\''+text.substring(0,50).replace(/'/g,\'\\\'\')+'\'})">💾 保存</button>' +
+        '<button class="btn btn-ghost btn-sm" onclick="_saveSentTool()">💾 保存</button>' +
         '</div>';
       if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
     }).catch(function(){ body.innerHTML = '<div style="color:#ef4444;padding:20px">❌ 网络错误</div>'; });

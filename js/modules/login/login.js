@@ -52,7 +52,8 @@ var LoginModule = (function() {
             window.location.href = '/admin.html';
             return;
           }
-          finishLogin(d.user);
+          if (window.ThesisApp && ThesisApp.handleLogin) ThesisApp.handleLogin(d.user);
+          else finishLogin(d.user);
         } else { err.textContent = d.error; }
       }).catch(function() { err.textContent = '网络错误'; });
   }
@@ -101,6 +102,7 @@ var LoginModule = (function() {
   }
 
   function doLogout() {
+    if (window.ThesisApp && ThesisApp.logout) { ThesisApp.logout(); return; }
     if (typeof window.clearManuscriptRuntime === 'function') window.clearManuscriptRuntime();
     sessionStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(USER_KEY);
@@ -124,14 +126,7 @@ var LoginModule = (function() {
       unInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { var el = document.getElementById('loginPassword'); if (el) el.focus(); } });
     }
 
-    // 启动时检查 token
-    var savedToken = getToken();
-    if (savedToken) {
-      fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + savedToken } })
-        .then(function(r) { return r.json(); })
-        .then(function(d) { if (d.success) finishLogin(d.user); })
-        .catch(function() {});
-    }
+    // Session validation is owned by ThesisApp; this module only owns the form.
   }
 
   return { init: init, doLogin: doLogin, doLogout: doLogout, toggleRegMode: toggleRegMode };

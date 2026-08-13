@@ -594,7 +594,7 @@ function enableLiteratureButtons(){
     }
   }catch(e){}
 }
-function switchModule(moduleId) {
+function legacySwitchModule(moduleId) {
   var _mod0 = APP_MODULES.find(function(x){return x.id===moduleId;});
   if (_mod0 && (_mod0.aiDriven || _mod0.localCharge || _mod0.serverFixed)) {
     if (!ensureLoggedIn('登录后即可使用该功能')) return;
@@ -856,8 +856,8 @@ function onThesisLoaded(options) {
     ThesisProject.onManuscriptReady();
   }
   // 导入后优先看论文正文与目录树（可滚动），而不是盖住正文的工作台卡片
-  if (typeof switchView === 'function') {
-    switchView('paper');
+  if (typeof window.switchView === 'function') {
+    window.switchView('paper');
   } else {
     // 兜底：显示 thesisBox 内论文节点，隐藏 workspace 首页
     var ws = document.getElementById('workspaceContent');
@@ -872,7 +872,7 @@ function onThesisLoaded(options) {
   }
 }
 
-function switchView(view) {
+function legacySwitchView(view) {
   // Update bar tabs
   document.querySelectorAll('.bar-tab').forEach(function(t) {
     t.classList.toggle('active', t.getAttribute('data-view') === view);

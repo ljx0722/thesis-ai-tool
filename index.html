@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="css/tokens.css?v=2">
 <link rel="stylesheet" href="css/reset.css?v=2">
 <link rel="stylesheet" href="css/base.css?v=2">
-<link rel="stylesheet" href="css/shell.css?v=2">
+<link rel="stylesheet" href="css/shell.css?v=3">
 <link rel="stylesheet" href="css/components.css?v=2">
 <link rel="stylesheet" href="css/style.css?v=2">
 <link rel="stylesheet" href="css/citely.css?v=2">
@@ -116,6 +116,7 @@
         <button onclick="doLogout()" style="color:var(--danger)">登出</button>
       </div>
     </div>
+    <button class="topbar-icon-btn" id="helpBtn" onclick="openContextHelp()" title="操作指南" aria-label="操作指南">?</button>
     <button class="topbar-icon-btn" id="adminPanelBtn" onclick="window.location.href='/admin.html'" style="background:rgba(99,102,241,.15);color:#c7d2fe;display:none" title="管理员看板">⚙️</button>
   </div>
 </header>
@@ -168,275 +169,272 @@
 document.addEventListener('click',function(e){var d=document.getElementById('accountDropdown');var b=document.querySelector('.bar-account-menu button');if(d&&d.style.display==='block'&&!d.contains(e.target)&&!(b&&b.contains(e.target)))d.style.display='none';});
 function toggleChangelog(){var p=document.getElementById('changelogPanel');var opening=p.style.display==='none';p.style.display=opening?'block':'none';if(!opening)return;fetch('/static/changelog.json').then(function(r){return r.json();}).then(function(d){var entries=(d.entries||[]).filter(function(e){return e.status==='released'&&e.commit;});var body=entries.map(function(e){return'<section style="padding:10px 0;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between;gap:10px"><b>'+e.version+' · '+e.summary+'</b><span style="color:var(--text-muted)">'+e.date+'</span></div><ul style="margin:7px 0 0 18px">'+(e.changes||[]).map(function(c){return'<li>'+c+'</li>';}).join('')+'</ul></section>';}).join('');p.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>功能更新日志</b><button onclick="toggleChangelog()" style="border:0;background:transparent;color:var(--text-muted);cursor:pointer">关闭</button></div>'+body;}).catch(function(){p.innerHTML='<div style="padding:16px">更新日志加载失败，请稍后重试。</div>';});}</script>
 
-<!-- ====== 两栏工作台：目录 | 论文正文 ====== -->
-<div class="main-layout" id="mainLayout">
-  <aside class="sidebar-icon" id="sidebar">
-    <button class="sidebar-icon-milestone active" data-milestone="prepare" onclick="Nav.navigate('prepare')" title="准备">
-      <span class="sidebar-icon-circle">1</span>准备
+<!-- ====== 项目制工作台 ====== -->
+<div class="main-layout app-workbench" id="mainLayout">
+  <aside class="milestone-rail" id="sidebar" aria-label="论文阶段导航">
+    <button class="rail-home active" type="button" data-route-surface="home" onclick="ThesisRouter.go('home')" aria-label="项目主页" title="项目主页">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20H4Z"/><path d="M9 20v-6h6v6"/></svg>
+      <span>主页</span>
     </button>
-    <button class="sidebar-icon-milestone" data-milestone="writing" onclick="Nav.navigate('writing')" title="写作">
-      <span class="sidebar-icon-circle">2</span>写作
-    </button>
-    <button class="sidebar-icon-milestone" data-milestone="polish" onclick="Nav.navigate('polish')" title="打磨">
-      <span class="sidebar-icon-circle">3</span>打磨
-    </button>
-    <button class="sidebar-icon-milestone" data-milestone="finish" onclick="Nav.navigate('finish')" title="收尾">
-      <span class="sidebar-icon-circle">4</span>收尾
-    </button>
-    <hr class="sidebar-icon-divider">
-    <button class="sidebar-icon-action" onclick="openIdeaWizard()" title="从想法开始">
-      <span class="sidebar-icon-action-icon">💡</span>想法
-    </button>
-    <button class="sidebar-icon-action" onclick="openImportDialog('new')" title="导入论文">
-      <span class="sidebar-icon-action-icon">📄</span>导入
-    </button>
-    <button class="sidebar-icon-action" onclick="Nav.switchToolTab('buddy');Nav.toggleToolPanel()" title="论文搭子">
-      <span class="sidebar-icon-action-icon">🤖</span>搭子
-    </button>
-    <button class="sidebar-icon-action" onclick="openThemeStudio()" title="外观设置">
-      <span class="sidebar-icon-action-icon">⚙️</span>设置
-    </button>
+    <div class="rail-stages" role="list" aria-label="四个论文里程碑">
+      <button type="button" class="rail-stage active" data-milestone="prepare" onclick="ThesisRouter.go({surface:'milestone',milestone:'prepare'})" role="listitem"><span>1</span><b>准备</b></button>
+      <button type="button" class="rail-stage" data-milestone="writing" onclick="ThesisRouter.go({surface:'milestone',milestone:'writing'})" role="listitem"><span>2</span><b>写作</b></button>
+      <button type="button" class="rail-stage" data-milestone="polish" onclick="ThesisRouter.go({surface:'milestone',milestone:'polish'})" role="listitem"><span>3</span><b>打磨</b></button>
+      <button type="button" class="rail-stage" data-milestone="finish" onclick="ThesisRouter.go({surface:'milestone',milestone:'finish'})" role="listitem"><span>4</span><b>收尾</b></button>
+    </div>
+    <div class="rail-footer">
+      <button type="button" onclick="ThesisRouter.go('tools')" data-route-surface="tools" title="全部工具" aria-label="全部工具">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg><span>工具</span>
+      </button>
+      <button type="button" onclick="ThesisRouter.go('buddy')" data-route-surface="buddy" title="论文搭子" aria-label="论文搭子">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v11H9l-4 3Z"/><path d="M8 9h8M8 12h5"/></svg><span>搭子</span>
+      </button>
+    </div>
   </aside>
 
-  <div class="main-stage" id="mainStage">
-    <div class="stage-dashboard" id="stageDashboard"></div>
-    <div class="stage-paper" id="stagePaper">
-      <div class="stage-paper-header">
-        <select id="paperChapterSelect" onchange="PaperPreview.selectChapter(this.value)" style="display:none">
-          <option value="">-- 选择章节 --</option>
-        </select>
-        <span id="paperWordCount" style="font-size:var(--text-xs);color:var(--text-muted);margin-left:auto"></span>
-      </div>
-      <div class="stage-paper-body" id="paperPreviewBody">
-        <div class="stage-paper-empty">
-          <div style="font-size:2rem;margin-bottom:8px">📄</div>
-          <strong>还没有论文</strong>
-          <span>创建项目或导入 DOCX 后会自动展示论文正文</span>
-          <button class="btn btn-primary btn-sm" onclick="openImportDialog('new')" style="margin-top:8px">导入论文</button>
-        </div>
-      </div>
+  <aside class="toc-panel" id="tocPanel" aria-label="论文目录">
+    <div class="toc-panel-head">
+      <div><strong>论文目录</strong><span id="navTreeMeta">创建大纲或导入 DOCX 后显示</span></div>
+      <button type="button" onclick="document.body.classList.remove('toc-drawer-open')" class="toc-close" aria-label="关闭目录">×</button>
     </div>
-  </div>
+    <div class="nav-tree" id="navTree">
+      <div class="tree-empty"><strong>还没有目录</strong><span>先创建项目，或导入已有论文。</span></div>
+    </div>
+    <div id="stageNav" hidden></div>
+  </aside>
 
-  <div class="tool-panel" id="toolPanel">
-    <div class="tool-panel-header">
-      <div class="tool-panel-tabs" id="toolPanelTabs" role="tablist">
-        <button class="tool-panel-tab active" data-tab="references" onclick="Nav.switchToolTab('references')" role="tab" aria-selected="true">📚 文献</button>
-        <button class="tool-panel-tab" data-tab="buddy" onclick="Nav.switchToolTab('buddy')" role="tab" aria-selected="false">🤖 搭子</button>
-        <button class="tool-panel-tab" data-tab="inspect" onclick="Nav.switchToolTab('inspect')" role="tab" aria-selected="false">🔍 检查</button>
-        <button class="tool-panel-tab" data-tab="review" onclick="Nav.switchToolTab('review')" role="tab" aria-selected="false">💬 审阅</button>
+  <main class="content-panel" id="contentPanel">
+    <header class="content-toolbar">
+      <div class="content-toolbar-copy"><button type="button" class="toc-trigger" onclick="document.body.classList.toggle('toc-drawer-open')" aria-label="打开论文目录">目录</button><div><strong id="contentTitle">项目主页</strong><span id="projectProgressChip">加载项目状态…</span></div></div>
+      <div class="content-toolbar-actions">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="ThesisRouter.go('paper')">论文</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="ThesisRouter.go('tools')">工具</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="openImportDialog('replace')">导入/换论文</button>
       </div>
-      <button class="btn-icon" onclick="Nav.toggleToolPanel()" title="收起面板">◀</button>
+    </header>
+    <div class="content-body" id="contentBody">
+      <section class="thesis-panel" id="thesisPanel" aria-label="项目与论文工作区">
+        <div class="thesis-bar" id="paperToolbar" hidden>
+          <div><strong>论文正文</strong><span id="upStatus">尚未导入正文</span></div>
+          <div class="thesis-bar-actions">
+            <button type="button" class="bar-mini" onclick="openImportDialog('replace')">换论文</button>
+            <button type="button" class="bar-mini" onclick="openFullPaperPreview()">完整预览</button>
+            <button type="button" class="bar-mini" onclick="mergeDraftsIntoThesis()">合并草稿</button>
+            <button type="button" class="bar-mini" onclick="zoomThesis(-0.1)" aria-label="缩小正文">−</button>
+            <span id="zoomLabel">100%</span>
+            <button type="button" class="bar-mini" onclick="zoomThesis(0.1)" aria-label="放大正文">＋</button>
+            <button type="button" class="ba-btn ba-search" id="baSearch" onclick="startSearch()">检索文献</button>
+            <button type="button" class="ba-btn" id="baKG" onclick="showKnowledgeGraph()">知识图谱</button>
+            <button type="button" class="ba-btn ba-verify" id="baVerify" onclick="batchVerify()">校验引用</button>
+          </div>
+        </div>
+        <div class="thesis-box" id="thesisBox"><div id="workspaceContent" class="workspace-content" aria-live="polite"></div></div>
+        <div class="skeleton-full" id="thesisSkeleton" hidden><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-block"></div></div>
+      </section>
+      <section id="focusSurface" class="focus-surface" hidden></section>
+      <section id="toolCatalogSurface" class="tool-catalog-surface" hidden></section>
+      <section id="importResultSurface" class="import-result-surface" hidden aria-live="polite"></section>
     </div>
-    <div class="tool-panel-body" id="toolPanelBody"></div>
+    <footer class="status-bar" id="statusBar" role="status" aria-live="polite">正在准备工作台…</footer>
+  </main>
+
+  <aside class="ref-panel context-panel" id="refPanel" aria-label="工具上下文">
+    <div class="tool-panel-head">
+      <div><div class="tool-panel-title" id="toolPanelTitle">工具上下文</div><div class="tool-panel-sub" id="toolPanelSub">按需显示当前任务的证据和操作</div></div>
+      <button type="button" class="btn-icon" onclick="this.closest('#refPanel').classList.remove('is-context-visible')" aria-label="收起工具上下文">×</button>
+    </div>
+    <div id="toolHome" class="tool-home" hidden><div id="toolHomeGrid"></div><div id="toolHomeGridThesis"></div></div>
+    <div class="kw-bar ref-only" id="kwBar" hidden><h4>论文主题词</h4><div class="kw-tags" id="kwTags"></div></div>
+    <div class="dashboard ref-only" id="dashboard" hidden><div class="dash-card"><div class="dv" id="dashTotal">0</div><div class="dl">总文献</div></div><div class="dash-card"><div class="dv" id="dashCN">0</div><div class="dl">中文</div></div><div class="dash-card"><div class="dv" id="dashEN">0</div><div class="dl">英文</div></div><div class="dash-card"><div class="dv" id="dash3Y">0</div><div class="dl">3年内</div></div><div class="dash-card"><div class="dv" id="dash5Y">0</div><div class="dl">5年内</div></div></div>
+    <div id="searchParamStore" hidden aria-hidden="true"><input type="hidden" id="fTotal" value="20"><input type="hidden" id="fCN" value="45"><input type="hidden" id="fEN" value="30"><input type="hidden" id="fY3" value="50"><input type="hidden" id="fY5" value="75"><input type="hidden" id="fDist" value="auto"></div>
+    <div id="literatureWorkbench" class="literature-workbench ref-only" hidden></div>
+    <div class="ref-list ref-only" id="refs" hidden><div class="panel-empty">导入论文或检索后，文献会出现在这里</div></div>
+    <div class="module-area" id="moduleAreaScroll"></div>
+  </aside>
+</div>
+
+<nav class="mobile-bottom-nav" aria-label="移动端主导航">
+  <button type="button" class="mobile-nav-item active" data-route-surface="home" onclick="ThesisRouter.go('home')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20H4Z"/><path d="M9 20v-6h6v6"/></svg><span>主页</span></button>
+  <button type="button" class="mobile-nav-item" data-route-surface="paper" onclick="ThesisRouter.go('paper')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6Z"/><path d="M9 10h6M9 14h6M9 18h4"/></svg><span>论文</span></button>
+  <button type="button" class="mobile-nav-item" data-route-surface="tools" onclick="ThesisRouter.openMobileToolDrawer()"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg><span>工具</span></button>
+  <button type="button" class="mobile-nav-item" data-route-surface="buddy" onclick="ThesisRouter.go('buddy')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v11H9l-4 3Z"/><path d="M8 9h8M8 12h5"/></svg><span>搭子</span></button>
+</nav>
+<div id="mobileDrawerBackdrop" class="mobile-drawer-backdrop" hidden onclick="ThesisRouter.closeMobileToolDrawer()"></div>
+<aside id="mobileToolDrawer" class="mobile-tool-drawer" hidden aria-hidden="true" aria-labelledby="mobileToolDrawerTitle">
+  <header><div><strong id="mobileToolDrawerTitle">全部工具</strong><span>按论文阶段选择</span></div><button type="button" onclick="ThesisRouter.closeMobileToolDrawer()" aria-label="关闭工具抽屉">×</button></header>
+  <div id="mobileToolDrawerBody" class="mobile-tool-drawer-body"></div>
+</aside>
+
+<input type="file" id="fileInput" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+<script>window._pendingFile=null;window._importIntent='new';window.openImportDialog=function(intent){window._importIntent=intent||'new';var ov=document.getElementById('uploadOverlay');if(ov){ov.classList.add('show');ov.setAttribute('aria-hidden','false');}else if(window.PaperImport)PaperImport.open(intent);};window.triggerUpload=function(){window.openImportDialog('new');};</script>
+<div class="upload-overlay" id="uploadOverlay" role="dialog" aria-modal="true" aria-labelledby="uploadTitle" aria-hidden="true">
+  <div class="upload-card">
+    <div class="upload-icon" aria-hidden="true">DOCX</div><h2 id="uploadTitle">导入已有论文</h2><p>支持 DOCX 和旧版 DOC。我们会先保留原文，再让你确认章、节和小节的 Word 样式。</p>
+    <button type="button" class="upload-drop" id="uploadDrop" onclick="document.getElementById('fileInput').click()"><strong>选择论文文件</strong><span>也可以把文件拖到这里</span><small>文件解析在浏览器完成；确认后再同步项目结果</small></button>
+    <div class="upload-recovery" id="uploadRecovery" role="status" aria-live="polite" hidden></div>
+    <section class="upload-decomposition" id="uploadDecomposition" aria-live="polite" hidden><div class="upload-decomposition-head"><strong>论文拆解进度</strong><span id="uploadDecompositionState">等待提交</span></div><div class="upload-decomposition-bar"><span id="uploadDecompositionProgress"></span></div><div class="import-checklist" id="uploadDecompositionChecklist"></div><div class="upload-decomposition-actions"><button type="button" class="ai-btn-clear" id="uploadDecompositionRetry" hidden>重试拆解</button><button type="button" class="ai-btn-clear" id="uploadDecompositionNavigate" hidden>查看项目结果</button></div></section>
+    <button type="button" class="btn btn-ghost upload-cancel" onclick="hideUploadOverlay()">取消</button>
   </div>
 </div>
+
+<!-- ====== 智能文献检索任务弹窗 ====== -->
+<div id="literatureSearchOverlay" class="workspace-modal-overlay literature-search-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="literatureSearchTitle" aria-describedby="literatureSearchSubtitle">
+  <div id="literatureSearchModal" class="workspace-modal literature-search-modal" tabindex="-1">
+    <div class="workspace-modal-head literature-search-head">
+      <div>
+        <h2 id="literatureSearchTitle">智能文献检索</h2>
+        <div id="literatureSearchSubtitle" class="workspace-modal-subtitle">从研究意图到证据应用，所有结果均需人工确认</div>
+      </div>
+      <div class="workspace-modal-actions">
+        <span id="literatureSearchSaveState" class="literature-search-save-state">未保存</span>
+        <button type="button" id="literatureSearchClose" class="workspace-modal-btn" aria-label="关闭智能文献检索">关闭</button>
+      </div>
+    </div>
+    <nav id="literatureSearchSteps" class="literature-search-steps" aria-label="文献检索步骤"></nav>
+    <div id="literatureSearchStatus" class="literature-search-status" role="status" aria-live="polite"></div>
+    <div id="literatureSearchContent" class="workspace-modal-content literature-search-content"></div>
+    <div id="literatureSearchExitConfirm" class="literature-search-exit-confirm" hidden>
+      <div><strong>检索任务尚未完成</strong><span>可以保存进度后退出，下次从文献工作台继续。</span></div>
+      <div>
+        <button type="button" class="workspace-modal-btn" data-search-exit="stay">继续任务</button>
+        <button type="button" class="workspace-modal-btn primary" data-search-exit="save">保存并退出</button>
+      </div>
+    </div>
+    <footer id="literatureSearchFooter" class="literature-search-footer"></footer>
+  </div>
+</div>
+
+<!-- ====== 知识图谱弹窗 ====== -->
+<div id="kgOverlay" class="workspace-modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="kgModalTitle">
+  <div id="kgModal" class="workspace-modal kg-modal">
+    <div class="workspace-modal-head">
+      <div class="workspace-modal-title-row">
+        <h2 id="kgModalTitle">🕸️ 知识图谱</h2>
+        <div id="kgTabs" class="kg-tabs" role="tablist" aria-label="知识图谱视图">
+          <button onclick="switchKGView('cloud')" onkeydown="handleKGTabKeydown(event)" id="kgTabCloud" class="kg-tab" role="tab" aria-selected="false" tabindex="-1" title="概念分析：区分高频词、特色词与章节分布。共现只表示共同出现，不代表因果。">🧭 概念概览</button>
+          <button onclick="switchKGView('network')" onkeydown="handleKGTabKeydown(event)" id="kgTabNetwork" class="kg-tab active" role="tab" aria-selected="true" tabindex="0" title="研究关系概览：章节、概念与文献的可追溯关系。现有共现边不自动解释为支持或因果。">🔗 研究关系</button>
+          <button onclick="switchKGView('timeline')" onkeydown="handleKGTabKeydown(event)" id="kgTabTimeline" class="kg-tab" role="tab" aria-selected="false" tabindex="-1" title="文献时间线：按年份观察研究演进与来源。">📅 文献演进</button>
+        </div>
+      </div>
+      <div class="workspace-modal-actions">
+        <button onclick="exportReport()" class="workspace-modal-btn primary">📄 导出报告</button>
+        <button onclick="exportKGAsPNG()" class="workspace-modal-btn">🖼️ 导出 PNG</button>
+        <button onclick="closeKnowledgeGraph()" class="workspace-modal-btn">✕ 关闭</button>
+      </div>
+    </div>
+    <div class="workspace-modal-note"><span>当前视图为研究概览；“共同出现”不等于支持、反驳或因果关系。</span><button type="button" onclick="openConceptExplorer()" class="workspace-modal-btn compact">概念证据</button></div>
+    <div id="kgContent" class="workspace-modal-content kg-content-surface">
+      <div id="kgCloudPanel" class="kg-view-panel kg-cloud-panel"></div>
+      <div id="kgGraphPanel" class="kg-view-panel kg-graph-panel">
+        <div id="kgPlaceholder" class="kg-placeholder" role="status" aria-live="polite"><div class="kg-placeholder-icon">🔍</div><div class="kg-placeholder-message">正在生成知识图谱...</div></div>
+        <svg id="kgSvg" class="kg-svg" role="img" aria-label="研究关系知识图谱" preserveAspectRatio="xMidYMid meet"></svg>
+        <div id="kgTimelinePanel" class="kg-timeline-panel"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 论文看板弹窗 ====== -->
+<div id="dbOverlay" class="workspace-modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="dbModalTitle">
+  <div class="workspace-modal thesis-board-modal">
+    <div class="workspace-modal-head">
+      <div>
+        <h2 id="dbModalTitle">论文看板</h2>
+        <div class="workspace-modal-subtitle">综合评估 · 证据说明 · 平台行动建议</div>
+      </div>
+      <div class="workspace-modal-actions">
+        <button onclick="showDashboard()" class="workspace-modal-btn">刷新</button>
+        <button onclick="exportDashboardReport()" class="workspace-modal-btn primary">导出报告</button>
+        <button onclick="closeDashboard()" class="workspace-modal-btn">关闭</button>
+      </div>
+    </div>
+    <div id="dbContent" class="workspace-modal-content thesis-board-modal-content"></div>
+  </div>
+</div>
+
+<div class="overlay" id="loadOv">
+  <div class="obox" style="max-width:600px">
+    <div class="spinner"></div>
+    <div class="msg" id="loadMsg"></div>
+    <div class="pct" id="loadPct" style="display:none">0%</div>
+    <div class="pbar"><div class="pfill" id="loadBar"></div></div>
+    <div class="detail" id="loadDetail"></div>
+    <div class="sr-progress" id="srProgress" style="display:none"><div style="font-size:.55rem;color:var(--m1);margin-bottom:6px;text-align:center">📡 每词查询 3 个学术数据库（OpenAlex + Crossref + Semantic Scholar），并发执行</div></div>
+  </div>
+  <div class="ambient-tips" id="ambientTips"></div>
+</div>
+
+<!-- ====== 弹窗①: 检索结果确认 ====== -->
+<div id="rcOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(30,30,32,0.92);backdrop-filter:blur(12px);z-index:99997;align-items:center;justify-content:center">
+  <div style="background:var(--solid);border-radius:var(--r-xl);padding:20px 24px;width:95%;height:92%;max-width:1400px;display:flex;flex-direction:column;box-shadow:0 25px 80px rgba(0,0,0,0.3);position:relative;border:1px solid rgba(255,255,255,0.08)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0">
+      <div>
+        <h2 style="font-size:1.1rem;font-weight:700;color:var(--t);margin:0">📚 检索结果确认 <span style="font-size:.72rem;color:var(--m);font-weight:400" id="rcStepLabel">第 1/2 步</span></h2>
+        <div style="font-size:.68rem;color:var(--m);margin-top:2px" id="rcSummary">选择你认可的文献，或直接点击"下一步"使用推荐结果</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button id="rcSkipBtn" onclick="rcFinish()" style="background:var(--g);color:#fff;border:none;border-radius:18px;padding:8px 18px;cursor:pointer;font-weight:600;font-size:.75rem">✅ 下一步</button>
+        <button onclick="rcClose()" style="background:rgba(0,0,0,0.06);color:var(--t);border:none;border-radius:18px;padding:8px 16px;cursor:pointer;font-weight:600;font-size:.8rem">✕ 取消</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-shrink:0;flex-wrap:wrap;align-items:center">
+      <button onclick="rcSelectAll()" style="background:rgba(0,0,0,0.05);color:var(--t);border:none;border-radius:12px;padding:4px 12px;cursor:pointer;font-size:.65rem;font-weight:500">全选</button>
+      <button onclick="rcSelectNone()" style="background:rgba(0,0,0,0.05);color:var(--t);border:none;border-radius:12px;padding:4px 12px;cursor:pointer;font-size:.65rem;font-weight:500">反选</button>
+      <span style="color:var(--bd);font-size:.6rem">|</span>
+      <button onclick="rcFilter('cn')" style="background:rgba(0,113,227,0.08);color:#0071e3;border:none;border-radius:12px;padding:4px 12px;cursor:pointer;font-size:.65rem;font-weight:500">仅中文</button>
+      <button onclick="rcFilter('en')" style="background:rgba(0,113,227,0.08);color:#0071e3;border:none;border-radius:12px;padding:4px 12px;cursor:pointer;font-size:.65rem;font-weight:500">仅英文</button>
+      <button onclick="rcFilter('relevant')" style="background:rgba(48,209,88,0.08);color:#30d158;border:none;border-radius:12px;padding:4px 12px;cursor:pointer;font-size:.65rem;font-weight:500">🎯 本领域</button>
+      <button onclick="rcFilter('recent')" style="background:rgba(0,113,227,0.08);color:#0071e3;border:none;border-radius:12px;padding:4px 12px;cursor:pointer;font-size:.65rem;font-weight:500">近5年高置信</button>
+      <button onclick="rcFilter('all')" style="background:rgba(0,113,227,0.08);color:#0071e3;border:none;border-radius:12px;padding:4px 12px;cursor:pointer;font-size:.65rem;font-weight:500">全部显示</button>
+      <span style="margin-left:auto;font-size:.62rem;color:var(--m)" id="rcCount">已选 0/0</span>
+    </div>
+    <div id="rcList" style="flex:1;overflow-y:auto;border-radius:var(--radius);background:rgba(0,0,0,0.02);padding:4px 6px"></div>
+  </div>
+</div>
+
+<!-- ====== 弹窗②: 分配策略确认 ====== -->
+<div id="asOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(30,30,32,0.92);backdrop-filter:blur(12px);z-index:99997;align-items:center;justify-content:center">
+  <div style="background:var(--solid);border-radius:var(--r-xl);padding:20px 24px;width:95%;height:92%;max-width:1200px;display:flex;flex-direction:column;box-shadow:0 25px 80px rgba(0,0,0,0.3);position:relative;border:1px solid rgba(255,255,255,0.08)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0">
+      <div>
+        <h2 style="font-size:1.1rem;font-weight:700;color:var(--t);margin:0">📂 分配策略确认 <span style="font-size:.72rem;color:var(--m);font-weight:400">第 2/2 步</span></h2>
+        <div style="font-size:.68rem;color:var(--m);margin-top:2px">确认每章分配的文献，点击章节可展开/折叠详情，拖动文献可改归属</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <select id="asMode" onchange="asRebuild()" style="border:1px solid var(--bd);border-radius:14px;padding:5px 12px;font-size:.68rem;background:var(--solid);color:var(--t);cursor:pointer">
+          <option value="auto">自动分配（默认）</option>
+          <option value="uniform">按章节平均</option>
+          <option value="weighted">按内容多少</option>
+        </select>
+        <button onclick="asFinish()" style="background:var(--g);color:#fff;border:none;border-radius:18px;padding:8px 18px;cursor:pointer;font-weight:600;font-size:.75rem">✅ 确认生成</button>
+        <button onclick="asSkip()" style="background:rgba(0,0,0,0.06);color:var(--t);border:none;border-radius:18px;padding:8px 16px;cursor:pointer;font-weight:600;font-size:.8rem">跳过</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-shrink:0;font-size:.65rem;color:var(--m)" id="asSummary"></div>
+    <div id="asList" style="flex:1;overflow-y:auto;border-radius:var(--radius);background:rgba(0,0,0,0.02);padding:4px 6px"></div>
+  </div>
+</div>
+
+<div class="ttp" id="ttp"></div>
 
 </div>
 
 <script>
-// ====== 登录/注册逻辑 ======
+// ====== 认证表单兼容入口（会话验证与启动由 ThesisApp 统一管理） ======
 (function(){
   var TOKEN_KEY = 'thesis_ai_token';
   var USER_KEY = 'thesis_ai_user';
-  var isRegMode = false;
-  var loginOverlay = document.getElementById('loginOverlay');
-  var appShell = document.getElementById('appShell');
-
-  function finishAuthenticatedBootstrap(user) {
-    if(user)sessionStorage.setItem(USER_KEY,JSON.stringify(user));
-    hideLogin();updateBalanceDisplay();if(window.reloadBuddyPreferences)window.reloadBuddyPreferences();if(window.pollNotifications)window.pollNotifications();
-    if(window.ThesisProject&&ThesisProject.bootstrapAuthenticatedUser){ThesisProject.bootstrapAuthenticatedUser().catch(function(e){console.warn('[bootstrap]',e);});}
-    else if(window.restoreScopedSession)window.restoreScopedSession();
-  }
-
-  // Check existing token
-  var savedToken = sessionStorage.getItem(TOKEN_KEY);
-  if (savedToken) {
-    fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + savedToken } })
-      .then(function(r) { if(!r.ok)throw new Error('expired');return r.json(); })
-      .then(function(d){if(!d.success)throw new Error('expired');finishAuthenticatedBootstrap(d.user);})
-      .catch(function() { sessionStorage.removeItem(TOKEN_KEY);sessionStorage.removeItem(USER_KEY);if(window.clearManuscriptRuntime)window.clearManuscriptRuntime(); });
-  }
-
-  if(loginOverlay) loginOverlay.style.display = 'flex';
-
-  window.doLogin = function() {
-    var u = document.getElementById('loginUsername').value.trim();
-    var p = document.getElementById('loginPassword').value;
-    var err = document.getElementById('loginError');
-    if (!u) { err.textContent = '请输入用户名'; return; }
-    if (!p) { err.textContent = '请输入密码'; return; }
-
-    if (isRegMode) {
-      var cp = document.getElementById('regConfirmPassword').value;
-      if (p !== cp) { err.textContent = '两次密码不一致'; return; }
-      fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: u, password: p, invite_code: document.getElementById('regInviteCode').value.trim() })
-      }).then(function(r) { return r.json(); })
-        .then(function(d) {
-          if (d.success) {
-            err.style.color = '#10b981';
-            err.textContent = '注册成功！请登录';
-            window.toggleRegMode();
-          } else { err.textContent = d.error; }
-        }).catch(function() { err.textContent = '网络错误'; });
-      return;
-    }
-
-    fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: u, password: p, invite_code: document.getElementById('regInviteCode').value.trim() })
-    }).then(function(r) { return r.json(); })
-      .then(function(d) {
-        if (d.success) {
-          sessionStorage.setItem(TOKEN_KEY, d.token);
-          sessionStorage.setItem(USER_KEY, JSON.stringify(d.user));
-          sessionStorage.setItem('thesis_ai_login', 'true'); // 启用引导教程
-          if (d.user.is_admin) {
-            // Admin: redirect to admin dashboard
-            sessionStorage.setItem('thesis_ai_admin_secret', d.token);
-            window.location.href = '/admin.html';
-            return;
-          }
-          finishAuthenticatedBootstrap(d.user);
-          if (window.maybeStartTour) window.maybeStartTour();
-        } else { err.textContent = d.error; }
-      }).catch(function() { err.textContent = '网络错误'; });
+  window.doLogin = function(){
+    if(window.LoginModule&&LoginModule.doLogin)return LoginModule.doLogin();
+    var err=document.getElementById('loginError');if(err)err.textContent='登录模块正在加载，请稍后重试';
   };
-
-  window.toggleRegMode = function() {
-    isRegMode = !isRegMode;
-    document.getElementById('regConfirmField').style.display = isRegMode ? '' : 'none';
-    document.getElementById('loginCardTitle').textContent = isRegMode ? '注册账号' : '登录系统';
-    document.getElementById('loginBtnText').textContent = isRegMode ? '注 册' : '登 录';
-    document.getElementById('loginSwitchText').textContent = isRegMode ? '已有账号？' : '还没有账号？';
-    document.getElementById('loginSwitchLink').textContent = isRegMode ? '去登录' : '立即注册';
-    document.getElementById('loginError').textContent = '';
+  window.toggleRegMode = function(){
+    if(window.LoginModule&&LoginModule.toggleRegMode)return LoginModule.toggleRegMode();
   };
-
-  document.getElementById('loginPassword').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') doLogin();
-  });
-  document.getElementById('loginUsername').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') { document.getElementById('loginPassword').focus(); }
-  });
-
-  function hideLogin() {
-    if (loginOverlay) {
-      loginOverlay.style.opacity = '0';
-      loginOverlay.style.transition = 'opacity .4s';
-      setTimeout(function() { loginOverlay.style.display = 'none'; }, 400);
-    }
-    if (appShell) appShell.style.display = '';
-    window.dispatchEvent(new Event('resize'));
-  }
-
-  window.doLogout = function() {
-    if(window.clearManuscriptRuntime)window.clearManuscriptRuntime();
-    sessionStorage.removeItem(TOKEN_KEY);
-    sessionStorage.removeItem(USER_KEY);
-    sessionStorage.removeItem('thesis_ai_admin_secret');
-    location.reload();
+  window.doLogout = function(){
+    if(window.ThesisApp&&ThesisApp.logout)return ThesisApp.logout();
+    sessionStorage.removeItem(TOKEN_KEY);sessionStorage.removeItem(USER_KEY);location.reload();
   };
-
-  function landingModuleLabel(id){
-    var names = {
-      'ideation':'开题工作台','citely':'文献检索','knowledge-graph':'研究图谱',
-      'writing-workbench':'写作编辑器','expand':'AI扩写','data-analysis':'数据分析',
-      'health-check':'论文体检','review':'综合审阅','dashboard':'论文看板',
-      'defense-ppt':'答辩PPT','en-abstract':'英文摘要'
-    };
-    return names[id] || id;
-  }
-  function escapeLandingHtml(value){
-    return String(value == null ? '' : value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-  function getLandingStages(){
-    if(window.ThesisProject && Array.isArray(ThesisProject.STAGES) && ThesisProject.STAGES.length){
-      return ThesisProject.STAGES.map(function(stage){
-        return {
-          id: stage.id, name: stage.name, icon: stage.icon || '',
-          desc: stage.desc || '', artifact: stage.artifact || '',
-          paths: stage.paths || ['idea','docx'],
-          modules: (stage.modules || []).map(landingModuleLabel)
-        };
-      });
-    }
-    return [
-      {id:'prepare',name:'准备',icon:'📋',desc:'选题打磨、文献调研、大纲构建',artifact:'选题 + 文献证据 + 论文大纲',paths:['idea','docx'],modules:['开题工作台','文献检索','知识图谱']},
-      {id:'write',name:'写作',icon:'✍️',desc:'分章写作、数据图表、AI辅助生成',artifact:'完整论文初稿',paths:['idea','docx'],modules:['写作编辑器','AI扩写','数据分析']},
-      {id:'polish',name:'打磨',icon:'🔍',desc:'论文体检、查重降重、深度审阅',artifact:'体检报告 + 审阅意见',paths:['idea','docx'],modules:['论文体检','综合审阅','论文看板']},
-      {id:'finalize',name:'收尾',icon:'🎤',desc:'答辩PPT、英文摘要、格式定稿',artifact:'答辩材料 + 终稿',paths:['idea','docx'],modules:['答辩PPT','英文摘要']}
-    ];
-  }
-  function initLandingExplorer(){
-    var stages = getLandingStages();
-    var stageButtons = Array.prototype.slice.call(document.querySelectorAll('[data-stage]'));
-    var pathButtons = Array.prototype.slice.call(document.querySelectorAll('[data-landing-path]'));
-    if(!stageButtons.length) return;
-    var state = {path: 'idea', stage: 0};
-    function render(){
-      var stage = stages[state.stage] || stages[0];
-      pathButtons.forEach(function(btn){
-        var active = btn.getAttribute('data-landing-path') === state.path;
-        btn.classList.toggle('is-active', active);
-        btn.setAttribute('aria-selected', active ? 'true' : 'false');
-      });
-      stageButtons.forEach(function(btn, index){
-        var stageMeta = stages[index] || {};
-        var pathOk = !stageMeta.paths || stageMeta.paths.indexOf(state.path) >= 0;
-        var active = index === state.stage;
-        btn.classList.toggle('is-active', active);
-        btn.classList.toggle('is-dimmed', !pathOk);
-        btn.setAttribute('aria-selected', active ? 'true' : 'false');
-        btn.disabled = false;
-      });
-      var indexEl = document.getElementById('landingStageIndex');
-      var nameEl = document.getElementById('landingStageName');
-      var descEl = document.getElementById('landingStageDesc');
-      var tagsEl = document.getElementById('landingStageTags');
-      if(indexEl) indexEl.textContent = (stage.icon || stage.name || '').slice(0, 2);
-      if(nameEl) nameEl.textContent = stage.name || '';
-      if(descEl){
-        var pathHint = state.path === 'docx' ? '导入路径通常从解析与审阅切入，再回到当前阶段补强。' : '创作路径从立项开始，逐步沉淀大纲、章节与证据。';
-        descEl.textContent = (stage.desc || '') + ' ' + pathHint + (stage.artifact ? ' 产出：' + stage.artifact : '');
-      }
-      if(tagsEl){
-        tagsEl.innerHTML = (stage.modules || []).map(function(label){ return '<span>' + escapeLandingHtml(label) + '</span>'; }).join('');
-      }
-      var detail = document.querySelector('.landing-stage-detail');
-      if(detail){
-        detail.classList.remove('is-refreshing');
-        void detail.offsetWidth;
-        detail.classList.add('is-refreshing');
-      }
-    }
-    pathButtons.forEach(function(btn){
-      btn.addEventListener('click', function(){
-        state.path = btn.getAttribute('data-landing-path') || 'idea';
-        var preferred = stages.findIndex(function(stage){ return (stage.paths || []).indexOf(state.path) >= 0; });
-        if(preferred >= 0) state.stage = preferred;
-        render();
-      });
-    });
-    stageButtons.forEach(function(btn, index){
-      btn.addEventListener('click', function(){ state.stage = index; render(); });
-      btn.addEventListener('keydown', function(e){
-        if(e.key === 'ArrowRight' || e.key === 'ArrowDown'){ e.preventDefault(); state.stage = Math.min(stages.length - 1, index + 1); stageButtons[state.stage].focus(); render(); }
-        if(e.key === 'ArrowLeft' || e.key === 'ArrowUp'){ e.preventDefault(); state.stage = Math.max(0, index - 1); stageButtons[state.stage].focus(); render(); }
-        if(e.key === 'Home'){ e.preventDefault(); state.stage = 0; stageButtons[0].focus(); render(); }
-        if(e.key === 'End'){ e.preventDefault(); state.stage = stages.length - 1; stageButtons[state.stage].focus(); render(); }
-      });
-    });
-    render();
-  }
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initLandingExplorer);
-  if (typeof Nav !== 'undefined' && Nav.init) { document.addEventListener('DOMContentLoaded', Nav.init); Nav.init(); }
-  else initLandingExplorer();
 
   // 余额更新
   window.formatPoints = function(v){
@@ -1013,7 +1011,7 @@ function toggleChangelog(){var p=document.getElementById('changelogPanel');var o
 <script>
 window.openAccountModal = function(title, htmlContent) {
   var d = document.createElement('div'); d.id = 'legacyModal'; d.className = 'modal-overlay'; d.style.display = 'flex'; d.onclick = function(e) { if(e.target === d) { d.style.display = 'none'; d.remove(); } };
-  d.innerHTML = '<div class="modal-card" style="max-width:640px;max-height:88vh;overflow:auto" onclick="event.stopPropagation()"><div class="modal-header"><span class="modal-header-title">'+title+'</span><button class="modal-close" onclick="this.closest('#' + 'modal-overlay' + '').style.display='none'">&times;</button></div><div class="modal-body">'+htmlContent+'</div></div>';
+  d.innerHTML = '<div class="modal-card" style="max-width:640px;max-height:88vh;overflow:auto" onclick="event.stopPropagation()"><div class="modal-header"><span class="modal-header-title">'+title+'</span><button class="modal-close" onclick="closeAccountModal()">&times;</button></div><div class="modal-body">'+htmlContent+'</div></div>';
   document.body.appendChild(d);
 };
 window.closeAccountModal = function() {
@@ -1054,8 +1052,9 @@ function showPricingInfo(){ openAccountCenter(); setTimeout(function(){ switchAc
 <script defer src="js/core/doc.js?v=91"></script>
 <script defer src="js/core/senttools.js?v=91"></script>
 <script defer src="js/core/auditor.js?v=91"></script>
-<script defer src="js/core/command-palette.js?v=2"></script>
-<script defer src="js/core/nav.js?v=2"></script>
+<script defer src="js/core/command-palette.js?v=3"></script>
+<script defer src="js/core/capabilities.js?v=1"></script>
+<script defer src="js/core/nav.js?v=3"></script>
 <script defer src="mammoth.browser.min.js?v=90"></script>
 <script defer src="jszip.min.js?v=90"></script>
 <script defer src="app.js?v=90"></script>
@@ -1073,8 +1072,9 @@ function showPricingInfo(){ openAccountCenter(); setTimeout(function(){ switchAc
 <script defer src="js/modules/writing/writing.js?v=90"></script>
 <script defer src="js/modules/optimization.js?v=90"></script>
 <script defer src="js/modules/paragraph-analysis.js?v=90"></script>
-<script defer src="js/modules/dashboard.js?v=90"></script>
-<script defer src="js/modules/onboarding.js?v=90"></script>
+<script defer src="js/modules/dashboard.js?v=91"></script>
+<script defer src="js/modules/activation.js?v=1"></script>
+<script defer src="js/modules/onboarding.js?v=91"></script>
 <script defer src="js/modules/de-duplicate.js?v=90"></script>
 <script defer src="js/modules/defense-ppt.js?v=90"></script>
 <script defer src="js/modules/en-abstract.js?v=90"></script>

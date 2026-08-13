@@ -10,6 +10,31 @@ var path = require('path');
 var passed = 0, failed = 0, warnings = 0, skipped = 0;
 var projectRoot = path.dirname(__dirname);
 
+function sourceFiles() {
+  var files = [];
+  function walk(relativeDir) {
+    fs.readdirSync(path.join(projectRoot, relativeDir), { withFileTypes: true }).forEach(function(entry) {
+      var relative = path.join(relativeDir, entry.name);
+      if (entry.isDirectory()) walk(relative);
+      else if (/\.js$/i.test(entry.name) && !/\.min\.js$/i.test(entry.name)) files.push(relative.replace(/\\/g, '/'));
+    });
+  }
+  ['js'].forEach(walk);
+  files.unshift('app.js');
+  return files;
+}
+
+function readSource(relativePath) {
+  return fs.readFileSync(path.join(projectRoot, relativePath), 'utf8');
+}
+
+function testIfFile(name, relativePath, fn) {
+  test(name, function() {
+    assert(fs.existsSync(path.join(projectRoot, relativePath)), 'Missing current module: ' + relativePath);
+    fn(readSource(relativePath));
+  });
+}
+
 // ── Tests requiring migration for new 2-column layout ──
 var NEW_LAYOUT_SKIPS = [
   'CSS class .ref-only',
@@ -104,43 +129,17 @@ function assert(cond, msg) {
 console.log('\n=== Section 1: Syntax & Structure ===');
 
 test('All JS files parse without syntax errors', function() {
-  var files = [
-    'app.js', 'js/app-modules.js',
-    'js/modules/optimization.js', 'js/modules/format-check.js',
-    'js/modules/terminology.js', 'js/modules/paragraph-analysis.js',
-    'js/modules/onboarding.js', 'js/modules/project.js',
-    'js/modules/topic-finder.js', 'js/modules/proposal.js',
-    'js/modules/proofread.js', 'js/modules/de-duplicate.js',
-    'js/modules/defense-ppt.js', 'js/modules/en-abstract.js',
-    'js/modules/dashboard.js', 'js/modules/literature-search-modal.js',
-    'js/modules/literature-workbench.js'
-  ];
-  files.forEach(function(f) {
-    var src = fs.readFileSync(path.join(projectRoot, f), 'utf8');
+  sourceFiles().forEach(function(f) {
+    var src = readSource(f);
     new Function(src); // throws if syntax error
   });
 });
 
-test('All JS files have balanced braces', function() {
-  var files = [
-    'app.js', 'js/app-modules.js',
-    'js/modules/optimization.js', 'js/modules/format-check.js',
-    'js/modules/terminology.js', 'js/modules/paragraph-analysis.js',
-    'js/modules/onboarding.js', 'js/modules/project.js',
-    'js/modules/topic-finder.js', 'js/modules/proposal.js',
-    'js/modules/proofread.js', 'js/modules/de-duplicate.js',
-    'js/modules/defense-ppt.js', 'js/modules/en-abstract.js',
-    'js/modules/dashboard.js', 'js/modules/literature-search-modal.js',
-    'js/modules/literature-workbench.js'
-  ];
+test('All tracked source JS files are present and non-empty', function() {
+  var files = sourceFiles();
+  assert(files.length >= 30, 'Unexpectedly small source inventory: ' + files.length);
   files.forEach(function(f) {
-    var src = fs.readFileSync(path.join(projectRoot, f), 'utf8');
-    var count = 0;
-    for (var i = 0; i < src.length; i++) {
-      if (src[i] === '{') count++;
-      if (src[i] === '}') count--;
-    }
-    assert(count === 0, f + ': brace imbalance = ' + count);
+    assert(readSource(f).trim().length > 0, f + ' is empty');
   });
 });
 
@@ -169,12 +168,12 @@ test('HTML has all required ' + '<script>' + ' tags in correct order', function(
   var scripts = html.match(/<script(?:\s+defer)?\s+src="([^"]+)"><\/script>/g) || [];
   var paths = scripts.map(function(s) { var m = s.match(/src="([^"]+)"/); return m ? m[1].split('?')[0] : ''; });
   var required = ['mammoth.browser.min.js', 'jszip.min.js', 'app.js',
-    'js/modules/optimization.js', 'js/modules/format-check.js',
-    'js/modules/terminology.js', 'js/modules/paragraph-analysis.js',
-    'js/modules/onboarding.js', 'js/modules/project.js',
-    'js/app-modules.js',
     'js/core/utils.js', 'js/core/api.js', 'js/core/state.js',
-    'js/core/events.js', 'js/core/ui.js'];
+    'js/core/events.js', 'js/core/ui.js', 'js/core/capabilities.js',
+    'js/core/nav.js', 'js/core/app.js',
+    'js/modules/onboarding.js', 'js/modules/project.js',
+    'js/modules/health-check.js', 'js/modules/review/review.js',
+    'js/app-modules.js'];
   required.forEach(function(r) {
     assert(paths.indexOf(r) >= 0, 'Missing script: ' + r);
   });
@@ -239,10 +238,11 @@ test('BUG-FIX: Passive voice detection uses negative lookahead', function() {
   assert(src.indexOf('被(?!称为') >= 0, 'Passive detection missing negative lookahead exclusions');
 });
 
-test('BUG-FIX: Figure/table detection deduplicates by main number', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
-  assert(src.indexOf('figSeen') >= 0, 'Figure dedup missing');
-  assert(src.indexOf('tblSeen') >= 0, 'Table dedup missing');
+test('CAPABILITY: merged format checker remains registered', function() {
+  var registry = readSource('js/core/capabilities.js');
+  var health = readSource('js/modules/health-check.js');
+  assert(registry.indexOf("id: 'format-check'") >= 0 && registry.indexOf("aliasOf: 'health-check'") >= 0, 'Format checker alias missing');
+  assert(health.indexOf("id: 'format-check'") >= 0, 'Health checker must expose format-check');
 });
 
 test('BUG-FIX: Non-body chapters excluded in search and analysis', function() {
@@ -498,11 +498,10 @@ test('LITERATURE: sentence highlights are safe and state-driven', function() {
   assert(src.indexOf('sentence-evidence-ai-risk') >= 0, 'AI risk marker missing');
 });
 
-test('DASHBOARD: scores come from thesis-review dimensions with real weights', function() {
-  var dash = fs.readFileSync(path.join(projectRoot, 'js/modules/dashboard.js'), 'utf8');
-  var review = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
+test('DASHBOARD: scores come from the review engine with real weights', function() {
+  var dash = readSource('js/modules/dashboard.js');
   assert(dash.indexOf('THESIS_BOARD_WEIGHTS') >= 0, 'Dashboard must declare dimension weights');
-  assert(dash.indexOf('dim1.score * 0.10') < 0 || review.indexOf('dim1.score * 0.10') >= 0, 'Review engine keeps authoritative weights');
+  assert(dash.indexOf('computeThesisReview') >= 0, 'Dashboard must consume the review engine');
   assert(dash.indexOf('innovation+5') < 0, 'Topic score must not be faked from innovation');
   assert(dash.indexOf('文献×35%') < 0, 'Dashboard must not claim fake literature weight');
   assert(dash.indexOf('buildDimInsight') >= 0, 'Dashboard must explain high/low scores from evidence');
@@ -612,15 +611,19 @@ test('TOUR: tourEnd calls showUploadOverlay when thesis not loaded', function() 
 // ============================================================
 console.log('\n=== Section 7: Module Enhancement Coverage ===');
 
-test('MODULE: format-check checks abstract elements', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
-  assert(src.indexOf('absElements') >= 0, 'Missing abstract element scoring');
+test('MODULE: health-check exposes format and paragraph checks', function() {
+  var src = readSource('js/modules/health-check.js');
+  assert(src.indexOf("id: 'format-check'") >= 0, 'Missing format check');
+  assert(src.indexOf("id: 'paragraph'") >= 0, 'Missing paragraph check');
+  assert(src.indexOf("capability_id: capabilityId") >= 0, 'Checks must use capability billing contract');
 });
 
-test('MODULE: format-check checks conclusion structure', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
-  assert(src.indexOf('结论与展望') >= 0, 'Missing conclusion check section');
-  assert(src.indexOf('研究局限性') >= 0, 'Missing limitation detection');
+test('MODULE: review unifies all polishing tools', function() {
+  var src = readSource('js/modules/review/review.js');
+  ['format','health-check','paragraph','de-duplicate','review','optimize'].forEach(function(id) {
+    assert(src.indexOf("id: '" + id + "'") >= 0, 'Review tab missing: ' + id);
+  });
+  assert(src.indexOf('HealthCheckModule.runCheck') >= 0, 'Review must delegate local checks to HealthCheckModule');
 });
 
 test('MODULE: optimization detects research methods', function() {
@@ -641,22 +644,24 @@ test('MODULE: paragraph analysis has academic tone check', function() {
   assert(src.indexOf('oralCount') >= 0 || src.indexOf('oralDensity') >= 0, 'Missing oral language counter');
 });
 
-test('MODULE: thesis-review.js covers all 10 dimensions', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
+test('MODULE: unified review exposes dashboard integration', function() {
+  var review = readSource('js/modules/review/review.js');
+  var dashboard = readSource('js/modules/dashboard.js');
+  assert(review.indexOf("id: 'review'") >= 0, 'Unified review tab missing');
+  assert(review.indexOf("runnerMap") >= 0 && review.indexOf("runReviewModule") >= 0, 'Review runner integration missing');
+  assert(dashboard.indexOf('THESIS_BOARD_WEIGHTS') >= 0 && dashboard.indexOf('computeThesisReview') >= 0, 'Dashboard review integration missing');
+});
+
+test('MODULE: review separates local and deep checks', function() {
+  var src = readSource('js/modules/review/review.js');
+  assert(src.indexOf('HealthCheckModule.runCheck') >= 0, 'Local checks must use HealthCheckModule');
+  assert(src.indexOf("'review': 'runReviewModule'") >= 0, 'Deep review runner missing');
+});
+
+test('MODULE: dashboard defines the ten review dimensions', function() {
+  var src = readSource('js/modules/dashboard.js');
   var dims = ['选题','文献','框架','方法','论证','结论','创新','写作','格式','实践'];
-  dims.forEach(function(d){assert(src.indexOf(d) >= 0, 'Missing dimension: '+d);});
-});
-
-test('MODULE: thesis-review.js auto+manual item distinction', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
-  assert(src.indexOf('auto: true') >= 0, 'Missing auto items');
-  assert(src.indexOf('auto: false') >= 0, 'Missing manual items');
-});
-
-test('MODULE: thesis-review composite uses all dimensions', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
-  assert(src.indexOf('dim1.score') >= 0, 'Missing dim1');
-  assert(src.indexOf('dim10.score') >= 0, 'Missing dim10');
+  dims.forEach(function(d){ assert(src.indexOf(d) >= 0, 'Missing dimension: ' + d); });
 });
 
 test('MODULE: dashboard.js integrates review scores', function() {
@@ -681,15 +686,18 @@ test('UI: Dashboard overlay has review report button', function() {
 // ============================================================
 console.log('\n=== Section 8: Onboarding / Tour ===');
 
-test('ONBOARD: Tour covers all major modules', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/onboarding.js'), 'utf8');
-  var modules = ['导入','目录','检索','工具','账户']; modules.forEach(function(m){assert(src.indexOf(m) >= 0, 'Tour missing: '+m);});
+test('ONBOARD: contextual guides cover both activation paths and tools', function() {
+  var src = readSource('js/modules/onboarding.js');
+  ['从想法','导入已有论文','标题层级','工具','Ctrl+K'].forEach(function(label) {
+    assert(src.indexOf(label) >= 0, 'Guide missing: ' + label);
+  });
 });
 
-test('ONBOARD: Tour step count >= 7', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/onboarding.js'), 'utf8');
-  var arrayItems = (src.match(/title:/g) || []).length;
-  assert(arrayItems >= 7, 'Tour should have >=7 steps, found ' + arrayItems);
+test('ONBOARD: guides stay short and non-blocking', function() {
+  var src = readSource('js/modules/onboarding.js');
+  assert(src.indexOf("aria-modal', 'false") >= 0, 'Guide must be non-modal');
+  assert(src.indexOf('Do not block it with an automatic tour') >= 0, 'Automatic tour must stay disabled');
+  assert((src.match(/steps:/g) || []).length === 4, 'Expected one short guide per activation/tool/help path');
 });
 
 // ============================================================
@@ -697,22 +705,23 @@ test('ONBOARD: Tour step count >= 7', function() {
 // ============================================================
 console.log('\n=== Section 9: Expanded Data Flow ===');
 
-test('DATA: thesis review includes timestamp', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
-  assert(src.indexOf('new Date()') >= 0, 'Missing timestamp');
+test('DATA: activation events include timestamps without paper content', function() {
+  var src = readSource('js/modules/activation.js');
+  assert(src.indexOf('Date.now()') >= 0, 'Activation timestamp missing');
+  assert(src.indexOf('paper content') >= 0 || src.indexOf('paperContent') < 0, 'Activation must not store paper content');
 });
 
-test('DATA: thesis review stats include CN/EN/DOI/5yr', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
-  assert(src.indexOf('cnRefs') >= 0, 'Missing cnRefs');
-  assert(src.indexOf('enRefs') >= 0, 'Missing enRefs');
-  assert(src.indexOf('recentRefs') >= 0, 'Missing recentRefs');
+test('DATA: dashboard keeps the full ten-dimension weighting model', function() {
+  var src = readSource('js/modules/dashboard.js');
+  var labels = ['选题价值','文献综述','框架结构','研究方法','内容论证','结论展望','创新性','学术写作','格式规范','实践价值'];
+  labels.forEach(function(label) { assert(src.indexOf("label: '" + label + "'") >= 0, 'Missing dimension: ' + label); });
+  assert(src.indexOf('THESIS_BOARD_WEIGHTS') >= 0, 'Dimension weights missing');
 });
 
-test('SAFETY: thesis review returns early when no text', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
-  var idx = src.indexOf('function computeThesisReview()');
-  assert(idx >= 0, 'Function not found');
+test('SAFETY: module routing blocks manuscript-required tools without text', function() {
+  var src = readSource('js/core/nav.js');
+  assert(src.indexOf('item.requiresManuscript && !hasManuscript()') >= 0, 'Manuscript guard missing');
+  assert(src.indexOf("openImportDialog('new')") >= 0, 'Guard must provide an import recovery action');
 });
 
 // ============================================================
@@ -891,9 +900,9 @@ test('FEATURE: kg_server.py search_api handles empty queries', function() {
 // ============================================================
 console.log('\n=== Section 14: Regression Tests ===');
 
-test('REGRESSION: format-check.js declares totalChars before use', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
-  assert(src.indexOf('var totalChars = text.length') >= 0, 'totalChars must be declared before conclusion check');
+test('REGRESSION: health-check bounds manuscript input before API calls', function() {
+  var src = readSource('js/modules/health-check.js');
+  assert(src.indexOf('getText().substring(0, 8000)') >= 0, 'Health-check input bound missing');
 });
 
 test('REGRESSION: dashboard.js buildDashboardHTML uses s.bodyChs not bare bodyChs', function() {
@@ -916,14 +925,11 @@ test('REGRESSION: paragraph-analysis.js declares bodyBoundaryEl or uses it from 
   assert(src.indexOf('typeof bodyBoundaryEl') >= 0, 'bodyBoundaryEl must have typeof guard');
 });
 
-test('REGRESSION: All run* functions accept container parameter', function() {
-  var files = ['js/modules/format-check.js','js/modules/optimization.js',
-    'js/modules/terminology.js','js/modules/paragraph-analysis.js'];
-  files.forEach(function(f) {
-    var src = fs.readFileSync(path.join(projectRoot, f), 'utf8');
-    assert(src.indexOf('function run') >= 0 && src.indexOf('container)') >= 0,
-      f + ': run* function must accept container parameter');
-  });
+test('REGRESSION: review and health-check runners accept mount containers', function() {
+  var review = readSource('js/modules/review/review.js');
+  var health = readSource('js/modules/health-check.js');
+  assert(review.indexOf('function mount(container)') >= 0, 'ReviewModule mount container missing');
+  assert(health.indexOf('mount: function(c)') >= 0, 'HealthCheckModule mount container missing');
 });
 
 test('REGRESSION: dashboard.js functions all use proper variable scoping', function() {
@@ -1046,15 +1052,15 @@ test('REGRESSION: Cat game starts when startSearch shows loading', function() {
 });
 
 test('REGRESSION: Dashboard and graph overlays use theme surfaces', function() {
-  var html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
-  var css = fs.readFileSync(path.join(projectRoot, 'css/style.css'), 'utf8');
-  assert(html.indexOf('class="workspace-modal-overlay"') >= 0, 'Dashboard and graph overlays must use shared modal styling');
-  var kgStart = html.indexOf('<!-- ====== 知识图谱弹窗 ====== -->');
+  var html = readSource('index.html');
+  var css = readSource('css/style.css');
+  assert(html.indexOf('workspace-modal-overlay') >= 0, 'Dashboard and graph overlays must use shared modal styling');
+  var kgStart = html.indexOf('知识图谱弹窗');
   var modalEnd = html.indexOf('<div class="overlay" id="loadOv">', kgStart);
-  var modalHtml = html.substring(kgStart, modalEnd);
+  var modalHtml = html.substring(Math.max(0, kgStart), modalEnd > kgStart ? modalEnd : html.length);
   assert(modalHtml.indexOf('background:var(--solid)') < 0, 'Theme modals must not use undefined legacy surface tokens');
-  assert(css.indexOf('background: var(--bg-overlay)') >= 0, 'Modal backdrop must use the theme overlay token');
-  assert(css.indexOf('background: var(--bg-card)') >= 0, 'Modal shell must use the theme card token');
+  assert(css.indexOf('var(--surface-overlay)') >= 0, 'Modal backdrop must use the theme overlay token');
+  assert(css.indexOf('var(--surface-card)') >= 0 || css.indexOf('var(--surface-elevated)') >= 0, 'Modal shell must use the theme surface token');
 });
 
 test('REGRESSION: claim search supports project seeds and explicit completion states', function() {
@@ -1156,25 +1162,19 @@ test('REGRESSION: DOI completion also shows loading overlay', function() {
   assert(src.indexOf("showLoad") >= 0, 'DOI completion and verify must use showLoad');
 });
 
-test('REGRESSION: All 10 review dimensions are computed with auto and manual items', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
-  var revFunc = src.substring(src.indexOf("function computeThesisReview"), src.indexOf("function renderReviewReport"));
-  assert(revFunc.indexOf("dim1") >= 0 && revFunc.indexOf("dim10") >= 0, 'All 10 dimensions must be computed');
-  assert(revFunc.indexOf("auto: true") >= 0, 'Must have auto-detected items');
-  assert(revFunc.indexOf("auto: false") >= 0 || revFunc.indexOf("人工") >= 0, 'Must have manual items');
+test('REGRESSION: dashboard computes and renders all configured dimensions', function() {
+  var src = readSource('js/modules/dashboard.js');
+  var labels = ['选题价值','文献综述','框架结构','研究方法','内容论证','结论展望','创新性','学术写作','格式规范','实践价值'];
+  labels.forEach(function(label) { assert(src.indexOf("label: '" + label + "'") >= 0, 'Missing dimension: ' + label); });
+  assert(src.indexOf('THESIS_BOARD_WEIGHTS.map') >= 0, 'Dashboard must compute from the authoritative dimension registry');
+  assert(src.indexOf('buildDimInsight') >= 0, 'Dimension evidence rendering missing');
 });
 
-test('REGRESSION: Review composite uses all 10 dimensions in formula', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
-  assert(src.indexOf("dim1.score * 0.10") >= 0, 'dim1 must contribute to composite');
-  assert(src.indexOf("dim10.score * 0.07") >= 0, 'dim10 must contribute to composite');
-});
-
-test('REGRESSION: Review render function generates HTML report', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
-  assert(src.indexOf("renderReviewReport") >= 0, 'Must have review report renderer');
-  assert(src.indexOf("generateReviewText") >= 0, 'Must have text review generator');
-  assert(src.indexOf("copyReviewText") >= 0, 'Must have copy-to-clipboard function');
+test('REGRESSION: dashboard exposes actionable review reporting', function() {
+  var src = readSource('js/modules/dashboard.js');
+  assert(src.indexOf('openBoardModule') >= 0, 'Dashboard action router missing');
+  assert(src.indexOf('buildDimInsight') >= 0, 'Dashboard insight renderer missing');
+  assert(src.indexOf('showDashboard') >= 0, 'Dashboard renderer missing');
 });
 
 test('REGRESSION: Search uses sentence-level keyword extraction', function() {
@@ -1265,13 +1265,12 @@ test('RENDER: Upload immediately shows loading overlay', function() {
 // ============================================================
 console.log('\n=== Section 19: Module Enhancement Coverage ===');
 
-test('FORMAT: Abstract bilingual check exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8'); assert(src.indexOf('中英文摘要完整性') >= 0, 'Missing abstract bilingual check'); });
-
-test('FORMAT: Citation position detection exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8'); assert(src.indexOf('引用位置检测') >= 0, 'Missing citation position detection'); });
-
-test('FORMAT: Chart citation check exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8'); assert(src.indexOf('图表引用检测') >= 0, 'Missing chart citation check'); });
-
-test('FORMAT: Header/footer detection exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8'); assert(src.indexOf('页眉页脚') >= 0, 'Missing header/footer detection'); });
+test('FORMAT: consolidated checker covers headings, figures, citations, and references', function() {
+  var src = readSource('js/modules/health-check.js');
+  ['标题层级','图表编号','引用格式','参考文献'].forEach(function(label) {
+    assert(src.indexOf(label) >= 0, 'Missing format concern: ' + label);
+  });
+});
 
 test('TERM: Spell check dictionary exists', function() { var src = fs.readFileSync(path.join(projectRoot, 'js/modules/terminology.js'), 'utf8'); assert(src.indexOf('术语拼写检查') >= 0, 'Missing spell check'); });
 
@@ -1323,12 +1322,11 @@ test('KG: tabs expose selected state and keyboard navigation', function() {
 });
 
 
-test('AUDIT: format-check preserves detailed findings before summary', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
-  var block = src.substring(src.indexOf('function runFormatCheck'), src.indexOf('container.innerHTML = h'));
-  assert(block.indexOf('h = summary + h') >= 0, 'Format summary must prepend instead of replacing detailed findings');
-  assert(block.indexOf("h = '<div class=\"module-panel\">'") < 0, 'Format findings must not be reset before render');
-  assert(block.indexOf('标题样式质量') < block.indexOf('h = summary + h'), 'Detailed checks must be generated before summary is prepended');
+test('AUDIT: health-check preserves detailed findings and summary counts', function() {
+  var src = readSource('js/modules/health-check.js');
+  assert(src.indexOf('totalIssues') >= 0, 'Health summary count missing');
+  assert(src.indexOf('r.html') >= 0, 'Detailed findings renderer missing');
+  assert(src.indexOf("_results[checkId] = { count: lines.length") >= 0, 'Detailed findings must be retained per check');
 });
 
 test('AUDIT: paragraph findings preserve original source indexes', function() {
@@ -1343,20 +1341,15 @@ test('AUDIT: terminology evolution never compares a term with itself', function(
   assert(src.indexOf('if(p.a===p.b)return') >= 0, 'Terminology evolution needs a generic self-comparison guard');
 });
 
-test('AUDIT: thesis review uses project or document title', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/thesis-review.js'), 'utf8');
-  assert(src.indexOf('function reviewDocumentTitle') >= 0, 'Review title resolver missing');
-  assert(src.indexOf('var title = reviewDocumentTitle()') >= 0, 'Review must use the resolved document title');
-  assert(src.indexOf("var title = (bodyChs[0] && bodyChs[0].name)") < 0, 'First body chapter must not be treated as thesis title');
+test('AUDIT: dashboard derives scores from current project data', function() {
+  var src = readSource('js/modules/dashboard.js');
+  assert(src.indexOf('ThesisProject') >= 0 && src.indexOf('computeAllScores') >= 0, 'Dashboard project-data integration missing');
+  assert(src.indexOf('bodyChs[0].name') < 0, 'First body chapter must not be treated as thesis title');
 });
 
-test('SECURITY: topic finder renders user and API text safely', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/topic-finder.js'), 'utf8');
-  // v3: _tfAnalyze replaces old runTopicFinderAI
-  var block = src.substring(src.indexOf('window._tfAnalyze'), src.length);
-  assert(block.indexOf('.catch(function') >= 0, 'Topic finder must handle errors');
-  // v3: All AI output goes through .replace(/&/g + .replace(/</g escaping
-  assert(src.indexOf('.replace(/&/g,') >= 0 && src.indexOf('.replace(/</g,') >= 0, 'AI output must be HTML-escaped');
+test('SECURITY: ideation renders dynamic text safely', function() {
+  var src = readSource('js/modules/ideation.js');
+  assert(src.indexOf('function esc') >= 0 || src.indexOf('escapeHtml') >= 0 || src.indexOf('textContent') >= 0, 'Ideation must escape or use textContent for dynamic text');
 });
 
 
@@ -1371,11 +1364,10 @@ test('AUDIT: section anchoring searches p+h1-h6', function() {
   assert(hasBroad, 'Section anchoring missing broad element search');
 });
 
-test('AUDIT: format-check var h declared before first h+= use', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
-  var varHIdx = src.indexOf('var h = ');
-  var firstHUse = src.indexOf('h += ');
-  assert(varHIdx >= 0 && firstHUse >= 0 && varHIdx < firstHUse, 'var h must be declared before first h+=');
+test('AUDIT: health-check declares render buffers before appending findings', function() {
+  var src = readSource('js/modules/health-check.js');
+  var render = src.substring(src.indexOf('function render()'), src.indexOf('function runCheck'));
+  assert(render.indexOf("var h =") >= 0 && render.indexOf("h +=") > render.indexOf("var h ="), 'Render buffer must be declared before use');
 });
 
 test('AUDIT: terminology.js has no duplicate updLoad calls', function() {
@@ -1433,20 +1425,12 @@ test('AUDIT: _bareHeadingCount global exists for heading style QA', function() {
   assert(src.indexOf('_totalHeadingCount') >= 0, '_totalHeadingCount global missing');
 });
 
-test('AUDIT: format-check has heading style quality section', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
-  assert(src.indexOf('标题样式质量') >= 0, 'Missing heading style quality check in format-check.js');
-  assert(src.indexOf('_bareHeadingCount') >= 0 || src.indexOf('bareCount') >= 0, 'format-check must read _bareHeadingCount');
-});
-
-test('AUDIT: format-check has empty chapter detection', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
-  assert(src.indexOf('章节内容缺失') >= 0, 'Missing empty chapter detection in format-check.js');
-});
-
-test('AUDIT: format-check has figure/table caption format check', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/format-check.js'), 'utf8');
-  assert(src.indexOf('图表标题格式') >= 0, 'Missing figure/table caption format check');
+test('AUDIT: health-check covers structural format concerns', function() {
+  var src = readSource('js/modules/health-check.js');
+  ['标题样式','图表格式','引用格式'].forEach(function(label) {
+    assert(src.indexOf(label) >= 0, 'Format check missing: ' + label);
+  });
+  assert(src.indexOf("id: 'format-check'") >= 0, 'Format check registration missing');
 });
 
 test('AUDIT: paragraph-analysis has debris paragraph detection', function() {
@@ -1589,63 +1573,32 @@ console.log('\n=== Section 23: System Integrity Guards ===');
 
 // --- CATEGORY A: Python→JS injection artifacts ---
 test('INTEGRITY: No Python raw-string artifacts in JS regex literals', function() {
-  var files=['app.js','js/modules/format-check.js','js/modules/terminology.js',
-             'js/modules/paragraph-analysis.js','js/modules/optimization.js'];
-  files.forEach(function(f){
-    var src=fs.readFileSync(path.join(projectRoot,f),'utf8');
-    // Python raw string leak: regex literal that starts with double-backslash shortcut
-    // /\\\\d/ or /\\\\s/ etc — these would match literal '\d' not digit
+  sourceFiles().forEach(function(f){
+    var src=readSource(f);
     var bad=src.match(/\/\\\\[dDsSwWbB]/g);
     assert(!bad,'Python regex artifact in '+f+': '+JSON.stringify(bad));
-    // Python raw string leak: indexOf with escaped pattern
     var badIdx=src.match(/indexOf\('\[\\\\[dDsSwWbB]\]/g)||src.match(/indexOf\('\*\\\\[dDsSwWbB]/g);
     assert(!badIdx,'Python indexOf artifact in '+f+': '+JSON.stringify(badIdx));
   });
 });
 
-// --- CATEGORY B: var declaration ordering ---
-test('INTEGRITY: Module functions declare var h before first h+= use', function() {
-  var files=[
-    {f:'js/modules/format-check.js',fn:'runFormatCheck'},
-    {f:'js/modules/optimization.js',fn:'runOptimization'},
-    {f:'js/modules/terminology.js',fn:'runTerminology'},
-    {f:'js/modules/paragraph-analysis.js',fn:'runParagraphAnalysis'}
-  ];
-  files.forEach(function(item){
-    var src=fs.readFileSync(path.join(projectRoot,item.f),'utf8');
-    var fnStart=src.indexOf('function '+item.fn);
-    var fnEnd=src.indexOf('\nfunction ',fnStart+10);
-    if(fnEnd<0)fnEnd=src.length;
-    var body=src.substring(fnStart,fnEnd);
-    var varHIdx=body.indexOf('var h =');
-    var firstUse=body.indexOf('h += ');
-    if(firstUse<0)firstUse=body.indexOf("h+='");
-    if(firstUse<0)firstUse=body.indexOf('h+="');
-    if(varHIdx>=0&&firstUse>=0){
-      assert(varHIdx<firstUse,'In '+item.fn+': var h declared at pos '+varHIdx+' but used at pos '+firstUse);
-    }
+// --- CATEGORY B: render buffer declaration ordering ---
+test('INTEGRITY: unified module renderers declare buffers before append', function() {
+  ['js/modules/health-check.js','js/modules/review/review.js','js/modules/optimization.js','js/modules/paragraph-analysis.js'].forEach(function(f){
+    var src=readSource(f);
+    var firstUse=src.indexOf('h += ');
+    if(firstUse<0) firstUse=src.indexOf("h+='");
+    var declaration=src.indexOf('var h =');
+    assert(firstUse<0 || (declaration>=0 && declaration<firstUse), 'Render buffer ordering invalid in ' + f);
   });
 });
 
-// --- CATEGORY C: updLoad progress integrity ---
-test('INTEGRITY: updLoad messages are not duplicated within each module', function() {
-  var files=['js/modules/format-check.js','js/modules/terminology.js',
-             'js/modules/paragraph-analysis.js','js/modules/optimization.js'];
-  files.forEach(function(f){
-    var src=fs.readFileSync(path.join(projectRoot,f),'utf8');
-    var matches=src.match(/updLoad\('([^']*)'/g)||[];
-    var seen={},dups=[];
-    matches.forEach(function(m){if(seen[m])dups.push(m);else seen[m]=true;});
-    assert(dups.length===0,'Duplicate updLoad in '+f+': '+dups.join(', '));
-  });
-});
-
-test('INTEGRITY: All runAnalysis functions contain updLoad("完成",100)', function() {
-  ['format-check','terminology','paragraph-analysis','optimization'].forEach(function(m){
-    var src=fs.readFileSync(path.join(projectRoot,'js/modules/'+m+'.js'),'utf8');
-    assert(src.indexOf("updLoad('完成',100)")>=0||src.indexOf('updLoad("完成",100)')>=0,
-      m+'.js must end with updLoad completion');
-  });
+// --- CATEGORY C: async result integrity ---
+test('INTEGRITY: health-check retains per-check progress and completion', function() {
+  var src=readSource('js/modules/health-check.js');
+  assert(src.indexOf('检查中...')>=0,'Health-check progress missing');
+  assert(src.indexOf("_results[checkId] = { count: lines.length")>=0,'Health-check completion result missing');
+  assert(src.indexOf('.catch(function()')>=0,'Health-check failure recovery missing');
 });
 
 // --- CATEGORY D: Heading format detection coverage ---
@@ -1730,13 +1683,14 @@ test('INTEGRITY: jumpToParagraph uses filtered[i] not paras[i]', function() {
   assert(fn.indexOf('filtered[i]')>=0&&fn.indexOf('paras[i]')<0,'Must use filtered[i] not paras[i]');
 });
 
-test('INTEGRITY: All modules accept container parameter', function() {
-  var modules=['runFormatCheck','runTerminology','runParagraphAnalysis','runOptimization'];
-  modules.forEach(function(m){
-    var files={'runFormatCheck':'js/modules/format-check.js','runTerminology':'js/modules/terminology.js',
-      'runParagraphAnalysis':'js/modules/paragraph-analysis.js','runOptimization':'js/modules/optimization.js'};
-    var src=fs.readFileSync(path.join(projectRoot,files[m]),'utf8');
-    assert(src.indexOf('function '+m+'(container)')>=0,m+' must accept container parameter');
+test('INTEGRITY: current module entrypoints accept their mount containers', function() {
+  var files = {
+    'js/modules/review/review.js': 'function mount(container)',
+    'js/modules/health-check.js': 'mount: function(c)',
+    'js/modules/writing/writing.js': 'mount:function(c)'
+  };
+  Object.keys(files).forEach(function(f) {
+    assert(readSource(f).indexOf(files[f]) >= 0, f + ' mount container missing');
   });
 });
 
@@ -1751,18 +1705,18 @@ test('INTEGRITY: structureThesisBox guards against double arrow insertion', func
   assert(src.indexOf("querySelector('.toggle-arrow')") >= 0, 'structureThesisBox must check for existing arrows');
 });
 
-test('INTEGRITY: onboarding.js covers new modules (expand + data-analysis)', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/onboarding.js'), 'utf8');
-  assert(src.indexOf('校准') >= 0 || src.indexOf('标题') >= 0 || src.indexOf('目录') >= 0, 'Onboarding must cover structure');
+test('INTEGRITY: onboarding.js covers current activation and tool paths', function() {
+  var src = readSource('js/modules/onboarding.js');
+  assert(src.indexOf('标题层级') >= 0 || src.indexOf('校准') >= 0, 'Onboarding must cover structure');
   assert(src.indexOf('检索') >= 0, 'Onboarding must cover search');
   assert(src.indexOf('扩写') >= 0 || src.indexOf('工具') >= 0, 'Onboarding must cover expand/tools');
-  assert(src.indexOf('工具') >= 0 || src.indexOf('分析') >= 0 || src.indexOf('数据') >= 0, 'Onboarding must cover analysis/tools');
+  assert(src.indexOf('分析') >= 0 || src.indexOf('数据') >= 0 || src.indexOf('工具') >= 0, 'Onboarding must cover analysis/tools');
 });
 
-test('INTEGRITY: onboarding.js has 11+ tour steps', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/onboarding.js'), 'utf8');
-  var steps = (src.match(/title:/g) || []).length;
-  assert(steps >= 8, 'Onboarding should have 8+ steps, found ' + steps);
+test('INTEGRITY: onboarding.js has short guides for all paths', function() {
+  var src = readSource('js/modules/onboarding.js');
+  var guides = (src.match(/title:/g) || []).length;
+  assert(guides >= 4, 'Onboarding should have 4 contextual guides, found ' + guides);
 });
 
 test('INTEGRITY: buildFullTree with paragraph+ sentence layers + _treeIndex', function() {
@@ -1910,13 +1864,11 @@ test('CITATION: renumber and delete update every occurrence marker', function() 
 // ============================================================
 console.log('\n=== Section 25: New Modules & Admin API ===');
 
-test('MODULE: topic-finder.js has runTopicFinder', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/topic-finder.js'), 'utf8');
-  assert(src.indexOf('function runTopicFinder') >= 0, 'runTopicFinder missing');
-});
-test('MODULE: proofread.js exists', function() {
-  var src = fs.readFileSync(path.join(projectRoot, 'js/modules/proofread.js'), 'utf8');
-  assert(src.indexOf('runProofreadAI') >= 0, 'runProofreadAI missing');
+test('MODULE: ideation and health-check own migrated capabilities', function() {
+  var ideation = readSource('js/modules/ideation.js');
+  var health = readSource('js/modules/health-check.js');
+  assert(ideation.indexOf('研究问题') >= 0 || ideation.indexOf('开题') >= 0, 'Ideation capability missing');
+  assert(health.indexOf('format-check') >= 0 && health.indexOf('terminology') >= 0, 'Migrated health checks missing');
 });
 test('MODULE: de-duplicate.js has check+rewrite modes', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/de-duplicate.js'), 'utf8');
@@ -2279,13 +2231,11 @@ test('REGRESSION: workspace resizers support all desktop columns', function() {
   assert(css.indexOf('.toc-panel.collapsed + #tocResizer')>=0,'collapsed TOC resizer state missing');
 });
 
-test('REGRESSION: ThesisBuddy FABs follow theme contrast tokens', function() {
-  var css=fs.readFileSync(path.join(projectRoot,'css/style.css'),'utf8');
-  var start=css.indexOf('.buddy-tool-fab {'),end=css.indexOf('.buddy-backdrop',start);
-  var fab=css.slice(start,end);
-  assert(fab.indexOf('color: var(--text-sidebar)')>=0,'FAB foreground does not follow sidebar theme token');
-  assert(fab.indexOf('background: var(--bg-sidebar-active)')>=0,'FAB hover does not follow active sidebar token');
-  assert(fab.indexOf('#f1f5f9')<0&&fab.indexOf('var(--color-primary-light)')<0,'FAB retains fixed contrast-breaking colors');
+test('REGRESSION: ThesisBuddy shell uses theme contrast tokens', function() {
+  var css=readSource('css/shell.css');
+  assert(css.indexOf('color:var(--text-sidebar)')>=0 || css.indexOf('color: var(--text-sidebar)')>=0,'Shell foreground does not follow sidebar theme token');
+  assert(css.indexOf('background:var(--surface-sidebar-active)')>=0 || css.indexOf('background: var(--surface-sidebar-active)')>=0 || css.indexOf('background:var(--accent-')>=0,'Shell active state does not follow theme token');
+  assert(css.indexOf('#f1f5f9')<0,'Shell retains fixed contrast-breaking colors');
 });
 test('PROJECT: merge/preview/cloud helpers exist', function() {
   var src = fs.readFileSync(path.join(projectRoot, 'js/modules/project.js'), 'utf8');

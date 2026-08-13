@@ -1201,9 +1201,11 @@
       // ensure project still current
       project = getCurrentProject() || project;
       closeIdeaWizard();
+      try { if (window.ThesisActivation) ThesisActivation.created(project.id); } catch (eAct) {}
       renderProjectChrome();
-      if (typeof switchView === 'function') switchView('workspace');
-      if (typeof ttp === 'function') ttp('项目已创建：' + project.title + '。可点「一键流水线」自动推进。');
+      if (window.ThesisRouter) ThesisRouter.go('home', { replace: true });
+      else if (typeof switchView === 'function') switchView('workspace');
+      if (typeof ttp === 'function') ttp('项目已创建。系统已为你准备好下一步。');
       // prefill topic finder fields if module later opens
       setTimeout(function () {
         var domain = document.getElementById('topicDomain');
@@ -1381,36 +1383,85 @@
       '<div style="font-size:12px">'+chBars+'</div>'+
     '</div>';
   }
+  function milestoneStageId(project, milestoneId) {
+    var preferred = {
+      prepare: ['prepare', 'ideation', 'literature', 'structure'],
+      writing: ['write', 'writing'],
+      polish: ['polish', 'review', 'integrity', 'revise'],
+      finish: ['finalize', 'defense']
+    }[milestoneId] || [];
+    var available = availableStages(project);
+    for (var i = 0; i < preferred.length; i++) {
+      for (var j = 0; j < available.length; j++) if (available[j].id === preferred[i]) return available[j].id;
+    }
+    return available.length ? available[0].id : '';
+  }
+
+  function renderMilestoneHome(milestoneId) {
+    var project = getCurrentProject();
+    var host = document.getElementById('workspaceContent');
+    if (!host) return;
+    if (!project) { host.innerHTML = renderProjectOverviewHTML(null); return; }
+    var stageId = milestoneStageId(project, milestoneId);
+    if (stageId && project.currentStage !== stageId) {
+      project.currentStage = stageId;
+      project.stageStatus = project.stageStatus || {};
+      if (project.stageStatus[stageId] !== 'done') project.stageStatus[stageId] = 'active';
+      upsertProject(project);
+    }
+    host.innerHTML = renderProjectOverviewHTML(getCurrentProject() || project);
+    host.style.display = '';
+  }
+
+  function renderImportResult() {
+    var host = document.getElementById('importResultSurface');
+    if (!host) return;
+    var project = getCurrentProject();
+    if (!project) {
+      host.innerHTML = '<div class="route-empty"><h2>还没有导入结果</h2><p>选择 DOCX 后，这里会汇总目录、字数、文献和需要确认的问题。</p><button class="btn btn-primary" onclick="openImportDialog(\'new\')">导入论文</button></div>';
+      return;
+    }
+    var signals = paperSignals(project);
+    var decomposition = project.artifacts && project.artifacts.importDecomposition || {};
+    var pending = 0;
+    try {
+      pending = Number(decomposition.pending || decomposition.unmatched || 0);
+      if (!pending && decomposition.decomposition && Array.isArray(decomposition.decomposition.warnings)) pending = decomposition.decomposition.warnings.length;
+    } catch (e) {}
+    var next = nextAction(project);
+    var chapters = signals.chCount || (signals.outline && signals.outline.chapters && signals.outline.chapters.length) || signals.stats.total || 0;
+    var words = (typeof manuscriptText !== 'undefined' && manuscriptText) ? String(manuscriptText).replace(/\s+/g, '').length : signals.stats.words || 0;
+    host.innerHTML = '<div class="import-result-page">' +
+      '<header class="import-result-head"><div><span class="project-badge">导入完成</span><h2>' + escapeHtml(project.title || '导入论文项目') + '</h2><p>先核对解析结果，再按系统推荐进入下一步。原文和用户修改不会被自动覆盖。</p></div><button class="btn btn-ghost" onclick="ThesisRouter.go(\'paper\')">查看正文</button></header>' +
+      '<div class="import-result-summary"><div><strong>' + chapters + '</strong><span>章/节结构</span></div><div><strong>' + words + '</strong><span>正文字数</span></div><div><strong>' + signals.refCount + '</strong><span>参考文献</span></div><div><strong>' + pending + '</strong><span>待确认项</span></div></div>' +
+      (pending ? '<div class="import-result-warning"><strong>仍有 ' + pending + ' 项需要确认</strong><span>可重新打开导入流程，继续校准未定位标题或拆解警告。</span><button class="btn btn-ghost btn-sm" onclick="openImportDialog(\'replace\')">继续校准</button></div>' : '<div class="import-result-ok"><strong>解析结果可以继续使用</strong><span>目录、正文和参考文献已进入当前项目。</span></div>') +
+      '<section class="project-next-card import-result-next"><div><div class="next-kicker">推荐下一步</div><strong>' + escapeHtml(next.title) + '</strong><p>' + escapeHtml(next.desc) + '</p></div><div class="project-cta-row"><button class="ai-btn" onclick="runRecommendedProjectAction(\'' + next.primary.action + '\',\'' + (next.primary.stageId || '') + '\',\'' + (next.primary.moduleId || '') + '\')">' + escapeHtml(next.primary.label) + '</button></div></section>' +
+      renderImportChecklist(project) + '</div>';
+  }
+
+  function runRecommendedProjectAction(action, stageId, moduleId) {
+    try { if (window.ThesisActivation) ThesisActivation.recommendedAction(moduleId || action, projectPath(getCurrentProject())); } catch (e) {}
+    return runProjectAction(action, stageId, moduleId);
+  }
+
   function renderProjectOverviewHTML(project) {
     var prog = calcProgress(project);
     var next = nextAction(project);
     if (!project || isProjectEmpty(project)) {
-      return '' +
-        '<div style=”max-width:640px;margin:80px auto;text-align:center;padding:0 20px”>' +
-          '<div style=”font-size:56px;margin-bottom:16px”>🎓</div>' +
-          '<h2 style=”font-size:24px;font-weight:700;color:#111;margin-bottom:4px”>论文搭子 ThesisBuddy</h2>' +
-          '<p style=”font-size:14px;color:#94a3b8;margin-bottom:36px”>AI 论文全流程工作台 — 从想法到答辩通关</p>' +
-          '<div style=”display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:32px”>' +
-            '<div onclick=”openIdeaWizard()” style=”flex:1;min-width:220px;max-width:300px;padding:28px 24px;background:#fff;border:2px solid #4f46e5;border-radius:16px;cursor:pointer;transition:all .15s;text-align:left” onmouseenter=”this.style.boxShadow=\'0 8px 30px rgba(79,70,229,.15)\'” onmouseleave=”this.style.boxShadow=\'none\'”>' +
-              '<div style=”font-size:32px;margin-bottom:12px”>💡</div>' +
-              '<div style=”font-size:16px;font-weight:700;color:#111;margin-bottom:4px”>从想法开始</div>' +
-              '<div style=”font-size:12px;color:#94a3b8;line-height:1.6”>选题分析 → 大纲生成 → 分章写作 → 审阅打磨 → 答辩准备</div>' +
-              '<div style=”font-size:11px;color:#4f46e5;font-weight:600;margin-top:12px”>适合：还没有论文草稿 →</div>' +
-            '</div>' +
-            '<div onclick=”openImportDialog(\'new\')” style=”flex:1;min-width:220px;max-width:300px;padding:28px 24px;background:#fff;border:2px solid #e2e8f0;border-radius:16px;cursor:pointer;transition:all .15s;text-align:left” onmouseenter=”this.style.borderColor=\'#4f46e5\';this.style.boxShadow=\'0 8px 30px rgba(79,70,229,.1)\'” onmouseleave=”this.style.borderColor=\'#e2e8f0\';this.style.boxShadow=\'none\'”>' +
-              '<div style=”font-size:32px;margin-bottom:12px”>📄</div>' +
-              '<div style=”font-size:16px;font-weight:700;color:#111;margin-bottom:4px”>导入已有论文</div>' +
-              '<div style=”font-size:12px;color:#94a3b8;line-height:1.6”>上传 DOCX → 自动解析目录与参考文献 → 逐章审阅优化</div>' +
-              '<div style=”font-size:11px;color:#4f46e5;font-weight:600;margin-top:12px”>适合：已有论文草稿 →</div>' +
-            '</div>' +
-          '</div>' +
-          '<p style=”font-size:12px;color:#94a3b8”>按 <kbd style=”padding:1px 6px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;font-family:monospace”>Ctrl+K</kbd> 搜索所有功能 · 已有项目？点击顶栏项目名切换</p>' +
-        '</div>';
+      return '<div class="activation-home">' +
+        '<header class="activation-intro"><span class="activation-brand-mark">TB</span><div><h2>从你的真实进度开始</h2><p>还没有草稿，就从研究想法立项；已经有论文，就导入 DOCX 继续打磨。先完成一条路径，不需要先学会全部工具。</p></div></header>' +
+        '<div class="activation-paths">' +
+          '<button type="button" class="activation-path primary" onclick="startActivationPath(\'idea\')"><span class="activation-path-icon">想法</span><strong>从想法开始</strong><p>用一句话建立项目，立即得到论文结构与明确下一步。</p><small>约 2 分钟 · 创建项目本身不扣点</small><b>创建论文项目 →</b></button>' +
+          '<button type="button" class="activation-path" onclick="startActivationPath(\'docx\')"><span class="activation-path-icon">DOCX</span><strong>导入已有论文</strong><p>保留原文，校准目录和文献，再查看可信解析结果。</p><small>约 3 分钟 · 本地解析不扣点</small><b>选择论文文件 →</b></button>' +
+        '</div>' +
+        '<div class="activation-assurance"><span>所有智能能力都会在实际执行前说明可用性</span><button type="button" onclick="ThesisRouter.go(\'tools\')">我熟悉流程，查看全部工具</button></div>' +
+      '</div>';
     }
 
     try { project = autoSyncStageProgress(project) || project; } catch (e) {}
     var prog = calcProgress(project);
     var next = nextAction(project);
+    var primaryAction = '<button class="ai-btn" onclick="runRecommendedProjectAction(\'' + next.primary.action + '\',\'' + (next.primary.stageId || '') + '\',\'' + (next.primary.moduleId || '') + '\')">' + next.primary.label + '</button>';
 
     var stagesForProject = availableStages(project);
     var stagesHtml = stagesForProject.map(function (s) {
@@ -1448,7 +1499,7 @@
         '<div class="project-next-card">' +
           '<div><div class="next-kicker">下一步只做这一件</div><strong>' + escapeHtml(next.title) + '</strong><p>' + escapeHtml(next.desc) + '</p></div>' +
           '<div class="project-cta-row" style="margin:0">' +
-            '<button class="ai-btn" onclick="runProjectAction(\'' + next.primary.action + '\',\'' + (next.primary.stageId || '') + '\',\'' + (next.primary.moduleId || '') + '\')">' + next.primary.label + '</button>' +
+            primaryAction +
             secAction +
             '<button class="ai-btn-clear" onclick="completeCurrentStage()">完成本阶段</button>' +
           '</div>' +
@@ -1605,6 +1656,13 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  function startActivationPath(path) {
+    try { if (window.ThesisActivation) ThesisActivation.start(path); } catch (e) {}
+    if (window.TaskGuide && TaskGuide.maybe && TaskGuide.maybe(path)) return;
+    if (path === 'docx') return openImportDialog('new');
+    return openIdeaWizard();
   }
 
   function renderWorkspaceHero() {
@@ -1948,37 +2006,14 @@
     try { syncSectionsToChapterDrafts(false); } catch (e) { console.warn('[import-sync]', e); }
     try { autoSyncStageProgress(getCurrentProject()); } catch (e) {}
     renderProjectChrome();
-    // 导入后显示论文正文（可滚动），不盖住原文
-    if (typeof switchView === 'function') switchView('paper');
+    // 导入完成后先展示可信解析结果，再由用户进入正文或审阅。
+    if (window.ThesisRouter) ThesisRouter.go('import-result', { replace: true });
+    else if (typeof switchView === 'function') switchView('workspace');
+    try { if (window.ThesisActivation) ThesisActivation.imported(p.id); } catch (eAct) {}
     try { ensureUnifiedProjectState(); } catch (e) {}
     try { saveManuscriptRevision({sourceType:'import',fileName:window._uploadFileName||'',kind:window._uploadFileKind||'',sizeBytes:window._uploadFileSize||0}).then(function(d){return runImportDecomposition({intent:window._importIntent||'new',fileName:window._uploadFileName||'',revisionId:d&&d.revision_id||''});}).catch(function(e){console.warn('[revision/decomposition]',e.message);if(typeof ttp==='function')ttp('论文已载入，云端拆解可稍后重试');}); } catch (eRev) {}
 
-    // 引导横幅
-    var chCount = (typeof sections !== 'undefined' && sections) ? sections.filter(function(s){return s.title}).length : 0;
-    var wc = typeof manuscriptText !== 'undefined' && manuscriptText ? Math.round(manuscriptText.length/1000) : 0;
-    var rc = typeof existingRefs !== 'undefined' && existingRefs.length ? existingRefs.length : 0;
-    var banner = document.createElement('div');
-    banner.id = 'importBanner';
-    banner.style.cssText = 'position:absolute;top:0;left:0;right:0;z-index:50;background:linear-gradient(135deg,rgba(79,70,229,.95),rgba(99,102,241,.95));color:#fff;padding:16px 20px;border-radius:0 0 12px 12px;box-shadow:0 4px 20px rgba(79,70,229,.25);animation:slideDown .3s ease;text-align:center;margin:0 20px';
-    banner.innerHTML =
-      '<div style="font-size:18px;font-weight:700;margin-bottom:4px">🎉 论文导入完成！</div>'+
-      '<div style="font-size:13px;opacity:.85;margin-bottom:2px">📄 ' + chCount + '章 · ' + wc + 'k字 · 📚 ' + rc + '条文献</div>'+
-      '<div style="font-size:12px;opacity:.7;margin-bottom:10px">段落右侧彩色圆点显示质量评估 · 选中文字激活AI工具栏 · Ctrl+K 搜索所有功能</div>'+
-      '<div style="display:flex;gap:8px;justify-content:center">'+
-        '<button onclick="var el=document.getElementById(\'importBanner\');if(el)el.remove();_open(\'format-check\')" style="border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;padding:5px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">✅ 开始审阅</button>'+
-        '<button onclick="var el=document.getElementById(\'importBanner\');if(el)el.remove();_open(\'citely\')" style="border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;padding:5px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🔍 检索文献</button>'+
-        '<button onclick="var el=document.getElementById(\'importBanner\');if(el)el.remove();_open(\'proofread\')" style="border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;padding:5px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">✏️ 校对查错</button>'+
-        '<button onclick="var el=document.getElementById(\'importBanner\');if(el)el.remove()" style="border:none;background:transparent;color:rgba(255,255,255,.5);cursor:pointer;font-size:14px;padding:0 8px">&times;</button>'+
-      '</div>';
-    var thesisPanel = document.getElementById('thesisPanel');
-    if (thesisPanel) {
-      thesisPanel.style.position = 'relative';
-      thesisPanel.insertBefore(banner, thesisPanel.firstChild);
-      setTimeout(function() {
-        var b = document.getElementById('importBanner');
-        if (b) { b.style.transition = 'opacity .5s'; b.style.opacity = '0'; setTimeout(function() { if (b && b.parentElement) b.remove(); }, 500); }
-      }, 10000);
-    }
+    // 结果页承担导入完成反馈；不再在正文上叠加多个并列动作。
   }
 
   function renderImportDecomposition(job) {
@@ -2005,7 +2040,7 @@
     }
     if(list)list.innerHTML='<div class="import-checklist-head"><strong>拆解清单</strong><span>'+Math.round(pct)+'%</span></div>'+steps.map(function(s){return '<div class="checklist-item '+(s.done?'is-done':'')+'"><div class="checklist-left"><span class="checklist-dot">'+(s.done?'✓':'○')+'</span><div><b>'+escapeHtml(s.label||'处理步骤')+'</b></div></div></div>';}).join('');
     if(retry){retry.hidden=status!=='failed';retry.onclick=function(){runImportDecomposition({intent:window._importIntent||'new',fileName:window._uploadFileName||'',revisionId:(getCurrentProject()||{}).activeRevisionId||''});};}
-    if(nav){nav.hidden=status!=='completed';nav.onclick=function(){if(typeof switchView==='function')switchView('workspace');if(typeof openChapterBoard==='function')openChapterBoard();};}
+    if(nav){nav.hidden=status!=='completed';nav.onclick=function(){if(window.ThesisRouter)ThesisRouter.go('import-result');else if(typeof switchView==='function')switchView('workspace');};}
   }
   function normalizePipelineJob(payload) {
     var run=(payload&&payload.run)||payload||{};
@@ -2130,6 +2165,8 @@
     nextAction: nextAction,
     ensureDefaultProject: ensureDefaultProject,
     onManuscriptReady: onManuscriptReady,
+    renderMilestoneHome: renderMilestoneHome,
+    renderImportResult: renderImportResult,
     renderProjectChrome: renderProjectChrome,
     renderWorkspaceHero: renderWorkspaceHero,
     renderStageNav: renderStageNav,
@@ -2171,6 +2208,8 @@
   window.openProjectStage = openProjectStage;
   window.completeCurrentStage = completeCurrentStage;
   window.runProjectAction = runProjectAction;
+  window.runRecommendedProjectAction = runRecommendedProjectAction;
+  window.startActivationPath = startActivationPath;
   window.renderWorkspaceHero = renderWorkspaceHero;
   window.openOutlineEditor = openOutlineEditor;
   window.closeOutlineEditor = closeOutlineEditor;
