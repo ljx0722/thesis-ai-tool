@@ -30,9 +30,9 @@ var LoginModule = (function() {
       }).then(function(r) { return r.json(); })
         .then(function(d) {
           if (d.success) {
+            toggleRegMode();
             err.style.color = '#10b981';
             err.textContent = '注册成功！请登录';
-            toggleRegMode();
           } else { err.textContent = d.error; }
         }).catch(function() { err.textContent = '网络错误'; });
       return;

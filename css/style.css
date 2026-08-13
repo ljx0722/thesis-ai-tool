@@ -927,17 +927,17 @@ body.literature-search-open { overflow: hidden; }
   display:flex;align-items:center;justify-content:center;padding:20px
 }
 .project-modal{
-  width:min(560px,100%);background:var(--surface-card);border:1px solid var(--border);border-radius:16px;
-  box-shadow:var(--shadow-lg);padding:20px 20px 16px;color:var(--text-primary)
+  width:min(560px,100%);max-height:calc(100dvh - 40px);background:var(--surface-card);border:1px solid var(--border);border-radius:16px;
+  box-shadow:var(--shadow-lg);padding:20px 20px 16px;color:var(--text-primary);display:flex;flex-direction:column;overflow:hidden
 }
-.project-modal-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:14px}
+.project-modal-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:14px;flex:0 0 auto}
 .project-modal-head h3{margin:0 0 4px;font-size:1rem}
 .project-modal-head p{margin:0;font-size:.72rem;color:var(--text-muted);line-height:1.6}
 .project-close{border:none;background:transparent;color:var(--text-muted);font-size:1rem;cursor:pointer}
-.project-form{display:flex;flex-direction:column;gap:10px}
+.project-form{display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;padding-right:4px}
 .project-form label{font-size:.68rem;font-weight:600;color:var(--text-secondary)}
 .project-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.project-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap}
+.project-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex:0 0 auto;flex-wrap:wrap}
 .outline-modal{width:min(680px,100%)}
 .outline-modal .ai-textarea{font-family:var(--font-mono);font-size:.74rem;line-height:1.55}
 /* Chapter draft cards */
@@ -2118,7 +2118,7 @@ body.dark #changelogPanel, body:not(.light) #changelogPanel { background: var(--
 .ref-list, .module-area{ min-height:0; overflow-y:auto; }
 #moduleOutput, .module-panel{ min-height:0; overflow:visible; }
 .project-overlay{ overflow-y:auto; }
-.project-modal{ max-height:90vh; overflow:auto; }
+.project-modal{ max-height:calc(100dvh - 40px); }
 .acct-modal{ max-height:82vh; overflow:auto; }
 #mergedPaperRoot, .merged-paper{ overflow:visible; }
 

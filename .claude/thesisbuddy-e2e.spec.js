@@ -36,15 +36,19 @@ test('new user sees two real activation paths and contextual help', async ({ pag
 
   await page.locator('#helpBtn').click();
   await expect(page.locator('#taskGuide')).toBeVisible();
-  await expect(page.locator('#taskGuide')).toContainText('工具如何使用');
+  await expect(page.locator('#taskGuide')).toContainText('找到下一步');
   await page.getByRole('button', { name: '关闭指南' }).click();
 
   await page.getByRole('button', { name: /从想法开始/ }).first().click();
+  await expect(page.locator('#taskGuide')).toContainText('从想法建立论文项目');
+  await page.getByRole('button', { name: '开始创建项目' }).click();
   await expect(page.locator('#ideaWizardOverlay')).toBeVisible();
   await expect(page.locator('#ideaWizardOverlay')).toContainText('从想法创建论文项目');
   await page.locator('#ideaText').fill('研究人工智能辅助工具对研究生论文写作效率与质量的影响');
   await page.locator('#ideaField').fill('教育技术');
   await expect(page.locator('#ideaWizardOverlay')).toContainText('创建项目并开始');
+  await expect(page.locator('#ideaWizardOverlay').getByRole('button', { name: '创建项目并开始' })).toBeVisible();
+  await page.screenshot({ path: 'C:/Users/刘锦烋/AppData/Local/Temp/thesisbuddy-desktop-acceptance.png', fullPage: true });
 
   expect(consoleErrors.filter(error => !error.includes('favicon'))).toEqual([]);
 });
@@ -65,4 +69,5 @@ test('mobile shell exposes four destinations and tool drawer', async ({ page }) 
   await expect(page.locator('#mobileToolDrawerBody')).toContainText('准备');
   await expect(page.locator('#mobileToolDrawerBody')).toContainText('打磨');
   await expect(page.locator('body')).not.toHaveClass(/mobile-overflow/);
+  await page.screenshot({ path: 'C:/Users/刘锦烋/AppData/Local/Temp/thesisbuddy-mobile-acceptance.png', fullPage: true });
 });
