@@ -30,28 +30,19 @@ var AccountModule = (function() {
         if (window.TB && TB.state) TB.state.set('balance', d.points || 0);
       });
   }
-  window.updateBalanceDisplay = updateBalanceDisplay;
-  window.setBalanceDisplay = function(points) {
-    var el = document.getElementById('balanceAmount');
-    if (!el) return;
-    var pts = Number(points || 0);
-    if (!isFinite(pts)) pts = 0;
-    el.textContent = pts.toFixed(3);
-    el.style.color = pts >= 1 ? '#10b981' : (pts > 0 ? '#f59e0b' : '#f87171');
-  };
 
   // ── 充值 ──
   function showRechargeModal() {
     resetRecharge(true);
     var el = document.getElementById('rechargeModal');
-    if (el) el.style.display = 'flex';
+    if (el) { el.classList.remove('hidden'); el.style.display = 'flex'; el.setAttribute('aria-hidden', 'false'); }
     updateBalanceDisplay();
     loadRechargeHistory();
   }
 
   function hideRechargeModal() {
     var el = document.getElementById('rechargeModal');
-    if (el) el.style.display = 'none';
+    if (el) { el.classList.add('hidden'); el.style.display = 'none'; el.setAttribute('aria-hidden', 'true'); }
     resetRecharge(true);
   }
 

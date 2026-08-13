@@ -1,12 +1,13 @@
 /**
  * 论文搭子助手 — 上下文感知对话 + 快捷指令 + Skill 调度
- * Mountable in tool panel or standalone drawer.
  */
 (function() {
   'use strict';
 
   var _messages = [];
   var _container = null;
+  var _conversationId = '';
+  var _projectId = '';
 
   var QUICK_COMMANDS = {
     any: [
@@ -38,72 +39,140 @@
     ]
   };
 
-  function getCurrentStage() {
-    if (window.ThesisProject && ThesisProject.getCurrentProject) {
-      var p = ThesisProject.getCurrentProject();
-      if (p && p.currentStage) return p.currentStage;
-    }
-    return 'any';
+  function currentProject() {
+    return window.ThesisProject && ThesisProject.getCurrentProject ? ThesisProject.getCurrentProject() : null;
   }
 
-  function esc(s) { return String(s||'').replace(/[&<>"']/g, function(c) {
-    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
-  }); }
+  function getCurrentStage() {
+    var project = currentProject();
+    return project && project.currentStage || 'any';
+  }
+
+  function esc(value) {
+    return String(value || '').replace(/[&<>"']/g, function(character) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[character];
+    });
+  }
+
+  function authHeaders() {
+    var token = sessionStorage.getItem('thesis_ai_token') || '';
+    return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+  }
+
+  function conversationKey(projectId) {
+    var user = {};
+    try { user = JSON.parse(sessionStorage.getItem('thesis_ai_user') || '{}'); } catch (e) {}
+    return 'thesisbuddy_conv_' + (user.id || 'guest') + '_' + (projectId || 'none');
+  }
+
+  function loadConversationId(projectId) {
+    try { return localStorage.getItem(conversationKey(projectId)) || ''; } catch (e) { return ''; }
+  }
+
+  function saveConversationId(projectId, conversationId) {
+    _conversationId = conversationId || '';
+    try {
+      if (_conversationId) localStorage.setItem(conversationKey(projectId), _conversationId);
+      else localStorage.removeItem(conversationKey(projectId));
+    } catch (e) {}
+  }
 
   function getContext() {
-    var ctx = [];
-    if (window.ThesisProject && ThesisProject.getCurrentProject) {
-      var p = ThesisProject.getCurrentProject();
-      if (p) {
-        if (p.title) ctx.push('论文题目：' + p.title);
-        if (p.keywords) ctx.push('关键词：' + p.keywords);
-      }
+    var context = [];
+    var project = currentProject();
+    if (project) {
+      if (project.title) context.push('论文题目：' + project.title);
+      if (project.keywords) context.push('关键词：' + project.keywords);
     }
-    if (typeof manuscriptText !== 'undefined' && manuscriptText) {
-      ctx.push('论文全文已加载（' + manuscriptText.length + ' 字）');
-    }
-    return ctx.length ? ctx.join('\n') : null;
+    if (typeof manuscriptText !== 'undefined' && manuscriptText) context.push('论文全文已加载（' + manuscriptText.length + ' 字）');
+    return context.length ? context.join('\n') : null;
+  }
+
+  function renderSources(host, sources) {
+    if (!host || !sources || !sources.length) return;
+    var groups = {};
+    sources.forEach(function(source) {
+      var key = source.source_type || source.document_id || source.material_id || source.filename || source.document || '其他来源';
+      if (!groups[key]) groups[key] = { name: (source.source_type === 'revision' ? '正文版本 · ' : source.source_type === 'legacy_rag' ? '项目资料 · ' : '') + (source.filename || source.document || source.source_name || '项目资料'), items: [] };
+      groups[key].items.push(source);
+    });
+    var section = document.createElement('section');
+    section.className = 'buddy-sources';
+    section.setAttribute('aria-label', '回答来源');
+    section.innerHTML = '<div class="buddy-sources-title">引用依据</div>' + Object.keys(groups).map(function(key) {
+      var group = groups[key];
+      return '<details class="buddy-source-group" open><summary>' + esc(group.name) + ' <span>' + group.items.length + ' 条</span></summary><div>' + group.items.map(function(source, index) {
+        var heading = source.heading || source.section || source.chapter_id || ('片段 ' + ((source.ordinal == null ? index : source.ordinal) + 1));
+        var excerpt = source.excerpt || source.quote || source.text || '';
+        return '<article class="buddy-source-item"><strong>' + esc(heading) + '</strong>' + (excerpt ? '<p>' + esc(excerpt.slice(0, 500)) + '</p>' : '') + '</article>';
+      }).join('') + '</div></details>';
+    }).join('');
+    host.appendChild(section);
+  }
+
+  function appendMessage(role, text, sources) {
+    var body = document.getElementById('buddyMessages');
+    if (!body) return null;
+    var message = document.createElement('div');
+    message.className = 'buddy-msg ' + (role === 'user' ? 'buddy-msg-user' : 'buddy-msg-ai');
+    var bubble = document.createElement('div');
+    bubble.className = 'buddy-msg-bubble';
+    bubble.textContent = text || '';
+    message.appendChild(bubble);
+    renderSources(message, sources);
+    body.appendChild(message);
+    body.scrollTop = body.scrollHeight;
+    return message;
+  }
+
+  function loadConversation(projectId, conversationId) {
+    if (!projectId || !conversationId) return;
+    fetch('/api/assistant/conversations/' + encodeURIComponent(conversationId), { headers: authHeaders() })
+      .then(function(response) { return response.json(); })
+      .then(function(data) {
+        if (!data.success || projectId !== _projectId || conversationId !== _conversationId) return;
+        var body = document.getElementById('buddyMessages');
+        if (!body) return;
+        body.innerHTML = '';
+        _messages = [];
+        (data.messages || []).forEach(function(message) {
+          appendMessage(message.role, message.content || '', message.sources || []);
+          _messages.push({ role: message.role, content: message.content || '' });
+        });
+      }).catch(function() {});
   }
 
   function render(container) {
     _container = container;
     if (!_container) return;
     var stage = getCurrentStage();
-    var cmds = QUICK_COMMANDS[stage] || QUICK_COMMANDS['any'];
-    var all = QUICK_COMMANDS['any'].concat(cmds).slice(0, 5);
-
-    var h = '<div class="buddy-panel">' +
-      '<div class="buddy-chat-body" id="buddyMessages">' +
-        '<div class="buddy-welcome">我会优先使用当前项目、论文版本和资料证据回答；找不到依据时会明确说明。</div>' +
-      '</div>' +
-      '<div class="buddy-quick-row" id="buddyQuickCommands">' +
-        all.map(function(c) {
-          return '<button onclick="BuddyAssistant.quickAsk(\''+c.prompt.replace(/'/g,"\\'")+'\')" class="buddy-quick-btn">'+c.label+'</button>';
-        }).join('') +
-      '</div>' +
-      '<div class="buddy-input-row">' +
-        '<textarea id="buddyInput" rows="2" placeholder="例如：总结当前章节；下一步做什么；这段有证据支撑吗？"></textarea>' +
-        '<button onclick="BuddyAssistant.ask()" class="ai-btn" style="padding:8px 16px;font-size:12px">发送</button>' +
-      '</div>' +
-      '</div>';
-    _container.innerHTML = h;
+    var commands = QUICK_COMMANDS[stage] || QUICK_COMMANDS.any;
+    var all = QUICK_COMMANDS.any.concat(commands).slice(0, 5);
+    _container.innerHTML = '<div class="buddy-panel">' +
+      '<div class="buddy-chat-body" id="buddyMessages"><div class="buddy-welcome">我会优先使用当前项目、论文版本和资料证据回答；找不到依据时会明确说明。</div></div>' +
+      '<div class="buddy-quick-row" id="buddyQuickCommands">' + all.map(function(command) {
+        return '<button onclick="BuddyAssistant.quickAsk(\'' + command.prompt.replace(/'/g, "\\'") + '\')" class="buddy-quick-btn">' + command.label + '</button>';
+      }).join('') + '</div>' +
+      '<div class="buddy-input-row"><textarea id="buddyInput" rows="2" placeholder="例如：总结当前章节；下一步做什么；这段有证据支撑吗？"></textarea><button onclick="BuddyAssistant.ask()" class="ai-btn" style="padding:8px 16px;font-size:12px">发送</button></div></div>';
     _messages = [];
+    var project = currentProject();
+    _projectId = project && project.id || '';
+    _conversationId = loadConversationId(_projectId);
+    if (_conversationId) loadConversation(_projectId, _conversationId);
   }
 
   function renderQuickCmds() {
-    var el = document.getElementById('buddyQuickCommands');
-    if (!el) return;
-    var stage = getCurrentStage();
-    var cmds = QUICK_COMMANDS[stage] || QUICK_COMMANDS['any'];
-    var all = QUICK_COMMANDS['any'].concat(cmds).slice(0, 5);
-    el.innerHTML = all.map(function(c) {
-      return '<button onclick="BuddyAssistant.quickAsk(\''+c.prompt.replace(/'/g,"\\'")+'\')" class="buddy-quick-btn">'+c.label+'</button>';
+    var element = document.getElementById('buddyQuickCommands');
+    if (!element) return;
+    var commands = QUICK_COMMANDS[getCurrentStage()] || QUICK_COMMANDS.any;
+    element.innerHTML = QUICK_COMMANDS.any.concat(commands).slice(0, 5).map(function(command) {
+      return '<button onclick="BuddyAssistant.quickAsk(\'' + command.prompt.replace(/'/g, "\\'") + '\')" class="buddy-quick-btn">' + command.label + '</button>';
     }).join('');
   }
 
   function quickAsk(prompt) {
     var input = document.getElementById('buddyInput');
-    if (input) { input.value = prompt; }
+    if (input) input.value = prompt;
     ask();
   }
 
@@ -113,55 +182,67 @@
     var question = input.value.trim();
     if (!question) return;
     input.value = '';
-
-    var body = document.getElementById('buddyMessages');
-    if (!body) return;
-
     _messages.push({ role: 'user', content: question });
-    body.innerHTML += '<div class="buddy-msg buddy-msg-user"><div class="buddy-msg-bubble">'+esc(question)+'</div></div>';
+    appendMessage('user', question);
+    var pending = appendMessage('assistant', '正在检索当前项目证据…');
+    var pendingBubble = pending && pending.querySelector('.buddy-msg-bubble');
+    var project = currentProject();
+    var context = getContext();
+    var request;
 
-    var loadingId = 'buddyLoading_' + Date.now();
-    body.innerHTML += '<div class="buddy-msg buddy-msg-ai" id="'+loadingId+'"><div class="buddy-msg-bubble"><div class="ai-loading" style="padding:10px;font-size:12px">搭子思考中...</div></div></div>';
-    body.scrollTop = body.scrollHeight;
-
-    var token = sessionStorage.getItem('thesis_ai_token') || '';
-    var ctx = getContext();
-    fetch('/api/llm/chat', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ messages: _messages, max_tokens: 800,
-        system_prompt: '你是"论文搭子"，一个专业的学术写作助手。你会根据用户当前的论文上下文提供具体、有针对性的建议。回答简洁（200字以内），如果用户需要详细分析你会主动提出。' + (ctx ? '\n\n当前上下文：\n' + ctx : '')
-      })
-    }).then(function(r) { return r.json(); })
-      .then(function(d) {
-        var loadingEl = document.getElementById(loadingId);
-        if (loadingEl) loadingEl.remove();
-        if (d.success) {
-          _messages.push({ role: 'assistant', content: d.content });
-          body.innerHTML += '<div class="buddy-msg buddy-msg-ai"><div class="buddy-msg-bubble">'+d.content.replace(/</g,'&lt;')+'</div></div>';
-        } else {
-          body.innerHTML += '<div class="buddy-msg buddy-msg-ai"><div class="buddy-msg-bubble" style="color:var(--danger)">' + esc(d.error||'请求失败') + '</div></div>';
-        }
-        body.scrollTop = body.scrollHeight;
-        if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
-      }).catch(function() {
-        var loadingEl = document.getElementById(loadingId);
-        if (loadingEl) loadingEl.remove();
-        body.innerHTML += '<div class="buddy-msg buddy-msg-ai"><div class="buddy-msg-bubble" style="color:var(--danger)">网络错误，请稍后重试</div></div>';
-        body.scrollTop = body.scrollHeight;
+    if (project && project.id) {
+      var revisionId = project.activeRevisionId || window._activeRevisionId || '';
+      request = fetch('/api/assistant/query', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          project_id: project.id,
+          question: question,
+          revision_id: revisionId,
+          module_id: window._activeModuleId || document.body.getAttribute('data-active-module') || '',
+          conversation_id: _conversationId || undefined,
+          idempotency_key: 'buddy_' + Date.now()
+        })
       });
+    } else {
+      request = fetch('/api/llm/chat', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          messages: _messages,
+          max_tokens: 800,
+          system_prompt: '你是“论文搭子”，一个专业的学术写作助手。回答简洁具体；如果缺少项目证据，要明确说明。' + (context ? '\n\n当前上下文：\n' + context : '')
+        })
+      });
+    }
+
+    request.then(function(response) {
+      return response.json().then(function(data) {
+        if (!response.ok || data.success === false) throw new Error(data.error || '请求失败');
+        return data;
+      });
+    }).then(function(data) {
+      var answer = data.answer || data.content || '没有找到可用回答';
+      if (pendingBubble) pendingBubble.textContent = answer;
+      renderSources(pending, data.sources || []);
+      _messages.push({ role: 'assistant', content: answer });
+      if (project && project.id && data.conversation_id) saveConversationId(project.id, data.conversation_id);
+      if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
+    }).catch(function(error) {
+      if (pendingBubble) pendingBubble.textContent = '暂时无法回答：' + error.message;
+    });
   }
 
-  // Keyboard shortcut: Ctrl+B
-  document.addEventListener('keydown', function(e) {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
-      e.preventDefault();
-      if (typeof Nav !== 'undefined') { Nav.switchToolTab('buddy'); Nav.toggleToolPanel(); }
+  document.addEventListener('keydown', function(event) {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'b') {
+      event.preventDefault();
+      if (window.ThesisRouter && ThesisRouter.go) ThesisRouter.go('buddy');
     }
   });
 
   window.BuddyAssistant = { mount: render, ask: ask, quickAsk: quickAsk, refresh: renderQuickCmds };
   window.openBuddyAssistant = function() {
-    if (typeof Nav !== 'undefined') { Nav.switchToolTab('buddy'); Nav.toggleToolPanel(); }
+    if (window.ThesisRouter && ThesisRouter.go) return ThesisRouter.go('buddy');
   };
   window.askBuddyAssistant = ask;
 })();

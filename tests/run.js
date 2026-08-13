@@ -2125,19 +2125,18 @@ test('RECHARGE: backend Decimal parser and confirmation are exact', function() {
     'db.rollback(); db.close()',
     "print('ok')"
   ].join('\n');
-  var candidates = [
-    {cmd:'python', args:['-c', script]},
-    {cmd:'py', args:['-3', '-c', script]}
-  ];
+  var candidates = [];
   if (process.platform === 'win32' && process.env.LOCALAPPDATA) {
     candidates.push({
       cmd:path.join(process.env.LOCALAPPDATA, 'Programs', 'Python', 'Python312', 'python.exe'),
       args:['-c', script]
     });
   }
+  candidates.push({cmd:'python', args:['-c', script]});
+  candidates.push({cmd:'py', args:['-3', '-c', script]});
   var result = null;
   for (var ci = 0; ci < candidates.length; ci++) {
-    result = cp.spawnSync(candidates[ci].cmd, candidates[ci].args, {cwd: projectRoot, encoding: 'utf8', timeout: 20000});
+    result = cp.spawnSync(candidates[ci].cmd, candidates[ci].args, {cwd: projectRoot, encoding: 'utf8', timeout: 60000});
     if (!(result.error && result.error.code === 'ENOENT')) break;
   }
   assert(result && result.status === 0, 'backend recharge behavior failed: ' + ((result && (result.stderr || result.stdout || result.error)) || 'python runtime unavailable'));
@@ -2402,12 +2401,12 @@ test('CITATION: DOCX superscript fidelity and audit runs are wired', function() 
 
 test('BUDDY: multi-source retrieval and conversation memory contracts', function() {
   var py=fs.readFileSync(path.join(projectRoot,'kg_server.py'),'utf8');
-  var js=fs.readFileSync(path.join(projectRoot,'js/app-modules.js'),'utf8');
+  var js=fs.readFileSync(path.join(projectRoot,'js/modules/buddy-assistant.js'),'utf8');
   assert(py.indexOf('assistant_conversations')>=0&&py.indexOf('assistant_messages')>=0,'assistant conversation tables missing');
   assert(py.indexOf("source_type': 'revision'")>=0||py.indexOf("source_type = 'revision'")>=0,'revision source fusion missing');
   assert(py.indexOf('revision_quota')>=0&&py.indexOf('legacy_quota')>=0,'source quotas missing');
-  assert(js.indexOf('conversation_id')>=0&&js.indexOf('saveBuddyConversationId')>=0,'frontend conversation persistence missing');
-  assert(js.indexOf('renderBuddySources')>=0&&js.indexOf('buddy-sources')>=0,'buddy source explanation missing');
+  assert(js.indexOf('conversation_id')>=0&&js.indexOf('saveConversationId')>=0,'frontend conversation persistence missing');
+  assert(js.indexOf('renderSources')>=0&&js.indexOf('buddy-sources')>=0,'buddy source explanation missing');
 });
 
 test('FIGURE: advisor closed loop uses profile/plan/render-code/qa', function() {

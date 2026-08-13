@@ -110,7 +110,7 @@
       <div class="topbar-dropdown" id="accountDropdown" style="display:none">
         <button onclick="openAccountCenter();toggleAccountMenu()">账户中心</button>
         <button onclick="openAccountCenter();setTimeout(function(){switchAcctTab('tx')},200);toggleAccountMenu()">消费明细</button>
-        <button onclick="openAccountCenter();setTimeout(function(){switchAcctTab('orders')},200);toggleAccountMenu()">使用说明</button>
+        <button onclick="openAccountCenter();setTimeout(function(){switchAcctTab('orders')},200);toggleAccountMenu()">充值订单</button>
         <button onclick="openThemeStudio();toggleAccountMenu()">外观设置</button>
         <button onclick="toggleChangelog();toggleAccountMenu()">更新日志</button>
         <hr>
@@ -444,7 +444,6 @@ function toggleChangelog(){var p=document.getElementById('changelogPanel');var o
     // 用户侧统一按“点”展示，固定 6 位小数；不暴露
     return n.toFixed(3);
   };
-  window.formatPoints=function(p){ p=Number(p||0); if(!isFinite(p)) p=0; return p.toFixed(3); }
   var _balanceRefreshTimer=null,_balanceRefreshInFlight=false,_balanceRefreshMs=30000;
   window.setBalanceDisplay=function(points){
     var balEl=document.getElementById('balanceAmount');if(!balEl)return;
@@ -550,7 +549,7 @@ function toggleChangelog(){var p=document.getElementById('changelogPanel');var o
   window.showRechargeModal = function() {
     resetRechargePaymentStep(true);
     var el = document.getElementById('rechargeModal');
-    if (el) el.style.display = 'flex';
+    if (el) { el.classList.remove('hidden'); el.style.display = 'flex'; el.setAttribute('aria-hidden', 'false'); }
     if (!window._selectedPayment) window._selectedPayment = 'alipay';
     updateRechargeBalance();
     loadRechargeHistory();
@@ -558,7 +557,7 @@ function toggleChangelog(){var p=document.getElementById('changelogPanel');var o
   };
   window.hideRechargeModal = function() {
     var el = document.getElementById('rechargeModal');
-    if (el) el.style.display = 'none';
+    if (el) { el.classList.add('hidden'); el.style.display = 'none'; el.setAttribute('aria-hidden', 'true'); }
     resetRechargePaymentStep(true);
   };
   window.fillRechargeAmount = function(amount) {
@@ -806,10 +805,10 @@ function toggleChangelog(){var p=document.getElementById('changelogPanel');var o
 </script>
 
 <!-- ====== 充值弹窗 ====== -->
-<div id="rechargeModal" class="modal-overlay hidden" style="display:none" onclick="hideRechargeModal()">
+<div id="rechargeModal" class="modal-overlay hidden" style="display:none" role="dialog" aria-modal="true" aria-labelledby="rechargeModalTitle" aria-hidden="true" onclick="hideRechargeModal()">
   <div class="modal-card" style="width:520px;max-width:96%;max-height:85vh;overflow-y:auto;padding:24px" onclick="event.stopPropagation()">
     <div class="modal-header">
-      <h3 class="modal-header-title">充值</h3>
+      <h3 class="modal-header-title" id="rechargeModalTitle">充值</h3>
       <button class="modal-close" onclick="hideRechargeModal()">&times;</button>
     </div>
     <p style="font-size:var(--font-size-md);color:var(--text-muted);margin:0 0 8px">当前余额: <strong id="rechargeBalance" style="color:var(--text-primary)">0.00</strong> 点</p>
@@ -853,11 +852,11 @@ function toggleChangelog(){var p=document.getElementById('changelogPanel');var o
 </div>
 
 <!-- ====== 账户中心 ====== -->
-<div id="accountCenterMask" class="modal-overlay hidden" style="display:none" onclick="closeAccountCenter()">
+<div id="accountCenterMask" class="modal-overlay hidden" style="display:none" role="dialog" aria-modal="true" aria-labelledby="accountCenterTitle" aria-hidden="true" onclick="closeAccountCenter()">
   <div id="accountCenter" class="modal-card" style="width:min(920px,96vw);max-height:88vh" onclick="event.stopPropagation()">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border,#e5e7eb)">
       <div>
-        <b style="font-size:1rem;color:var(--text-primary,#111)">账户中心</b>
+        <b id="accountCenterTitle" style="font-size:1rem;color:var(--text-primary,#111)">账户中心</b>
         <span id="acctUserMeta" style="margin-left:10px;font-size:.72rem;color:var(--text-muted,#888)"></span>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
@@ -917,7 +916,9 @@ function toggleChangelog(){var p=document.getElementById('changelogPanel');var o
   window.openAccountCenter = function() {
     var mask = document.getElementById('accountCenterMask');
     if (!mask) return;
+    mask.classList.remove('hidden');
     mask.style.display = 'flex';
+    mask.setAttribute('aria-hidden', 'false');
     var token = sessionStorage.getItem('thesis_ai_token');
     if (!token) { document.getElementById('acctBody').innerHTML = '请先登录'; return; }
     document.getElementById('acctBody').innerHTML = '<div style="padding:20px;color:#999">加载中…</div>';
@@ -941,7 +942,7 @@ function toggleChangelog(){var p=document.getElementById('changelogPanel');var o
   };
   window.closeAccountCenter = function(){
     var mask = document.getElementById('accountCenterMask');
-    if (mask) mask.style.display = 'none';
+    if (mask) { mask.classList.add('hidden'); mask.style.display = 'none'; mask.setAttribute('aria-hidden', 'true'); }
   };
   window.switchAcctTab = function(tab){
     _acctTab = tab || 'tx';
@@ -1043,7 +1044,6 @@ function showPricingInfo(){ openAccountCenter(); setTimeout(function(){ switchAc
 </div><script defer src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/simple-statistics@7.8.0/dist/simple-statistics.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/diff-match-patch@1.0.5/index.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
 <script defer src="js/core/utils.js?v=91"></script>
 <script defer src="js/core/api.js?v=91"></script>

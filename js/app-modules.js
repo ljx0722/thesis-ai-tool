@@ -2183,39 +2183,13 @@ function renderBuddySources(host,sources){
   host.appendChild(section);
 }
 function openBuddyAssistant(){
-  var d=document.getElementById('buddyDrawer');d.classList.add('open');d.setAttribute('aria-hidden','false');document.getElementById('buddyBackdrop').classList.add('open');
-  var p=window.ThesisProject&&ThesisProject.getCurrentProject?ThesisProject.getCurrentProject():null;
-  var ctx=document.getElementById('buddyContext');if(ctx)ctx.textContent=p?(p.title+' · '+(p.currentStage||'进行中')):'尚未选择项目';
-  var host=document.getElementById('buddyMessages');
-  var projectId=p&&p.id||'';
-  var nextId=loadBuddyConversationId(projectId);
-  if(nextId!==_buddyConversationId){
-    _buddyConversationId=nextId;
-    _buddyConversation=[];
-    if(host)host.innerHTML='';
-  }
-  if(_buddyConversationId&&projectId&&(!_buddyConversation||!_buddyConversation.length)){
-    fetch('/api/assistant/conversations/'+encodeURIComponent(_buddyConversationId),{headers:authJsonHeaders()}).then(function(r){return r.json();}).then(function(d){
-      if(!d.success)return;
-      _buddyConversation=[];
-      if(host)host.innerHTML='';
-      (d.messages||[]).forEach(function(m){
-        var kind=m.role==='user'?'user':'assistant';
-        var el=appendBuddyMessage(m.content||'',kind);
-        if(kind==='assistant'&&m.sources&&m.sources.length)renderBuddySources(el,m.sources);
-        _buddyConversation.push({role:m.role,content:m.content||''});
-      });
-    }).catch(function(){});
-  }
-  setTimeout(function(){document.getElementById('buddyInput').focus();},100);
+  if(window.ThesisRouter&&ThesisRouter.go)return ThesisRouter.go('buddy');
 }
-function closeBuddyAssistant(){var d=document.getElementById('buddyDrawer');d.classList.remove('open');d.setAttribute('aria-hidden','true');document.getElementById('buddyBackdrop').classList.remove('open');}
-function appendBuddyMessage(text,kind){var host=document.getElementById('buddyMessages');var el=document.createElement('div');el.className='buddy-message '+(kind||'assistant');el.textContent=text;host.appendChild(el);host.scrollTop=host.scrollHeight;return el;}
+function closeBuddyAssistant(){
+  if(window.ThesisRouter&&ThesisRouter.current&&ThesisRouter.current.surface==='buddy')return ThesisRouter.go('home');
+}
 function askBuddyAssistant(){
-  var input=document.getElementById('buddyInput'),q=(input.value||'').trim();if(!q)return;if(!ensureLoggedIn())return;input.value='';appendBuddyMessage(q,'user');var pending=appendBuddyMessage('正在检索当前项目证据…','assistant');var p=window.ThesisProject&&ThesisProject.getCurrentProject?ThesisProject.getCurrentProject():null;
-  var projectContext=p?('项目：'+p.title+'\n阶段：'+(p.currentStage||'')+'\n想法：'+(p.idea||'')+'\n'):'';var chapter=getBuddyChapterContext(p);var revisionId=p&&p.activeRevisionId||window._activeRevisionId||'';var moduleId=window._activeModuleId||document.body.getAttribute('data-active-module')||'';_buddyConversation.push({role:'user',content:q});
-  var conversationId=_buddyConversationId||loadBuddyConversationId(p&&p.id||'');
-  fetch('/api/assistant/query',{method:'POST',headers:authJsonHeaders(),body:JSON.stringify({project_id:p&&p.id,question:q,context:projectContext,revision:revisionId,revision_id:revisionId,module:moduleId,module_id:moduleId,chapter:chapter,selection:getBuddySelection(),conversation_id:conversationId||undefined,conversation:_buddyConversation.slice(-12),idempotency_key:'buddy_'+Date.now()})}).then(function(r){return r.json().then(function(d){return{status:r.status,data:d};});}).then(function(x){var d=x.data||{};if(!d.success)throw new Error(d.error||'回答失败');pending.textContent=d.answer||d.content||'没有找到可用回答';_buddyConversation.push({role:'assistant',content:pending.textContent}); if(d.conversation_id)saveBuddyConversationId(p&&p.id||'',d.conversation_id); if(d.sources&&d.sources.length)renderBuddySources(pending,d.sources);if(d.usage&&d.usage.cost_points!=null)document.getElementById('buddyCostHint').textContent='本次回答已按实际使用量计费';if(typeof updateBalanceDisplay==='function')updateBalanceDisplay();}).catch(function(e){pending.textContent='暂时无法回答：'+e.message;});
+  if(window.BuddyAssistant&&BuddyAssistant.ask)return BuddyAssistant.ask();
 }
 window.openBuddyAssistant=openBuddyAssistant;window.closeBuddyAssistant=closeBuddyAssistant;window.askBuddyAssistant=askBuddyAssistant;window.openThemeStudio=openThemeStudio;window.closeThemeStudio=closeThemeStudio;window.previewPreferences=previewPreferences;window.savePreferences=savePreferences;window.resetPreferences=resetPreferences;window.reloadBuddyPreferences=reloadBuddyPreferences;window.openContextHelp=openContextHelp;
 try{applyPreferences(loadPreferences());}catch(e){}

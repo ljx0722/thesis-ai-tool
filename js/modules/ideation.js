@@ -284,21 +284,20 @@ var IdeationModule = (function() {
 
   // ── Socratic Mode ──
   function startSocratic() {
-    // Signal to Claude Code to start academic-paper plan mode
     if (typeof window._startSocraticMode === 'function') {
       window._startSocraticMode();
       return;
     }
-    // Fallback: open buddy assistant with a pre-filled prompt
-    if (typeof openBuddyAssistant === 'function') {
-      openBuddyAssistant();
+    if (window.ThesisRouter && ThesisRouter.go) {
+      ThesisRouter.go('buddy');
       var input = document.getElementById('buddyInput');
       if (input) {
         input.value = '请用Socratic对话方式引导我规划论文。我的研究方向是：' + (_state.domain || '待定');
+        input.focus();
       }
-    } else {
-      alert('Socratic引导模式将在搭子助手中启动。你可以直接在对话中说："引导我规划论文"。');
+      return;
     }
+    alert('Socratic引导模式将在搭子助手中启动。你可以直接在对话中说："引导我规划论文"。');
   }
 
   // ── Public API ──

@@ -380,16 +380,45 @@
 
     h += '</div>';
 
-    // Show in tool drawer
     var drawer = document.getElementById('toolDrawer');
+    var backdrop = document.getElementById('toolDrawerBackdrop');
     if (!drawer) {
+      backdrop = document.createElement('div');
+      backdrop.id = 'toolDrawerBackdrop';
+      backdrop.className = 'tool-drawer-backdrop';
+      backdrop.setAttribute('aria-hidden', 'true');
+      backdrop.onclick = function () { closeToolDrawer(); };
+      document.body.appendChild(backdrop);
       drawer = document.createElement('div'); drawer.id = 'toolDrawer'; drawer.className = 'tool-drawer';
-      drawer.innerHTML = '<div class="tool-drawer-head"><span id="toolDrawerTitle">段落审阅</span><button onclick="this.parentElement.parentElement.classList.remove(\'open\')" style="border:none;background:none;font-size:18px;cursor:pointer;color:#94a3b8">&times;</button></div><div class="tool-drawer-body" id="toolDrawerBody"></div>';
+      drawer.setAttribute('role', 'dialog');
+      drawer.setAttribute('aria-modal', 'true');
+      drawer.setAttribute('aria-labelledby', 'toolDrawerTitle');
+      drawer.setAttribute('aria-hidden', 'true');
+      drawer.innerHTML = '<div class="tool-drawer-head"><span id="toolDrawerTitle">段落审阅</span><button type="button" aria-label="关闭段落审阅" onclick="closeToolDrawer()">&times;</button></div><div class="tool-drawer-body" id="toolDrawerBody"></div>';
       document.body.appendChild(drawer);
     }
+    function closeToolDrawer() {
+      var currentDrawer = document.getElementById('toolDrawer');
+      var currentBackdrop = document.getElementById('toolDrawerBackdrop');
+      if (currentDrawer) { currentDrawer.classList.remove('open'); currentDrawer.setAttribute('aria-hidden', 'true'); }
+      if (currentBackdrop) { currentBackdrop.classList.remove('open'); currentBackdrop.setAttribute('aria-hidden', 'true'); }
+    }
+    window.closeToolDrawer = closeToolDrawer;
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      var d = document.getElementById('toolDrawer');
+      if (d && d.classList.contains('open')) closeToolDrawer();
+    }
+  });
     drawer.classList.add('open');
+    drawer.setAttribute('aria-hidden', 'false');
+    if (backdrop) { backdrop.classList.add('open'); backdrop.setAttribute('aria-hidden', 'false'); }
     document.getElementById('toolDrawerTitle').textContent = '段落审阅 #'+(parseInt(el.getAttribute('data-para-index')||'0')+1);
     document.getElementById('toolDrawerBody').innerHTML = h;
+    setTimeout(function () {
+      var close = drawer.querySelector('.tool-drawer-head button');
+      if (close) close.focus();
+    }, 0);
   };
 
   window.ThesisAuditor = {

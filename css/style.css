@@ -478,7 +478,7 @@ body.is-resizing, body.is-resizing * { cursor: col-resize !important; user-selec
   background: var(--surface-overlay);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  z-index: 9999;
+  z-index: var(--z-loading);
   display: none;
   flex-direction: column;
   align-items: center;
@@ -572,7 +572,7 @@ body.is-resizing, body.is-resizing * { cursor: col-resize !important; user-selec
 .workspace-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 99998;
+  z-index: var(--z-modal);
   align-items: center;
   justify-content: center;
   padding: 24px;
@@ -2113,7 +2113,7 @@ body.dark #changelogPanel, body:not(.light) #changelogPanel { background: var(--
 .nav-tools-details{ flex:0 0 auto; max-height:28vh; overflow:auto; }
 
 .thesis-box{ overflow-y:auto; overflow-x:hidden; min-height:0; -webkit-overflow-scrolling:touch; }
-.workspace-content{ min-height:100%; height:auto; overflow:visible; align-items:flex-start; }
+.workspace-content{ min-height:100%; height:auto; overflow:visible; }
 .ref-panel{ min-height:0; overflow:hidden; display:flex; flex-direction:column; }
 .ref-list, .module-area{ min-height:0; overflow-y:auto; }
 #moduleOutput, .module-panel{ min-height:0; overflow:visible; }
@@ -2241,8 +2241,6 @@ body.dark #changelogPanel, body:not(.light) #changelogPanel { background: var(--
   width:100%;
   box-sizing:border-box;
   overflow:visible !important;
-  height:auto !important;
-  min-height:0 !important;
   max-height:none !important;
 }
 .tool-panel,

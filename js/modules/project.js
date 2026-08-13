@@ -3254,7 +3254,7 @@ function closeChapterOverlays() {
       '<div class="project-modal-actions">' +
       '<button class="ai-btn-clear" onclick="closeDefensePack()">关闭</button>' +
       '<button class="ai-btn-clear" onclick="downloadDefensePack()">下载TXT</button>' +
-      '<button class="ai-btn" onclick="window._openDefensePpt&&window._openDefensePpt();">打开答辩PPT模块</button>' +
+      '<button class="ai-btn" onclick="closeDefensePack();ThesisRouter.openModule(\'defense-ppt\');">打开答辩PPT模块</button>' +
       '</div></div>';
     ov.onclick = function(){ closeDefensePack(); };
     document.body.appendChild(ov);

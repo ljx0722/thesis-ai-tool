@@ -3050,6 +3050,12 @@ function alignDocxParagraphs(xmlEntries,domEntries){
   }
   window.beginImportFile=beginImportFile;
   fi.addEventListener('change',function(e){var file=e.target.files[0];e.target.value='';beginImportFile(file,window._importIntent||'new').catch(function(err){console.error('[import change]',err);});});
+  var drop=document.getElementById('uploadDrop');
+  if(drop){
+    ['dragenter','dragover'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();drop.classList.add('dragover');},false);});
+    ['dragleave','drop'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();drop.classList.remove('dragover');},false);});
+    drop.addEventListener('drop',function(e){var files=e.dataTransfer&&e.dataTransfer.files;if(files&&files.length)beginImportFile(files[0],window._importIntent||'new').catch(function(err){console.error('[import drop]',err);});},false);
+  }
   async function parseImportedFile(f,importId){
     if(!f)return;
     var importSnapshot={

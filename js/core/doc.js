@@ -35,26 +35,16 @@
   };
 
   // ── 兼容旧全局变量的 getter/setter ──
-  Object.defineProperty(window, 'manuscriptText', {
-    get: function(){ return _doc.text; },
-    set: function(v){ _doc.text = v || ''; }
-  });
-  Object.defineProperty(window, 'manuscriptHTML', {
-    get: function(){ return _doc.html; },
-    set: function(v){ _doc.html = v || ''; }
-  });
-  Object.defineProperty(window, 'existingRefs', {
-    get: function(){ return _doc.references; },
-    set: function(v){ _doc.references = v || []; }
-  });
-  Object.defineProperty(window, 'mergedRefs', {
-    get: function(){ return _doc.references; },
-    set: function(v){ _doc.references = v || []; }
-  });
-  Object.defineProperty(window, 'paperTopics', {
-    get: function(){ return _doc.topics; },
-    set: function(v){ _doc.topics = v || []; }
-  });
+  function defineGlobal(name, getter, setter) {
+    try {
+      Object.defineProperty(window, name, { configurable: true, get: getter, set: setter });
+    } catch (e) {}
+  }
+  defineGlobal('manuscriptText', function(){ return _doc.text; }, function(v){ _doc.text = v || ''; });
+  defineGlobal('manuscriptHTML', function(){ return _doc.html; }, function(v){ _doc.html = v || ''; });
+  defineGlobal('existingRefs', function(){ return _doc.references; }, function(v){ _doc.references = v || []; });
+  defineGlobal('mergedRefs', function(){ return _doc.references; }, function(v){ _doc.references = v || []; });
+  defineGlobal('paperTopics', function(){ return _doc.topics; }, function(v){ _doc.topics = v || []; });
 
   // ── 句子查找 ──
   function getSentence(id) {

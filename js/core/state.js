@@ -85,25 +85,15 @@ var TB = window.TB || {};
 
   // ── 兼容旧代码的全局变量 ──
   // 旧代码大量使用这些全局变量，需要保持同步
-  Object.defineProperty(window, 'manuscriptText', {
-    get: function() { return _state.manuscript.text; },
-    set: function(v) { _state.manuscript.text = v || ''; }
-  });
-  Object.defineProperty(window, 'manuscriptHTML', {
-    get: function() { return _state.manuscript.html; },
-    set: function(v) { _state.manuscript.html = v || ''; }
-  });
-  Object.defineProperty(window, 'sections', {
-    get: function() { return _state.manuscript.sections; },
-    set: function(v) { _state.manuscript.sections = v || []; }
-  });
-  Object.defineProperty(window, 'existingRefs', {
-    get: function() { return _state.manuscript.refs; },
-    set: function(v) { _state.manuscript.refs = v || []; }
-  });
-  Object.defineProperty(window, 'paperTopics', {
-    get: function() { return _state.manuscript.topics; },
-    set: function(v) { _state.manuscript.topics = v || []; }
-  });
+  function defineGlobal(name, getter, setter) {
+    try {
+      Object.defineProperty(window, name, { configurable: true, get: getter, set: setter });
+    } catch (e) {}
+  }
+  defineGlobal('manuscriptText', function() { return _state.manuscript.text; }, function(v) { _state.manuscript.text = v || ''; });
+  defineGlobal('manuscriptHTML', function() { return _state.manuscript.html; }, function(v) { _state.manuscript.html = v || ''; });
+  defineGlobal('sections', function() { return _state.manuscript.sections; }, function(v) { _state.manuscript.sections = v || []; });
+  defineGlobal('existingRefs', function() { return _state.manuscript.refs; }, function(v) { _state.manuscript.refs = v || []; });
+  defineGlobal('paperTopics', function() { return _state.manuscript.topics; }, function(v) { _state.manuscript.topics = v || []; });
 
 })();

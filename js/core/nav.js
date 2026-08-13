@@ -131,7 +131,7 @@
   function renderTools() {
     var host = document.getElementById('toolCatalogSurface');
     if (!host || !window.ThesisCapabilities) return;
-    var html = '<div class="catalog-head"><div><h2>全部工具</h2><p>按论文阶段查找能力。打开工具只检查可用性，实际执行时才计点。</p></div><button type="button" class="btn btn-ghost" onclick="ThesisRouter.openMobileToolDrawer()">筛选工具</button></div>';
+    var html = '<div class="catalog-head"><div><h2>全部工具</h2><p>按论文阶段查找能力。打开工具只检查可用性，实际执行时才计点。</p></div><button type="button" class="btn btn-ghost catalog-mobile-filter" onclick="ThesisRouter.openMobileToolDrawer()">筛选工具</button></div>';
     ThesisCapabilities.milestones.forEach(function (ms) {
       var items = ThesisCapabilities.forMilestone(ms.id);
       html += '<section class="catalog-section"><div class="catalog-section-head"><span class="catalog-step">' + ms.icon + '</span><div><h3>' + ms.name + '</h3><p>' + ms.description + '</p></div></div><div class="catalog-list">';
